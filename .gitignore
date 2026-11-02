@@ -25,9 +25,9 @@ web/*.tsbuildinfo
 .env.*
 !.env.example
 configs/config.local.yaml
-artifacts/
-data/
-tmp/
+/artifacts/
+/data/
+/tmp/
 *.log
 .DS_Store
 
