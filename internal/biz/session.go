@@ -41,6 +41,9 @@ func (uc *SessionUsecase) ValidateSession(ctx context.Context, raw string) (Acto
 		return ActorContext{}, ErrDependency
 	}
 	session.ActiveRoleIDs = roles
+	if userRoles, rerr := uc.Users.RolesForUser(ctx, nil, user.ID); rerr == nil {
+		user.Roles = userRoles
+	}
 	idle := uc.IdleTimeout
 	_ = uc.Sessions.Touch(ctx, nil, session.ID, now, now.Add(idle))
 	return ActorContext{
