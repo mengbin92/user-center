@@ -1,0 +1,11 @@
+.git
+bin
+data
+artifacts
+web/node_modules
+web/dist
+web/coverage
+web/test-results
+*.log
+.env
+.DS_Store

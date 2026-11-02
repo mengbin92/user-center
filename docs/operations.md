@@ -1,0 +1,137 @@
+# 运维手册
+
+## 1. 前置条件
+
+- MySQL 8.x（生产唯一验收数据库）、Redis 7.x（推荐；不可用时退化为进程内存储）。
+- HTTPS 反向代理（Nginx/Caddy/网关），负责 TLS、请求体上限、基础 WAF。
+- 独立数据库账号；生产账号不应具备跨库读取或 DDL 权限（DDL 由 `migrate` 专用账号执行）。
+
+## 2. 密钥
+
+| 环境变量 | 用途 |
+|---|---|
+| `SESSION_SECRET` | 验证码 HMAC 与内部签名材料；变更会使未完成验证码失效 |
+| `CSRF_SECRET` | 保留给签名型 CSRF 扩展；当前双提交不依赖它，但生产必须设置 |
+| `MFA_ENCRYPTION_KEY` | TOTP secret AES-GCM 密钥；**丢失将无法解密现有 MFA** |
+| `USER_CENTER_INTEGRATION_TOKEN` | 内部 gRPC 调用方 Bearer 令牌；为空时内部 API 不鉴权（仅开发） |
+| `COOKIE_SECURE` | 生产 `true` |
+| `COOKIE_DOMAIN` | 门户域名；留空表示 host-only |
+| `PUBLIC_BASE_URL` | 邮件链接基址 |
+
+生成：
+
+```bash
+openssl rand -base64 48   # 每个密钥单独生成
+```
+
+密钥只通过环境变量/密钥管理注入，不写入镜像、Compose 文件或 Git。轮换 `MFA_ENCRYPTION_KEY` 需要先离线解密再以新密钥重加密；当前未内置批量轮换工具，轮换前必须演练。
+
+## 3. 部署
+
+```bash
+cd deployments/docker-compose
+cp .env.example .env
+# 编辑 .env：MYSQL_PASSWORD、SESSION_SECRET、CSRF_SECRET、MFA_ENCRYPTION_KEY、PUBLIC_BASE_URL、COOKIE_SECURE
+docker compose up -d --build
+docker compose ps
+docker compose logs -f user-center
+```
+
+顺序：`mysql` 健康 → `migrate` 一次性执行（DDL + 权限目录）→ `user-center` 启动 → `redis` 健康。
+
+首次初始化 root：
+
+```bash
+docker compose run --rm user-center /app/admin-rescue \
+  -config /app/configs/config.docker.yaml -action bootstrap \
+  -username root -password '...' -email root@example.com
+```
+
+或在 `.env` 设置 `USER_CENTER_BOOTSTRAP_USERNAME/PASSWORD`，主服务启动时自举（仅当用户名不存在时）。生产建议使用离线 `admin-rescue`，不要在长期环境变量中保留初始密码。
+
+## 4. 反向代理
+
+要求：
+
+- 终止 TLS；转发 `Host`、`X-Forwarded-For`、`X-Real-IP`；设置 `TRUST_PROXY_HEADERS=true` 时才会信任这些头。
+- 请求体上限 ≤ 1 MiB；禁用代理层缓存 `/api/`。
+- 透传 `Set-Cookie`（不要重写 `uc_session`/`uc_csrf`）。
+- 建议安全头：`Strict-Transport-Security`、`Content-Security-Policy`（SPA 资源同源）、`X-Content-Type-Options`（服务已设置后者）。
+
+Nginx 片段：
+
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:8080;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_http_version 1.1;
+  client_max_body_size 1m;
+}
+```
+
+## 5. 健康检查与日志
+
+- `GET /healthz` → `{"status":"ok"}`；仅表示进程存活，不代表 DB/Redis 可用。
+- 日志为 zap JSON；关注 `open database`、`send mail failed`、`run migrations`。
+- 每个请求的 `X-Request-ID` 会写入安全事件与审计；排障时先取该 ID。
+
+## 6. 备份与恢复
+
+```bash
+# 数据库
+mysqldump --single-transaction --routines --triggers \
+  -h HOST -u usercenter -p usercenter > usercenter-$(date +%F).sql
+
+# 导出制品
+docker run --rm -v user-center_artifacts:/data -v "$PWD":/backup alpine \
+  tar czf /backup/artifacts-$(date +%F).tgz -C /data .
+```
+
+恢复：
+
+1. 停 `user-center`，保留 `migrate` 镜像版本；
+2. 恢复 MySQL 到同版本 schema；
+3. 恢复制品目录（可选，导出任务可重新生成）；
+4. 启动服务并执行 `GET /healthz`、管理员登录、`/me/authorization` 抽查。
+
+审计表不允许通过恢复旧备份回滚来“消除”事件；如有合规要求，应在恢复后记录恢复操作本身。
+
+## 7. 紧急恢复 root
+
+```bash
+# 主机/数据库权限 + 离线命令，不接受 HTTP 万能口令
+docker compose run --rm user-center /app/admin-rescue \
+  -config /app/configs/config.docker.yaml -action reset -username root -password '...'
+```
+
+`reset` 会校验目标确实是 root 角色成员，更新密码、提升身份版本、撤销全部会话并写审计。若 root 账号被归档/禁用，`reset` 会恢复为 `enabled`。
+
+## 8. 常见故障
+
+| 现象 | 排查 |
+|---|---|
+| 所有写请求 403 `PERMISSION_DENIED` | 缺少 `X-CSRF-Token` 或与 `uc_csrf` 不一致；前端先请求 `/auth/context` |
+| 登录后立即 401 | 会话 Cookie 未透传、`COOKIE_SECURE` 与访问协议不匹配、或用户被禁用/身份版本已变 |
+| 管理员 403 | 检查 `iam_user_roles` 是否 active、角色状态、Scope 边界与 deny、会话激活角色 |
+| 409 反复出现 | 前端未回读最新 revision；不要自动重放高风险写 |
+| 验证码总是无效 | Redis key 前缀/DB 不一致、时钟漂移、验证码过期或已消费；检查 `SESSION_SECRET` 是否变更 |
+| MFA 验证码无效 | 设备时钟漂移 > 30s；检查 `last_step` 与锁定时间 |
+| 邮件未发送 | `console` 驱动只打日志；SMTP 驱动检查 host/port/凭据/发件人 |
+
+## 9. 升级
+
+1. 备份数据库与制品；
+2. 构建/拉取新镜像（`migrate` 与主服务同版本）；
+3. 先运行 `migrate`；DDL 必须向后兼容一个版本；
+4. 滚动重启主服务；
+5. 验证登录、`/me/authorization`、用户列表、审计写入；
+6. 保留上一版本镜像用于回退。回退二进制前确认新迁移未引入不可逆列删除。
+
+## 10. 容量与扩展
+
+- 服务无状态；会话/验证码/限流在 MySQL/Redis。可水平扩展，但 `USER_CENTER_INTEGRATION_TOKEN` 需所有实例一致。
+- 授权事实每次请求实时读取 DB；用户/角色规模增大后应加入带版本失效的缓存，缓存键必须包含 policy/user/session revision。
+- 导出为同步生成，大表导出应迁移到异步 worker（当前限制 100000 行）。
+- 审计表增长快，建议按月分区或归档到只读存储；不要删除普通管理员可见的审计证据。

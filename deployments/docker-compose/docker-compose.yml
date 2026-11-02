@@ -1,0 +1,88 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: usercenter
+      MYSQL_USER: usercenter
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD:-change-me-root}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: user-center:latest
+    command: ["/app/migrate", "-config", "/app/configs/config.docker.yaml"]
+    environment:
+      DB_DRIVER: mysql
+      DB_DSN: usercenter:${MYSQL_PASSWORD:-change-me}@tcp(mysql:3306)/usercenter?parseTime=true&loc=UTC&charset=utf8mb4
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      CSRF_SECRET: ${CSRF_SECRET:?set CSRF_SECRET}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?set MFA_ENCRYPTION_KEY}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  user-center:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: user-center:latest
+    restart: unless-stopped
+    environment:
+      DB_DRIVER: mysql
+      DB_DSN: usercenter:${MYSQL_PASSWORD:-change-me}@tcp(mysql:3306)/usercenter?parseTime=true&loc=UTC&charset=utf8mb4
+      REDIS_ADDR: redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      CSRF_SECRET: ${CSRF_SECRET:?set CSRF_SECRET}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?set MFA_ENCRYPTION_KEY}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      TRUST_PROXY_HEADERS: "true"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      ARTIFACT_DIR: /app/artifacts
+      USER_CENTER_INTEGRATION_TOKEN: ${USER_CENTER_INTEGRATION_TOKEN:-}
+    volumes:
+      - artifacts:/app/artifacts
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  mysql-data:
+  redis-data:
+  artifacts:

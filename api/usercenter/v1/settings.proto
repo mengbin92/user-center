@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// SettingsService owns non-secret authentication policy. Secret material is
+// only accepted on write and never returned by this API.
+service SettingsService {
+  rpc GetAuthSettings(GetAuthSettingsRequest) returns (AuthSettings) {
+    option (google.api.http) = {get: "/api/v1/admin/settings/auth"};
+  }
+  rpc UpdateAuthSettings(UpdateAuthSettingsRequest) returns (AuthSettings) {
+    option (google.api.http) = {patch: "/api/v1/admin/settings/auth" body: "*"};
+  }
+  rpc GetEmailSettings(GetEmailSettingsRequest) returns (EmailSettings) {
+    option (google.api.http) = {get: "/api/v1/admin/settings/email"};
+  }
+  rpc UpdateEmailSettings(UpdateEmailSettingsRequest) returns (EmailSettings) {
+    option (google.api.http) = {patch: "/api/v1/admin/settings/email" body: "*"};
+  }
+}
+
+message GetAuthSettingsRequest {}
+
+message AuthSettings {
+  bool registration_enabled = 1;
+  bool email_verification_required = 2;
+  int32 password_min_length = 3;
+  int32 session_ttl_minutes = 4;
+  int32 idle_timeout_minutes = 5;
+  bool mfa_required_for_admins = 6;
+  repeated string allowed_email_domains = 7;
+  repeated string providers = 8;
+  string revision = 9;
+}
+
+message UpdateAuthSettingsRequest {
+  bool registration_enabled = 1;
+  bool email_verification_required = 2;
+  int32 password_min_length = 3;
+  int32 session_ttl_minutes = 4;
+  int32 idle_timeout_minutes = 5;
+  bool mfa_required_for_admins = 6;
+  repeated string allowed_email_domains = 7;
+  repeated string providers = 8;
+  string update_mask = 9;
+  string expected_revision = 10;
+  string reason = 11;
+}
+
+message GetEmailSettingsRequest {}
+
+message EmailSettings {
+  // console | smtp
+  string driver = 1;
+  string from = 2;
+  string smtp_host = 3;
+  int32 smtp_port = 4;
+  string smtp_username = 5;
+  bool password_configured = 6;
+  string revision = 7;
+}
+
+message UpdateEmailSettingsRequest {
+  string driver = 1;
+  string from = 2;
+  string smtp_host = 3;
+  int32 smtp_port = 4;
+  string smtp_username = 5;
+  // Write-only. Empty keeps the stored secret.
+  string smtp_password = 6;
+  string update_mask = 7;
+  string expected_revision = 8;
+  string reason = 9;
+}

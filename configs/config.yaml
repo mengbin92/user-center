@@ -1,0 +1,41 @@
+server:
+  http:
+    addr: ":8080"
+    timeout_seconds: 30
+    public_base_url: "http://localhost:5173"
+  grpc:
+    addr: ":9090"
+    timeout_seconds: 30
+
+data:
+  database:
+    driver: mysql
+    source: "usercenter:change-me@tcp(127.0.0.1:3306)/usercenter?parseTime=true&loc=UTC&charset=utf8mb4"
+    max_open_conns: 20
+    max_idle_conns: 10
+  redis:
+    addr: "127.0.0.1:6379"
+    password: ""
+    db: 0
+
+# Sample values only. Production MUST override every secret via environment
+# variables: SESSION_SECRET, CSRF_SECRET, MFA_ENCRYPTION_KEY.
+security:
+  session_secret: "sample-session-secret-change-me"
+  csrf_secret: "sample-csrf-secret-change-me"
+  mfa_encryption_key: "sample-mfa-key-change-me-32-bytes!!"
+  cookie_secure: false
+  cookie_domain: ""
+  session_ttl_minutes: 720
+  idle_timeout_minutes: 60
+  step_up_ttl_minutes: 5
+  trust_proxy_headers: true
+
+mail:
+  driver: console
+  from: "no-reply@user-center.local"
+  smtp:
+    host: ""
+    port: 587
+    username: ""
+    password: ""

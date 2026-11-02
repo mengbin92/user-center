@@ -1,0 +1,299 @@
+package biz
+
+import (
+	"time"
+
+	"github.com/mengbin92/user-center/domain/authorization"
+)
+
+const (
+	UserStatusEnabled  = "enabled"
+	UserStatusDisabled = "disabled"
+	UserStatusArchived = "archived"
+
+	ApplicationCode = "user-center"
+
+	OriginDefault   = "default"
+	OriginBootstrap = "bootstrap"
+	OriginExplicit  = "explicit"
+	OriginLegacy    = "legacy_candidate"
+
+	RoleStatusActive   = "active"
+	RoleStatusDisabled = "disabled"
+	RoleStatusArchived = "archived"
+
+	PermissionStatusActive   = "active"
+	PermissionStatusDisabled = "disabled"
+	PermissionStatusArchived = "archived"
+
+	BindingBound   = "bound"
+	BindingUnbound = "unbound"
+
+	ExportPending = "pending"
+	ExportReady   = "ready"
+	ExportFailed  = "failed"
+)
+
+type User struct {
+	ID                 int64
+	Username           string
+	UsernameNormalized string
+	DisplayName        string
+	Email              string
+	EmailNormalized    string
+	EmailVerified      bool
+	Status             string
+	Revision           uint64
+	IdentityVersion    uint64
+	MFAEnabled         bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	ArchivedAt         *time.Time
+	Roles              []RoleRef
+}
+
+type RoleRef struct {
+	ID   int64
+	Code string
+	Name string
+}
+
+type Credential struct {
+	UserID             int64
+	PasswordHash       string
+	Algorithm          string
+	PasswordVersion    uint64
+	MustChangePassword bool
+	Revision           uint64
+	UpdatedAt          time.Time
+}
+
+type ExternalIdentity struct {
+	ID              int64
+	UserID          int64
+	Provider        string
+	ProviderSubject string
+	Issuer          string
+	Display         string
+	CreatedAt       time.Time
+}
+
+type MFAState struct {
+	UserID         int64
+	Secret         string
+	KeyVersion     int
+	PendingSecret  string
+	PendingSession string
+	PendingUntil   time.Time
+	RecoveryHashes []string
+	LastStep       int64
+	Failures       int
+	LockedUntil    time.Time
+	Revision       uint64
+}
+
+func (m MFAState) Enabled() bool { return m.Secret != "" }
+
+type Session struct {
+	ID              string
+	UserID          int64
+	ApplicationCode string
+	TokenHash       string
+	UserAgent       string
+	IPMasked        string
+	IssuedAt        time.Time
+	LastSeenAt      time.Time
+	ExpiresAt       time.Time
+	IdleExpiresAt   time.Time
+	RevokedAt       *time.Time
+	IdentityVersion uint64
+	Revision        uint64
+	ActiveRoleIDs   []int64
+}
+
+func (s Session) Valid(now time.Time) bool {
+	return s.RevokedAt == nil && now.Before(s.ExpiresAt) && now.Before(s.IdleExpiresAt)
+}
+
+type SecurityEvent struct {
+	ID               string
+	UserID           int64
+	SessionID        string
+	Kind             string
+	Result           string
+	IPMasked         string
+	UserAgentSummary string
+	RequestID        string
+	OccurredAt       time.Time
+}
+
+type Role struct {
+	ID                   int64
+	Code                 string
+	Name                 string
+	Description          string
+	Builtin              bool
+	Status               string
+	MaxMembers           *int64
+	Revision             uint64
+	CreationDelegationID int64
+	Inherits             []int64
+	Grants               []Grant
+}
+
+type Grant struct {
+	Operation string
+	Effect    authorization.Effect
+	Scope     authorization.Scope
+}
+
+type Assignment struct {
+	ID         int64
+	UserID     int64
+	RoleID     int64
+	Boundary   authorization.Scope
+	StartsAt   time.Time
+	ExpiresAt  *time.Time
+	Revoked    bool
+	Origin     string
+	Revision   uint64
+	AssignedBy int64
+	CreatedAt  time.Time
+}
+
+func (a Assignment) Active(now time.Time) bool {
+	if a.Revoked || now.Before(a.StartsAt) {
+		return false
+	}
+	return a.ExpiresAt == nil || now.Before(*a.ExpiresAt)
+}
+
+type Resource struct {
+	ID      int64
+	Code    string
+	Name    string
+	Owner   string
+	Enabled bool
+}
+
+type Permission struct {
+	ID              int64
+	ResourceID      int64
+	Code            string
+	Name            string
+	Category        string
+	RiskLevel       string
+	Status          string
+	Binding         string
+	SupportedScopes []string
+	ContextTypes    []string
+	Protected       bool
+	Description     string
+	Sort            int32
+	Revision        uint64
+}
+
+func (p Permission) ScopeKinds() []authorization.ScopeKind {
+	out := make([]authorization.ScopeKind, 0, len(p.SupportedScopes))
+	for _, s := range p.SupportedScopes {
+		out = append(out, authorization.ScopeKind(s))
+	}
+	return out
+}
+
+type Constraint struct {
+	ID       int64
+	Kind     string
+	Name     string
+	RoleIDs  []int64
+	MaxCount int64
+	Enabled  bool
+	Revision uint64
+}
+
+type MenuItem struct {
+	ID          int64
+	ParentID    int64
+	RouteKey    string
+	Name        string
+	IconKey     string
+	Sort        int32
+	Enabled     bool
+	RequiredAll []string
+	RequiredAny []string
+	Revision    uint64
+}
+
+type AuditEvent struct {
+	EventID        string
+	ActorUserID    int64
+	ActorServiceID string
+	ActorSessionID string
+	Action         string
+	Target         string
+	Before         string
+	After          string
+	Diff           string
+	Result         string
+	Reason         string
+	RequestID      string
+	Versions       string
+	OccurredAt     time.Time
+}
+
+type ExportJob struct {
+	ID              int64
+	Kind            string
+	ActorUserID     int64
+	ActorSessionID  string
+	ScopeSnapshot   string
+	RequestedFields []string
+	Status          string
+	ArtifactName    string
+	Error           string
+	CreatedAt       time.Time
+	ExpiresAt       time.Time
+}
+
+type Event struct {
+	EventID           string
+	AggregateType     string
+	AggregateID       int64
+	AggregateRevision uint64
+	EventType         string
+	SchemaVersion     int
+	Payload           string
+	OccurredAt        time.Time
+}
+
+type OutboxDelivery struct {
+	EventID      string
+	SubscriberID string
+	Attempts     int
+	NextRetryAt  time.Time
+	Status       string
+	LastError    string
+}
+
+type AuthSettings struct {
+	RegistrationEnabled       bool
+	EmailVerificationRequired bool
+	PasswordMinLength         int
+	SessionTTLMinutes         int
+	IdleTimeoutMinutes        int
+	MFARequiredForAdmins      bool
+	AllowedEmailDomains       []string
+	Providers                 []string
+	Revision                  uint64
+	UpdatedAt                 time.Time
+}
+
+type EmailSettings struct {
+	Driver       string
+	From         string
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUsername string
+	PasswordSet  bool
+	Revision     uint64
+}

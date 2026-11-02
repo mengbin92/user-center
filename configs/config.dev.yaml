@@ -1,0 +1,44 @@
+# Local development profile: SQLite + in-memory challenges (no Redis needed).
+# Run: go run ./cmd/migrate -config configs/config.dev.yaml
+#      go run ./cmd/admin-rescue -config configs/config.dev.yaml -action bootstrap \
+#        -username root -password 'ChangeMe-12345' -email root@example.com
+#      go run ./cmd/user-center -config configs/config.dev.yaml
+server:
+  http:
+    addr: "127.0.0.1:8080"
+    timeout_seconds: 30
+    public_base_url: "http://localhost:5173"
+  grpc:
+    addr: "127.0.0.1:9090"
+    timeout_seconds: 30
+
+data:
+  database:
+    driver: sqlite
+    source: "file:./data/user-center.db?_fk=1&cache=shared"
+    max_open_conns: 1
+    max_idle_conns: 1
+  redis:
+    addr: ""
+    password: ""
+    db: 0
+
+security:
+  session_secret: "dev-session-secret"
+  csrf_secret: "dev-csrf-secret"
+  mfa_encryption_key: "dev-mfa-key"
+  cookie_secure: false
+  cookie_domain: ""
+  session_ttl_minutes: 720
+  idle_timeout_minutes: 60
+  step_up_ttl_minutes: 5
+  trust_proxy_headers: false
+
+mail:
+  driver: console
+  from: "no-reply@user-center.local"
+  smtp:
+    host: ""
+    port: 587
+    username: ""
+    password: ""

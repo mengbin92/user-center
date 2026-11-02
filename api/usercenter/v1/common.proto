@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// User is the account projection returned by the API. Numeric IDs and
+// revisions are decimal strings so JavaScript callers never lose precision.
+message User {
+  string id = 1;
+  string username = 2;
+  string display_name = 3;
+  string email = 4;
+  bool email_verified = 5;
+  // enabled | disabled | archived
+  string status = 6;
+  string revision = 7;
+  string identity_version = 8;
+  string created_at = 9;
+  string updated_at = 10;
+  string archived_at = 11;
+  bool mfa_enabled = 12;
+  repeated RoleRef roles = 13;
+}
+
+message RoleRef {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+}
+
+message ListMeta {
+  string next_page_token = 1;
+  string total_size = 2;
+}
+
+// WriteMeta carries the optimistic-concurrency and audit fields required by
+// every sensitive management mutation.
+message WriteMeta {
+  string expected_revision = 1;
+  string expected_policy_revision = 2;
+  string reason = 3;
+}
+
+message SecurityEvent {
+  string id = 1;
+  string user_id = 2;
+  string session_id = 3;
+  string kind = 4;
+  string result = 5;
+  string ip_masked = 6;
+  string user_agent_summary = 7;
+  string request_id = 8;
+  string occurred_at = 9;
+}
+
+message SessionInfo {
+  string id = 1;
+  string user_id = 2;
+  string application_code = 3;
+  string device = 4;
+  string ip_masked = 5;
+  bool current = 6;
+  repeated string active_role_ids = 7;
+  string issued_at = 8;
+  string last_seen_at = 9;
+  string expires_at = 10;
+  string revoked_at = 11;
+}
+
+message AuditEvent {
+  string id = 1;
+  string actor_user_id = 2;
+  string actor_service_id = 3;
+  string actor_session_id = 4;
+  string action = 5;
+  string target = 6;
+  string before = 7;
+  string after = 8;
+  string diff = 9;
+  string result = 10;
+  string reason = 11;
+  string request_id = 12;
+  string authorization_versions = 13;
+  string occurred_at = 14;
+}
+
+message ChallengeReply {
+  string challenge_id = 1;
+  string expires_at = 2;
+}
+
+message SessionsReply {
+  repeated SessionInfo items = 1;
+}
+
+message Scope {
+  bool all = 1;
+  bool self = 2;
+  repeated string user_ids = 3;
+}
+
+message PermissionSummary {
+  string operation = 1;
+  string effect = 2;
+  string scope = 3;
+}
+
+message ExportJob {
+  string id = 1;
+  string kind = 2;
+  string status = 3;
+  string requested_fields = 4;
+  string artifact_name = 5;
+  string expires_at = 6;
+  string created_at = 7;
+  string error = 8;
+}

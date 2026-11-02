@@ -1,0 +1,12 @@
+user-center
+Copyright (c) 2026 孟斯特
+
+This product includes software copied and independently maintained from
+micro-one-api (https://github.com/mengbin92/micro-one-api), licensed under the
+MIT License:
+
+- pkg/jsonx
+- pkg/totp
+- pkg/aesgcm
+
+The full MIT license text is in LICENSE.

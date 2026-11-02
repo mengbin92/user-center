@@ -1,0 +1,36 @@
+# Binaries
+/bin/
+/user-center
+/cmd/user-center/user-center
+/cmd/migrate/migrate
+/cmd/admin-rescue/admin-rescue
+
+# Go
+*.test
+coverage.out
+coverage.html
+vendor/
+
+# Frontend
+web/node_modules/
+web/dist/
+web/coverage/
+web/test-results/
+web/playwright-report/
+web/.vite/
+web/*.tsbuildinfo
+
+# Local configuration & secrets
+.env
+.env.*
+!.env.example
+configs/config.local.yaml
+artifacts/
+data/
+tmp/
+*.log
+.DS_Store
+
+# IDE
+.idea/
+.vscode/

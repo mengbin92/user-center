@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// AdminUserService is the administrator account lifecycle surface.
+service AdminUserService {
+  rpc GetOverview(GetOverviewRequest) returns (OverviewReply) {
+    option (google.api.http) = {get: "/api/v1/admin/overview"};
+  }
+  rpc ListUsers(ListUsersRequest) returns (UsersReply) {
+    option (google.api.http) = {get: "/api/v1/admin/users"};
+  }
+  rpc CreateUser(CreateUserRequest) returns (User) {
+    option (google.api.http) = {post: "/api/v1/admin/users" body: "*"};
+  }
+  rpc GetUser(GetUserRequest) returns (User) {
+    option (google.api.http) = {get: "/api/v1/admin/users/{id}"};
+  }
+  rpc UpdateUser(UpdateUserRequest) returns (User) {
+    option (google.api.http) = {patch: "/api/v1/admin/users/{id}" body: "*"};
+  }
+  rpc SetUserStatus(SetUserStatusRequest) returns (User) {
+    option (google.api.http) = {post: "/api/v1/admin/users/{id}:set-status" body: "*"};
+  }
+  rpc ArchiveUser(ArchiveUserRequest) returns (User) {
+    option (google.api.http) = {post: "/api/v1/admin/users/{id}:archive" body: "*"};
+  }
+  rpc CreatePasswordResetRequest(CreatePasswordResetTaskRequest) returns (PasswordResetTaskReply) {
+    option (google.api.http) = {post: "/api/v1/admin/users/{id}/password-reset-requests" body: "*"};
+  }
+  rpc ResetMFA(ResetMFARequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/admin/users/{id}/mfa:reset" body: "*"};
+  }
+  rpc ListUserSessions(ListUserSessionsRequest) returns (SessionsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/users/{id}/sessions"};
+  }
+  rpc RevokeUserSessions(RevokeUserSessionsRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/admin/users/{id}/sessions:revoke" body: "*"};
+  }
+  rpc GetUserEffectivePermissions(GetUserEffectivePermissionsRequest) returns (EffectivePermissionsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/users/{id}/effective-permissions"};
+  }
+  rpc ExportUsers(ExportUsersRequest) returns (ExportJob) {
+    option (google.api.http) = {post: "/api/v1/admin/users:export" body: "*"};
+  }
+  rpc GetExport(GetExportRequest) returns (ExportJob) {
+    option (google.api.http) = {get: "/api/v1/admin/exports/{id}"};
+  }
+  rpc ListExports(ListExportsRequest) returns (ExportsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/exports"};
+  }
+}
+
+message GetOverviewRequest {}
+
+message OverviewReply {
+  int64 total_users = 1;
+  int64 enabled_users = 2;
+  int64 disabled_users = 3;
+  int64 archived_users = 4;
+  int64 mfa_users = 5;
+  int64 active_sessions = 6;
+  int64 logins_24h = 7;
+  int64 failed_logins_24h = 8;
+}
+
+message ListUsersRequest {
+  string keyword = 1;
+  string status = 2;
+  string role_id = 3;
+  // any | true | false
+  string mfa_enabled = 4;
+  int32 page_size = 5;
+  string page_token = 6;
+}
+
+message UsersReply {
+  repeated User items = 1;
+  ListMeta meta = 2;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+  string display_name = 3;
+  repeated string role_ids = 4;
+  bool send_activation = 5;
+  string initial_password = 6;
+  string reason = 7;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  string display_name = 2;
+  string update_mask = 3;
+  string expected_revision = 4;
+  string expected_policy_revision = 5;
+  string reason = 6;
+}
+
+message SetUserStatusRequest {
+  string id = 1;
+  // enabled | disabled
+  string status = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message ArchiveUserRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}
+
+message CreatePasswordResetTaskRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message PasswordResetTaskReply {
+  bool queued = 1;
+  string expires_at = 2;
+}
+
+message ResetMFARequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message ListUserSessionsRequest {
+  string id = 1;
+}
+
+message RevokeUserSessionsRequest {
+  string id = 1;
+  repeated string session_ids = 2;
+  bool revoke_all = 3;
+  string reason = 4;
+}
+
+message GetUserEffectivePermissionsRequest {
+  string id = 1;
+}
+
+message EffectivePermission {
+  string operation = 1;
+  string effect = 2;
+  string scope = 3;
+  string role_id = 4;
+  string role_code = 5;
+  string assignment_id = 6;
+  string source = 7;
+}
+
+message EffectivePermissionsReply {
+  repeated EffectivePermission permissions = 1;
+  string policy_revision = 2;
+  string user_revision = 3;
+}
+
+message ExportUsersRequest {
+  string keyword = 1;
+  string status = 2;
+  repeated string fields = 3;
+  string reason = 4;
+}
+
+message GetExportRequest {
+  string id = 1;
+}
+
+message ListExportsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ExportsReply {
+  repeated ExportJob items = 1;
+  ListMeta meta = 2;
+}

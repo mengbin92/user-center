@@ -1,0 +1,181 @@
+package server
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+
+	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/internal/conf"
+	"github.com/mengbin92/user-center/internal/service"
+	"github.com/mengbin92/user-center/platform/httpx"
+)
+
+type Middleware struct {
+	sessions   *biz.SessionUsecase
+	log        *zap.Logger
+	secure     bool
+	domain     string
+	trustProxy bool
+}
+
+func NewMiddleware(sessions *biz.SessionUsecase, sec *conf.Security, log *zap.Logger) *Middleware {
+	m := &Middleware{sessions: sessions, log: log}
+	if sec != nil {
+		m.secure = sec.CookieSecure
+		m.domain = sec.CookieDomain
+		m.trustProxy = sec.TrustProxyHeaders
+	}
+	return m
+}
+
+func (m *Middleware) Filter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, ok := m.prepare(w, r)
+		if !ok {
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// Require protects raw (non-proto) routes with the same auth/CSRF rules.
+func (m *Middleware) Require(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, ok := m.prepare(w, r)
+		if !ok {
+			return
+		}
+		if _, has := biz.ActorFromContext(ctx); !has {
+			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "登录状态无效或已过期")
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Context, bool) {
+	ctx := r.Context()
+	requestID := strings.TrimSpace(r.Header.Get("X-Request-ID"))
+	if requestID == "" || len(requestID) > 64 {
+		requestID = uuid.NewString()
+	}
+	w.Header().Set("X-Request-ID", requestID)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("X-Frame-Options", "DENY")
+
+	info := httpx.Info{
+		RequestID: requestID,
+		IP:        clientIP(r, m.trustProxy),
+		UserAgent: r.UserAgent(),
+	}
+	if c, err := r.Cookie(service.CSRFCookie); err == nil && c.Value != "" {
+		info.CSRF = c.Value
+	} else {
+		token := randomToken()
+		http.SetCookie(w, &http.Cookie{
+			Name: service.CSRFCookie, Value: token, Path: "/", HttpOnly: false,
+			Secure: m.secure, SameSite: http.SameSiteLaxMode, Domain: m.domain,
+			MaxAge: 86400,
+		})
+		info.CSRF = token
+	}
+	ctx = httpx.With(ctx, info)
+	ctx = biz.WithRequestID(ctx, requestID)
+	r = r.WithContext(ctx)
+
+	if isUnsafe(r.Method) && strings.HasPrefix(r.URL.Path, "/api/v1/") {
+		header := r.Header.Get("X-CSRF-Token")
+		if header == "" || header != info.CSRF {
+			writeError(w, http.StatusForbidden, "PERMISSION_DENIED", "CSRF 校验失败，请刷新页面后重试")
+			return ctx, false
+		}
+	}
+
+	if c, err := r.Cookie(service.SessionCookie); err == nil && c.Value != "" {
+		actor, err := m.sessions.ValidateSession(ctx, c.Value)
+		if err == nil {
+			actor.RequestID = requestID
+			actor.IP = info.IP
+			actor.UserAgent = info.UserAgent
+			ctx = biz.WithActor(ctx, actor)
+		} else if errors.Is(err, biz.ErrSessionRevoked) || errors.Is(err, biz.ErrUnauthenticated) {
+			http.SetCookie(w, &http.Cookie{
+				Name: service.SessionCookie, Value: "", Path: "/", HttpOnly: true,
+				Secure: m.secure, SameSite: http.SameSiteLaxMode, Domain: m.domain, MaxAge: -1,
+			})
+		}
+	}
+
+	if requiresAuth(r.URL.Path) {
+		if _, has := biz.ActorFromContext(ctx); !has {
+			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "登录状态无效或已过期")
+			return ctx, false
+		}
+	}
+	return ctx, true
+}
+
+func isUnsafe(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	default:
+		return true
+	}
+}
+
+func requiresAuth(path string) bool {
+	if strings.HasPrefix(path, "/api/v1/me") || strings.HasPrefix(path, "/api/v1/admin") {
+		return true
+	}
+	return false
+}
+
+func clientIP(r *http.Request, trustProxy bool) string {
+	if trustProxy {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if i := strings.IndexByte(xff, ','); i >= 0 {
+				return strings.TrimSpace(xff[:i])
+			}
+			return strings.TrimSpace(xff)
+		}
+		if xr := r.Header.Get("X-Real-IP"); xr != "" {
+			return strings.TrimSpace(xr)
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func randomToken() string {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func writeError(w http.ResponseWriter, status int, reason, message string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"code": status, "reason": reason, "message": message,
+		"metadata": map[string]string{"request_id": w.Header().Get("X-Request-ID")},
+	})
+}
+
+var _ = time.Now

@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/protobuf/empty.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// IntegrationService is the internal gRPC contract for approved business
+// systems. It is intentionally separate from the browser HTTP surface: callers
+// authenticate as an integration client and every response is scoped to the
+// requested application.
+service IntegrationService {
+  rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionReply);
+  rpc ValidateSubject(ValidateSubjectRequest) returns (ValidateSubjectReply);
+  rpc GetUser(IntegrationGetUserRequest) returns (IntegrationUserReply);
+  rpc BatchGetUsers(BatchGetUsersRequest) returns (IntegrationUsersReply);
+  rpc GetSessionAuthorization(SessionAuthorizationRequest) returns (SessionAuthorizationReply);
+  rpc GetResourceAuthorization(ResourceAuthorizationRequest) returns (ResourceAuthorizationReply);
+  rpc RevokeSession(IntegrationRevokeSessionRequest) returns (google.protobuf.Empty);
+}
+
+message SessionFacts {
+  string session_id = 1;
+  string user_id = 2;
+  string application_code = 3;
+  string status = 4;
+  string identity_version = 5;
+  string issued_at = 6;
+  string expires_at = 7;
+}
+
+message ValidateSessionRequest {
+  // Raw browser session cookie value. Only the server-side adapter may hold it.
+  string session_token = 1;
+  string application_code = 2;
+}
+
+message ValidateSessionReply {
+  bool valid = 1;
+  string reason = 2;
+  SessionFacts session = 3;
+  User user = 4;
+}
+
+message ValidateSubjectRequest {
+  string user_id = 1;
+}
+
+message ValidateSubjectReply {
+  bool enabled = 1;
+  string status = 2;
+  string identity_version = 3;
+}
+
+message IntegrationGetUserRequest {
+  string user_id = 1;
+}
+
+message IntegrationUserReply {
+  User user = 1;
+}
+
+message BatchGetUsersRequest {
+  repeated string user_ids = 1;
+}
+
+message IntegrationUsersReply {
+  repeated User items = 1;
+}
+
+message SessionAuthorizationRequest {
+  string session_token = 1;
+  string application_code = 2;
+}
+
+message SessionAuthorizationReply {
+  repeated PermissionSummary permissions = 1;
+  repeated string menu_keys = 2;
+  string policy_revision = 3;
+  string user_revision = 4;
+}
+
+message AuthorizationObjectFacts {
+  string owner_user_id = 1;
+  string resource_id = 2;
+  repeated string routing_group_ids = 3;
+}
+
+message ResourceAuthorizationRequest {
+  string session_token = 1;
+  string execution_point = 2;
+  string operation = 3;
+  AuthorizationObjectFacts object = 4;
+}
+
+message ResourceAuthorizationReply {
+  bool allowed = 1;
+  string reason = 2;
+  Scope scope = 3;
+  string policy_revision = 4;
+  string valid_until = 5;
+}
+
+message IntegrationRevokeSessionRequest {
+  string session_id = 1;
+  string reason = 2;
+}

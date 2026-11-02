@@ -1,0 +1,218 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// MeService owns the authenticated user's self-service surface.
+service MeService {
+  rpc GetMe(GetMeRequest) returns (User) {
+    option (google.api.http) = {get: "/api/v1/me"};
+  }
+  rpc UpdateMe(UpdateMeRequest) returns (User) {
+    option (google.api.http) = {patch: "/api/v1/me" body: "*"};
+  }
+  rpc ChangePassword(ChangePasswordRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/me/password:change" body: "*"};
+  }
+  rpc CreateEmailChallenge(CreateEmailChallengeRequest) returns (ChallengeReply) {
+    option (google.api.http) = {post: "/api/v1/me/email-challenges" body: "*"};
+  }
+  rpc ConfirmEmail(ConfirmEmailRequest) returns (User) {
+    option (google.api.http) = {post: "/api/v1/me/email:confirm" body: "*"};
+  }
+  rpc ListExternalIdentities(ListExternalIdentitiesRequest) returns (ExternalIdentitiesReply) {
+    option (google.api.http) = {get: "/api/v1/me/external-identities"};
+  }
+  rpc DeleteExternalIdentity(DeleteExternalIdentityRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/me/external-identities/{id}"};
+  }
+  rpc GetSecurity(GetSecurityRequest) returns (SecurityStatus) {
+    option (google.api.http) = {get: "/api/v1/me/security"};
+  }
+  rpc SetupMFA(SetupMFARequest) returns (SetupMFAReply) {
+    option (google.api.http) = {post: "/api/v1/me/mfa:setup" body: "*"};
+  }
+  rpc ConfirmMFA(ConfirmMFARequest) returns (RecoveryCodesReply) {
+    option (google.api.http) = {post: "/api/v1/me/mfa:confirm" body: "*"};
+  }
+  rpc DisableMFA(DisableMFARequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/me/mfa:disable" body: "*"};
+  }
+  rpc RotateRecoveryCodes(RotateRecoveryCodesRequest) returns (RecoveryCodesReply) {
+    option (google.api.http) = {post: "/api/v1/me/mfa/recovery-codes:rotate" body: "*"};
+  }
+  rpc VerifySecurity(VerifySecurityRequest) returns (VerifySecurityReply) {
+    option (google.api.http) = {post: "/api/v1/me/security:verify" body: "*"};
+  }
+  rpc ListSessions(ListSessionsRequest) returns (SessionsReply) {
+    option (google.api.http) = {get: "/api/v1/me/sessions"};
+  }
+  rpc RevokeSession(RevokeSessionRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/me/sessions/{id}"};
+  }
+  rpc RevokeOtherSessions(RevokeOtherSessionsRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/me/sessions:revoke-others" body: "*"};
+  }
+  rpc GetSessionRoles(GetSessionRolesRequest) returns (SessionRolesReply) {
+    option (google.api.http) = {get: "/api/v1/me/session-roles"};
+  }
+  rpc PutSessionRoles(PutSessionRolesRequest) returns (SessionRolesReply) {
+    option (google.api.http) = {put: "/api/v1/me/session-roles" body: "*"};
+  }
+  rpc GetAuthorization(GetAuthorizationRequest) returns (AuthorizationReply) {
+    option (google.api.http) = {get: "/api/v1/me/authorization"};
+  }
+  rpc ListSecurityEvents(ListSecurityEventsRequest) returns (SecurityEventsReply) {
+    option (google.api.http) = {get: "/api/v1/me/security-events"};
+  }
+}
+
+message GetMeRequest {}
+
+message UpdateMeRequest {
+  string display_name = 1;
+  string update_mask = 2;
+  string expected_revision = 3;
+}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  string new_password = 2;
+}
+
+message CreateEmailChallengeRequest {
+  string new_email = 1;
+  string current_password = 2;
+  string code = 3;
+}
+
+message ConfirmEmailRequest {
+  string challenge_id = 1;
+  string code = 2;
+}
+
+message ExternalIdentity {
+  string id = 1;
+  string provider = 2;
+  string display = 3;
+  string created_at = 4;
+}
+
+message ExternalIdentitiesReply {
+  repeated ExternalIdentity items = 1;
+}
+
+message ListExternalIdentitiesRequest {}
+
+message DeleteExternalIdentityRequest {
+  string id = 1;
+}
+
+message GetSecurityRequest {}
+
+message SecurityStatus {
+  bool mfa_enabled = 1;
+  bool password_available = 2;
+  int32 recovery_codes_remaining = 3;
+  bool step_up_verified = 4;
+  string step_up_expires_at = 5;
+  bool mfa_required = 6;
+}
+
+message SetupMFARequest {
+  string current_password = 1;
+}
+
+message SetupMFAReply {
+  string secret = 1;
+  string otpauth_uri = 2;
+  string expires_at = 3;
+}
+
+message ConfirmMFARequest {
+  string code = 1;
+}
+
+message RecoveryCodesReply {
+  repeated string recovery_codes = 1;
+}
+
+message DisableMFARequest {
+  string current_password = 1;
+  string code = 2;
+}
+
+message RotateRecoveryCodesRequest {
+  string current_password = 1;
+  string code = 2;
+}
+
+message VerifySecurityRequest {
+  string current_password = 1;
+  string code = 2;
+}
+
+message VerifySecurityReply {
+  bool verified = 1;
+  string expires_at = 2;
+}
+
+message ListSessionsRequest {}
+
+message RevokeSessionRequest {
+  string id = 1;
+}
+
+message RevokeOtherSessionsRequest {}
+
+message SessionRole {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  bool active = 4;
+  bool builtin = 5;
+}
+
+message GetSessionRolesRequest {}
+
+message SessionRolesReply {
+  repeated SessionRole items = 1;
+  string revision = 2;
+}
+
+message PutSessionRolesRequest {
+  repeated string role_ids = 1;
+  string expected_revision = 2;
+}
+
+message AuthorizationGrant {
+  string operation = 1;
+  string effect = 2;
+  string scope = 3;
+  string role_id = 4;
+  string role_code = 5;
+}
+
+message AuthorizationReply {
+  repeated PermissionSummary permissions = 1;
+  repeated string menu_keys = 2;
+  string policy_revision = 3;
+  string user_revision = 4;
+}
+
+message GetAuthorizationRequest {}
+
+message ListSecurityEventsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message SecurityEventsReply {
+  repeated SecurityEvent items = 1;
+  ListMeta meta = 2;
+}

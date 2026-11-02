@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package usercenter.conf;
+
+option go_package = "github.com/mengbin92/user-center/internal/conf;conf";
+
+message Bootstrap {
+  Server server = 1;
+  Data data = 2;
+  Security security = 3;
+  Mail mail = 4;
+}
+
+message Server {
+  HTTP http = 1;
+  GRPC grpc = 2;
+}
+
+message HTTP {
+  string addr = 1;
+  int32 timeout_seconds = 2;
+  string public_base_url = 3;
+}
+
+message GRPC {
+  string addr = 1;
+  int32 timeout_seconds = 2;
+}
+
+message Data {
+  Database database = 1;
+  Redis redis = 2;
+}
+
+message Database {
+  // mysql | sqlite
+  string driver = 1;
+  string source = 2;
+  int32 max_open_conns = 3;
+  int32 max_idle_conns = 4;
+}
+
+message Redis {
+  string addr = 1;
+  string password = 2;
+  int32 db = 3;
+}
+
+message Security {
+  string session_secret = 1;
+  string csrf_secret = 2;
+  string mfa_encryption_key = 3;
+  bool cookie_secure = 4;
+  string cookie_domain = 5;
+  int32 session_ttl_minutes = 6;
+  int32 idle_timeout_minutes = 7;
+  int32 step_up_ttl_minutes = 8;
+  bool trust_proxy_headers = 9;
+}
+
+message Mail {
+  // console | smtp
+  string driver = 1;
+  string from = 2;
+  SMTP smtp = 3;
+}
+
+message SMTP {
+  string host = 1;
+  int32 port = 2;
+  string username = 3;
+  string password = 4;
+}

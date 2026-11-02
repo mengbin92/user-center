@@ -1,0 +1,502 @@
+package biz
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/mengbin92/user-center/domain/authorization"
+	"github.com/mengbin92/user-center/pkg/jsonx"
+)
+
+type RegisterInput struct {
+	Username     string
+	Email        string
+	Password     string
+	Code         string
+	ChallengeID  string
+	TermsVersion string
+}
+
+type LoginInput struct {
+	Username  string
+	Password  string
+	Remember  bool
+	IP        string
+	UserAgent string
+}
+
+type LoginResult struct {
+	Status           string
+	ChallengeID      string
+	ChallengeExpires time.Time
+	User             *User
+	Session          *Session
+	RawToken         string
+}
+
+func (uc *AuthUsecase) AuthConfig(ctx context.Context) (*AuthSettings, error) {
+	s, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	return s, nil
+}
+
+func (uc *AuthUsecase) CreateRegistrationChallenge(ctx context.Context, email, ip string) (string, time.Time, error) {
+	settings, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	if !settings.RegistrationEnabled {
+		return "", time.Time{}, Validation("当前未开放注册")
+	}
+	email = NormalizeEmail(email)
+	if err := ValidateEmail(email); err != nil {
+		return "", time.Time{}, err
+	}
+	if !emailDomainAllowed(email, settings.AllowedEmailDomains) {
+		return "", time.Time{}, Validation("该邮箱域名不允许注册")
+	}
+	if ok, _ := uc.Limiter.Allow(ctx, "reg:"+ip, 10, time.Hour); !ok {
+		return "", time.Time{}, ErrRateLimited
+	}
+	code, err := GenerateCode()
+	if err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	id := uc.IDs.NewID()
+	expires := uc.Clock.Now().Add(uc.ChallengeTTL)
+	if err := uc.Challenges.Put(ctx, Challenge{
+		ID:        id,
+		Purpose:   "registration",
+		CodeHash:  HMACCode(uc.CodeSecret, "registration:"+email, code),
+		Email:     email,
+		ExpiresAt: expires,
+	}); err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	if err := uc.Mail.Send(ctx, email, "用户中心注册验证码", fmt.Sprintf("你的注册验证码是 %s，%d 分钟内有效。如非本人操作请忽略。", code, int(uc.ChallengeTTL.Minutes()))); err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	return id, expires, nil
+}
+
+func (uc *AuthUsecase) Register(ctx context.Context, in RegisterInput) (*User, error) {
+	settings, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	if !settings.RegistrationEnabled {
+		return nil, Validation("当前未开放注册")
+	}
+	in.Username = strings.TrimSpace(in.Username)
+	in.Email = NormalizeEmail(in.Email)
+	if err := ValidateUsername(in.Username); err != nil {
+		return nil, err
+	}
+	if err := ValidateEmail(in.Email); err != nil {
+		return nil, err
+	}
+	if !emailDomainAllowed(in.Email, settings.AllowedEmailDomains) {
+		return nil, Validation("该邮箱域名不允许注册")
+	}
+	if err := ValidatePassword(in.Password, settings.PasswordMinLength); err != nil {
+		return nil, err
+	}
+	if in.TermsVersion == "" {
+		return nil, Validation("必须同意服务条款")
+	}
+	if ok, _ := uc.Limiter.Allow(ctx, "register:"+in.Email, 10, time.Hour); !ok {
+		return nil, ErrRateLimited
+	}
+
+	var challenge *Challenge
+	if settings.EmailVerificationRequired {
+		if in.ChallengeID == "" || in.Code == "" {
+			return nil, ErrChallengeInvalid
+		}
+		c, err := uc.Challenges.Verify(ctx, "registration", in.ChallengeID, in.Code)
+		if err != nil {
+			return nil, err
+		}
+		if c.Email != in.Email {
+			return nil, ErrChallengeInvalid
+		}
+		challenge = &c
+	}
+
+	if _, err := uc.Users.GetByUsername(ctx, nil, NormalizeUsername(in.Username)); err == nil {
+		return nil, ErrUsernameExists
+	} else if !errors.Is(err, ErrUserNotFound) {
+		return nil, ErrDependency
+	}
+	if _, err := uc.Users.GetByEmail(ctx, nil, in.Email); err == nil {
+		// Do not reveal whether an address is registered.
+		return nil, ErrChallengeInvalid
+	} else if !errors.Is(err, ErrUserNotFound) {
+		return nil, ErrDependency
+	}
+
+	hash, err := HashPassword(in.Password)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	now := uc.Clock.Now().UTC()
+	user := &User{
+		Username:           in.Username,
+		UsernameNormalized: NormalizeUsername(in.Username),
+		DisplayName:        in.Username,
+		Email:              in.Email,
+		EmailNormalized:    in.Email,
+		EmailVerified:      settings.EmailVerificationRequired,
+		Status:             UserStatusEnabled,
+		Revision:           1,
+		IdentityVersion:    1,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+	if !settings.EmailVerificationRequired {
+		user.EmailVerified = false
+	}
+
+	var created *User
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		u, err := uc.Users.Create(ctx, tx, user)
+		if err != nil {
+			return err
+		}
+		created = u
+		if err := uc.Credentials.Create(ctx, tx, &Credential{
+			UserID:          u.ID,
+			PasswordHash:    hash,
+			Algorithm:       "bcrypt",
+			PasswordVersion: 1,
+			Revision:        1,
+			UpdatedAt:       now,
+		}); err != nil {
+			return err
+		}
+		member, err := uc.IAM.GetRoleByCode(ctx, tx, "member")
+		if err != nil {
+			return fmt.Errorf("default member role missing: %w", err)
+		}
+		if _, err := uc.IAM.CreateAssignment(ctx, tx, &Assignment{
+			UserID: u.ID, RoleID: member.ID,
+			Boundary: authorization.Scope{All: true},
+			StartsAt: now, Origin: OriginDefault, Revision: 1,
+			CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+		if challenge != nil {
+			if err := uc.Flows.Complete(ctx, tx, challenge.ID, "registration", u.ID, "user"); err != nil {
+				return err
+			}
+		}
+		if err := uc.audit(ctx, tx, ActorContext{}, "account.register", itoa(u.ID), "{}", "{}", "{}", "self registration", "success"); err != nil {
+			return err
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"user_id": u.ID, "username": u.Username, "created_at": now})
+		if err := uc.emit(ctx, tx, "user", u.ID, u.Revision, "user.created", string(payload)); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if challenge != nil {
+		_ = uc.Challenges.Delete(ctx, challenge.ID)
+	}
+	return created, nil
+}
+
+func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, error) {
+	if ok, _ := uc.Limiter.Allow(ctx, "login:"+in.IP, 30, 5*time.Minute); !ok {
+		return nil, ErrRateLimited
+	}
+	identifier := strings.TrimSpace(in.Username)
+	var user *User
+	var err error
+	if strings.Contains(identifier, "@") {
+		user, err = uc.Users.GetByEmail(ctx, nil, NormalizeEmail(identifier))
+	} else {
+		user, err = uc.Users.GetByUsername(ctx, nil, NormalizeUsername(identifier))
+	}
+	if err != nil {
+		uc.recordSecurity(ctx, 0, "", "login", "failure", in.IP, in.UserAgent, "")
+		return nil, ErrInvalidCredentials
+	}
+	cred, err := uc.Credentials.Get(ctx, nil, user.ID)
+	if err != nil || cred.PasswordHash == "" || !VerifyPassword(cred.PasswordHash, in.Password) {
+		uc.recordSecurity(ctx, user.ID, "", "login", "failure", in.IP, in.UserAgent, "")
+		return nil, ErrInvalidCredentials
+	}
+	if user.Status != UserStatusEnabled {
+		uc.recordSecurity(ctx, user.ID, "", "login", "denied", in.IP, in.UserAgent, "")
+		return nil, ErrUnauthenticated
+	}
+	if ok, _ := uc.Limiter.Allow(ctx, fmt.Sprintf("login-user:%d", user.ID), 10, 5*time.Minute); !ok {
+		return nil, ErrRateLimited
+	}
+
+	mfa, err := uc.MFA.Get(ctx, nil, user.ID)
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
+		return nil, ErrDependency
+	}
+	if mfa != nil && mfa.Enabled() {
+		challengeID := uc.IDs.NewID()
+		expires := uc.Clock.Now().Add(5 * time.Minute)
+		payload, _ := jsonx.Marshal(map[string]any{"user_id": user.ID, "ip": in.IP, "ua": SummizeAgent(in.UserAgent), "remember": in.Remember})
+		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
+			return nil, ErrDependency
+		}
+		return &LoginResult{Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires, User: uc.publicUser(ctx, user)}, nil
+	}
+
+	session, raw, err := uc.issueSession(ctx, user, in.UserAgent, in.IP)
+	if err != nil {
+		return nil, err
+	}
+	return &LoginResult{Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw}, nil
+}
+
+func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, ua string) (*LoginResult, error) {
+	if ok, _ := uc.Limiter.Allow(ctx, "mfa:"+ip, 20, 5*time.Minute); !ok {
+		return nil, ErrRateLimited
+	}
+	c, err := uc.Challenges.Get(ctx, "mfa", challengeID)
+	if err != nil {
+		return nil, ErrChallengeInvalid
+	}
+	user, err := uc.Users.Get(ctx, nil, c.UserID)
+	if err != nil {
+		return nil, ErrUnauthenticated
+	}
+	if user.Status != UserStatusEnabled {
+		return nil, ErrUnauthenticated
+	}
+	var payload struct {
+		IP       string `json:"ip"`
+		UA       string `json:"ua"`
+		Remember bool   `json:"remember"`
+	}
+	_ = jsonx.Unmarshal([]byte(c.Payload), &payload)
+	if err := uc.verifyMFA(ctx, user.ID, code); err != nil {
+		uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
+		return nil, err
+	}
+	if payload.IP == "" {
+		payload.IP = ip
+	}
+	if payload.UA == "" {
+		payload.UA = ua
+	}
+	session, raw, err := uc.issueSession(ctx, user, payload.UA, payload.IP)
+	if err != nil {
+		return nil, err
+	}
+	_ = uc.Challenges.Delete(ctx, challengeID)
+	return &LoginResult{Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw}, nil
+}
+
+func (uc *AuthUsecase) issueSession(ctx context.Context, user *User, ua, ip string) (*Session, string, error) {
+	settings, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return nil, "", ErrDependency
+	}
+	raw, hash, err := GenerateSessionToken()
+	if err != nil {
+		return nil, "", ErrDependency
+	}
+	now := uc.Clock.Now().UTC()
+	ttl := uc.SessionTTL
+	if settings.SessionTTLMinutes > 0 {
+		ttl = time.Duration(settings.SessionTTLMinutes) * time.Minute
+	}
+	idle := uc.IdleTimeout
+	if settings.IdleTimeoutMinutes > 0 {
+		idle = time.Duration(settings.IdleTimeoutMinutes) * time.Minute
+	}
+	activeRoles, err := uc.activeRoleSubset(ctx, user.ID)
+	if err != nil {
+		return nil, "", err
+	}
+	s := &Session{
+		ID:              uc.IDs.NewID(),
+		UserID:          user.ID,
+		ApplicationCode: ApplicationCode,
+		TokenHash:       hash,
+		UserAgent:       SummizeAgent(ua),
+		IPMasked:        MaskIP(ip),
+		IssuedAt:        now,
+		LastSeenAt:      now,
+		ExpiresAt:       now.Add(ttl),
+		IdleExpiresAt:   now.Add(idle),
+		IdentityVersion: user.IdentityVersion,
+		Revision:        1,
+		ActiveRoleIDs:   activeRoles,
+	}
+	if err := uc.Sessions.Create(ctx, nil, s); err != nil {
+		return nil, "", ErrDependency
+	}
+	uc.recordSecurity(ctx, user.ID, s.ID, "login", "success", ip, ua, "")
+	return s, raw, nil
+}
+
+func (uc *AuthUsecase) activeRoleSubset(ctx context.Context, userID int64) ([]int64, error) {
+	assignments, err := uc.IAM.ListAssignmentsForUser(ctx, nil, userID)
+	if err != nil {
+		return nil, err
+	}
+	constraints, err := uc.IAM.ListConstraints(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := uc.IAM.ListRoles(ctx, nil, RoleFilter{})
+	if err != nil {
+		return nil, err
+	}
+	byID := map[int64]*Role{}
+	for _, r := range roles {
+		byID[r.ID] = r
+	}
+	now := uc.Clock.Now()
+	var out []int64
+	for _, a := range assignments {
+		if !a.Active(now) {
+			continue
+		}
+		if r := byID[a.RoleID]; r == nil || r.Status != RoleStatusActive {
+			continue
+		}
+		candidate := append(append([]int64{}, out...), a.RoleID)
+		if CheckConstraints(candidate, constraints) != nil {
+			continue
+		}
+		out = append(out, a.RoleID)
+	}
+	return out, nil
+}
+
+func (uc *AuthUsecase) Logout(ctx context.Context, actor ActorContext) error {
+	if actor.Session == nil {
+		return nil
+	}
+	now := uc.Clock.Now().UTC()
+	if err := uc.Sessions.Revoke(ctx, nil, actor.Session.ID, &now); err != nil {
+		return ErrDependency
+	}
+	_ = uc.StepUp.Delete(ctx, actor.Session.ID)
+	return nil
+}
+
+func (uc *AuthUsecase) CreatePasswordResetChallenge(ctx context.Context, identifier, ip string) (string, time.Time, error) {
+	if ok, _ := uc.Limiter.Allow(ctx, "reset:"+ip, 10, time.Hour); !ok {
+		return "", time.Time{}, ErrRateLimited
+	}
+	identifier = strings.TrimSpace(identifier)
+	var user *User
+	var err error
+	if strings.Contains(identifier, "@") {
+		user, err = uc.Users.GetByEmail(ctx, nil, NormalizeEmail(identifier))
+	} else {
+		user, err = uc.Users.GetByUsername(ctx, nil, NormalizeUsername(identifier))
+	}
+	// Always return a challenge-shaped response to avoid account enumeration.
+	id := uc.IDs.NewID()
+	expires := uc.Clock.Now().Add(uc.ResetTTL)
+	if err != nil || user == nil || user.Status == UserStatusArchived || user.Email == "" {
+		return id, expires, nil
+	}
+	code, err := GenerateCode()
+	if err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	if err := uc.Challenges.Put(ctx, Challenge{
+		ID: id, Purpose: "password_reset",
+		CodeHash: HMACCode(uc.CodeSecret, "password_reset:"+itoa(user.ID), code),
+		UserID:   user.ID, Email: user.Email, ExpiresAt: expires,
+	}); err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	_ = uc.Mail.Send(ctx, user.Email, "用户中心密码重置验证码", fmt.Sprintf("你的密码重置验证码是 %s，%d 分钟内有效。如非本人操作请忽略。", code, int(uc.ResetTTL.Minutes())))
+	return id, expires, nil
+}
+
+func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, newPassword string) error {
+	settings, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return ErrDependency
+	}
+	if err := ValidatePassword(newPassword, settings.PasswordMinLength); err != nil {
+		return err
+	}
+	challenge, err := uc.Challenges.Verify(ctx, "password_reset", challengeID, code)
+	if err != nil {
+		return err
+	}
+	user, err := uc.Users.Get(ctx, nil, challenge.UserID)
+	if err != nil {
+		return ErrChallengeInvalid
+	}
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return ErrDependency
+	}
+	now := uc.Clock.Now().UTC()
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		version, err := uc.Credentials.UpdatePassword(ctx, tx, user.ID, hash, "bcrypt", 1, false)
+		if err != nil {
+			return err
+		}
+		_ = version
+		newVersion, err := uc.Users.BumpIdentityVersion(ctx, tx, user.ID)
+		if err != nil {
+			return err
+		}
+		if err := uc.Sessions.RevokeAllForUser(ctx, tx, user.ID, &now); err != nil {
+			return err
+		}
+		if err := uc.Flows.Complete(ctx, tx, challenge.ID, "password_reset", user.ID, "password_reset"); err != nil {
+			return err
+		}
+		if err := uc.audit(ctx, tx, ActorContext{}, "credential.password.reset", itoa(user.ID), "{}", "{}", "{}", "self-service password reset", "success"); err != nil {
+			return err
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"user_id": user.ID, "identity_version": newVersion})
+		return uc.emit(ctx, tx, "user", user.ID, newVersion, "credential.changed", string(payload))
+	})
+	if err != nil {
+		return err
+	}
+	_ = uc.Challenges.Delete(ctx, challengeID)
+	uc.recordSecurity(ctx, user.ID, "", "password_reset", "success", "", "", "")
+	return nil
+}
+
+func (uc *AuthUsecase) publicUser(ctx context.Context, u *User) *User {
+	roles, _ := uc.Users.RolesForUser(ctx, nil, u.ID)
+	u.Roles = roles
+	return u
+}
+
+func emailDomainAllowed(email string, allowed []string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	at := strings.LastIndexByte(email, '@')
+	if at < 0 {
+		return false
+	}
+	domain := strings.ToLower(email[at+1:])
+	for _, d := range allowed {
+		if strings.EqualFold(strings.TrimSpace(d), domain) {
+			return true
+		}
+	}
+	return false
+}

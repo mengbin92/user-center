@@ -1,0 +1,3120 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: ""
+    version: 0.0.1
+paths:
+    /api/v1/admin/audits:
+        get:
+            tags:
+                - AuditService
+            operationId: AuditService_ListAuditEvents
+            parameters:
+                - name: action
+                  in: query
+                  schema:
+                    type: string
+                - name: actor_user_id
+                  in: query
+                  schema:
+                    type: string
+                - name: target
+                  in: query
+                  schema:
+                    type: string
+                - name: from
+                  in: query
+                  schema:
+                    type: string
+                - name: to
+                  in: query
+                  schema:
+                    type: string
+                - name: page_size
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: page_token
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AuditsReply'
+    /api/v1/admin/audits/{id}:
+        get:
+            tags:
+                - AuditService
+            operationId: AuditService_GetAuditEvent
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AuditEvent'
+    /api/v1/admin/audits:export:
+        post:
+            tags:
+                - AuditService
+            operationId: AuditService_ExportAuditEvents
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ExportAuditEventsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ExportJob'
+    /api/v1/admin/exports:
+        get:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_ListExports
+            parameters:
+                - name: page_size
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: page_token
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ExportsReply'
+    /api/v1/admin/exports/{id}:
+        get:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_GetExport
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ExportJob'
+    /api/v1/admin/iam/assignments:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_CreateAssignment
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateAssignmentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Assignment'
+    /api/v1/admin/iam/assignments/{id}:revoke:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_RevokeAssignment
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RevokeAssignmentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Assignment'
+    /api/v1/admin/iam/assignments:batch-assign:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_BatchAssign
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.BatchAssignRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.BatchAssignReply'
+    /api/v1/admin/iam/assignments:batch-preview:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_PreviewBatchAssign
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.PreviewBatchAssignRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.BatchPreviewReply'
+    /api/v1/admin/iam/authorization:explain:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_ExplainAuthorization
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ExplainAuthorizationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ExplainAuthorizationReply'
+    /api/v1/admin/iam/authorization:simulate:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_SimulateAuthorization
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.SimulateAuthorizationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SimulateAuthorizationReply'
+    /api/v1/admin/iam/constraints:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListConstraints
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ConstraintsReply'
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_CreateConstraint
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateConstraintRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Constraint'
+    /api/v1/admin/iam/constraints/{id}:
+        delete:
+            tags:
+                - IAMService
+            operationId: IAMService_DeleteConstraint
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: expected_revision
+                  in: query
+                  schema:
+                    type: string
+                - name: reason
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+        patch:
+            tags:
+                - IAMService
+            operationId: IAMService_UpdateConstraint
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateConstraintRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Constraint'
+    /api/v1/admin/iam/menus:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListMenus
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.MenusReply'
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_CreateMenuItem
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateMenuItemRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.MenuItem'
+    /api/v1/admin/iam/menus/{id}:
+        patch:
+            tags:
+                - IAMService
+            operationId: IAMService_UpdateMenuItem
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateMenuItemRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.MenuItem'
+    /api/v1/admin/iam/menus/{id}:archive:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_ArchiveMenuItem
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ArchiveMenuItemRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.MenuItem'
+    /api/v1/admin/iam/permissions:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListPermissions
+            parameters:
+                - name: category
+                  in: query
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  schema:
+                    type: string
+                - name: keyword
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.PermissionsReply'
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_CreatePermission
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreatePermissionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Permission'
+    /api/v1/admin/iam/permissions/{id}:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_GetPermission
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Permission'
+        patch:
+            tags:
+                - IAMService
+            operationId: IAMService_UpdatePermission
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdatePermissionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Permission'
+    /api/v1/admin/iam/permissions/{id}/references:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_GetPermissionReferences
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ReferencesReply'
+    /api/v1/admin/iam/permissions/{id}:archive:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_ArchivePermission
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ArchivePermissionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Permission'
+    /api/v1/admin/iam/permissions/{id}:set-status:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_SetPermissionStatus
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.SetPermissionStatusRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Permission'
+    /api/v1/admin/iam/resources:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListResources
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ResourcesReply'
+    /api/v1/admin/iam/roles:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListRoles
+            parameters:
+                - name: status
+                  in: query
+                  schema:
+                    type: string
+                - name: keyword
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RolesReply'
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_CreateRole
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateRoleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Role'
+    /api/v1/admin/iam/roles/{id}:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_GetRole
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Role'
+        patch:
+            tags:
+                - IAMService
+            operationId: IAMService_UpdateRole
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateRoleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Role'
+    /api/v1/admin/iam/roles/{id}/inheritance:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_GetRoleInheritance
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RoleInheritanceReply'
+        put:
+            tags:
+                - IAMService
+            operationId: IAMService_PutRoleInheritance
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.PutRoleInheritanceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RoleInheritanceReply'
+    /api/v1/admin/iam/roles/{id}/members:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListRoleMembers
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RoleMembersReply'
+    /api/v1/admin/iam/roles/{id}/permissions:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_GetRolePermissions
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RolePermissionsReply'
+        put:
+            tags:
+                - IAMService
+            operationId: IAMService_PutRolePermissions
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.PutRolePermissionsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RolePermissionsReply'
+    /api/v1/admin/iam/roles/{id}:archive:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_ArchiveRole
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ArchiveRoleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Role'
+    /api/v1/admin/iam/roles/{id}:copy:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_CopyRole
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CopyRoleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Role'
+    /api/v1/admin/iam/roles/{id}:preview:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_PreviewRoleChange
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.PreviewRoleChangeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.PreviewReply'
+    /api/v1/admin/iam/roles/{id}:set-status:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_SetRoleStatus
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.SetRoleStatusRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Role'
+    /api/v1/admin/overview:
+        get:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_GetOverview
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OverviewReply'
+    /api/v1/admin/settings/auth:
+        get:
+            tags:
+                - SettingsService
+            operationId: SettingsService_GetAuthSettings
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AuthSettings'
+        patch:
+            tags:
+                - SettingsService
+            operationId: SettingsService_UpdateAuthSettings
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateAuthSettingsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AuthSettings'
+    /api/v1/admin/settings/email:
+        get:
+            tags:
+                - SettingsService
+            operationId: SettingsService_GetEmailSettings
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.EmailSettings'
+        patch:
+            tags:
+                - SettingsService
+            operationId: SettingsService_UpdateEmailSettings
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateEmailSettingsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.EmailSettings'
+    /api/v1/admin/users:
+        get:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_ListUsers
+            parameters:
+                - name: keyword
+                  in: query
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  schema:
+                    type: string
+                - name: role_id
+                  in: query
+                  schema:
+                    type: string
+                - name: mfa_enabled
+                  in: query
+                  description: any | true | false
+                  schema:
+                    type: string
+                - name: page_size
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: page_token
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.UsersReply'
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_CreateUser
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateUserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
+    /api/v1/admin/users/{id}:
+        get:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_GetUser
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
+        patch:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_UpdateUser
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateUserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
+    /api/v1/admin/users/{id}/effective-permissions:
+        get:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_GetUserEffectivePermissions
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.EffectivePermissionsReply'
+    /api/v1/admin/users/{id}/mfa:reset:
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_ResetMFA
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ResetMFARequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/admin/users/{id}/password-reset-requests:
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_CreatePasswordResetRequest
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreatePasswordResetTaskRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.PasswordResetTaskReply'
+    /api/v1/admin/users/{id}/roles:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListUserRoles
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AssignmentsReply'
+    /api/v1/admin/users/{id}/sessions:
+        get:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_ListUserSessions
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SessionsReply'
+    /api/v1/admin/users/{id}/sessions:revoke:
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_RevokeUserSessions
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RevokeUserSessionsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/admin/users/{id}:archive:
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_ArchiveUser
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ArchiveUserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
+    /api/v1/admin/users/{id}:set-status:
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_SetUserStatus
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.SetUserStatusRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
+    /api/v1/admin/users:export:
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_ExportUsers
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ExportUsersRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ExportJob'
+    /api/v1/auth/context:
+        get:
+            tags:
+                - AuthService
+            operationId: AuthService_GetAuthContext
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AuthContext'
+    /api/v1/auth/login:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_Login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.LoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.LoginReply'
+    /api/v1/auth/logout:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_Logout
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.LogoutRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/auth/mfa/complete:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_CompleteMFA
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CompleteMFARequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.LoginReply'
+    /api/v1/auth/password-reset:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_ResetPassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ResetPasswordRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/auth/password-reset-challenges:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_CreatePasswordResetChallenge
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreatePasswordResetChallengeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ChallengeReply'
+    /api/v1/auth/register:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_Register
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RegisterRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RegisterReply'
+    /api/v1/auth/registration-challenges:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_CreateRegistrationChallenge
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateRegistrationChallengeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ChallengeReply'
+    /api/v1/me:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_GetMe
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
+        patch:
+            tags:
+                - MeService
+            operationId: MeService_UpdateMe
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateMeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
+    /api/v1/me/authorization:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_GetAuthorization
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AuthorizationReply'
+    /api/v1/me/email-challenges:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_CreateEmailChallenge
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateEmailChallengeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ChallengeReply'
+    /api/v1/me/email:confirm:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_ConfirmEmail
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ConfirmEmailRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
+    /api/v1/me/external-identities:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_ListExternalIdentities
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ExternalIdentitiesReply'
+    /api/v1/me/external-identities/{id}:
+        delete:
+            tags:
+                - MeService
+            operationId: MeService_DeleteExternalIdentity
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/me/mfa/recovery-codes:rotate:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_RotateRecoveryCodes
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RotateRecoveryCodesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RecoveryCodesReply'
+    /api/v1/me/mfa:confirm:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_ConfirmMFA
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ConfirmMFARequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.RecoveryCodesReply'
+    /api/v1/me/mfa:disable:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_DisableMFA
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.DisableMFARequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/me/mfa:setup:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_SetupMFA
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.SetupMFARequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SetupMFAReply'
+    /api/v1/me/password:change:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_ChangePassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ChangePasswordRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/me/security:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_GetSecurity
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SecurityStatus'
+    /api/v1/me/security-events:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_ListSecurityEvents
+            parameters:
+                - name: page_size
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: page_token
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SecurityEventsReply'
+    /api/v1/me/security:verify:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_VerifySecurity
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.VerifySecurityRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.VerifySecurityReply'
+    /api/v1/me/session-roles:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_GetSessionRoles
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SessionRolesReply'
+        put:
+            tags:
+                - MeService
+            operationId: MeService_PutSessionRoles
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.PutSessionRolesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SessionRolesReply'
+    /api/v1/me/sessions:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_ListSessions
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SessionsReply'
+    /api/v1/me/sessions/{id}:
+        delete:
+            tags:
+                - MeService
+            operationId: MeService_RevokeSession
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/me/sessions:revoke-others:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_RevokeOtherSessions
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RevokeOtherSessionsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+components:
+    schemas:
+        api.usercenter.v1.ArchiveMenuItemRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.ArchivePermissionRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.ArchiveRoleRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.ArchiveUserRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.Assignment:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                role_id:
+                    type: string
+                boundary:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                revoked:
+                    type: boolean
+                origin:
+                    type: string
+                revision:
+                    type: string
+                assigned_by:
+                    type: string
+        api.usercenter.v1.AssignmentsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Assignment'
+        api.usercenter.v1.AuditEvent:
+            type: object
+            properties:
+                id:
+                    type: string
+                actor_user_id:
+                    type: string
+                actor_service_id:
+                    type: string
+                actor_session_id:
+                    type: string
+                action:
+                    type: string
+                target:
+                    type: string
+                before:
+                    type: string
+                after:
+                    type: string
+                diff:
+                    type: string
+                result:
+                    type: string
+                reason:
+                    type: string
+                request_id:
+                    type: string
+                authorization_versions:
+                    type: string
+                occurred_at:
+                    type: string
+        api.usercenter.v1.AuditsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.AuditEvent'
+                meta:
+                    $ref: '#/components/schemas/api.usercenter.v1.ListMeta'
+        api.usercenter.v1.AuthContext:
+            type: object
+            properties:
+                registration_enabled:
+                    type: boolean
+                email_verification_required:
+                    type: boolean
+                providers:
+                    type: array
+                    items:
+                        type: string
+                csrf_token:
+                    type: string
+                password_min_length:
+                    type: integer
+                    format: int32
+                mfa_required_for_admins:
+                    type: boolean
+        api.usercenter.v1.AuthSettings:
+            type: object
+            properties:
+                registration_enabled:
+                    type: boolean
+                email_verification_required:
+                    type: boolean
+                password_min_length:
+                    type: integer
+                    format: int32
+                session_ttl_minutes:
+                    type: integer
+                    format: int32
+                idle_timeout_minutes:
+                    type: integer
+                    format: int32
+                mfa_required_for_admins:
+                    type: boolean
+                allowed_email_domains:
+                    type: array
+                    items:
+                        type: string
+                providers:
+                    type: array
+                    items:
+                        type: string
+                revision:
+                    type: string
+        api.usercenter.v1.AuthorizationReply:
+            type: object
+            properties:
+                permissions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.PermissionSummary'
+                menu_keys:
+                    type: array
+                    items:
+                        type: string
+                policy_revision:
+                    type: string
+                user_revision:
+                    type: string
+        api.usercenter.v1.BatchAssignReply:
+            type: object
+            properties:
+                assignments:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Assignment'
+        api.usercenter.v1.BatchAssignRequest:
+            type: object
+            properties:
+                user_ids:
+                    type: array
+                    items:
+                        type: string
+                role_id:
+                    type: string
+                boundary:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
+        api.usercenter.v1.BatchFailure:
+            type: object
+            properties:
+                user_id:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.BatchPreviewReply:
+            type: object
+            properties:
+                eligible_user_ids:
+                    type: array
+                    items:
+                        type: string
+                failures:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.BatchFailure'
+        api.usercenter.v1.ChallengeReply:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                expires_at:
+                    type: string
+        api.usercenter.v1.ChangePasswordRequest:
+            type: object
+            properties:
+                current_password:
+                    type: string
+                new_password:
+                    type: string
+        api.usercenter.v1.CompleteMFARequest:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                code:
+                    type: string
+        api.usercenter.v1.ConfirmEmailRequest:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                code:
+                    type: string
+        api.usercenter.v1.ConfirmMFARequest:
+            type: object
+            properties:
+                code:
+                    type: string
+        api.usercenter.v1.Constraint:
+            type: object
+            properties:
+                id:
+                    type: string
+                kind:
+                    type: string
+                    description: mutual_exclusion | max_roles
+                name:
+                    type: string
+                role_ids:
+                    type: array
+                    items:
+                        type: string
+                max_count:
+                    type: string
+                enabled:
+                    type: boolean
+                revision:
+                    type: string
+        api.usercenter.v1.ConstraintsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Constraint'
+        api.usercenter.v1.CopyRoleRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.CreateAssignmentRequest:
+            type: object
+            properties:
+                user_id:
+                    type: string
+                role_id:
+                    type: string
+                boundary:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
+        api.usercenter.v1.CreateConstraintRequest:
+            type: object
+            properties:
+                kind:
+                    type: string
+                name:
+                    type: string
+                role_ids:
+                    type: array
+                    items:
+                        type: string
+                max_count:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
+        api.usercenter.v1.CreateEmailChallengeRequest:
+            type: object
+            properties:
+                new_email:
+                    type: string
+                current_password:
+                    type: string
+                code:
+                    type: string
+        api.usercenter.v1.CreateMenuItemRequest:
+            type: object
+            properties:
+                parent_id:
+                    type: string
+                route_key:
+                    type: string
+                name:
+                    type: string
+                icon_key:
+                    type: string
+                sort:
+                    type: integer
+                    format: int32
+                required_all:
+                    type: array
+                    items:
+                        type: string
+                required_any:
+                    type: array
+                    items:
+                        type: string
+                reason:
+                    type: string
+        api.usercenter.v1.CreatePasswordResetChallengeRequest:
+            type: object
+            properties:
+                identifier:
+                    type: string
+                    description: Username or email. The response never reveals whether the account exists.
+        api.usercenter.v1.CreatePasswordResetTaskRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.CreatePermissionRequest:
+            type: object
+            properties:
+                resource_id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                category:
+                    type: string
+                risk_level:
+                    type: string
+                supported_scopes:
+                    type: array
+                    items:
+                        type: string
+                context_types:
+                    type: array
+                    items:
+                        type: string
+                description:
+                    type: string
+                sort:
+                    type: integer
+                    format: int32
+                reason:
+                    type: string
+        api.usercenter.v1.CreateRegistrationChallengeRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+        api.usercenter.v1.CreateRoleRequest:
+            type: object
+            properties:
+                code:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Grant'
+                inherits:
+                    type: array
+                    items:
+                        type: string
+                max_members:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
+        api.usercenter.v1.CreateUserRequest:
+            type: object
+            properties:
+                username:
+                    type: string
+                email:
+                    type: string
+                display_name:
+                    type: string
+                role_ids:
+                    type: array
+                    items:
+                        type: string
+                send_activation:
+                    type: boolean
+                initial_password:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.DisableMFARequest:
+            type: object
+            properties:
+                current_password:
+                    type: string
+                code:
+                    type: string
+        api.usercenter.v1.EffectivePermission:
+            type: object
+            properties:
+                operation:
+                    type: string
+                effect:
+                    type: string
+                scope:
+                    type: string
+                role_id:
+                    type: string
+                role_code:
+                    type: string
+                assignment_id:
+                    type: string
+                source:
+                    type: string
+        api.usercenter.v1.EffectivePermissionsReply:
+            type: object
+            properties:
+                permissions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.EffectivePermission'
+                policy_revision:
+                    type: string
+                user_revision:
+                    type: string
+        api.usercenter.v1.EmailSettings:
+            type: object
+            properties:
+                driver:
+                    type: string
+                    description: console | smtp
+                from:
+                    type: string
+                smtp_host:
+                    type: string
+                smtp_port:
+                    type: integer
+                    format: int32
+                smtp_username:
+                    type: string
+                password_configured:
+                    type: boolean
+                revision:
+                    type: string
+        api.usercenter.v1.ExplainAuthorizationReply:
+            type: object
+            properties:
+                allowed:
+                    type: boolean
+                reason:
+                    type: string
+                sources:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.GrantSource'
+                policy_revision:
+                    type: string
+                user_revision:
+                    type: string
+                valid_until:
+                    type: string
+        api.usercenter.v1.ExplainAuthorizationRequest:
+            type: object
+            properties:
+                user_id:
+                    type: string
+                operation:
+                    type: string
+                resource_id:
+                    type: string
+                owner_user_id:
+                    type: string
+        api.usercenter.v1.ExportAuditEventsRequest:
+            type: object
+            properties:
+                action:
+                    type: string
+                actor_user_id:
+                    type: string
+                from:
+                    type: string
+                to:
+                    type: string
+                fields:
+                    type: array
+                    items:
+                        type: string
+                reason:
+                    type: string
+        api.usercenter.v1.ExportJob:
+            type: object
+            properties:
+                id:
+                    type: string
+                kind:
+                    type: string
+                status:
+                    type: string
+                requested_fields:
+                    type: string
+                artifact_name:
+                    type: string
+                expires_at:
+                    type: string
+                created_at:
+                    type: string
+                error:
+                    type: string
+        api.usercenter.v1.ExportUsersRequest:
+            type: object
+            properties:
+                keyword:
+                    type: string
+                status:
+                    type: string
+                fields:
+                    type: array
+                    items:
+                        type: string
+                reason:
+                    type: string
+        api.usercenter.v1.ExportsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.ExportJob'
+                meta:
+                    $ref: '#/components/schemas/api.usercenter.v1.ListMeta'
+        api.usercenter.v1.ExternalIdentitiesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.ExternalIdentity'
+        api.usercenter.v1.ExternalIdentity:
+            type: object
+            properties:
+                id:
+                    type: string
+                provider:
+                    type: string
+                display:
+                    type: string
+                created_at:
+                    type: string
+        api.usercenter.v1.Grant:
+            type: object
+            properties:
+                operation:
+                    type: string
+                effect:
+                    type: string
+                    description: allow | deny
+                scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+        api.usercenter.v1.GrantSource:
+            type: object
+            properties:
+                role_id:
+                    type: string
+                role_code:
+                    type: string
+                operation:
+                    type: string
+                effect:
+                    type: string
+                scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                assignment_id:
+                    type: string
+                inheritance_path:
+                    type: array
+                    items:
+                        type: string
+                active:
+                    type: boolean
+                expires_at:
+                    type: string
+        api.usercenter.v1.ListMeta:
+            type: object
+            properties:
+                next_page_token:
+                    type: string
+                total_size:
+                    type: string
+        api.usercenter.v1.LoginReply:
+            type: object
+            properties:
+                status:
+                    type: string
+                    description: authenticated | mfa_required
+                challenge_id:
+                    type: string
+                challenge_expires_at:
+                    type: string
+                user:
+                    $ref: '#/components/schemas/api.usercenter.v1.User'
+                session_expires_at:
+                    type: string
+        api.usercenter.v1.LoginRequest:
+            type: object
+            properties:
+                username:
+                    type: string
+                password:
+                    type: string
+                remember:
+                    type: boolean
+        api.usercenter.v1.LogoutRequest:
+            type: object
+            properties: {}
+        api.usercenter.v1.MenuItem:
+            type: object
+            properties:
+                id:
+                    type: string
+                parent_id:
+                    type: string
+                route_key:
+                    type: string
+                name:
+                    type: string
+                icon_key:
+                    type: string
+                sort:
+                    type: integer
+                    format: int32
+                enabled:
+                    type: boolean
+                required_all:
+                    type: array
+                    items:
+                        type: string
+                required_any:
+                    type: array
+                    items:
+                        type: string
+                revision:
+                    type: string
+        api.usercenter.v1.MenusReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.MenuItem'
+        api.usercenter.v1.OverviewReply:
+            type: object
+            properties:
+                total_users:
+                    type: string
+                enabled_users:
+                    type: string
+                disabled_users:
+                    type: string
+                archived_users:
+                    type: string
+                mfa_users:
+                    type: string
+                active_sessions:
+                    type: string
+                logins_24h:
+                    type: string
+                failed_logins_24h:
+                    type: string
+        api.usercenter.v1.PasswordResetTaskReply:
+            type: object
+            properties:
+                queued:
+                    type: boolean
+                expires_at:
+                    type: string
+        api.usercenter.v1.Permission:
+            type: object
+            properties:
+                id:
+                    type: string
+                resource_id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                category:
+                    type: string
+                risk_level:
+                    type: string
+                status:
+                    type: string
+                    description: active | disabled | archived
+                binding:
+                    type: string
+                    description: bound | unbound
+                supported_scopes:
+                    type: array
+                    items:
+                        type: string
+                context_types:
+                    type: array
+                    items:
+                        type: string
+                protected:
+                    type: boolean
+                description:
+                    type: string
+                sort:
+                    type: integer
+                    format: int32
+                revision:
+                    type: string
+        api.usercenter.v1.PermissionSummary:
+            type: object
+            properties:
+                operation:
+                    type: string
+                effect:
+                    type: string
+                scope:
+                    type: string
+        api.usercenter.v1.PermissionsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Permission'
+        api.usercenter.v1.PreviewBatchAssignRequest:
+            type: object
+            properties:
+                user_ids:
+                    type: array
+                    items:
+                        type: string
+                role_id:
+                    type: string
+                boundary:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                expires_at:
+                    type: string
+        api.usercenter.v1.PreviewReply:
+            type: object
+            properties:
+                warnings:
+                    type: array
+                    items:
+                        type: string
+                permission_diff_added:
+                    type: array
+                    items:
+                        type: string
+                permission_diff_removed:
+                    type: array
+                    items:
+                        type: string
+                affected_user_count:
+                    type: string
+        api.usercenter.v1.PreviewRoleChangeRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Grant'
+                inherits:
+                    type: array
+                    items:
+                        type: string
+        api.usercenter.v1.PutRoleInheritanceRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                inherits:
+                    type: array
+                    items:
+                        type: string
+                expected_revision:
+                    type: string
+                expected_policy_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.PutRolePermissionsRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Grant'
+                expected_revision:
+                    type: string
+                expected_policy_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.PutSessionRolesRequest:
+            type: object
+            properties:
+                role_ids:
+                    type: array
+                    items:
+                        type: string
+                expected_revision:
+                    type: string
+        api.usercenter.v1.RecoveryCodesReply:
+            type: object
+            properties:
+                recovery_codes:
+                    type: array
+                    items:
+                        type: string
+        api.usercenter.v1.Reference:
+            type: object
+            properties:
+                kind:
+                    type: string
+                id:
+                    type: string
+                user_id:
+                    type: string
+        api.usercenter.v1.ReferencesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Reference'
+        api.usercenter.v1.RegisterReply:
+            type: object
+            properties:
+                user:
+                    $ref: '#/components/schemas/api.usercenter.v1.User'
+        api.usercenter.v1.RegisterRequest:
+            type: object
+            properties:
+                username:
+                    type: string
+                email:
+                    type: string
+                password:
+                    type: string
+                code:
+                    type: string
+                challenge_id:
+                    type: string
+                terms_version:
+                    type: string
+        api.usercenter.v1.ResetMFARequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.ResetPasswordRequest:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                code:
+                    type: string
+                new_password:
+                    type: string
+        api.usercenter.v1.Resource:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                owner:
+                    type: string
+                enabled:
+                    type: boolean
+        api.usercenter.v1.ResourcesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Resource'
+        api.usercenter.v1.RevokeAssignmentRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
+        api.usercenter.v1.RevokeOtherSessionsRequest:
+            type: object
+            properties: {}
+        api.usercenter.v1.RevokeUserSessionsRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                session_ids:
+                    type: array
+                    items:
+                        type: string
+                revoke_all:
+                    type: boolean
+                reason:
+                    type: string
+        api.usercenter.v1.Role:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                builtin:
+                    type: boolean
+                status:
+                    type: string
+                    description: active | disabled | archived
+                max_members:
+                    type: string
+                revision:
+                    type: string
+                inherits:
+                    type: array
+                    items:
+                        type: string
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Grant'
+        api.usercenter.v1.RoleInheritanceReply:
+            type: object
+            properties:
+                inherits:
+                    type: array
+                    items:
+                        type: string
+                revision:
+                    type: string
+        api.usercenter.v1.RoleMember:
+            type: object
+            properties:
+                user_id:
+                    type: string
+                username:
+                    type: string
+                display_name:
+                    type: string
+                assignment_id:
+                    type: string
+                assigned_at:
+                    type: string
+                expires_at:
+                    type: string
+                origin:
+                    type: string
+        api.usercenter.v1.RoleMembersReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.RoleMember'
+        api.usercenter.v1.RolePermissionsReply:
+            type: object
+            properties:
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Grant'
+                revision:
+                    type: string
+        api.usercenter.v1.RoleRef:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+        api.usercenter.v1.RolesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Role'
+        api.usercenter.v1.RotateRecoveryCodesRequest:
+            type: object
+            properties:
+                current_password:
+                    type: string
+                code:
+                    type: string
+        api.usercenter.v1.Scope:
+            type: object
+            properties:
+                all:
+                    type: boolean
+                self:
+                    type: boolean
+                user_ids:
+                    type: array
+                    items:
+                        type: string
+        api.usercenter.v1.SecurityEvent:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                session_id:
+                    type: string
+                kind:
+                    type: string
+                result:
+                    type: string
+                ip_masked:
+                    type: string
+                user_agent_summary:
+                    type: string
+                request_id:
+                    type: string
+                occurred_at:
+                    type: string
+        api.usercenter.v1.SecurityEventsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.SecurityEvent'
+                meta:
+                    $ref: '#/components/schemas/api.usercenter.v1.ListMeta'
+        api.usercenter.v1.SecurityStatus:
+            type: object
+            properties:
+                mfa_enabled:
+                    type: boolean
+                password_available:
+                    type: boolean
+                recovery_codes_remaining:
+                    type: integer
+                    format: int32
+                step_up_verified:
+                    type: boolean
+                step_up_expires_at:
+                    type: string
+                mfa_required:
+                    type: boolean
+        api.usercenter.v1.SessionInfo:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                application_code:
+                    type: string
+                device:
+                    type: string
+                ip_masked:
+                    type: string
+                current:
+                    type: boolean
+                active_role_ids:
+                    type: array
+                    items:
+                        type: string
+                issued_at:
+                    type: string
+                last_seen_at:
+                    type: string
+                expires_at:
+                    type: string
+                revoked_at:
+                    type: string
+        api.usercenter.v1.SessionRole:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                active:
+                    type: boolean
+                builtin:
+                    type: boolean
+        api.usercenter.v1.SessionRolesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.SessionRole'
+                revision:
+                    type: string
+        api.usercenter.v1.SessionsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.SessionInfo'
+        api.usercenter.v1.SetPermissionStatusRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                status:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.SetRoleStatusRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                status:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.SetUserStatusRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                status:
+                    type: string
+                    description: enabled | disabled
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.SetupMFAReply:
+            type: object
+            properties:
+                secret:
+                    type: string
+                otpauth_uri:
+                    type: string
+                expires_at:
+                    type: string
+        api.usercenter.v1.SetupMFARequest:
+            type: object
+            properties:
+                current_password:
+                    type: string
+        api.usercenter.v1.SimulateAuthorizationReply:
+            type: object
+            properties:
+                before_allowed:
+                    type: boolean
+                after_allowed:
+                    type: boolean
+                before_reason:
+                    type: string
+                after_reason:
+                    type: string
+                added_permissions:
+                    type: array
+                    items:
+                        type: string
+                removed_permissions:
+                    type: array
+                    items:
+                        type: string
+        api.usercenter.v1.SimulateAuthorizationRequest:
+            type: object
+            properties:
+                user_id:
+                    type: string
+                add_role_ids:
+                    type: array
+                    items:
+                        type: string
+                remove_role_ids:
+                    type: array
+                    items:
+                        type: string
+                operation:
+                    type: string
+                owner_user_id:
+                    type: string
+        api.usercenter.v1.UpdateAuthSettingsRequest:
+            type: object
+            properties:
+                registration_enabled:
+                    type: boolean
+                email_verification_required:
+                    type: boolean
+                password_min_length:
+                    type: integer
+                    format: int32
+                session_ttl_minutes:
+                    type: integer
+                    format: int32
+                idle_timeout_minutes:
+                    type: integer
+                    format: int32
+                mfa_required_for_admins:
+                    type: boolean
+                allowed_email_domains:
+                    type: array
+                    items:
+                        type: string
+                providers:
+                    type: array
+                    items:
+                        type: string
+                update_mask:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateConstraintRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                role_ids:
+                    type: array
+                    items:
+                        type: string
+                max_count:
+                    type: string
+                enabled:
+                    type: boolean
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateEmailSettingsRequest:
+            type: object
+            properties:
+                driver:
+                    type: string
+                from:
+                    type: string
+                smtp_host:
+                    type: string
+                smtp_port:
+                    type: integer
+                    format: int32
+                smtp_username:
+                    type: string
+                smtp_password:
+                    type: string
+                    description: Write-only. Empty keeps the stored secret.
+                update_mask:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateMeRequest:
+            type: object
+            properties:
+                display_name:
+                    type: string
+                update_mask:
+                    type: string
+                expected_revision:
+                    type: string
+        api.usercenter.v1.UpdateMenuItemRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                icon_key:
+                    type: string
+                sort:
+                    type: integer
+                    format: int32
+                enabled:
+                    type: boolean
+                required_all:
+                    type: array
+                    items:
+                        type: string
+                required_any:
+                    type: array
+                    items:
+                        type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdatePermissionRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                category:
+                    type: string
+                risk_level:
+                    type: string
+                supported_scopes:
+                    type: array
+                    items:
+                        type: string
+                description:
+                    type: string
+                sort:
+                    type: integer
+                    format: int32
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateRoleRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                max_members:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateUserRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                display_name:
+                    type: string
+                update_mask:
+                    type: string
+                expected_revision:
+                    type: string
+                expected_policy_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.User:
+            type: object
+            properties:
+                id:
+                    type: string
+                username:
+                    type: string
+                display_name:
+                    type: string
+                email:
+                    type: string
+                email_verified:
+                    type: boolean
+                status:
+                    type: string
+                    description: enabled | disabled | archived
+                revision:
+                    type: string
+                identity_version:
+                    type: string
+                created_at:
+                    type: string
+                updated_at:
+                    type: string
+                archived_at:
+                    type: string
+                mfa_enabled:
+                    type: boolean
+                roles:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.RoleRef'
+            description: |-
+                User is the account projection returned by the API. Numeric IDs and
+                 revisions are decimal strings so JavaScript callers never lose precision.
+        api.usercenter.v1.UsersReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.User'
+                meta:
+                    $ref: '#/components/schemas/api.usercenter.v1.ListMeta'
+        api.usercenter.v1.VerifySecurityReply:
+            type: object
+            properties:
+                verified:
+                    type: boolean
+                expires_at:
+                    type: string
+        api.usercenter.v1.VerifySecurityRequest:
+            type: object
+            properties:
+                current_password:
+                    type: string
+                code:
+                    type: string
+tags:
+    - name: AdminUserService
+      description: AdminUserService is the administrator account lifecycle surface.
+    - name: AuditService
+      description: AuditService exposes the immutable authorization and security audit trail.
+    - name: AuthService
+      description: |-
+        AuthService owns public, unauthenticated authentication entry points.
+         Browser sessions are established with HttpOnly cookies; no bearer token is
+         ever returned to a browser caller.
+    - name: IAMService
+      description: |-
+        IAMService is the platform authorization governance surface. Every write
+         carries the expected policy revision and a reason; preview responses are
+         descriptive and never grant authority.
+    - name: MeService
+      description: MeService owns the authenticated user's self-service surface.
+    - name: SettingsService
+      description: |-
+        SettingsService owns non-secret authentication policy. Secret material is
+         only accepted on write and never returned by this API.

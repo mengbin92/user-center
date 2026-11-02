@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// AuthService owns public, unauthenticated authentication entry points.
+// Browser sessions are established with HttpOnly cookies; no bearer token is
+// ever returned to a browser caller.
+service AuthService {
+  rpc GetAuthContext(GetAuthContextRequest) returns (AuthContext) {
+    option (google.api.http) = {get: "/api/v1/auth/context"};
+  }
+  rpc CreateRegistrationChallenge(CreateRegistrationChallengeRequest) returns (ChallengeReply) {
+    option (google.api.http) = {post: "/api/v1/auth/registration-challenges" body: "*"};
+  }
+  rpc Register(RegisterRequest) returns (RegisterReply) {
+    option (google.api.http) = {post: "/api/v1/auth/register" body: "*"};
+  }
+  rpc Login(LoginRequest) returns (LoginReply) {
+    option (google.api.http) = {post: "/api/v1/auth/login" body: "*"};
+  }
+  rpc CompleteMFA(CompleteMFARequest) returns (LoginReply) {
+    option (google.api.http) = {post: "/api/v1/auth/mfa/complete" body: "*"};
+  }
+  rpc Logout(LogoutRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/auth/logout" body: "*"};
+  }
+  rpc CreatePasswordResetChallenge(CreatePasswordResetChallengeRequest) returns (ChallengeReply) {
+    option (google.api.http) = {post: "/api/v1/auth/password-reset-challenges" body: "*"};
+  }
+  rpc ResetPassword(ResetPasswordRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/auth/password-reset" body: "*"};
+  }
+}
+
+message GetAuthContextRequest {}
+
+message AuthContext {
+  bool registration_enabled = 1;
+  bool email_verification_required = 2;
+  repeated string providers = 3;
+  string csrf_token = 4;
+  int32 password_min_length = 5;
+  bool mfa_required_for_admins = 6;
+}
+
+message CreateRegistrationChallengeRequest {
+  string email = 1;
+}
+
+message RegisterRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+  string code = 4;
+  string challenge_id = 5;
+  string terms_version = 6;
+}
+
+message RegisterReply {
+  User user = 1;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+  bool remember = 3;
+}
+
+message LoginReply {
+  // authenticated | mfa_required
+  string status = 1;
+  string challenge_id = 2;
+  string challenge_expires_at = 3;
+  User user = 4;
+  string session_expires_at = 5;
+}
+
+message CompleteMFARequest {
+  string challenge_id = 1;
+  string code = 2;
+}
+
+message LogoutRequest {}
+
+message CreatePasswordResetChallengeRequest {
+  // Username or email. The response never reveals whether the account exists.
+  string identifier = 1;
+}
+
+message ResetPasswordRequest {
+  string challenge_id = 1;
+  string code = 2;
+  string new_password = 3;
+}

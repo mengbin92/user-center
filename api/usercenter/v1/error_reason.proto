@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// ErrorReason is the stable machine-readable reason carried in the Kratos
+// error reason field and matching the `reason` member of the JSON error body.
+enum ErrorReason {
+  ERROR_REASON_UNSPECIFIED = 0;
+  VALIDATION_FAILED = 1;
+  CHALLENGE_INVALID = 2;
+  UNAUTHENTICATED = 3;
+  SESSION_REVOKED = 4;
+  PERMISSION_DENIED = 5;
+  PROTECTED_ACCOUNT = 6;
+  STEP_UP_REQUIRED = 7;
+  MFA_ENROLLMENT_REQUIRED = 8;
+  USER_NOT_FOUND = 9;
+  RESOURCE_NOT_FOUND = 10;
+  REVISION_CONFLICT = 11;
+  USERNAME_EXISTS = 12;
+  ROLE_CONSTRAINT_VIOLATION = 13;
+  RATE_LIMITED = 14;
+  MFA_LOCKED = 15;
+  DEPENDENCY_UNAVAILABLE = 16;
+  AUTHORIZATION_UNAVAILABLE = 17;
+  MFA_REQUIRED = 18;
+  INVALID_CREDENTIALS = 19;
+  LAST_LOGIN_METHOD = 20;
+  ROOT_PROTECTED = 21;
+  POLICY_CONFLICT = 22;
+}

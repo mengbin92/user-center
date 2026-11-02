@@ -1,0 +1,30 @@
+server:
+  http:
+    addr: ":8080"
+    timeout_seconds: 30
+    public_base_url: "http://localhost:8080"
+  grpc:
+    addr: ":9090"
+    timeout_seconds: 30
+
+data:
+  database:
+    driver: mysql
+    source: "usercenter:change-me@tcp(mysql:3306)/usercenter?parseTime=true&loc=UTC&charset=utf8mb4"
+    max_open_conns: 20
+    max_idle_conns: 10
+  redis:
+    addr: "redis:6379"
+    password: ""
+    db: 0
+
+security:
+  cookie_secure: true
+  session_ttl_minutes: 720
+  idle_timeout_minutes: 60
+  step_up_ttl_minutes: 5
+  trust_proxy_headers: true
+
+mail:
+  driver: console
+  from: "no-reply@user-center.local"

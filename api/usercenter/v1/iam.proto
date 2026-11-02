@@ -1,0 +1,569 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// IAMService is the platform authorization governance surface. Every write
+// carries the expected policy revision and a reason; preview responses are
+// descriptive and never grant authority.
+service IAMService {
+  rpc ListResources(ListResourcesRequest) returns (ResourcesReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/resources"};
+  }
+  rpc ListPermissions(ListPermissionsRequest) returns (PermissionsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/permissions"};
+  }
+  rpc GetPermission(GetPermissionRequest) returns (Permission) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/permissions/{id}"};
+  }
+  rpc CreatePermission(CreatePermissionRequest) returns (Permission) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/permissions" body: "*"};
+  }
+  rpc UpdatePermission(UpdatePermissionRequest) returns (Permission) {
+    option (google.api.http) = {patch: "/api/v1/admin/iam/permissions/{id}" body: "*"};
+  }
+  rpc SetPermissionStatus(SetPermissionStatusRequest) returns (Permission) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/permissions/{id}:set-status" body: "*"};
+  }
+  rpc ArchivePermission(ArchivePermissionRequest) returns (Permission) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/permissions/{id}:archive" body: "*"};
+  }
+  rpc GetPermissionReferences(GetPermissionReferencesRequest) returns (ReferencesReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/permissions/{id}/references"};
+  }
+
+  rpc ListRoles(ListRolesRequest) returns (RolesReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/roles"};
+  }
+  rpc GetRole(GetRoleRequest) returns (Role) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/roles/{id}"};
+  }
+  rpc CreateRole(CreateRoleRequest) returns (Role) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/roles" body: "*"};
+  }
+  rpc UpdateRole(UpdateRoleRequest) returns (Role) {
+    option (google.api.http) = {patch: "/api/v1/admin/iam/roles/{id}" body: "*"};
+  }
+  rpc CopyRole(CopyRoleRequest) returns (Role) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/roles/{id}:copy" body: "*"};
+  }
+  rpc SetRoleStatus(SetRoleStatusRequest) returns (Role) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/roles/{id}:set-status" body: "*"};
+  }
+  rpc ArchiveRole(ArchiveRoleRequest) returns (Role) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/roles/{id}:archive" body: "*"};
+  }
+  rpc ListRoleMembers(ListRoleMembersRequest) returns (RoleMembersReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/roles/{id}/members"};
+  }
+  rpc GetRolePermissions(GetRolePermissionsRequest) returns (RolePermissionsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/roles/{id}/permissions"};
+  }
+  rpc PutRolePermissions(PutRolePermissionsRequest) returns (RolePermissionsReply) {
+    option (google.api.http) = {put: "/api/v1/admin/iam/roles/{id}/permissions" body: "*"};
+  }
+  rpc GetRoleInheritance(GetRoleInheritanceRequest) returns (RoleInheritanceReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/roles/{id}/inheritance"};
+  }
+  rpc PutRoleInheritance(PutRoleInheritanceRequest) returns (RoleInheritanceReply) {
+    option (google.api.http) = {put: "/api/v1/admin/iam/roles/{id}/inheritance" body: "*"};
+  }
+  rpc PreviewRoleChange(PreviewRoleChangeRequest) returns (PreviewReply) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/roles/{id}:preview" body: "*"};
+  }
+
+  rpc ListUserRoles(ListUserRolesRequest) returns (AssignmentsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/users/{id}/roles"};
+  }
+  rpc CreateAssignment(CreateAssignmentRequest) returns (Assignment) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/assignments" body: "*"};
+  }
+  rpc RevokeAssignment(RevokeAssignmentRequest) returns (Assignment) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/assignments/{id}:revoke" body: "*"};
+  }
+  rpc PreviewBatchAssign(PreviewBatchAssignRequest) returns (BatchPreviewReply) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/assignments:batch-preview" body: "*"};
+  }
+  rpc BatchAssign(BatchAssignRequest) returns (BatchAssignReply) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/assignments:batch-assign" body: "*"};
+  }
+
+  rpc ListConstraints(ListConstraintsRequest) returns (ConstraintsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/constraints"};
+  }
+  rpc CreateConstraint(CreateConstraintRequest) returns (Constraint) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/constraints" body: "*"};
+  }
+  rpc UpdateConstraint(UpdateConstraintRequest) returns (Constraint) {
+    option (google.api.http) = {patch: "/api/v1/admin/iam/constraints/{id}" body: "*"};
+  }
+  rpc DeleteConstraint(DeleteConstraintRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/admin/iam/constraints/{id}"};
+  }
+
+  rpc ListMenus(ListMenusRequest) returns (MenusReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/menus"};
+  }
+  rpc CreateMenuItem(CreateMenuItemRequest) returns (MenuItem) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/menus" body: "*"};
+  }
+  rpc UpdateMenuItem(UpdateMenuItemRequest) returns (MenuItem) {
+    option (google.api.http) = {patch: "/api/v1/admin/iam/menus/{id}" body: "*"};
+  }
+  rpc ArchiveMenuItem(ArchiveMenuItemRequest) returns (MenuItem) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/menus/{id}:archive" body: "*"};
+  }
+
+  rpc ExplainAuthorization(ExplainAuthorizationRequest) returns (ExplainAuthorizationReply) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/authorization:explain" body: "*"};
+  }
+  rpc SimulateAuthorization(SimulateAuthorizationRequest) returns (SimulateAuthorizationReply) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/authorization:simulate" body: "*"};
+  }
+}
+
+message Grant {
+  string operation = 1;
+  // allow | deny
+  string effect = 2;
+  Scope scope = 3;
+}
+
+message Resource {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string owner = 4;
+  bool enabled = 5;
+}
+
+message Permission {
+  string id = 1;
+  string resource_id = 2;
+  string code = 3;
+  string name = 4;
+  string category = 5;
+  string risk_level = 6;
+  // active | disabled | archived
+  string status = 7;
+  // bound | unbound
+  string binding = 8;
+  repeated string supported_scopes = 9;
+  repeated string context_types = 10;
+  bool protected = 11;
+  string description = 12;
+  int32 sort = 13;
+  string revision = 14;
+}
+
+message Role {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string description = 4;
+  bool builtin = 5;
+  // active | disabled | archived
+  string status = 6;
+  int64 max_members = 7;
+  string revision = 8;
+  repeated string inherits = 9;
+  repeated Grant grants = 10;
+}
+
+message Assignment {
+  string id = 1;
+  string user_id = 2;
+  string role_id = 3;
+  Scope boundary = 4;
+  string starts_at = 5;
+  string expires_at = 6;
+  bool revoked = 7;
+  string origin = 8;
+  string revision = 9;
+  string assigned_by = 10;
+}
+
+message RoleMember {
+  string user_id = 1;
+  string username = 2;
+  string display_name = 3;
+  string assignment_id = 4;
+  string assigned_at = 5;
+  string expires_at = 6;
+  string origin = 7;
+}
+
+message Constraint {
+  string id = 1;
+  // mutual_exclusion | max_roles
+  string kind = 2;
+  string name = 3;
+  repeated string role_ids = 4;
+  int64 max_count = 5;
+  bool enabled = 6;
+  string revision = 7;
+}
+
+message MenuItem {
+  string id = 1;
+  string parent_id = 2;
+  string route_key = 3;
+  string name = 4;
+  string icon_key = 5;
+  int32 sort = 6;
+  bool enabled = 7;
+  repeated string required_all = 8;
+  repeated string required_any = 9;
+  string revision = 10;
+}
+
+message ListResourcesRequest {}
+
+message ResourcesReply {
+  repeated Resource items = 1;
+}
+
+message ListPermissionsRequest {
+  string category = 1;
+  string status = 2;
+  string keyword = 3;
+}
+
+message PermissionsReply {
+  repeated Permission items = 1;
+}
+
+message GetPermissionRequest {
+  string id = 1;
+}
+
+message CreatePermissionRequest {
+  string resource_id = 1;
+  string code = 2;
+  string name = 3;
+  string category = 4;
+  string risk_level = 5;
+  repeated string supported_scopes = 6;
+  repeated string context_types = 7;
+  string description = 8;
+  int32 sort = 9;
+  string reason = 10;
+}
+
+message UpdatePermissionRequest {
+  string id = 1;
+  string name = 2;
+  string category = 3;
+  string risk_level = 4;
+  repeated string supported_scopes = 5;
+  string description = 6;
+  int32 sort = 7;
+  string expected_revision = 8;
+  string reason = 9;
+}
+
+message SetPermissionStatusRequest {
+  string id = 1;
+  string status = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message ArchivePermissionRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}
+
+message GetPermissionReferencesRequest {
+  string id = 1;
+}
+
+message Reference {
+  string kind = 1;
+  string id = 2;
+  string user_id = 3;
+}
+
+message ReferencesReply {
+  repeated Reference items = 1;
+}
+
+message ListRolesRequest {
+  string status = 1;
+  string keyword = 2;
+}
+
+message RolesReply {
+  repeated Role items = 1;
+}
+
+message GetRoleRequest {
+  string id = 1;
+}
+
+message CreateRoleRequest {
+  string code = 1;
+  string name = 2;
+  string description = 3;
+  repeated Grant grants = 4;
+  repeated string inherits = 5;
+  int64 max_members = 6;
+  string reason = 7;
+  string expected_policy_revision = 8;
+}
+
+message UpdateRoleRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int64 max_members = 4;
+  string expected_revision = 5;
+  string reason = 6;
+}
+
+message CopyRoleRequest {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string reason = 4;
+}
+
+message SetRoleStatusRequest {
+  string id = 1;
+  string status = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message ArchiveRoleRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}
+
+message ListRoleMembersRequest {
+  string id = 1;
+}
+
+message RoleMembersReply {
+  repeated RoleMember items = 1;
+}
+
+message GetRolePermissionsRequest {
+  string id = 1;
+}
+
+message RolePermissionsReply {
+  repeated Grant grants = 1;
+  string revision = 2;
+}
+
+message PutRolePermissionsRequest {
+  string id = 1;
+  repeated Grant grants = 2;
+  string expected_revision = 3;
+  string expected_policy_revision = 4;
+  string reason = 5;
+}
+
+message GetRoleInheritanceRequest {
+  string id = 1;
+}
+
+message RoleInheritanceReply {
+  repeated string inherits = 1;
+  string revision = 2;
+}
+
+message PutRoleInheritanceRequest {
+  string id = 1;
+  repeated string inherits = 2;
+  string expected_revision = 3;
+  string expected_policy_revision = 4;
+  string reason = 5;
+}
+
+message PreviewRoleChangeRequest {
+  string id = 1;
+  repeated Grant grants = 2;
+  repeated string inherits = 3;
+}
+
+message PreviewReply {
+  repeated string warnings = 1;
+  repeated string permission_diff_added = 2;
+  repeated string permission_diff_removed = 3;
+  int64 affected_user_count = 4;
+}
+
+message ListUserRolesRequest {
+  string id = 1;
+}
+
+message AssignmentsReply {
+  repeated Assignment items = 1;
+}
+
+message CreateAssignmentRequest {
+  string user_id = 1;
+  string role_id = 2;
+  Scope boundary = 3;
+  string starts_at = 4;
+  string expires_at = 5;
+  string reason = 6;
+  string expected_policy_revision = 7;
+}
+
+message RevokeAssignmentRequest {
+  string id = 1;
+  string reason = 2;
+  string expected_policy_revision = 3;
+}
+
+message PreviewBatchAssignRequest {
+  repeated string user_ids = 1;
+  string role_id = 2;
+  Scope boundary = 3;
+  string expires_at = 4;
+}
+
+message BatchPreviewReply {
+  repeated string eligible_user_ids = 1;
+  repeated BatchFailure failures = 2;
+}
+
+message BatchFailure {
+  string user_id = 1;
+  string reason = 2;
+}
+
+message BatchAssignRequest {
+  repeated string user_ids = 1;
+  string role_id = 2;
+  Scope boundary = 3;
+  string starts_at = 4;
+  string expires_at = 5;
+  string reason = 6;
+  string expected_policy_revision = 7;
+}
+
+message BatchAssignReply {
+  repeated Assignment assignments = 1;
+}
+
+message ListConstraintsRequest {}
+
+message ConstraintsReply {
+  repeated Constraint items = 1;
+}
+
+message CreateConstraintRequest {
+  string kind = 1;
+  string name = 2;
+  repeated string role_ids = 3;
+  int64 max_count = 4;
+  string reason = 5;
+  string expected_policy_revision = 6;
+}
+
+message UpdateConstraintRequest {
+  string id = 1;
+  string name = 2;
+  repeated string role_ids = 3;
+  int64 max_count = 4;
+  bool enabled = 5;
+  string expected_revision = 6;
+  string reason = 7;
+}
+
+message DeleteConstraintRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}
+
+message ListMenusRequest {}
+
+message MenusReply {
+  repeated MenuItem items = 1;
+}
+
+message CreateMenuItemRequest {
+  string parent_id = 1;
+  string route_key = 2;
+  string name = 3;
+  string icon_key = 4;
+  int32 sort = 5;
+  repeated string required_all = 6;
+  repeated string required_any = 7;
+  string reason = 8;
+}
+
+message UpdateMenuItemRequest {
+  string id = 1;
+  string name = 2;
+  string icon_key = 3;
+  int32 sort = 4;
+  bool enabled = 5;
+  repeated string required_all = 6;
+  repeated string required_any = 7;
+  string expected_revision = 8;
+  string reason = 9;
+}
+
+message ArchiveMenuItemRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}
+
+message GrantSource {
+  string role_id = 1;
+  string role_code = 2;
+  string operation = 3;
+  string effect = 4;
+  Scope scope = 5;
+  string assignment_id = 6;
+  repeated string inheritance_path = 7;
+  bool active = 8;
+  string expires_at = 9;
+}
+
+message ExplainAuthorizationRequest {
+  string user_id = 1;
+  string operation = 2;
+  string resource_id = 3;
+  string owner_user_id = 4;
+}
+
+message ExplainAuthorizationReply {
+  bool allowed = 1;
+  string reason = 2;
+  repeated GrantSource sources = 3;
+  string policy_revision = 4;
+  string user_revision = 5;
+  string valid_until = 6;
+}
+
+message SimulateAuthorizationRequest {
+  string user_id = 1;
+  repeated string add_role_ids = 2;
+  repeated string remove_role_ids = 3;
+  string operation = 4;
+  string owner_user_id = 5;
+}
+
+message SimulateAuthorizationReply {
+  bool before_allowed = 1;
+  bool after_allowed = 2;
+  string before_reason = 3;
+  string after_reason = 4;
+  repeated string added_permissions = 5;
+  repeated string removed_permissions = 6;
+}

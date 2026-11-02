@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// AuditService exposes the immutable authorization and security audit trail.
+service AuditService {
+  rpc ListAuditEvents(ListAuditEventsRequest) returns (AuditsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/audits"};
+  }
+  rpc GetAuditEvent(GetAuditEventRequest) returns (AuditEvent) {
+    option (google.api.http) = {get: "/api/v1/admin/audits/{id}"};
+  }
+  rpc ExportAuditEvents(ExportAuditEventsRequest) returns (ExportJob) {
+    option (google.api.http) = {post: "/api/v1/admin/audits:export" body: "*"};
+  }
+}
+
+message ListAuditEventsRequest {
+  string action = 1;
+  string actor_user_id = 2;
+  string target = 3;
+  string from = 4;
+  string to = 5;
+  int32 page_size = 6;
+  string page_token = 7;
+}
+
+message AuditsReply {
+  repeated AuditEvent items = 1;
+  ListMeta meta = 2;
+}
+
+message GetAuditEventRequest {
+  string id = 1;
+}
+
+message ExportAuditEventsRequest {
+  string action = 1;
+  string actor_user_id = 2;
+  string from = 3;
+  string to = 4;
+  repeated string fields = 5;
+  string reason = 6;
+}
