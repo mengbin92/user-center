@@ -19,6 +19,8 @@ var _ = new(context.Context)
 const _ = http.SupportPackageIsVersion3
 
 const OperationAdminUserServiceArchiveUser = "/api.usercenter.v1.AdminUserService/ArchiveUser"
+const OperationAdminUserServiceConfirmEmailChange = "/api.usercenter.v1.AdminUserService/ConfirmEmailChange"
+const OperationAdminUserServiceCreateEmailChangeChallenge = "/api.usercenter.v1.AdminUserService/CreateEmailChangeChallenge"
 const OperationAdminUserServiceCreatePasswordResetRequest = "/api.usercenter.v1.AdminUserService/CreatePasswordResetRequest"
 const OperationAdminUserServiceCreateUser = "/api.usercenter.v1.AdminUserService/CreateUser"
 const OperationAdminUserServiceExportUsers = "/api.usercenter.v1.AdminUserService/ExportUsers"
@@ -36,6 +38,8 @@ const OperationAdminUserServiceUpdateUser = "/api.usercenter.v1.AdminUserService
 
 type AdminUserServiceHTTPServer interface {
 	ArchiveUser(context.Context, *ArchiveUserRequest) (*User, error)
+	ConfirmEmailChange(context.Context, *ConfirmEmailChangeRequest) (*User, error)
+	CreateEmailChangeChallenge(context.Context, *CreateEmailChangeChallengeRequest) (*ChallengeReply, error)
 	CreatePasswordResetRequest(context.Context, *CreatePasswordResetTaskRequest) (*PasswordResetTaskReply, error)
 	CreateUser(context.Context, *CreateUserRequest) (*User, error)
 	ExportUsers(context.Context, *ExportUsersRequest) (*ExportJob, error)
@@ -63,6 +67,8 @@ func RegisterAdminUserServiceHTTPServer(s *http.Server, srv AdminUserServiceHTTP
 	r.Handle("POST", "/api/v1/admin/users/{id}:archive", _AdminUserService_ArchiveUser0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/users/{id}/password-reset-requests", _AdminUserService_CreatePasswordResetRequest0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/users/{id}/mfa:reset", _AdminUserService_ResetMFA0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/admin/users/{id}/email-changes", _AdminUserService_CreateEmailChangeChallenge0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/admin/users/{id}/email-changes:confirm", _AdminUserService_ConfirmEmailChange0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/admin/users/{id}/sessions", _AdminUserService_ListUserSessions0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/users/{id}/sessions:revoke", _AdminUserService_RevokeUserSessions0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/admin/users/{id}/effective-permissions", _AdminUserService_GetUserEffectivePermissions0_HTTP_Handler(srv))
@@ -260,6 +266,50 @@ func _AdminUserService_ResetMFA0_HTTP_Handler(srv AdminUserServiceHTTPServer) fu
 	}
 }
 
+func _AdminUserService_CreateEmailChangeChallenge0_HTTP_Handler(srv AdminUserServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CreateEmailChangeChallengeRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationAdminUserServiceCreateEmailChangeChallenge)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CreateEmailChangeChallenge(ctx, req.(*CreateEmailChangeChallengeRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ChallengeReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _AdminUserService_ConfirmEmailChange0_HTTP_Handler(srv AdminUserServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ConfirmEmailChangeRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationAdminUserServiceConfirmEmailChange)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ConfirmEmailChange(ctx, req.(*ConfirmEmailChangeRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*User)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _AdminUserService_ListUserSessions0_HTTP_Handler(srv AdminUserServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in ListUserSessionsRequest
@@ -388,6 +438,8 @@ func _AdminUserService_ListExports0_HTTP_Handler(srv AdminUserServiceHTTPServer)
 
 type AdminUserServiceHTTPClient interface {
 	ArchiveUser(ctx context.Context, req *ArchiveUserRequest, opts ...http.CallOption) (rsp *User, err error)
+	ConfirmEmailChange(ctx context.Context, req *ConfirmEmailChangeRequest, opts ...http.CallOption) (rsp *User, err error)
+	CreateEmailChangeChallenge(ctx context.Context, req *CreateEmailChangeChallengeRequest, opts ...http.CallOption) (rsp *ChallengeReply, err error)
 	CreatePasswordResetRequest(ctx context.Context, req *CreatePasswordResetTaskRequest, opts ...http.CallOption) (rsp *PasswordResetTaskReply, err error)
 	CreateUser(ctx context.Context, req *CreateUserRequest, opts ...http.CallOption) (rsp *User, err error)
 	ExportUsers(ctx context.Context, req *ExportUsersRequest, opts ...http.CallOption) (rsp *ExportJob, err error)
@@ -420,6 +472,40 @@ func (c *AdminUserServiceHTTPClientImpl) ArchiveUser(ctx context.Context, in *Ar
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationAdminUserServiceArchiveUser),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *AdminUserServiceHTTPClientImpl) ConfirmEmailChange(ctx context.Context, in *ConfirmEmailChangeRequest, opts ...http.CallOption) (*User, error) {
+	var out User
+	pattern := "/api/v1/admin/users/{id}/email-changes:confirm"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationAdminUserServiceConfirmEmailChange),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *AdminUserServiceHTTPClientImpl) CreateEmailChangeChallenge(ctx context.Context, in *CreateEmailChangeChallengeRequest, opts ...http.CallOption) (*ChallengeReply, error) {
+	var out ChallengeReply
+	pattern := "/api/v1/admin/users/{id}/email-changes"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationAdminUserServiceCreateEmailChangeChallenge),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)

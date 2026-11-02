@@ -519,6 +519,7 @@ type SecurityStatus struct {
 	StepUpVerified         bool                   `protobuf:"varint,4,opt,name=step_up_verified,json=stepUpVerified,proto3" json:"step_up_verified,omitempty"`
 	StepUpExpiresAt        string                 `protobuf:"bytes,5,opt,name=step_up_expires_at,json=stepUpExpiresAt,proto3" json:"step_up_expires_at,omitempty"`
 	MfaRequired            bool                   `protobuf:"varint,6,opt,name=mfa_required,json=mfaRequired,proto3" json:"mfa_required,omitempty"`
+	PasswordChangeRequired bool                   `protobuf:"varint,7,opt,name=password_change_required,json=passwordChangeRequired,proto3" json:"password_change_required,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -591,6 +592,13 @@ func (x *SecurityStatus) GetStepUpExpiresAt() string {
 func (x *SecurityStatus) GetMfaRequired() bool {
 	if x != nil {
 		return x.MfaRequired
+	}
+	return false
+}
+
+func (x *SecurityStatus) GetPasswordChangeRequired() bool {
+	if x != nil {
+		return x.PasswordChangeRequired
 	}
 	return false
 }
@@ -1643,7 +1651,7 @@ const file_api_usercenter_v1_me_proto_rawDesc = "" +
 	"\x1dListExternalIdentitiesRequest\"/\n" +
 	"\x1dDeleteExternalIdentityRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x14\n" +
-	"\x12GetSecurityRequest\"\x94\x02\n" +
+	"\x12GetSecurityRequest\"\xce\x02\n" +
 	"\x0eSecurityStatus\x12\x1f\n" +
 	"\vmfa_enabled\x18\x01 \x01(\bR\n" +
 	"mfaEnabled\x12-\n" +
@@ -1651,7 +1659,8 @@ const file_api_usercenter_v1_me_proto_rawDesc = "" +
 	"\x18recovery_codes_remaining\x18\x03 \x01(\x05R\x16recoveryCodesRemaining\x12(\n" +
 	"\x10step_up_verified\x18\x04 \x01(\bR\x0estepUpVerified\x12+\n" +
 	"\x12step_up_expires_at\x18\x05 \x01(\tR\x0fstepUpExpiresAt\x12!\n" +
-	"\fmfa_required\x18\x06 \x01(\bR\vmfaRequired\"<\n" +
+	"\fmfa_required\x18\x06 \x01(\bR\vmfaRequired\x128\n" +
+	"\x18password_change_required\x18\a \x01(\bR\x16passwordChangeRequired\"<\n" +
 	"\x0fSetupMFARequest\x12)\n" +
 	"\x10current_password\x18\x01 \x01(\tR\x0fcurrentPassword\"g\n" +
 	"\rSetupMFAReply\x12\x16\n" +

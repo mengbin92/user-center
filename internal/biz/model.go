@@ -201,6 +201,35 @@ func (p Permission) ScopeKinds() []authorization.ScopeKind {
 	return out
 }
 
+type DelegationCeiling struct {
+	Operation string
+	Scope     authorization.Scope
+}
+
+type Delegation struct {
+	ID              int64
+	ManagerRoleID   int64
+	TargetRoleID    int64
+	TargetKind      string
+	Actions         []string
+	TargetUserScope authorization.Scope
+	GrantCeiling    []DelegationCeiling
+	CanRedelegate   bool
+	StartsAt        time.Time
+	ExpiresAt       *time.Time
+	RevokedAt       *time.Time
+	Revision        uint64
+	CreatedBy       int64
+	CreatedAt       time.Time
+}
+
+func (d Delegation) Active(now time.Time) bool {
+	if d.RevokedAt != nil || now.Before(d.StartsAt) {
+		return false
+	}
+	return d.ExpiresAt == nil || now.Before(*d.ExpiresAt)
+}
+
 type Constraint struct {
 	ID       int64
 	Kind     string
@@ -273,6 +302,38 @@ type OutboxDelivery struct {
 	NextRetryAt  time.Time
 	Status       string
 	LastError    string
+}
+
+type IntegrationClient struct {
+	ID                 int64
+	ClientID           string
+	Code               string
+	ServiceOwner       string
+	Status             string
+	CredentialHash     string
+	CredentialVersion  int
+	AllowedMethods     []string
+	EventSubscriptions []string
+	CallbackURL        string
+	ExpiresAt          *time.Time
+	Revision           uint64
+	CreatedAt          time.Time
+}
+
+type Delivery struct {
+	EventID       string
+	EventType     string
+	SubscriberID  string
+	Status        string
+	Attempts      int
+	NextRetryAt   time.Time
+	LastError     string
+	Payload       string
+	AggregateType string
+	AggregateID   int64
+	SchemaVersion int
+	OccurredAt    time.Time
+	CallbackURL   string
 }
 
 type AuthSettings struct {

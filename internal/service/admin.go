@@ -201,6 +201,32 @@ func (s *AdminUserService) ResetMFA(ctx context.Context, req *usercv1.ResetMFARe
 	return &emptypb.Empty{}, nil
 }
 
+func (s *AdminUserService) CreateEmailChangeChallenge(ctx context.Context, req *usercv1.CreateEmailChangeChallengeRequest) (*usercv1.ChallengeReply, error) {
+	actor := requestMeta(ctx)
+	userID, err := parseIDField(req.GetId(), "id")
+	if err != nil {
+		return nil, err
+	}
+	challengeID, expires, err := s.users.CreateAdminEmailChange(ctx, actor, userID, req.GetNewEmail(), reasonOr(req.GetReason(), "administrator email change"))
+	if err != nil {
+		return nil, err
+	}
+	return &usercv1.ChallengeReply{ChallengeId: challengeID, ExpiresAt: ts(expires)}, nil
+}
+
+func (s *AdminUserService) ConfirmEmailChange(ctx context.Context, req *usercv1.ConfirmEmailChangeRequest) (*usercv1.User, error) {
+	actor := requestMeta(ctx)
+	userID, err := parseIDField(req.GetId(), "id")
+	if err != nil {
+		return nil, err
+	}
+	u, err := s.users.ConfirmAdminEmailChange(ctx, actor, userID, req.GetChallengeId(), req.GetCode(), reasonOr(req.GetReason(), "administrator email change"))
+	if err != nil {
+		return nil, err
+	}
+	return userProto(u), nil
+}
+
 func (s *AdminUserService) ListUserSessions(ctx context.Context, req *usercv1.ListUserSessionsRequest) (*usercv1.SessionsReply, error) {
 	actor := requestMeta(ctx)
 	userID, err := parseIDField(req.GetId(), "id")
@@ -256,7 +282,27 @@ func (s *AdminUserService) GetUserEffectivePermissions(ctx context.Context, req 
 
 func (s *AdminUserService) ExportUsers(ctx context.Context, req *usercv1.ExportUsersRequest) (*usercv1.ExportJob, error) {
 	actor := requestMeta(ctx)
-	job, err := s.users.ExportUsers(ctx, actor, req.GetKeyword(), req.GetStatus(), req.GetFields(), reasonOr(req.GetReason(), "administrator export users"))
+	var roleID int64
+	var err error
+	if req.GetRoleId() != "" {
+		roleID, err = parseIDField(req.GetRoleId(), "role_id")
+		if err != nil {
+			return nil, err
+		}
+	}
+	var mfa *bool
+	switch req.GetMfaEnabled() {
+	case "", "any":
+	case "true":
+		v := true
+		mfa = &v
+	case "false":
+		v := false
+		mfa = &v
+	default:
+		return nil, biz.Validation("mfa_enabled 只能是 any/true/false")
+	}
+	job, err := s.users.ExportUsers(ctx, actor, req.GetKeyword(), req.GetStatus(), req.GetFields(), roleID, mfa, reasonOr(req.GetReason(), "administrator export users"))
 	if err != nil {
 		return nil, err
 	}

@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
+	"github.com/mengbin92/user-center/pkg/jsonx"
 	"net"
 	"net/http"
 	"strings"
@@ -37,6 +37,9 @@ func NewMiddleware(sessions *biz.SessionUsecase, sec *conf.Security, log *zap.Lo
 	}
 	return m
 }
+
+func (m *Middleware) CookieSecure() bool   { return m.secure }
+func (m *Middleware) CookieDomain() string { return m.domain }
 
 func (m *Middleware) Filter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -118,8 +121,13 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 	}
 
 	if requiresAuth(r.URL.Path) {
-		if _, has := biz.ActorFromContext(ctx); !has {
+		actor, has := biz.ActorFromContext(ctx)
+		if !has {
 			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "登录状态无效或已过期")
+			return ctx, false
+		}
+		if actor.PasswordChangeRequired && strings.HasPrefix(r.URL.Path, "/api/v1/admin") {
+			writeError(w, http.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "首次登录必须先修改初始密码")
 			return ctx, false
 		}
 	}
@@ -172,10 +180,11 @@ func randomToken() string {
 func writeError(w http.ResponseWriter, status int, reason, message string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	body, _ := jsonx.Marshal(map[string]any{
 		"code": status, "reason": reason, "message": message,
 		"metadata": map[string]string{"request_id": w.Header().Get("X-Request-ID")},
 	})
+	_, _ = w.Write(body)
 }
 
 var _ = time.Now

@@ -466,6 +466,60 @@ func (r *iamRepo) CountActiveAssignmentsForRole(ctx context.Context, tx biz.Tx, 
 	return n, err
 }
 
+func (r *iamRepo) ListAssignments(ctx context.Context, tx biz.Tx, f biz.AssignmentFilter) ([]*biz.AssignmentItem, int64, error) {
+	db := r.d.dbOr(tx).WithContext(ctx).Table("iam_user_roles AS ur").
+		Joins("JOIN users AS u ON u.id = ur.user_id").
+		Joins("JOIN iam_roles AS r ON r.id = ur.role_id")
+	if f.UserID > 0 {
+		db = db.Where("ur.user_id = ?", f.UserID)
+	}
+	if f.RoleID > 0 {
+		db = db.Where("ur.role_id = ?", f.RoleID)
+	}
+	if f.Status != "" {
+		db = db.Where("ur.status = ?", f.Status)
+	}
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	type row struct {
+		ID, UserID, RoleID                        int64
+		Username, DisplayName, RoleCode, RoleName string
+		Boundary                                  string
+		StartsAt                                  time.Time
+		ExpiresAt                                 *time.Time
+		Status, Origin                            string
+		Revision                                  uint64
+		AssignedBy                                int64
+		CreatedAt                                 time.Time
+	}
+	var rows []row
+	err := db.Select("ur.id, ur.user_id, ur.role_id, u.username, u.display_name, r.code AS role_code, r.name AS role_name, ur.boundary, ur.starts_at, ur.expires_at, ur.status, ur.origin, ur.revision, ur.assigned_by, ur.created_at").
+		Order("ur.id DESC").Offset(f.Offset).Limit(f.Limit).Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.AssignmentItem, 0, len(rows))
+	for _, x := range rows {
+		var scope authorization.Scope
+		if err := jsonx.Unmarshal([]byte(x.Boundary), &scope); err != nil {
+			return nil, 0, err
+		}
+		item := &biz.AssignmentItem{
+			Username: x.Username, DisplayName: x.DisplayName,
+			RoleCode: x.RoleCode, RoleName: x.RoleName,
+			Assignment: &biz.Assignment{
+				ID: x.ID, UserID: x.UserID, RoleID: x.RoleID, Boundary: scope,
+				StartsAt: x.StartsAt.UTC(), ExpiresAt: x.ExpiresAt, Revoked: x.Status != "active",
+				Origin: x.Origin, Revision: x.Revision, AssignedBy: x.AssignedBy, CreatedAt: x.CreatedAt.UTC(),
+			},
+		}
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
 func (r *iamRepo) ListRoleMembers(ctx context.Context, tx biz.Tx, roleID int64) ([]biz.RoleMember, error) {
 	db := r.d.dbOr(tx).WithContext(ctx)
 	type row struct {
@@ -616,4 +670,124 @@ func (r *iamRepo) UpdateMenu(ctx context.Context, tx biz.Tx, m *biz.MenuItem, ex
 		return nil, biz.ConflictRevision(expected)
 	}
 	return r.GetMenu(ctx, tx, m.ID)
+}
+
+func delegationToBiz(p delegationPO) (*biz.Delegation, error) {
+	var actions []string
+	var targetScope authorization.Scope
+	var ceilingRaw []struct {
+		Operation string              `json:"operation"`
+		Scope     authorization.Scope `json:"scope"`
+	}
+	if err := jsonx.Unmarshal([]byte(p.Actions), &actions); err != nil {
+		return nil, err
+	}
+	if err := jsonx.Unmarshal([]byte(p.TargetUserScope), &targetScope); err != nil {
+		return nil, err
+	}
+	if err := jsonx.Unmarshal([]byte(p.GrantCeiling), &ceilingRaw); err != nil {
+		return nil, err
+	}
+	ceiling := make([]biz.DelegationCeiling, 0, len(ceilingRaw))
+	for _, c := range ceilingRaw {
+		ceiling = append(ceiling, biz.DelegationCeiling{Operation: c.Operation, Scope: c.Scope})
+	}
+	return &biz.Delegation{
+		ID: p.ID, ManagerRoleID: p.ManagerRoleID, TargetRoleID: p.TargetRoleID,
+		TargetKind: p.TargetKind, Actions: actions, TargetUserScope: targetScope,
+		GrantCeiling: ceiling, CanRedelegate: p.CanRedelegate,
+		StartsAt: p.StartsAt.UTC(), ExpiresAt: p.ExpiresAt, RevokedAt: p.RevokedAt,
+		Revision: p.Revision, CreatedBy: p.CreatedBy, CreatedAt: p.CreatedAt.UTC(),
+	}, nil
+}
+
+func (r *iamRepo) ListDelegations(ctx context.Context, tx biz.Tx, f biz.DelegationFilter) ([]*biz.Delegation, error) {
+	db := r.d.dbOr(tx).WithContext(ctx).Model(&delegationPO{})
+	if f.ManagerRoleID > 0 {
+		db = db.Where("manager_role_id = ?", f.ManagerRoleID)
+	}
+	if f.TargetRoleID > 0 {
+		db = db.Where("target_role_id = ?", f.TargetRoleID)
+	}
+	if f.Status == "active" {
+		db = db.Where("revoked_at IS NULL")
+	} else if f.Status == "revoked" {
+		db = db.Where("revoked_at IS NOT NULL")
+	}
+	var rows []delegationPO
+	if err := db.Order("id DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*biz.Delegation, 0, len(rows))
+	for _, p := range rows {
+		d, err := delegationToBiz(p)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+func (r *iamRepo) GetDelegation(ctx context.Context, tx biz.Tx, id int64) (*biz.Delegation, error) {
+	var p delegationPO
+	err := r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, biz.ErrResourceNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return delegationToBiz(p)
+}
+
+func (r *iamRepo) CreateDelegation(ctx context.Context, tx biz.Tx, d *biz.Delegation) (*biz.Delegation, error) {
+	actions, _ := jsonx.Marshal(d.Actions)
+	scope, _ := jsonx.Marshal(d.TargetUserScope)
+	ceiling, _ := jsonx.Marshal(d.GrantCeiling)
+	p := &delegationPO{
+		ManagerRoleID: d.ManagerRoleID, TargetRoleID: d.TargetRoleID, TargetKind: d.TargetKind,
+		Actions: string(actions), TargetUserScope: string(scope), GrantCeiling: string(ceiling),
+		CanRedelegate: d.CanRedelegate, StartsAt: d.StartsAt, ExpiresAt: d.ExpiresAt,
+		Revision: 1, CreatedBy: d.CreatedBy, CreatedAt: time.Now().UTC(),
+	}
+	if p.TargetKind == "" {
+		p.TargetKind = "role"
+	}
+	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+		return nil, err
+	}
+	return delegationToBiz(*p)
+}
+
+func (r *iamRepo) UpdateDelegation(ctx context.Context, tx biz.Tx, d *biz.Delegation, expected uint64) (*biz.Delegation, error) {
+	actions, _ := jsonx.Marshal(d.Actions)
+	scope, _ := jsonx.Marshal(d.TargetUserScope)
+	ceiling, _ := jsonx.Marshal(d.GrantCeiling)
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&delegationPO{}).Where("id = ? AND revision = ?", d.ID, expected).Updates(map[string]any{
+		"actions": string(actions), "target_user_scope": string(scope), "grant_ceiling": string(ceiling),
+		"can_redelegate": d.CanRedelegate, "starts_at": d.StartsAt, "expires_at": d.ExpiresAt,
+		"revision": expected + 1,
+	})
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, biz.ConflictRevision(expected)
+	}
+	return r.GetDelegation(ctx, tx, d.ID)
+}
+
+func (r *iamRepo) RevokeDelegation(ctx context.Context, tx biz.Tx, id int64, expected uint64, by int64) error {
+	now := time.Now().UTC()
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&delegationPO{}).Where("id = ? AND revision = ? AND revoked_at IS NULL", id, expected).Updates(map[string]any{
+		"revoked_at": now, "revision": expected + 1, "created_by": by,
+	})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return biz.ConflictRevision(expected)
+	}
+	return nil
 }

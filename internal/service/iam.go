@@ -438,6 +438,47 @@ func (s *IAMService) ListUserRoles(ctx context.Context, req *usercv1.ListUserRol
 	return out, nil
 }
 
+func (s *IAMService) ListAssignments(ctx context.Context, req *usercv1.ListAssignmentsRequest) (*usercv1.AssignmentListReply, error) {
+	offset, err := biz.DecodePageToken(req.GetPageToken(), bizFingerprint(req.GetUserId(), req.GetRoleId(), req.GetStatus()))
+	if err != nil {
+		return nil, err
+	}
+	var userID, roleID int64
+	if req.GetUserId() != "" {
+		userID, err = parseIDField(req.GetUserId(), "user_id")
+		if err != nil {
+			return nil, err
+		}
+	}
+	if req.GetRoleId() != "" {
+		roleID, err = parseIDField(req.GetRoleId(), "role_id")
+		if err != nil {
+			return nil, err
+		}
+	}
+	limit := pageSize(req.GetPageSize())
+	items, total, err := s.iam.Assignments(ctx, requestMeta(ctx), biz.AssignmentFilter{
+		UserID: userID, RoleID: roleID, Status: req.GetStatus(), Offset: offset, Limit: limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := &usercv1.AssignmentListReply{Meta: &usercv1.ListMeta{TotalSize: rev(uint64(total))}}
+	for _, item := range items {
+		a := item.Assignment
+		out.Items = append(out.Items, &usercv1.AssignmentItem{
+			Id: id(a.ID), UserId: id(a.UserID), Username: item.Username, DisplayName: item.DisplayName,
+			RoleId: id(a.RoleID), RoleCode: item.RoleCode, RoleName: item.RoleName,
+			Boundary: scopeProto(a.Boundary), StartsAt: ts(a.StartsAt), ExpiresAt: tptr(a.ExpiresAt),
+			Revoked: a.Revoked, Origin: a.Origin, Revision: rev(a.Revision),
+		})
+	}
+	if offset+len(items) < int(total) {
+		out.Meta.NextPageToken = biz.EncodePageToken(offset+len(items), bizFingerprint(req.GetUserId(), req.GetRoleId(), req.GetStatus()))
+	}
+	return out, nil
+}
+
 func (s *IAMService) CreateAssignment(ctx context.Context, req *usercv1.CreateAssignmentRequest) (*usercv1.Assignment, error) {
 	userID, err := parseIDField(req.GetUserId(), "user_id")
 	if err != nil {
@@ -807,4 +848,164 @@ func parseIDs(raw []string, field string) ([]int64, error) {
 		out = append(out, id)
 	}
 	return out, nil
+}
+
+func delegationProto(d *biz.Delegation) *usercv1.Delegation {
+	out := &usercv1.Delegation{
+		Id: id(d.ID), ManagerRoleId: id(d.ManagerRoleID), TargetRoleId: id(d.TargetRoleID),
+		TargetKind: d.TargetKind, Actions: d.Actions, TargetUserScope: scopeProto(d.TargetUserScope),
+		CanRedelegate: d.CanRedelegate, StartsAt: ts(d.StartsAt), ExpiresAt: tptr(d.ExpiresAt),
+		Revision: rev(d.Revision), CreatedBy: id(d.CreatedBy),
+		Revoked: d.RevokedAt != nil, RevokedAt: tptr(d.RevokedAt),
+	}
+	for _, c := range d.GrantCeiling {
+		out.GrantCeiling = append(out.GrantCeiling, &usercv1.DelegationCeiling{Operation: c.Operation, Scope: scopeProto(c.Scope)})
+	}
+	return out
+}
+
+func (s *IAMService) ListDelegations(ctx context.Context, req *usercv1.ListDelegationsRequest) (*usercv1.DelegationsReply, error) {
+	filter := biz.DelegationFilter{Status: req.GetStatus()}
+	var err error
+	if req.GetManagerRoleId() != "" {
+		filter.ManagerRoleID, err = parseIDField(req.GetManagerRoleId(), "manager_role_id")
+		if err != nil {
+			return nil, err
+		}
+	}
+	if req.GetTargetRoleId() != "" {
+		filter.TargetRoleID, err = parseIDField(req.GetTargetRoleId(), "target_role_id")
+		if err != nil {
+			return nil, err
+		}
+	}
+	items, err := s.iam.Delegations(ctx, requestMeta(ctx), filter)
+	if err != nil {
+		return nil, err
+	}
+	out := &usercv1.DelegationsReply{}
+	for _, d := range items {
+		out.Items = append(out.Items, delegationProto(d))
+	}
+	return out, nil
+}
+
+func (s *IAMService) CreateDelegation(ctx context.Context, req *usercv1.CreateDelegationRequest) (*usercv1.Delegation, error) {
+	managerID, err := parseIDField(req.GetManagerRoleId(), "manager_role_id")
+	if err != nil {
+		return nil, err
+	}
+	targetID, err := parseIDField(req.GetTargetRoleId(), "target_role_id")
+	if err != nil {
+		return nil, err
+	}
+	scope, err := scopeBiz(req.GetTargetUserScope())
+	if err != nil {
+		return nil, err
+	}
+	starts, err := biz.ParseTime(req.GetStartsAt(), "starts_at")
+	if err != nil {
+		return nil, err
+	}
+	expires, err := biz.ParseTime(req.GetExpiresAt(), "expires_at")
+	if err != nil {
+		return nil, err
+	}
+	var expPtr *time.Time
+	if !expires.IsZero() {
+		expPtr = &expires
+	}
+	var ceiling []biz.DelegationCeiling
+	for _, c := range req.GetGrantCeiling() {
+		cs, err := scopeBiz(c.GetScope())
+		if err != nil {
+			return nil, err
+		}
+		ceiling = append(ceiling, biz.DelegationCeiling{Operation: c.GetOperation(), Scope: cs})
+	}
+	var policy uint64
+	if req.GetExpectedPolicyRevision() != "" {
+		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
+		if err != nil {
+			return nil, err
+		}
+	}
+	d, err := s.iam.CreateDelegation(ctx, requestMeta(ctx), &biz.Delegation{
+		ManagerRoleID: managerID, TargetRoleID: targetID, TargetKind: req.GetTargetKind(),
+		Actions: req.GetActions(), TargetUserScope: scope, GrantCeiling: ceiling,
+		CanRedelegate: req.GetCanRedelegate(), StartsAt: starts, ExpiresAt: expPtr,
+	}, reasonOr(req.GetReason(), "create delegation"), policy)
+	if err != nil {
+		return nil, err
+	}
+	return delegationProto(d), nil
+}
+
+func (s *IAMService) UpdateDelegation(ctx context.Context, req *usercv1.UpdateDelegationRequest) (*usercv1.Delegation, error) {
+	delegationID, err := parseIDField(req.GetId(), "id")
+	if err != nil {
+		return nil, err
+	}
+	existing, err := s.iam.Delegation(ctx, requestMeta(ctx), delegationID)
+	if err != nil {
+		return nil, err
+	}
+	scope, err := scopeBiz(req.GetTargetUserScope())
+	if err != nil {
+		return nil, err
+	}
+	starts, err := biz.ParseTime(req.GetStartsAt(), "starts_at")
+	if err != nil {
+		return nil, err
+	}
+	expires, err := biz.ParseTime(req.GetExpiresAt(), "expires_at")
+	if err != nil {
+		return nil, err
+	}
+	var expPtr *time.Time
+	if !expires.IsZero() {
+		expPtr = &expires
+	}
+	var ceiling []biz.DelegationCeiling
+	for _, c := range req.GetGrantCeiling() {
+		cs, err := scopeBiz(c.GetScope())
+		if err != nil {
+			return nil, err
+		}
+		ceiling = append(ceiling, biz.DelegationCeiling{Operation: c.GetOperation(), Scope: cs})
+	}
+	expected, err := parseRevisionField(req.GetExpectedRevision(), "expected_revision")
+	if err != nil {
+		return nil, err
+	}
+	existing.Actions = req.GetActions()
+	existing.TargetUserScope = scope
+	existing.GrantCeiling = ceiling
+	existing.CanRedelegate = req.GetCanRedelegate()
+	if starts.IsZero() {
+		starts = existing.StartsAt
+	}
+	existing.StartsAt = starts
+	existing.ExpiresAt = expPtr
+	d, err := s.iam.UpdateDelegation(ctx, requestMeta(ctx), existing, expected, reasonOr(req.GetReason(), "update delegation"))
+	if err != nil {
+		return nil, err
+	}
+	return delegationProto(d), nil
+}
+
+func (s *IAMService) RevokeDelegation(ctx context.Context, req *usercv1.RevokeDelegationRequest) (*usercv1.Delegation, error) {
+	delegationID, err := parseIDField(req.GetId(), "id")
+	if err != nil {
+		return nil, err
+	}
+	expected, err := parseRevisionField(req.GetExpectedRevision(), "expected_revision")
+	if err != nil {
+		return nil, err
+	}
+	d, err := s.iam.RevokeDelegation(ctx, requestMeta(ctx), delegationID, expected, reasonOr(req.GetReason(), "revoke delegation"))
+	if err != nil {
+		return nil, err
+	}
+	return delegationProto(d), nil
 }

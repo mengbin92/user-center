@@ -6,7 +6,7 @@ import {
 import type { ReactNode } from 'react'
 
 import { useAuth } from './auth'
-import { isApiError, type ApiError } from './errors'
+import { errorMessage, isApiError, type ApiError } from './errors'
 import { useConflict } from '../components/conflict'
 import { useStepUp } from '../components/step-up'
 import { useToast } from '../components/toast'
@@ -77,6 +77,8 @@ export function useApiMutation<TData, TVariables>(
         return
       }
 
+      const message = errorMessage(error)
+
       if (error.status === 409) {
         if (
           error.currentRevision ||
@@ -91,27 +93,24 @@ export function useApiMutation<TData, TVariables>(
             conflictType: error.conflictType,
           })
         } else {
-          toast.error('数据冲突', error.message)
+          toast.error('数据冲突', message)
         }
       } else if (error.status === 429) {
-        toast.warning(
-          '请求过于频繁',
-          `${error.message}，请等待一段时间后重试。`,
-        )
+        toast.warning('请求过于频繁', `${message}，请等待一段时间后重试。`)
       } else if (error.status === 403 && error.isStepUpRequired) {
         toast.info('需要安全验证', '未完成近期安全验证，操作尚未执行。')
       } else if (error.status === 403) {
-        toast.error('没有操作权限', error.message)
+        toast.error('没有操作权限', message)
       } else if (error.status === 401) {
         toast.warning('登录状态已失效', '请重新登录后再操作。')
       } else if (error.status === 400) {
-        toast.error('请求不合法', error.message)
+        toast.error('请求不合法', message)
       } else if (error.status === 404) {
-        toast.error('资源不存在', error.message)
+        toast.error('资源不存在', message)
       } else if (error.status === 0) {
-        toast.error('网络错误', error.message)
+        toast.error('网络错误', message)
       } else {
-        toast.error('操作失败', error.message)
+        toast.error('操作失败', message)
       }
 
       options.onError?.(error)

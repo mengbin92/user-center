@@ -39,29 +39,35 @@ func NewGRPCServer(cfg *conf.Server, integrationToken IntegrationToken, log *zap
 			timeout = int(cfg.Grpc.TimeoutSeconds)
 		}
 	}
-	if integrationToken == "" {
-		log.Warn("integration gRPC token is empty; the internal API is unauthenticated (development only)")
-	}
 	srv := kgrpc.NewServer(
 		kgrpc.Address(addr),
 		kgrpc.Timeout(time.Duration(timeout)*time.Second),
-		kgrpc.Options(grpc.ChainUnaryInterceptor(integrationAuth(string(integrationToken)))),
+		kgrpc.Options(grpc.ChainUnaryInterceptor(integrationAuth(string(integrationToken), integration.Usecase()))),
 	)
 	usercv1.RegisterIntegrationServiceServer(srv, integration)
 	return &GRPCServer{Server: srv}
 }
 
-func integrationAuth(token string) grpc.UnaryServerInterceptor {
+func integrationAuth(staticToken string, uc *biz.IntegrationUsecase) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if !strings.HasPrefix(info.FullMethod, "/api.usercenter.v1.IntegrationService/") {
 			return handler(ctx, req)
 		}
-		if token == "" {
-			return handler(ctx, req)
-		}
 		md, _ := metadata.FromIncomingContext(ctx)
 		values := md.Get("authorization")
-		if len(values) == 0 || values[0] != "Bearer "+token {
+		if len(values) == 0 {
+			return nil, biz.ErrUnauthenticated
+		}
+		raw := strings.TrimSpace(values[0])
+		raw = strings.TrimPrefix(raw, "Bearer ")
+		if staticToken != "" && raw == staticToken {
+			return handler(ctx, req)
+		}
+		client, err := uc.AuthenticateClient(ctx, raw)
+		if err != nil {
+			return nil, biz.ErrUnauthenticated
+		}
+		if !uc.AllowedMethod(client, info.FullMethod) {
 			return nil, biz.ErrPermissionDenied
 		}
 		return handler(ctx, req)

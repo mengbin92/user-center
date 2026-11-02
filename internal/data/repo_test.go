@@ -152,3 +152,88 @@ func TestSeedIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, roles, 3)
 }
+
+func TestLegacyImportDryRunAndApply(t *testing.T) {
+	d := testData(t)
+	ctx := context.Background()
+	hash, err := biz.HashPassword("LegacyPass-123")
+	require.NoError(t, err)
+	spec := LegacyImportSpec{
+		SourceCommit: "4116899a",
+		Users: []LegacyUser{{
+			ID: 42, Username: "legacy.user", DisplayName: "Legacy",
+			Email: "legacy@example.com", EmailVerified: true,
+			Status: "1", PasswordHash: hash, RoleCodes: []string{"member"},
+		}},
+	}
+	dry, err := ImportLegacy(ctx, d, spec, "batch-dry", false)
+	require.NoError(t, err)
+	require.False(t, dry.Applied)
+	require.Equal(t, 1, dry.Counts["users"])
+	_, err = NewUserRepo(d).Get(ctx, nil, 42)
+	require.Error(t, err)
+
+	applied, err := ImportLegacy(ctx, d, spec, "batch-1", true)
+	require.NoError(t, err)
+	require.True(t, applied.Applied)
+	user, err := NewUserRepo(d).Get(ctx, nil, 42)
+	require.NoError(t, err)
+	require.Equal(t, "legacy.user", user.Username)
+	require.True(t, user.EmailVerified)
+	roles, err := NewUserRepo(d).RolesForUser(ctx, nil, 42)
+	require.NoError(t, err)
+	require.Len(t, roles, 1)
+
+	conflict, err := ImportLegacy(ctx, d, spec, "batch-2", false)
+	require.NoError(t, err)
+	require.NotEmpty(t, conflict.Conflicts)
+	require.False(t, conflict.Applied)
+}
+
+func TestAssignmentListAndDelegationRepo(t *testing.T) {
+	d := testData(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	users := NewUserRepo(d)
+	iam := NewIAMRepo(d)
+	u, err := users.Create(ctx, nil, &biz.User{
+		Username: "assignee", UsernameNormalized: "assignee", DisplayName: "Assignee",
+		Status: biz.UserStatusEnabled, Revision: 1, IdentityVersion: 1, CreatedAt: now, UpdatedAt: now,
+	})
+	require.NoError(t, err)
+	member, err := iam.GetRoleByCode(ctx, nil, "member")
+	require.NoError(t, err)
+	assignment, err := iam.CreateAssignment(ctx, nil, &biz.Assignment{
+		UserID: u.ID, RoleID: member.ID, Boundary: authorization.Scope{All: true},
+		StartsAt: now, Origin: biz.OriginExplicit, Revision: 1, CreatedAt: now,
+	})
+	require.NoError(t, err)
+	require.NotZero(t, assignment.ID)
+
+	items, total, err := iam.ListAssignments(ctx, nil, biz.AssignmentFilter{UserID: u.ID, Limit: 10})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, total)
+	require.Len(t, items, 1)
+	require.Equal(t, "assignee", items[0].Username)
+	require.Equal(t, "member", items[0].RoleCode)
+
+	admin, err := iam.GetRoleByCode(ctx, nil, "admin")
+	require.NoError(t, err)
+	delegation, err := iam.CreateDelegation(ctx, nil, &biz.Delegation{
+		ManagerRoleID: admin.ID, TargetRoleID: member.ID, TargetKind: "role",
+		Actions: []string{"assign"}, TargetUserScope: authorization.Scope{UserIDs: []int64{u.ID}},
+		CanRedelegate: false, StartsAt: now,
+	})
+	require.NoError(t, err)
+	require.NotZero(t, delegation.ID)
+	list, err := iam.ListDelegations(ctx, nil, biz.DelegationFilter{Status: "active"})
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	updated, err := iam.UpdateDelegation(ctx, nil, list[0], list[0].Revision)
+	require.NoError(t, err)
+	require.NotZero(t, updated.Revision)
+	require.NoError(t, iam.RevokeDelegation(ctx, nil, delegation.ID, updated.Revision, 1))
+	revoked, err := iam.GetDelegation(ctx, nil, delegation.ID)
+	require.NoError(t, err)
+	require.NotNil(t, revoked.RevokedAt)
+}

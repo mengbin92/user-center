@@ -60,6 +60,7 @@ export const ADMIN_PERMISSIONS = [
   'iam.role.read',
   'iam.permission.read',
   'iam.assignment.read',
+  'iam.delegation.read',
   'iam.constraint.read',
   'iam.menu.read',
   'iam.authorization.explain',
@@ -67,6 +68,8 @@ export const ADMIN_PERMISSIONS = [
   'audit.export',
   'settings.auth.read',
   'settings.email.read',
+  'integration.client.read',
+  'integration.delivery.read',
 ]
 
 export function hasAdminAccess(permissions: Set<string>): boolean {

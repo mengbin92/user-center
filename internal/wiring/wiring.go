@@ -102,23 +102,28 @@ func envOr(key, def string) string {
 
 // App owns the two transports and the one-time bootstrap hook.
 type App struct {
-	http *server.HTTPServer
-	grpc *server.GRPCServer
-	svc  *biz.Services
-	log  *zap.Logger
+	http   *server.HTTPServer
+	grpc   *server.GRPCServer
+	svc    *biz.Services
+	worker *biz.IntegrationAdminUsecase
+	log    *zap.Logger
 }
 
-func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, svc *biz.Services, log *zap.Logger) *App {
-	return &App{http: httpSrv, grpc: grpcSrv, svc: svc, log: log}
+func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, svc *biz.Services, worker *biz.IntegrationAdminUsecase, log *zap.Logger) *App {
+	return &App{http: httpSrv, grpc: grpcSrv, svc: svc, worker: worker, log: log}
 }
 
 func (a *App) Run() error {
 	opts := []kratos.Option{
 		kratos.Name("user-center"),
-		kratos.Version("0.1.0"),
+		kratos.Version("0.2.0"),
 		kratos.Logger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))),
 		kratos.Server(a.http.Server, a.grpc.Server),
 		kratos.BeforeStart(a.bootstrap),
+		kratos.BeforeStart(func(ctx context.Context) error {
+			go a.worker.StartWorker(ctx)
+			return nil
+		}),
 	}
 	return kratos.New(opts...).Run()
 }
@@ -153,8 +158,9 @@ func BuildServices(d *data.Data, b *conf.Bootstrap) *biz.Services {
 		data.NewFlowCompletionRepo(d), data.NewChallengeStore(d), data.NewRateLimiter(d),
 		data.NewStepUpStore(d), data.NewMailSender(d, zap.NewNop(), ProvideMail(b)),
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
-		data.NewSettingsRepo(d), data.NewExportRepo(d), d,
-		data.Clock{}, data.IDs{}, data.NewSecretBox(sec), cfg,
+		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d), d,
+		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
+		map[string]biz.OAuthProvider{}, cfg,
 	)
 }
 

@@ -95,3 +95,12 @@ func TestInheritance(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestScopeCovers(t *testing.T) {
+	require.True(t, Covers(Scope{All: true}, Scope{UserIDs: []int64{1, 2}}))
+	require.True(t, Covers(Scope{UserIDs: []int64{1, 2, 3}}, Scope{UserIDs: []int64{1, 2}}))
+	require.False(t, Covers(Scope{UserIDs: []int64{1}}, Scope{UserIDs: []int64{1, 2}}))
+	require.True(t, Covers(Scope{Self: true}, Scope{Self: true}))
+	require.False(t, Covers(Scope{Self: true}, Scope{All: true}))
+	require.False(t, Covers(Scope{UserIDs: []int64{1}}, Scope{All: true}))
+}

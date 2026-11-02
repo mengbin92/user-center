@@ -154,7 +154,7 @@ func (uc *UserUsecase) CreateEmailChallenge(ctx context.Context, actor ActorCont
 	expires := uc.Clock.Now().Add(uc.ChallengeTTL)
 	if err := uc.Challenges.Put(ctx, Challenge{
 		ID: id, Purpose: "email_change",
-		CodeHash: HMACCode(uc.CodeSecret, "email_change:"+newEmail, code),
+		CodeHash: HMACCode(uc.CodeSecret, "email_change", code),
 		UserID:   actor.User.ID, Email: newEmail, ExpiresAt: expires,
 	}); err != nil {
 		return "", time.Time{}, ErrDependency
@@ -223,6 +223,98 @@ func (uc *UserUsecase) ConfirmEmail(ctx context.Context, actor ActorContext, cha
 	}
 	_ = uc.Challenges.Delete(ctx, c.ID)
 	return uc.Me(ctx, actor)
+}
+
+func (uc *UserUsecase) CreateAdminEmailChange(ctx context.Context, actor ActorContext, targetID int64, newEmail, reason string) (string, time.Time, error) {
+	if _, err := uc.Authorize(ctx, actor, "identity.user.email_binding.update", targetID, false); err != nil {
+		return "", time.Time{}, err
+	}
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
+		return "", time.Time{}, err
+	}
+	newEmail = NormalizeEmail(newEmail)
+	if err := ValidateEmail(newEmail); err != nil {
+		return "", time.Time{}, err
+	}
+	user, err := uc.Users.Get(ctx, nil, targetID)
+	if err != nil {
+		return "", time.Time{}, ErrUserNotFound
+	}
+	if user.Status == UserStatusArchived {
+		return "", time.Time{}, Validation("已归档账号不能变更邮箱")
+	}
+	if other, err := uc.Users.GetByEmail(ctx, nil, newEmail); err == nil && other.ID != targetID {
+		return "", time.Time{}, Validation("该邮箱已被使用")
+	}
+	code, err := GenerateCode()
+	if err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	challengeID := uc.IDs.NewID()
+	expires := uc.Clock.Now().Add(uc.ChallengeTTL)
+	if err := uc.Challenges.Put(ctx, Challenge{
+		ID: challengeID, Purpose: "admin_email_change",
+		CodeHash: HMACCode(uc.CodeSecret, "admin_email_change", code),
+		UserID:   targetID, Email: newEmail, ExpiresAt: expires,
+	}); err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	if err := uc.Mail.Send(ctx, newEmail, "用户中心邮箱变更验证码", fmt.Sprintf("管理员发起邮箱变更。验证码：%s，%d 分钟内有效。", code, int(uc.ChallengeTTL.Minutes()))); err != nil {
+		return "", time.Time{}, ErrDependency
+	}
+	_ = uc.audit(ctx, nil, actor, "identity.user.email.change_request", itoa(targetID), "{}", "{}", string(mustJSON(map[string]string{"new_email": newEmail})), reason, "success")
+	return challengeID, expires, nil
+}
+
+func (uc *UserUsecase) ConfirmAdminEmailChange(ctx context.Context, actor ActorContext, targetID int64, challengeID, code, reason string) (*User, error) {
+	if _, err := uc.Authorize(ctx, actor, "identity.user.email_binding.update", targetID, false); err != nil {
+		return nil, err
+	}
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
+		return nil, err
+	}
+	c, err := uc.Challenges.Verify(ctx, "admin_email_change", challengeID, code)
+	if err != nil {
+		return nil, err
+	}
+	if c.UserID != targetID {
+		return nil, ErrChallengeInvalid
+	}
+	email := NormalizeEmail(c.Email)
+	now := uc.Clock.Now().UTC()
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		u, err := uc.Users.Get(ctx, tx, targetID)
+		if err != nil {
+			return ErrUserNotFound
+		}
+		if other, oerr := uc.Users.GetByEmail(ctx, tx, email); oerr == nil && other.ID != targetID {
+			return Validation("该邮箱已被使用")
+		}
+		u.Email, u.EmailNormalized, u.EmailVerified = email, email, true
+		if _, err := uc.Users.Update(ctx, tx, u, u.Revision); err != nil {
+			return err
+		}
+		version, err := uc.Users.BumpIdentityVersion(ctx, tx, targetID)
+		if err != nil {
+			return err
+		}
+		if err := uc.Sessions.RevokeAllForUser(ctx, tx, targetID, &now); err != nil {
+			return err
+		}
+		if err := uc.Flows.Complete(ctx, tx, c.ID, "admin_email_change", targetID, "email"); err != nil {
+			return err
+		}
+		if err := uc.audit(ctx, tx, actor, "identity.user.email.update", itoa(targetID), "{}", "{}", string(mustJSON(map[string]string{"new_email": email})), reason, "success"); err != nil {
+			return err
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"user_id": targetID, "email_verified": true, "identity_version": version})
+		return uc.emit(ctx, tx, "user", targetID, version, "user.profile.updated", string(payload))
+	})
+	if err != nil {
+		return nil, err
+	}
+	_ = uc.Challenges.Delete(ctx, challengeID)
+	return uc.loadUserWithRoles(ctx, actor, targetID)
 }
 
 func (uc *UserUsecase) ExternalIdentities(ctx context.Context, actor ActorContext) ([]*ExternalIdentity, error) {
@@ -314,6 +406,9 @@ func (s *Services) ListScope(ctx context.Context, actor ActorContext, operation 
 	}
 	if CheckConstraints(actor.Session.ActiveRoleIDs, facts.Constraints) != nil {
 		return authorization.Scope{}, ErrPermissionDenied
+	}
+	if err := s.requireAdminMFA(ctx, actor); err != nil {
+		return authorization.Scope{}, err
 	}
 	scope := scopeForFacts(facts, actor, operation, s.Clock.Now())
 	if scope.Empty() {
@@ -514,7 +609,7 @@ func (uc *UserUsecase) createActivation(ctx context.Context, user *User, actor A
 	id := uc.IDs.NewID()
 	if err := uc.Challenges.Put(ctx, Challenge{
 		ID: id, Purpose: "password_reset",
-		CodeHash: HMACCode(uc.CodeSecret, "password_reset:"+itoa(user.ID), code),
+		CodeHash: HMACCode(uc.CodeSecret, "password_reset", code),
 		UserID:   user.ID, Email: user.Email,
 		ExpiresAt: uc.Clock.Now().Add(uc.ActivationTTL),
 	}); err != nil {
@@ -792,7 +887,7 @@ func (uc *UserUsecase) EffectivePermissions(ctx context.Context, actor ActorCont
 	return uc.Services.EffectivePermissions(ctx, id, nil)
 }
 
-func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyword, status string, fields []string, reason string) (*ExportJob, error) {
+func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyword, status string, fields []string, roleID int64, mfa *bool, reason string) (*ExportJob, error) {
 	scope, err := uc.ListScope(ctx, actor, "identity.user.export")
 	if err != nil {
 		return nil, err
@@ -811,7 +906,7 @@ func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyw
 			return nil, ErrPermissionDenied
 		}
 	}
-	filter := UserFilter{Keyword: keyword, Status: status, Scope: scope, Limit: 100000}
+	filter := UserFilter{Keyword: keyword, Status: status, Scope: scope, RoleID: roleID, MFA: mfa, Limit: 100000}
 	users, _, err := uc.Users.List(ctx, nil, filter)
 	if err != nil {
 		return nil, ErrDependency

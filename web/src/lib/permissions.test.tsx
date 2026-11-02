@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 
 import { Can } from '../components/can'
+import { RequirePermission } from '../app/guards'
 import { AuthContext, type AuthContextValue } from '../lib/auth'
 import {
   buildMenuKeySet,
@@ -79,5 +81,37 @@ describe('permission gating', () => {
 
     expect(screen.getByText('无权限提示')).toBeInTheDocument()
     expect(screen.queryByText('创建表单')).not.toBeInTheDocument()
+  })
+
+  it('blocks the delegations page without iam.delegation.read', () => {
+    const value = authValue([
+      { operation: 'audit.read', effect: 'allow', scope: 'all' },
+    ])
+    render(
+      <MemoryRouter>
+        <AuthContext.Provider value={value}>
+          <RequirePermission permission="iam.delegation.read">
+            <span>委派管理内容</span>
+          </RequirePermission>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByText('委派管理内容')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('需要权限：iam.delegation.read'),
+    ).toBeInTheDocument()
+  })
+
+  it('supports the admin/iam/delegations menu key even without a permission projection', () => {
+    expect(
+      canAccessMenu(
+        { menuKey: 'admin/iam/delegations' },
+        {
+          permissions: buildPermissionSet([]),
+          menuKeys: buildMenuKeySet(['admin/iam/delegations']),
+        },
+      ),
+    ).toBe(true)
   })
 })

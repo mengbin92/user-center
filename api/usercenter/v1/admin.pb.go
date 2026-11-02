@@ -801,6 +801,134 @@ func (x *ResetMFARequest) GetReason() string {
 	return ""
 }
 
+type CreateEmailChangeChallengeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	NewEmail      string                 `protobuf:"bytes,2,opt,name=new_email,json=newEmail,proto3" json:"new_email,omitempty"`
+	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateEmailChangeChallengeRequest) Reset() {
+	*x = CreateEmailChangeChallengeRequest{}
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateEmailChangeChallengeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateEmailChangeChallengeRequest) ProtoMessage() {}
+
+func (x *CreateEmailChangeChallengeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateEmailChangeChallengeRequest.ProtoReflect.Descriptor instead.
+func (*CreateEmailChangeChallengeRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *CreateEmailChangeChallengeRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CreateEmailChangeChallengeRequest) GetNewEmail() string {
+	if x != nil {
+		return x.NewEmail
+	}
+	return ""
+}
+
+func (x *CreateEmailChangeChallengeRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ConfirmEmailChangeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ChallengeId   string                 `protobuf:"bytes,2,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	Code          string                 `protobuf:"bytes,3,opt,name=code,proto3" json:"code,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmEmailChangeRequest) Reset() {
+	*x = ConfirmEmailChangeRequest{}
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmEmailChangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmEmailChangeRequest) ProtoMessage() {}
+
+func (x *ConfirmEmailChangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmEmailChangeRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmEmailChangeRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ConfirmEmailChangeRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ConfirmEmailChangeRequest) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *ConfirmEmailChangeRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ConfirmEmailChangeRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 type ListUserSessionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -810,7 +938,7 @@ type ListUserSessionsRequest struct {
 
 func (x *ListUserSessionsRequest) Reset() {
 	*x = ListUserSessionsRequest{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[12]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -822,7 +950,7 @@ func (x *ListUserSessionsRequest) String() string {
 func (*ListUserSessionsRequest) ProtoMessage() {}
 
 func (x *ListUserSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[12]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -835,7 +963,7 @@ func (x *ListUserSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUserSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListUserSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{12}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListUserSessionsRequest) GetId() string {
@@ -857,7 +985,7 @@ type RevokeUserSessionsRequest struct {
 
 func (x *RevokeUserSessionsRequest) Reset() {
 	*x = RevokeUserSessionsRequest{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[13]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -869,7 +997,7 @@ func (x *RevokeUserSessionsRequest) String() string {
 func (*RevokeUserSessionsRequest) ProtoMessage() {}
 
 func (x *RevokeUserSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[13]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -882,7 +1010,7 @@ func (x *RevokeUserSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeUserSessionsRequest.ProtoReflect.Descriptor instead.
 func (*RevokeUserSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{13}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RevokeUserSessionsRequest) GetId() string {
@@ -922,7 +1050,7 @@ type GetUserEffectivePermissionsRequest struct {
 
 func (x *GetUserEffectivePermissionsRequest) Reset() {
 	*x = GetUserEffectivePermissionsRequest{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[14]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -934,7 +1062,7 @@ func (x *GetUserEffectivePermissionsRequest) String() string {
 func (*GetUserEffectivePermissionsRequest) ProtoMessage() {}
 
 func (x *GetUserEffectivePermissionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[14]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -947,7 +1075,7 @@ func (x *GetUserEffectivePermissionsRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetUserEffectivePermissionsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserEffectivePermissionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{14}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetUserEffectivePermissionsRequest) GetId() string {
@@ -972,7 +1100,7 @@ type EffectivePermission struct {
 
 func (x *EffectivePermission) Reset() {
 	*x = EffectivePermission{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[15]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -984,7 +1112,7 @@ func (x *EffectivePermission) String() string {
 func (*EffectivePermission) ProtoMessage() {}
 
 func (x *EffectivePermission) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[15]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -997,7 +1125,7 @@ func (x *EffectivePermission) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EffectivePermission.ProtoReflect.Descriptor instead.
 func (*EffectivePermission) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{15}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *EffectivePermission) GetOperation() string {
@@ -1060,7 +1188,7 @@ type EffectivePermissionsReply struct {
 
 func (x *EffectivePermissionsReply) Reset() {
 	*x = EffectivePermissionsReply{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[16]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1072,7 +1200,7 @@ func (x *EffectivePermissionsReply) String() string {
 func (*EffectivePermissionsReply) ProtoMessage() {}
 
 func (x *EffectivePermissionsReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[16]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1085,7 +1213,7 @@ func (x *EffectivePermissionsReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EffectivePermissionsReply.ProtoReflect.Descriptor instead.
 func (*EffectivePermissionsReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{16}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *EffectivePermissionsReply) GetPermissions() []*EffectivePermission {
@@ -1115,13 +1243,15 @@ type ExportUsersRequest struct {
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	Fields        []string               `protobuf:"bytes,3,rep,name=fields,proto3" json:"fields,omitempty"`
 	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	RoleId        string                 `protobuf:"bytes,5,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	MfaEnabled    string                 `protobuf:"bytes,6,opt,name=mfa_enabled,json=mfaEnabled,proto3" json:"mfa_enabled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ExportUsersRequest) Reset() {
 	*x = ExportUsersRequest{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[17]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1133,7 +1263,7 @@ func (x *ExportUsersRequest) String() string {
 func (*ExportUsersRequest) ProtoMessage() {}
 
 func (x *ExportUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[17]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1146,7 +1276,7 @@ func (x *ExportUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportUsersRequest.ProtoReflect.Descriptor instead.
 func (*ExportUsersRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{17}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ExportUsersRequest) GetKeyword() string {
@@ -1177,6 +1307,20 @@ func (x *ExportUsersRequest) GetReason() string {
 	return ""
 }
 
+func (x *ExportUsersRequest) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *ExportUsersRequest) GetMfaEnabled() string {
+	if x != nil {
+		return x.MfaEnabled
+	}
+	return ""
+}
+
 type GetExportRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1186,7 +1330,7 @@ type GetExportRequest struct {
 
 func (x *GetExportRequest) Reset() {
 	*x = GetExportRequest{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[18]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1198,7 +1342,7 @@ func (x *GetExportRequest) String() string {
 func (*GetExportRequest) ProtoMessage() {}
 
 func (x *GetExportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[18]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1211,7 +1355,7 @@ func (x *GetExportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExportRequest.ProtoReflect.Descriptor instead.
 func (*GetExportRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{18}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetExportRequest) GetId() string {
@@ -1231,7 +1375,7 @@ type ListExportsRequest struct {
 
 func (x *ListExportsRequest) Reset() {
 	*x = ListExportsRequest{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[19]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1243,7 +1387,7 @@ func (x *ListExportsRequest) String() string {
 func (*ListExportsRequest) ProtoMessage() {}
 
 func (x *ListExportsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[19]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1256,7 +1400,7 @@ func (x *ListExportsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListExportsRequest.ProtoReflect.Descriptor instead.
 func (*ListExportsRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{19}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListExportsRequest) GetPageSize() int32 {
@@ -1283,7 +1427,7 @@ type ExportsReply struct {
 
 func (x *ExportsReply) Reset() {
 	*x = ExportsReply{}
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[20]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1295,7 +1439,7 @@ func (x *ExportsReply) String() string {
 func (*ExportsReply) ProtoMessage() {}
 
 func (x *ExportsReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_admin_proto_msgTypes[20]
+	mi := &file_api_usercenter_v1_admin_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1308,7 +1452,7 @@ func (x *ExportsReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportsReply.ProtoReflect.Descriptor instead.
 func (*ExportsReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{20}
+	return file_api_usercenter_v1_admin_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ExportsReply) GetItems() []*ExportJob {
@@ -1391,7 +1535,16 @@ const file_api_usercenter_v1_admin_proto_rawDesc = "" +
 	"expires_at\x18\x02 \x01(\tR\texpiresAt\"9\n" +
 	"\x0fResetMFARequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\")\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"h\n" +
+	"!CreateEmailChangeChallengeRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tnew_email\x18\x02 \x01(\tR\bnewEmail\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"z\n" +
+	"\x19ConfirmEmailChangeRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fchallenge_id\x18\x02 \x01(\tR\vchallengeId\x12\x12\n" +
+	"\x04code\x18\x03 \x01(\tR\x04code\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\")\n" +
 	"\x17ListUserSessionsRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x83\x01\n" +
 	"\x19RevokeUserSessionsRequest\x12\x0e\n" +
@@ -1414,12 +1567,15 @@ const file_api_usercenter_v1_admin_proto_rawDesc = "" +
 	"\x19EffectivePermissionsReply\x12H\n" +
 	"\vpermissions\x18\x01 \x03(\v2&.api.usercenter.v1.EffectivePermissionR\vpermissions\x12'\n" +
 	"\x0fpolicy_revision\x18\x02 \x01(\tR\x0epolicyRevision\x12#\n" +
-	"\ruser_revision\x18\x03 \x01(\tR\fuserRevision\"v\n" +
+	"\ruser_revision\x18\x03 \x01(\tR\fuserRevision\"\xb0\x01\n" +
 	"\x12ExportUsersRequest\x12\x18\n" +
 	"\akeyword\x18\x01 \x01(\tR\akeyword\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x16\n" +
 	"\x06fields\x18\x03 \x03(\tR\x06fields\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"\"\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12\x17\n" +
+	"\arole_id\x18\x05 \x01(\tR\x06roleId\x12\x1f\n" +
+	"\vmfa_enabled\x18\x06 \x01(\tR\n" +
+	"mfaEnabled\"\"\n" +
 	"\x10GetExportRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"P\n" +
 	"\x12ListExportsRequest\x12\x1b\n" +
@@ -1428,7 +1584,7 @@ const file_api_usercenter_v1_admin_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"s\n" +
 	"\fExportsReply\x122\n" +
 	"\x05items\x18\x01 \x03(\v2\x1c.api.usercenter.v1.ExportJobR\x05items\x12/\n" +
-	"\x04meta\x18\x02 \x01(\v2\x1b.api.usercenter.v1.ListMetaR\x04meta2\xb3\x0f\n" +
+	"\x04meta\x18\x02 \x01(\v2\x1b.api.usercenter.v1.ListMetaR\x04meta2\xf7\x11\n" +
 	"\x10AdminUserService\x12v\n" +
 	"\vGetOverview\x12%.api.usercenter.v1.GetOverviewRequest\x1a .api.usercenter.v1.OverviewReply\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/admin/overview\x12l\n" +
 	"\tListUsers\x12#.api.usercenter.v1.ListUsersRequest\x1a\x1d.api.usercenter.v1.UsersReply\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/api/v1/admin/users\x12k\n" +
@@ -1440,7 +1596,9 @@ const file_api_usercenter_v1_admin_proto_rawDesc = "" +
 	"\rSetUserStatus\x12'.api.usercenter.v1.SetUserStatusRequest\x1a\x17.api.usercenter.v1.User\".\x82\xd3\xe4\x93\x02(:\x01*\"#/api/v1/admin/users/{id}:set-status\x12z\n" +
 	"\vArchiveUser\x12%.api.usercenter.v1.ArchiveUserRequest\x1a\x17.api.usercenter.v1.User\"+\x82\xd3\xe4\x93\x02%:\x01*\" /api/v1/admin/users/{id}:archive\x12\xb7\x01\n" +
 	"\x1aCreatePasswordResetRequest\x121.api.usercenter.v1.CreatePasswordResetTaskRequest\x1a).api.usercenter.v1.PasswordResetTaskReply\";\x82\xd3\xe4\x93\x025:\x01*\"0/api/v1/admin/users/{id}/password-reset-requests\x12u\n" +
-	"\bResetMFA\x12\".api.usercenter.v1.ResetMFARequest\x1a\x16.google.protobuf.Empty\"-\x82\xd3\xe4\x93\x02':\x01*\"\"/api/v1/admin/users/{id}/mfa:reset\x12\x8b\x01\n" +
+	"\bResetMFA\x12\".api.usercenter.v1.ResetMFARequest\x1a\x16.google.protobuf.Empty\"-\x82\xd3\xe4\x93\x02':\x01*\"\"/api/v1/admin/users/{id}/mfa:reset\x12\xa8\x01\n" +
+	"\x1aCreateEmailChangeChallenge\x124.api.usercenter.v1.CreateEmailChangeChallengeRequest\x1a!.api.usercenter.v1.ChallengeReply\"1\x82\xd3\xe4\x93\x02+:\x01*\"&/api/v1/admin/users/{id}/email-changes\x12\x96\x01\n" +
+	"\x12ConfirmEmailChange\x12,.api.usercenter.v1.ConfirmEmailChangeRequest\x1a\x17.api.usercenter.v1.User\"9\x82\xd3\xe4\x93\x023:\x01*\"./api/v1/admin/users/{id}/email-changes:confirm\x12\x8b\x01\n" +
 	"\x10ListUserSessions\x12*.api.usercenter.v1.ListUserSessionsRequest\x1a .api.usercenter.v1.SessionsReply\")\x82\xd3\xe4\x93\x02#\x12!/api/v1/admin/users/{id}/sessions\x12\x8f\x01\n" +
 	"\x12RevokeUserSessions\x12,.api.usercenter.v1.RevokeUserSessionsRequest\x1a\x16.google.protobuf.Empty\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/api/v1/admin/users/{id}/sessions:revoke\x12\xba\x01\n" +
 	"\x1bGetUserEffectivePermissions\x125.api.usercenter.v1.GetUserEffectivePermissionsRequest\x1a,.api.usercenter.v1.EffectivePermissionsReply\"6\x82\xd3\xe4\x93\x020\x12./api/v1/admin/users/{id}/effective-permissions\x12y\n" +
@@ -1460,7 +1618,7 @@ func file_api_usercenter_v1_admin_proto_rawDescGZIP() []byte {
 	return file_api_usercenter_v1_admin_proto_rawDescData
 }
 
-var file_api_usercenter_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_api_usercenter_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_api_usercenter_v1_admin_proto_goTypes = []any{
 	(*GetOverviewRequest)(nil),                 // 0: api.usercenter.v1.GetOverviewRequest
 	(*OverviewReply)(nil),                      // 1: api.usercenter.v1.OverviewReply
@@ -1474,27 +1632,30 @@ var file_api_usercenter_v1_admin_proto_goTypes = []any{
 	(*CreatePasswordResetTaskRequest)(nil),     // 9: api.usercenter.v1.CreatePasswordResetTaskRequest
 	(*PasswordResetTaskReply)(nil),             // 10: api.usercenter.v1.PasswordResetTaskReply
 	(*ResetMFARequest)(nil),                    // 11: api.usercenter.v1.ResetMFARequest
-	(*ListUserSessionsRequest)(nil),            // 12: api.usercenter.v1.ListUserSessionsRequest
-	(*RevokeUserSessionsRequest)(nil),          // 13: api.usercenter.v1.RevokeUserSessionsRequest
-	(*GetUserEffectivePermissionsRequest)(nil), // 14: api.usercenter.v1.GetUserEffectivePermissionsRequest
-	(*EffectivePermission)(nil),                // 15: api.usercenter.v1.EffectivePermission
-	(*EffectivePermissionsReply)(nil),          // 16: api.usercenter.v1.EffectivePermissionsReply
-	(*ExportUsersRequest)(nil),                 // 17: api.usercenter.v1.ExportUsersRequest
-	(*GetExportRequest)(nil),                   // 18: api.usercenter.v1.GetExportRequest
-	(*ListExportsRequest)(nil),                 // 19: api.usercenter.v1.ListExportsRequest
-	(*ExportsReply)(nil),                       // 20: api.usercenter.v1.ExportsReply
-	(*User)(nil),                               // 21: api.usercenter.v1.User
-	(*ListMeta)(nil),                           // 22: api.usercenter.v1.ListMeta
-	(*ExportJob)(nil),                          // 23: api.usercenter.v1.ExportJob
-	(*emptypb.Empty)(nil),                      // 24: google.protobuf.Empty
-	(*SessionsReply)(nil),                      // 25: api.usercenter.v1.SessionsReply
+	(*CreateEmailChangeChallengeRequest)(nil),  // 12: api.usercenter.v1.CreateEmailChangeChallengeRequest
+	(*ConfirmEmailChangeRequest)(nil),          // 13: api.usercenter.v1.ConfirmEmailChangeRequest
+	(*ListUserSessionsRequest)(nil),            // 14: api.usercenter.v1.ListUserSessionsRequest
+	(*RevokeUserSessionsRequest)(nil),          // 15: api.usercenter.v1.RevokeUserSessionsRequest
+	(*GetUserEffectivePermissionsRequest)(nil), // 16: api.usercenter.v1.GetUserEffectivePermissionsRequest
+	(*EffectivePermission)(nil),                // 17: api.usercenter.v1.EffectivePermission
+	(*EffectivePermissionsReply)(nil),          // 18: api.usercenter.v1.EffectivePermissionsReply
+	(*ExportUsersRequest)(nil),                 // 19: api.usercenter.v1.ExportUsersRequest
+	(*GetExportRequest)(nil),                   // 20: api.usercenter.v1.GetExportRequest
+	(*ListExportsRequest)(nil),                 // 21: api.usercenter.v1.ListExportsRequest
+	(*ExportsReply)(nil),                       // 22: api.usercenter.v1.ExportsReply
+	(*User)(nil),                               // 23: api.usercenter.v1.User
+	(*ListMeta)(nil),                           // 24: api.usercenter.v1.ListMeta
+	(*ExportJob)(nil),                          // 25: api.usercenter.v1.ExportJob
+	(*emptypb.Empty)(nil),                      // 26: google.protobuf.Empty
+	(*ChallengeReply)(nil),                     // 27: api.usercenter.v1.ChallengeReply
+	(*SessionsReply)(nil),                      // 28: api.usercenter.v1.SessionsReply
 }
 var file_api_usercenter_v1_admin_proto_depIdxs = []int32{
-	21, // 0: api.usercenter.v1.UsersReply.items:type_name -> api.usercenter.v1.User
-	22, // 1: api.usercenter.v1.UsersReply.meta:type_name -> api.usercenter.v1.ListMeta
-	15, // 2: api.usercenter.v1.EffectivePermissionsReply.permissions:type_name -> api.usercenter.v1.EffectivePermission
-	23, // 3: api.usercenter.v1.ExportsReply.items:type_name -> api.usercenter.v1.ExportJob
-	22, // 4: api.usercenter.v1.ExportsReply.meta:type_name -> api.usercenter.v1.ListMeta
+	23, // 0: api.usercenter.v1.UsersReply.items:type_name -> api.usercenter.v1.User
+	24, // 1: api.usercenter.v1.UsersReply.meta:type_name -> api.usercenter.v1.ListMeta
+	17, // 2: api.usercenter.v1.EffectivePermissionsReply.permissions:type_name -> api.usercenter.v1.EffectivePermission
+	25, // 3: api.usercenter.v1.ExportsReply.items:type_name -> api.usercenter.v1.ExportJob
+	24, // 4: api.usercenter.v1.ExportsReply.meta:type_name -> api.usercenter.v1.ListMeta
 	0,  // 5: api.usercenter.v1.AdminUserService.GetOverview:input_type -> api.usercenter.v1.GetOverviewRequest
 	2,  // 6: api.usercenter.v1.AdminUserService.ListUsers:input_type -> api.usercenter.v1.ListUsersRequest
 	4,  // 7: api.usercenter.v1.AdminUserService.CreateUser:input_type -> api.usercenter.v1.CreateUserRequest
@@ -1504,29 +1665,33 @@ var file_api_usercenter_v1_admin_proto_depIdxs = []int32{
 	8,  // 11: api.usercenter.v1.AdminUserService.ArchiveUser:input_type -> api.usercenter.v1.ArchiveUserRequest
 	9,  // 12: api.usercenter.v1.AdminUserService.CreatePasswordResetRequest:input_type -> api.usercenter.v1.CreatePasswordResetTaskRequest
 	11, // 13: api.usercenter.v1.AdminUserService.ResetMFA:input_type -> api.usercenter.v1.ResetMFARequest
-	12, // 14: api.usercenter.v1.AdminUserService.ListUserSessions:input_type -> api.usercenter.v1.ListUserSessionsRequest
-	13, // 15: api.usercenter.v1.AdminUserService.RevokeUserSessions:input_type -> api.usercenter.v1.RevokeUserSessionsRequest
-	14, // 16: api.usercenter.v1.AdminUserService.GetUserEffectivePermissions:input_type -> api.usercenter.v1.GetUserEffectivePermissionsRequest
-	17, // 17: api.usercenter.v1.AdminUserService.ExportUsers:input_type -> api.usercenter.v1.ExportUsersRequest
-	18, // 18: api.usercenter.v1.AdminUserService.GetExport:input_type -> api.usercenter.v1.GetExportRequest
-	19, // 19: api.usercenter.v1.AdminUserService.ListExports:input_type -> api.usercenter.v1.ListExportsRequest
-	1,  // 20: api.usercenter.v1.AdminUserService.GetOverview:output_type -> api.usercenter.v1.OverviewReply
-	3,  // 21: api.usercenter.v1.AdminUserService.ListUsers:output_type -> api.usercenter.v1.UsersReply
-	21, // 22: api.usercenter.v1.AdminUserService.CreateUser:output_type -> api.usercenter.v1.User
-	21, // 23: api.usercenter.v1.AdminUserService.GetUser:output_type -> api.usercenter.v1.User
-	21, // 24: api.usercenter.v1.AdminUserService.UpdateUser:output_type -> api.usercenter.v1.User
-	21, // 25: api.usercenter.v1.AdminUserService.SetUserStatus:output_type -> api.usercenter.v1.User
-	21, // 26: api.usercenter.v1.AdminUserService.ArchiveUser:output_type -> api.usercenter.v1.User
-	10, // 27: api.usercenter.v1.AdminUserService.CreatePasswordResetRequest:output_type -> api.usercenter.v1.PasswordResetTaskReply
-	24, // 28: api.usercenter.v1.AdminUserService.ResetMFA:output_type -> google.protobuf.Empty
-	25, // 29: api.usercenter.v1.AdminUserService.ListUserSessions:output_type -> api.usercenter.v1.SessionsReply
-	24, // 30: api.usercenter.v1.AdminUserService.RevokeUserSessions:output_type -> google.protobuf.Empty
-	16, // 31: api.usercenter.v1.AdminUserService.GetUserEffectivePermissions:output_type -> api.usercenter.v1.EffectivePermissionsReply
-	23, // 32: api.usercenter.v1.AdminUserService.ExportUsers:output_type -> api.usercenter.v1.ExportJob
-	23, // 33: api.usercenter.v1.AdminUserService.GetExport:output_type -> api.usercenter.v1.ExportJob
-	20, // 34: api.usercenter.v1.AdminUserService.ListExports:output_type -> api.usercenter.v1.ExportsReply
-	20, // [20:35] is the sub-list for method output_type
-	5,  // [5:20] is the sub-list for method input_type
+	12, // 14: api.usercenter.v1.AdminUserService.CreateEmailChangeChallenge:input_type -> api.usercenter.v1.CreateEmailChangeChallengeRequest
+	13, // 15: api.usercenter.v1.AdminUserService.ConfirmEmailChange:input_type -> api.usercenter.v1.ConfirmEmailChangeRequest
+	14, // 16: api.usercenter.v1.AdminUserService.ListUserSessions:input_type -> api.usercenter.v1.ListUserSessionsRequest
+	15, // 17: api.usercenter.v1.AdminUserService.RevokeUserSessions:input_type -> api.usercenter.v1.RevokeUserSessionsRequest
+	16, // 18: api.usercenter.v1.AdminUserService.GetUserEffectivePermissions:input_type -> api.usercenter.v1.GetUserEffectivePermissionsRequest
+	19, // 19: api.usercenter.v1.AdminUserService.ExportUsers:input_type -> api.usercenter.v1.ExportUsersRequest
+	20, // 20: api.usercenter.v1.AdminUserService.GetExport:input_type -> api.usercenter.v1.GetExportRequest
+	21, // 21: api.usercenter.v1.AdminUserService.ListExports:input_type -> api.usercenter.v1.ListExportsRequest
+	1,  // 22: api.usercenter.v1.AdminUserService.GetOverview:output_type -> api.usercenter.v1.OverviewReply
+	3,  // 23: api.usercenter.v1.AdminUserService.ListUsers:output_type -> api.usercenter.v1.UsersReply
+	23, // 24: api.usercenter.v1.AdminUserService.CreateUser:output_type -> api.usercenter.v1.User
+	23, // 25: api.usercenter.v1.AdminUserService.GetUser:output_type -> api.usercenter.v1.User
+	23, // 26: api.usercenter.v1.AdminUserService.UpdateUser:output_type -> api.usercenter.v1.User
+	23, // 27: api.usercenter.v1.AdminUserService.SetUserStatus:output_type -> api.usercenter.v1.User
+	23, // 28: api.usercenter.v1.AdminUserService.ArchiveUser:output_type -> api.usercenter.v1.User
+	10, // 29: api.usercenter.v1.AdminUserService.CreatePasswordResetRequest:output_type -> api.usercenter.v1.PasswordResetTaskReply
+	26, // 30: api.usercenter.v1.AdminUserService.ResetMFA:output_type -> google.protobuf.Empty
+	27, // 31: api.usercenter.v1.AdminUserService.CreateEmailChangeChallenge:output_type -> api.usercenter.v1.ChallengeReply
+	23, // 32: api.usercenter.v1.AdminUserService.ConfirmEmailChange:output_type -> api.usercenter.v1.User
+	28, // 33: api.usercenter.v1.AdminUserService.ListUserSessions:output_type -> api.usercenter.v1.SessionsReply
+	26, // 34: api.usercenter.v1.AdminUserService.RevokeUserSessions:output_type -> google.protobuf.Empty
+	18, // 35: api.usercenter.v1.AdminUserService.GetUserEffectivePermissions:output_type -> api.usercenter.v1.EffectivePermissionsReply
+	25, // 36: api.usercenter.v1.AdminUserService.ExportUsers:output_type -> api.usercenter.v1.ExportJob
+	25, // 37: api.usercenter.v1.AdminUserService.GetExport:output_type -> api.usercenter.v1.ExportJob
+	22, // 38: api.usercenter.v1.AdminUserService.ListExports:output_type -> api.usercenter.v1.ExportsReply
+	22, // [22:39] is the sub-list for method output_type
+	5,  // [5:22] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -1544,7 +1709,7 @@ func file_api_usercenter_v1_admin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_usercenter_v1_admin_proto_rawDesc), len(file_api_usercenter_v1_admin_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   21,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

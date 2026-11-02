@@ -29,12 +29,13 @@ type LoginInput struct {
 }
 
 type LoginResult struct {
-	Status           string
-	ChallengeID      string
-	ChallengeExpires time.Time
-	User             *User
-	Session          *Session
-	RawToken         string
+	Status                 string
+	ChallengeID            string
+	ChallengeExpires       time.Time
+	User                   *User
+	Session                *Session
+	RawToken               string
+	PasswordChangeRequired bool
 }
 
 func (uc *AuthUsecase) AuthConfig(ctx context.Context) (*AuthSettings, error) {
@@ -72,7 +73,7 @@ func (uc *AuthUsecase) CreateRegistrationChallenge(ctx context.Context, email, i
 	if err := uc.Challenges.Put(ctx, Challenge{
 		ID:        id,
 		Purpose:   "registration",
-		CodeHash:  HMACCode(uc.CodeSecret, "registration:"+email, code),
+		CodeHash:  HMACCode(uc.CodeSecret, "registration", code),
 		Email:     email,
 		ExpiresAt: expires,
 	}); err != nil {
@@ -261,7 +262,10 @@ func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, 
 	if err != nil {
 		return nil, err
 	}
-	return &LoginResult{Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw}, nil
+	return &LoginResult{
+		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session,
+		RawToken: raw, PasswordChangeRequired: cred.MustChangePassword,
+	}, nil
 }
 
 func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, ua string) (*LoginResult, error) {
@@ -295,12 +299,17 @@ func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, u
 	if payload.UA == "" {
 		payload.UA = ua
 	}
+	cred, _ := uc.Credentials.Get(ctx, nil, user.ID)
 	session, raw, err := uc.issueSession(ctx, user, payload.UA, payload.IP)
 	if err != nil {
 		return nil, err
 	}
 	_ = uc.Challenges.Delete(ctx, challengeID)
-	return &LoginResult{Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw}, nil
+	result := &LoginResult{Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw}
+	if cred != nil {
+		result.PasswordChangeRequired = cred.MustChangePassword
+	}
+	return result, nil
 }
 
 func (uc *AuthUsecase) issueSession(ctx context.Context, user *User, ua, ip string) (*Session, string, error) {
@@ -418,7 +427,7 @@ func (uc *AuthUsecase) CreatePasswordResetChallenge(ctx context.Context, identif
 	}
 	if err := uc.Challenges.Put(ctx, Challenge{
 		ID: id, Purpose: "password_reset",
-		CodeHash: HMACCode(uc.CodeSecret, "password_reset:"+itoa(user.ID), code),
+		CodeHash: HMACCode(uc.CodeSecret, "password_reset", code),
 		UserID:   user.ID, Email: user.Email, ExpiresAt: expires,
 	}); err != nil {
 		return "", time.Time{}, ErrDependency
@@ -499,4 +508,31 @@ func emailDomainAllowed(email string, allowed []string) bool {
 		}
 	}
 	return false
+}
+
+// MFAEnrollmentRequired reports whether the account must bind a second factor
+// before management calls are accepted. Authentication itself is not blocked,
+// otherwise a root account could never enroll.
+func (uc *AuthUsecase) MFAEnrollmentRequired(ctx context.Context, user *User) bool {
+	if user == nil {
+		return false
+	}
+	isAdmin := false
+	for _, r := range user.Roles {
+		if r.Code == "root" || r.Code == "admin" {
+			isAdmin = true
+			break
+		}
+	}
+	if !isAdmin {
+		return false
+	}
+	settings, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil || !settings.MFARequiredForAdmins {
+		return false
+	}
+	if state, merr := uc.MFA.Get(ctx, nil, user.ID); merr == nil && state.Enabled() {
+		return false
+	}
+	return true
 }

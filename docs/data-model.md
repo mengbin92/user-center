@@ -30,7 +30,7 @@
 
 ### `user_oauth_identities`
 
-`(provider, issuer, provider_subject)` 唯一；同邮箱不自动合并账号。表已建立，第三方登录提供方接入在 V1.1。
+`(provider, issuer, provider_subject)` 唯一；同邮箱不自动合并账号。GitHub/Google 登录与绑定已实现（见 `docs/api.md`）。
 
 ### `auth_flow_completions`
 
@@ -76,6 +76,7 @@
 | `iam_role_inheritance` | `(role_id, inherits_role_id)` 主键 | 禁止自环与循环，写入前验证 |
 | `iam_user_roles` | `user_id`、`role_id`、`boundary` JSON、`starts_at`/`expires_at`、`status`、`origin`、`revision` | 分配 = 角色 + 边界 + 有效期；撤销保留行 |
 | `iam_role_constraints` | `kind`、`role_ids` JSON、`max_count`、`enabled`、`revision` | `mutual_exclusion` / `max_roles` |
+| `iam_delegations` | `manager_role_id`、`target_role_id`、`target_kind`、`actions` JSON、`target_user_scope` JSON、`grant_ceiling` JSON、`can_redelegate`、有效期、`revoked_at`、`revision` | 只授权分配/撤销角色，不授予策略修改 |
 | `iam_menu_items` | `route_key` 唯一、`required_all/any`、`enabled` | 仅展示投影，不参与 API 鉴权 |
 | `iam_audit_events` | `event_id`、actor、action、target、before/after/diff、result、reason、request_id、versions、occurred_at | 只追加；不对用户删除级联 |
 
@@ -87,9 +88,11 @@
 |---|---|
 | `event_outbox` | 与业务写同事务；`event_id` 唯一；`aggregate_revision` 用于消费端拒绝旧版本覆盖 |
 | `event_deliveries` | `(event_id, subscriber_id)` 唯一；`attempts`、`next_retry_at`、`status`、`last_error` |
+| `integration_clients` | `client_id`、`code`、`service_owner`、`credential_hash`、`credential_version`、`allowed_methods` JSON、`event_subscriptions` JSON、`callback_url`、`expires_at`、`revision` |
+| `legacy_import_batches` | `batch_id`、`source_commit`、`snapshot_position`、`counts`、`fingerprint`、`state`、`error`、`completed_at` |
 | `export_jobs` | 导出任务；`scope_snapshot`、字段、状态、制品名、过期时间；下载时重新鉴权 |
 | `schema_migrations` | `cmd/migrate` 维护的已执行版本 |
-| `legacy_import_batches` | 设计文档要求；离线导入工具交付时启用（当前未建表） |
+| `legacy_import_batches` | `cmd/import-legacy` 的批次记录；保留源提交、位点、计数、指纹与终态 |
 
 ## 5. Revision 语义
 

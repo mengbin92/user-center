@@ -11,9 +11,10 @@ import {
   Smartphone,
   Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router'
 import { QRCodeSVG } from 'qrcode.react'
 
 import { PageTitle } from '../../app/guards'
@@ -36,7 +37,11 @@ import { useAuth } from '../../lib/auth'
 import { errorMessage } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import { useApiMutation } from '../../lib/mutations'
+import { oauthErrorMessage, providerLabel } from '../../lib/oauth'
+import { useSecurityStatus } from '../../lib/security'
 import type { SetupMFAReply } from '../../lib/types'
+import { PasswordChangeNotice } from './password-change-notice'
+import { ProviderButtons } from '../auth/provider-buttons'
 
 function SectionCard({
   title,
@@ -60,12 +65,13 @@ function SectionCard({
 export function SecurityPage() {
   const { user } = useAuth()
   const toast = useToast()
+  const [searchParams] = useSearchParams()
+  const boundProvider = searchParams.get('bound')
+  const oauthError = searchParams.get('oauth_error')
+  const passwordChangeParam =
+    searchParams.get('password_change_required') === '1'
 
-  const securityQuery = useQuery({
-    queryKey: ['me', 'security'],
-    queryFn: () => api.me.security(),
-    retry: false,
-  })
+  const securityQuery = useSecurityStatus()
   const contextQuery = useQuery({
     queryKey: ['auth', 'context'],
     queryFn: () => api.auth.context(),
@@ -81,6 +87,16 @@ export function SecurityPage() {
 
   const security = securityQuery.data
   const mfaEnabled = security?.mfa_enabled ?? false
+  const passwordChangeRequired =
+    security?.password_change_required === true ||
+    (passwordChangeParam && security?.password_change_required !== false)
+
+  const handledBound = useRef<string | null>(null)
+  useEffect(() => {
+    if (!boundProvider || handledBound.current === boundProvider) return
+    handledBound.current = boundProvider
+    void identitiesQuery.refetch()
+  }, [boundProvider, identitiesQuery])
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState('')
@@ -96,6 +112,8 @@ export function SecurityPage() {
       }),
     successMessage: '密码已更新',
     successDescription: '其他设备上的会话已被撤销。',
+    invalidate: [['me', 'security'], ['me', 'external-identities']],
+    refreshAuth: true,
     onSuccess: () => {
       setCurrentPassword('')
       setNewPassword('')
@@ -321,6 +339,24 @@ export function SecurityPage() {
           刷新状态
         </Button>
       </div>
+
+      <PasswordChangeNotice required={passwordChangeRequired} />
+
+      {boundProvider ? (
+        <InlineAlert
+          tone="success"
+          icon={Link2}
+          title={`已绑定 ${providerLabel(boundProvider)}`}
+        >
+          第三方身份已与当前账号关联，可用于后续登录。
+        </InlineAlert>
+      ) : null}
+
+      {oauthError ? (
+        <InlineAlert tone="danger" title="第三方账号操作失败">
+          {oauthErrorMessage(oauthError)}
+        </InlineAlert>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard
@@ -570,7 +606,7 @@ export function SecurityPage() {
 
       <SectionCard
         title="第三方账号绑定"
-        description="已关联的外部身份。解绑前会要求近期安全验证。"
+        description="绑定启用的身份提供方，或解除已关联的外部身份。解绑前会要求近期安全验证。"
         actions={
           <Button
             size="xs"
@@ -582,6 +618,26 @@ export function SecurityPage() {
           </Button>
         }
       >
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="text-xs font-medium text-slate-800">
+            绑定第三方账号
+          </div>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            点击后将整页跳转到身份提供方完成授权，回调由服务端校验 state。
+          </p>
+          {contextQuery.data?.providers?.length ? (
+            <ProviderButtons
+              providers={contextQuery.data.providers}
+              mode="bind"
+              className="mt-2 sm:grid-cols-2"
+            />
+          ) : (
+            <p className="mt-2 text-[11px] text-slate-500">
+              当前没有启用的第三方身份提供方。
+            </p>
+          )}
+        </div>
+
         {identitiesQuery.isPending ? (
           <LoadingBlock />
         ) : identitiesQuery.isError ? (
@@ -622,7 +678,7 @@ export function SecurityPage() {
         ) : (
           <EmptyState
             title="尚未绑定第三方账号"
-            description="完成身份提供方接入后，可在此查看与解绑。"
+            description="使用上方按钮绑定 GitHub、Google 等身份提供方。"
             icon={Link2}
           />
         )}

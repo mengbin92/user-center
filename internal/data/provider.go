@@ -33,4 +33,6 @@ var ProviderSet = wire.NewSet(
 	NewOutboxRepo,
 	NewSettingsRepo,
 	NewExportRepo,
+	NewIntegrationClientRepo,
+	NewOAuthRegistry,
 )

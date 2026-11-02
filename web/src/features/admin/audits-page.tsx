@@ -110,6 +110,7 @@ export function AdminAuditsPage() {
       api.audits.export({
         action: action || undefined,
         actor_user_id: actorId || undefined,
+        target: target || undefined,
         from: toRfc3339(from),
         to: toRfc3339(to),
         fields: [...exportFields],
@@ -420,7 +421,7 @@ export function AdminAuditsPage() {
           if (exportFields.size > 0) exportAudits.mutate(reason)
         }}
         title="导出审计 CSV"
-        description="按操作、操作者与时间筛选导出（导出接口不支持 target 过滤），产物 24 小时内可下载。"
+        description="按操作、操作者、目标与时间筛选导出，产物 24 小时内可下载。"
         confirmLabel="创建导出任务"
         busy={exportAudits.isPending}
       >

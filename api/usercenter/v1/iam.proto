@@ -80,11 +80,26 @@ service IAMService {
   rpc ListUserRoles(ListUserRolesRequest) returns (AssignmentsReply) {
     option (google.api.http) = {get: "/api/v1/admin/users/{id}/roles"};
   }
+  rpc ListAssignments(ListAssignmentsRequest) returns (AssignmentListReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/assignments"};
+  }
   rpc CreateAssignment(CreateAssignmentRequest) returns (Assignment) {
     option (google.api.http) = {post: "/api/v1/admin/iam/assignments" body: "*"};
   }
   rpc RevokeAssignment(RevokeAssignmentRequest) returns (Assignment) {
     option (google.api.http) = {post: "/api/v1/admin/iam/assignments/{id}:revoke" body: "*"};
+  }
+  rpc ListDelegations(ListDelegationsRequest) returns (DelegationsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/iam/delegations"};
+  }
+  rpc CreateDelegation(CreateDelegationRequest) returns (Delegation) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/delegations" body: "*"};
+  }
+  rpc UpdateDelegation(UpdateDelegationRequest) returns (Delegation) {
+    option (google.api.http) = {patch: "/api/v1/admin/iam/delegations/{id}" body: "*"};
+  }
+  rpc RevokeDelegation(RevokeDelegationRequest) returns (Delegation) {
+    option (google.api.http) = {post: "/api/v1/admin/iam/delegations/{id}:revoke" body: "*"};
   }
   rpc PreviewBatchAssign(PreviewBatchAssignRequest) returns (BatchPreviewReply) {
     option (google.api.http) = {post: "/api/v1/admin/iam/assignments:batch-preview" body: "*"};
@@ -408,6 +423,99 @@ message ListUserRolesRequest {
 
 message AssignmentsReply {
   repeated Assignment items = 1;
+}
+
+message AssignmentItem {
+  string id = 1;
+  string user_id = 2;
+  string username = 3;
+  string display_name = 4;
+  string role_id = 5;
+  string role_code = 6;
+  string role_name = 7;
+  Scope boundary = 8;
+  string starts_at = 9;
+  string expires_at = 10;
+  bool revoked = 11;
+  string origin = 12;
+  string revision = 13;
+}
+
+message AssignmentListReply {
+  repeated AssignmentItem items = 1;
+  ListMeta meta = 2;
+}
+
+message ListAssignmentsRequest {
+  string user_id = 1;
+  string role_id = 2;
+  string status = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message DelegationCeiling {
+  string operation = 1;
+  Scope scope = 2;
+}
+
+message Delegation {
+  string id = 1;
+  string manager_role_id = 2;
+  string target_role_id = 3;
+  string target_kind = 4;
+  repeated string actions = 5;
+  Scope target_user_scope = 6;
+  repeated DelegationCeiling grant_ceiling = 7;
+  bool can_redelegate = 8;
+  string starts_at = 9;
+  string expires_at = 10;
+  string revision = 11;
+  string created_by = 12;
+  bool revoked = 13;
+  string revoked_at = 14;
+}
+
+message ListDelegationsRequest {
+  string manager_role_id = 1;
+  string target_role_id = 2;
+  string status = 3;
+}
+
+message DelegationsReply {
+  repeated Delegation items = 1;
+}
+
+message CreateDelegationRequest {
+  string manager_role_id = 1;
+  string target_role_id = 2;
+  string target_kind = 3;
+  repeated string actions = 4;
+  Scope target_user_scope = 5;
+  repeated DelegationCeiling grant_ceiling = 6;
+  bool can_redelegate = 7;
+  string starts_at = 8;
+  string expires_at = 9;
+  string reason = 10;
+  string expected_policy_revision = 11;
+}
+
+message UpdateDelegationRequest {
+  string id = 1;
+  repeated string actions = 2;
+  Scope target_user_scope = 3;
+  repeated DelegationCeiling grant_ceiling = 4;
+  bool can_redelegate = 5;
+  string starts_at = 6;
+  string expires_at = 7;
+  string expected_revision = 8;
+  string reason = 9;
+}
+
+message RevokeDelegationRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
 }
 
 message CreateAssignmentRequest {

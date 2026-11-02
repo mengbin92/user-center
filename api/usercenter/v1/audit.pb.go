@@ -218,6 +218,7 @@ type ExportAuditEventsRequest struct {
 	To            string                 `protobuf:"bytes,4,opt,name=to,proto3" json:"to,omitempty"`
 	Fields        []string               `protobuf:"bytes,5,rep,name=fields,proto3" json:"fields,omitempty"`
 	Reason        string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	Target        string                 `protobuf:"bytes,7,opt,name=target,proto3" json:"target,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -294,6 +295,13 @@ func (x *ExportAuditEventsRequest) GetReason() string {
 	return ""
 }
 
+func (x *ExportAuditEventsRequest) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
 var File_api_usercenter_v1_audit_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_audit_proto_rawDesc = "" +
@@ -312,14 +320,15 @@ const file_api_usercenter_v1_audit_proto_rawDesc = "" +
 	"\x05items\x18\x01 \x03(\v2\x1d.api.usercenter.v1.AuditEventR\x05items\x12/\n" +
 	"\x04meta\x18\x02 \x01(\v2\x1b.api.usercenter.v1.ListMetaR\x04meta\"&\n" +
 	"\x14GetAuditEventRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xaa\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xc2\x01\n" +
 	"\x18ExportAuditEventsRequest\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12\"\n" +
 	"\ractor_user_id\x18\x02 \x01(\tR\vactorUserId\x12\x12\n" +
 	"\x04from\x18\x03 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x04 \x01(\tR\x02to\x12\x16\n" +
 	"\x06fields\x18\x05 \x03(\tR\x06fields\x12\x16\n" +
-	"\x06reason\x18\x06 \x01(\tR\x06reason2\x8f\x03\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x16\n" +
+	"\x06target\x18\a \x01(\tR\x06target2\x8f\x03\n" +
 	"\fAuditService\x12z\n" +
 	"\x0fListAuditEvents\x12).api.usercenter.v1.ListAuditEventsRequest\x1a\x1e.api.usercenter.v1.AuditsReply\"\x1c\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/admin/audits\x12z\n" +
 	"\rGetAuditEvent\x12'.api.usercenter.v1.GetAuditEventRequest\x1a\x1d.api.usercenter.v1.AuditEvent\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/admin/audits/{id}\x12\x86\x01\n" +

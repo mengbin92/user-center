@@ -378,13 +378,15 @@ func (x *LoginRequest) GetRemember() bool {
 type LoginReply struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// authenticated | mfa_required
-	Status             string `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	ChallengeId        string `protobuf:"bytes,2,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
-	ChallengeExpiresAt string `protobuf:"bytes,3,opt,name=challenge_expires_at,json=challengeExpiresAt,proto3" json:"challenge_expires_at,omitempty"`
-	User               *User  `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
-	SessionExpiresAt   string `protobuf:"bytes,5,opt,name=session_expires_at,json=sessionExpiresAt,proto3" json:"session_expires_at,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	Status                 string `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	ChallengeId            string `protobuf:"bytes,2,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	ChallengeExpiresAt     string `protobuf:"bytes,3,opt,name=challenge_expires_at,json=challengeExpiresAt,proto3" json:"challenge_expires_at,omitempty"`
+	User                   *User  `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
+	SessionExpiresAt       string `protobuf:"bytes,5,opt,name=session_expires_at,json=sessionExpiresAt,proto3" json:"session_expires_at,omitempty"`
+	PasswordChangeRequired bool   `protobuf:"varint,6,opt,name=password_change_required,json=passwordChangeRequired,proto3" json:"password_change_required,omitempty"`
+	MfaEnrollmentRequired  bool   `protobuf:"varint,7,opt,name=mfa_enrollment_required,json=mfaEnrollmentRequired,proto3" json:"mfa_enrollment_required,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *LoginReply) Reset() {
@@ -450,6 +452,20 @@ func (x *LoginReply) GetSessionExpiresAt() string {
 		return x.SessionExpiresAt
 	}
 	return ""
+}
+
+func (x *LoginReply) GetPasswordChangeRequired() bool {
+	if x != nil {
+		return x.PasswordChangeRequired
+	}
+	return false
+}
+
+func (x *LoginReply) GetMfaEnrollmentRequired() bool {
+	if x != nil {
+		return x.MfaEnrollmentRequired
+	}
+	return false
 }
 
 type CompleteMFARequest struct {
@@ -673,14 +689,16 @@ const file_api_usercenter_v1_auth_proto_rawDesc = "" +
 	"\fLoginRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1a\n" +
-	"\bremember\x18\x03 \x01(\bR\bremember\"\xd4\x01\n" +
+	"\bremember\x18\x03 \x01(\bR\bremember\"\xc6\x02\n" +
 	"\n" +
 	"LoginReply\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12!\n" +
 	"\fchallenge_id\x18\x02 \x01(\tR\vchallengeId\x120\n" +
 	"\x14challenge_expires_at\x18\x03 \x01(\tR\x12challengeExpiresAt\x12+\n" +
 	"\x04user\x18\x04 \x01(\v2\x17.api.usercenter.v1.UserR\x04user\x12,\n" +
-	"\x12session_expires_at\x18\x05 \x01(\tR\x10sessionExpiresAt\"K\n" +
+	"\x12session_expires_at\x18\x05 \x01(\tR\x10sessionExpiresAt\x128\n" +
+	"\x18password_change_required\x18\x06 \x01(\bR\x16passwordChangeRequired\x126\n" +
+	"\x17mfa_enrollment_required\x18\a \x01(\bR\x15mfaEnrollmentRequired\"K\n" +
 	"\x12CompleteMFARequest\x12!\n" +
 	"\fchallenge_id\x18\x01 \x01(\tR\vchallengeId\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\"\x0f\n" +

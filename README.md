@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。本仓库是该方案的**第一阶段可运行实现**，范围与差异见[实现范围](#实现范围与已知差异)。
+> **状态：v0.2.0 — V1 功能完成。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。剩余差异全部属于 V2 或需要真实第三方环境验收，见[实现范围](#实现范围与已知差异)。
 
 ## 目录
 
@@ -34,6 +34,8 @@ go run ./cmd/admin-rescue -config configs/config.dev.yaml \
 
 # 3. 启动 HTTP :8080 / gRPC :9090
 go run ./cmd/user-center -config configs/config.dev.yaml
+# 管理员默认被要求绑定 MFA：登录后先到 /account/security 完成 TOTP，
+# 否则 /admin/* 返回 403 MFA_ENROLLMENT_REQUIRED。
 
 # 4. 前端（另一个终端）
 cd web && npm install && npm run dev   # http://localhost:5173
@@ -81,10 +83,11 @@ flowchart TB
 ## 仓库结构
 
 ```text
-api/usercenter/v1/        auth / me / admin / iam / audit / settings / integration proto
+api/usercenter/v1/        auth / me / admin / iam / audit / settings / integration / integration_admin proto
 cmd/user-center/          主服务（HTTP + gRPC + SPA）
 cmd/migrate/              MySQL 版本化迁移 + 权限目录种子
 cmd/admin-rescue/         离线 root 初始化 / 凭据恢复
+cmd/import-legacy/        离线用户快照导入（dry-run / apply）
 internal/conf/            配置 proto
 internal/config/          配置加载 + 环境变量覆盖
 internal/server/          HTTP/gRPC 装配、中间件、CSV 下载、SPA
@@ -135,9 +138,11 @@ scripts/                  开发与检查脚本
 | 接口族 | 路径 |
 |---|---|
 | 公开认证 | `/auth/context`、`/auth/registration-challenges`、`/auth/register`、`/auth/login`、`/auth/mfa/complete`、`/auth/logout`、`/auth/password-reset-challenges`、`/auth/password-reset` |
+| 第三方登录 | `GET /auth/providers/{provider}/start`、`GET /auth/providers/{provider}/callback`（GitHub / Google；绑定使用 `?mode=bind`） |
 | 本人 | `/me`、`/me/password:change`、`/me/email-challenges`、`/me/email:confirm`、`/me/security`、`/me/mfa:*`、`/me/sessions`、`/me/session-roles`、`/me/authorization`、`/me/security-events` |
-| 用户管理 | `/admin/overview`、`/admin/users`、`/admin/users/{id}`、`{id}:set-status`、`{id}:archive`、`{id}/password-reset-requests`、`{id}/mfa:reset`、`{id}/sessions*`、`{id}/effective-permissions`、`/admin/users:export`、`/admin/exports/{id}`、`/admin/exports/{id}/download` |
-| IAM | `/admin/iam/resources`、`permissions*`、`roles*`、`assignments*`、`constraints*`、`menus*`、`authorization:explain`、`authorization:simulate` |
+| 用户管理 | `/admin/overview`、`/admin/users`、`/admin/users/{id}`、`{id}:set-status`、`{id}:archive`、`{id}/password-reset-requests`、`{id}/mfa:reset`、`{id}/email-changes*`、`{id}/sessions*`、`{id}/effective-permissions`、`/admin/users:export`、`/admin/exports/{id}`、`/admin/exports/{id}/download` |
+| IAM | `/admin/iam/resources`、`permissions*`、`roles*`、`assignments*`（含列表）、`delegations*`、`constraints*`、`menus*`、`authorization:explain`、`authorization:simulate` |
+| 接入服务 | `/admin/integration-clients*`、`/admin/event-deliveries*` |
 | 审计 / 配置 | `/admin/audits*`、`/admin/settings/auth`、`/admin/settings/email` |
 | 内部 gRPC | `ValidateSession`、`ValidateSubject`、`GetUser`、`BatchGetUsers`、`GetSessionAuthorization`、`GetResourceAuthorization`、`RevokeSession` |
 
@@ -145,15 +150,16 @@ scripts/                  开发与检查脚本
 
 ## 实现范围与已知差异
 
-**已实现**：用户生命周期（创建/资料/启停/归档）、密码与邮箱、TOTP + 恢复码、Step-up、会话治理、角色/会话角色、权限目录、角色继承、授权分配（含批量，事务内整批拒绝）、职责分离、菜单投影、授权解释/模拟、审计与导出、认证配置、内部 gRPC 校验、事务 Outbox 写入。
+**已实现（V1）**：用户生命周期（创建/资料/启停/归档）、密码与邮箱变更、管理员邮箱变更、强制首次改密、TOTP + 恢复码、管理员强制 MFA、Step-up、会话治理、角色/会话角色、权限目录、角色继承、授权分配（含列表与批量，事务内整批拒绝）、委派、职责分离、菜单投影、授权解释/模拟、审计与导出、认证配置、GitHub/Google 登录与绑定、接入客户端管理、gRPC 客户端鉴权、Outbox Webhook 投递、`cmd/import-legacy` 离线导入。
 
-**明确延后（V1.1/V2）**：
+**仍延后（V2 或需要外部环境）**：
 
-- 委派（`iam_delegations`）与接入客户端管理 UI：表结构/设计已保留，接口暂未开放；
-- OAuth 第三方登录与绑定：`user_oauth_identities` 与 `/me/external-identities` 已具备读/解绑，登录提供方接入待配置与沙箱验收；
-- `cmd/import-legacy` 离线导入工具：迁移文档给出字段映射、校验与回滚步骤，导入命令尚未交付；
-- 组织/多租户、WebAuthn、SCIM、OIDC Provider（设计文档中均属 V2）；
-- 原 `micro-one-api` 的 BFF 兼容层与适配器不在本仓库内，接入契约见 `docs/migration.md`。
+- 组织/多租户、WebAuthn/Passkey、SCIM、标准 OIDC Provider（设计文档中均属 V2）；
+- OAuth 真实提供方沙箱验收、生产 SMTP 送达验收：代码与 mock 测试已就绪，需配置真实凭据后执行；
+- 委派目前约束“分配/撤销角色”的目标角色、用户范围与动作；角色 Grant/继承的变更仍要求直接权限，不允许通过委派修改策略本身；
+- 原 `micro-one-api` 的 BFF 兼容层与适配器不在本仓库内，接入契约见 `docs/migration.md`；
+- OpenAPI 未描述 Cookie/CSRF 安全方案与原始 OAuth/CSV 下载路由；这些在 `docs/api.md` 中约定；
+- 列表 `total_size` 为粗过滤值（deny/self 逐行应用），受限管理员可能看到略大的总数。
 
 这些差异不会把权限退化回 `role >= 10`：未实现的模块不暴露菜单/接口，而不是用空实现伪装完成。
 
@@ -168,7 +174,7 @@ cd web && npm run build # tsc + vite 构建
 关键覆盖：
 - `domain/authorization`：Scope 求交、deny、过期、继承环检测。
 - `internal/data`：唯一约束、revision CAS、会话哈希/撤销、目录种子幂等。
-- `internal/server`：未登录 401、缺失 CSRF 403、登录、受限管理员越权 403、并发更新 409、导出下载、MFA 完整登录。
+- `internal/server`：未登录 401、缺失 CSRF 403、登录、受限管理员越权 403、并发更新 409、导出下载、MFA 完整登录、注册/重置/改密、管理员邮箱变更、OAuth 绑定与登录、委派/接入/Outbox 投递、MFA 强制与首次改密拦截。
 
 ## 部署
 

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/internal/conf"
 	"github.com/mengbin92/user-center/internal/service"
+	"github.com/mengbin92/user-center/platform/httpx"
 )
 
 type HTTPServer struct {
@@ -41,6 +43,7 @@ func NewHTTPServer(
 	iam *service.IAMService,
 	audit *service.AuditService,
 	settings *service.SettingsService,
+	integrationAdmin *service.IntegrationAdminService,
 	users *biz.UserUsecase,
 	artifactDir ArtifactDir,
 ) *HTTPServer {
@@ -71,11 +74,14 @@ func NewHTTPServer(
 	usercv1.RegisterIAMServiceHTTPServer(srv, iam)
 	usercv1.RegisterAuditServiceHTTPServer(srv, audit)
 	usercv1.RegisterSettingsServiceHTTPServer(srv, settings)
+	usercv1.RegisterIntegrationAdminServiceHTTPServer(srv, integrationAdmin)
 
 	srv.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	mountOAuthRoutes(srv, mw, auth, publicBase)
 
 	// CSV artifact download is a raw stream; it re-verifies the actor, job
 	// ownership and expiry on every request.
@@ -122,6 +128,88 @@ func NewHTTPServer(
 	}
 
 	return &HTTPServer{Server: srv}
+}
+
+func mountOAuthRoutes(srv *khttp.Server, mw *Middleware, auth *service.AuthService, publicBase string) {
+	authUC := auth.Usecase()
+	stateCookie := "uc_oauth_state"
+	start := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		provider := oauthProviderFromPath(r.URL.Path)
+		mode := r.URL.Query().Get("mode")
+		if mode == "" {
+			mode = "login"
+		}
+		var actor *biz.ActorContext
+		if a, ok := biz.ActorFromContext(r.Context()); ok {
+			actor = &a
+		}
+		url, state, expires, err := authUC.StartOAuth(r.Context(), provider, mode, actor)
+		if err != nil {
+			target := "/login?oauth_error=oauth_failed"
+			if actor != nil {
+				target = "/account/security?oauth_error=oauth_failed"
+			}
+			http.Redirect(w, r, target, http.StatusFound)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name: stateCookie, Value: state, Path: "/api/v1/auth/", HttpOnly: true,
+			Secure: mw.CookieSecure(), SameSite: http.SameSiteLaxMode, Domain: mw.CookieDomain(),
+			Expires: expires, MaxAge: int(time.Until(expires).Seconds()),
+		})
+		http.Redirect(w, r, url, http.StatusFound)
+	})
+	callback := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		provider := oauthProviderFromPath(r.URL.Path)
+		state := r.URL.Query().Get("state")
+		code := r.URL.Query().Get("code")
+		cookie, err := r.Cookie(stateCookie)
+		failTarget := "/login?oauth_error=state_invalid"
+		if _, ok := biz.ActorFromContext(r.Context()); ok {
+			failTarget = "/account/security?oauth_error=state_invalid"
+		}
+		if err != nil || state == "" || cookie.Value != state || code == "" {
+			http.Redirect(w, r, failTarget, http.StatusFound)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: stateCookie, Value: "", Path: "/api/v1/auth/", HttpOnly: true, MaxAge: -1, Secure: mw.CookieSecure(), Domain: mw.CookieDomain()})
+		var actor *biz.ActorContext
+		if a, ok := biz.ActorFromContext(r.Context()); ok {
+			actor = &a
+		}
+		info := httpx.From(r.Context())
+		result, err := authUC.CompleteOAuth(r.Context(), provider, state, code, actor, info.IP, info.UserAgent)
+		if err != nil {
+			reason := "oauth_failed"
+			if errors.Is(err, biz.ErrOAuthNotBound) {
+				reason = "not_bound"
+			}
+			target := "/login?oauth_error=" + reason
+			if actor != nil {
+				target = "/account/security?oauth_error=" + reason
+			}
+			http.Redirect(w, r, target, http.StatusFound)
+			return
+		}
+		if result.RawToken != "" {
+			http.SetCookie(w, &http.Cookie{
+				Name: service.SessionCookie, Value: result.RawToken, Path: "/", HttpOnly: true,
+				Secure: mw.CookieSecure(), SameSite: http.SameSiteLaxMode, Domain: mw.CookieDomain(),
+				Expires: result.Session.ExpiresAt,
+			})
+		}
+		http.Redirect(w, r, result.Redirect, http.StatusFound)
+	})
+	srv.HandleFunc("/api/v1/auth/providers/{provider}/start", mw.Filter(start).ServeHTTP)
+	srv.HandleFunc("/api/v1/auth/providers/{provider}/callback", mw.Filter(callback).ServeHTTP)
+}
+
+func oauthProviderFromPath(path string) string {
+	parts := strings.Split(strings.TrimPrefix(path, "/api/v1/auth/providers/"), "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
 }
 
 func spaHandler(dir string, log *zap.Logger) http.Handler {

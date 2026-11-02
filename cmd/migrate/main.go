@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
-	"github.com/mengbin92/user-center/internal/config"
 	"github.com/mengbin92/user-center/internal/conf"
+	"github.com/mengbin92/user-center/internal/config"
 	"github.com/mengbin92/user-center/internal/data"
 	"github.com/mengbin92/user-center/internal/wiring"
 )

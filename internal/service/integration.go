@@ -20,6 +20,9 @@ func NewIntegrationService(uc *biz.IntegrationUsecase) *IntegrationService {
 	return &IntegrationService{uc: uc}
 }
 
+// Usecase exposes the integration usecase to the gRPC auth interceptor.
+func (s *IntegrationService) Usecase() *biz.IntegrationUsecase { return s.uc }
+
 func (s *IntegrationService) ValidateSession(ctx context.Context, req *usercv1.ValidateSessionRequest) (*usercv1.ValidateSessionReply, error) {
 	facts, user, err := s.uc.ValidateSession(ctx, req.GetSessionToken(), req.GetApplicationCode())
 	if err != nil {

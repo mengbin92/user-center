@@ -84,6 +84,61 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.ExportJob'
+    /api/v1/admin/event-deliveries:
+        get:
+            tags:
+                - IntegrationAdminService
+            operationId: IntegrationAdminService_ListEventDeliveries
+            parameters:
+                - name: status
+                  in: query
+                  schema:
+                    type: string
+                - name: page_size
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: page_token
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.EventDeliveriesReply'
+    /api/v1/admin/event-deliveries/{event_id}/subscribers/{subscriber_id}:retry:
+        post:
+            tags:
+                - IntegrationAdminService
+            operationId: IntegrationAdminService_RetryEventDelivery
+            parameters:
+                - name: event_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: subscriber_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RetryEventDeliveryRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.EventDelivery'
     /api/v1/admin/exports:
         get:
             tags:
@@ -125,6 +180,39 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.ExportJob'
     /api/v1/admin/iam/assignments:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListAssignments
+            parameters:
+                - name: user_id
+                  in: query
+                  schema:
+                    type: string
+                - name: role_id
+                  in: query
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  schema:
+                    type: string
+                - name: page_size
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: page_token
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AssignmentListReply'
         post:
             tags:
                 - IAMService
@@ -313,6 +401,96 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.Constraint'
+    /api/v1/admin/iam/delegations:
+        get:
+            tags:
+                - IAMService
+            operationId: IAMService_ListDelegations
+            parameters:
+                - name: manager_role_id
+                  in: query
+                  schema:
+                    type: string
+                - name: target_role_id
+                  in: query
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DelegationsReply'
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_CreateDelegation
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateDelegationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Delegation'
+    /api/v1/admin/iam/delegations/{id}:
+        patch:
+            tags:
+                - IAMService
+            operationId: IAMService_UpdateDelegation
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateDelegationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Delegation'
+    /api/v1/admin/iam/delegations/{id}:revoke:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_RevokeDelegation
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RevokeDelegationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Delegation'
     /api/v1/admin/iam/menus:
         get:
             tags:
@@ -826,6 +1004,107 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.Role'
+    /api/v1/admin/integration-clients:
+        get:
+            tags:
+                - IntegrationAdminService
+            operationId: IntegrationAdminService_ListIntegrationClients
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.IntegrationClientsReply'
+        post:
+            tags:
+                - IntegrationAdminService
+            operationId: IntegrationAdminService_CreateIntegrationClient
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateIntegrationClientRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.IntegrationClientCredentialReply'
+    /api/v1/admin/integration-clients/{id}:
+        patch:
+            tags:
+                - IntegrationAdminService
+            operationId: IntegrationAdminService_UpdateIntegrationClient
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateIntegrationClientRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.IntegrationClient'
+    /api/v1/admin/integration-clients/{id}:disable:
+        post:
+            tags:
+                - IntegrationAdminService
+            operationId: IntegrationAdminService_DisableIntegrationClient
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.DisableIntegrationClientRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.IntegrationClient'
+    /api/v1/admin/integration-clients/{id}:rotate-credential:
+        post:
+            tags:
+                - IntegrationAdminService
+            operationId: IntegrationAdminService_RotateIntegrationClientCredential
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RotateIntegrationClientCredentialRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.IntegrationClientCredentialReply'
     /api/v1/admin/overview:
         get:
             tags:
@@ -1011,6 +1290,54 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.EffectivePermissionsReply'
+    /api/v1/admin/users/{id}/email-changes:
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_CreateEmailChangeChallenge
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateEmailChangeChallengeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.ChallengeReply'
+    /api/v1/admin/users/{id}/email-changes:confirm:
+        post:
+            tags:
+                - AdminUserService
+            operationId: AdminUserService_ConfirmEmailChange
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ConfirmEmailChangeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
     /api/v1/admin/users/{id}/mfa:reset:
         post:
             tags:
@@ -1683,6 +2010,44 @@ components:
                     type: string
                 assigned_by:
                     type: string
+        api.usercenter.v1.AssignmentItem:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                username:
+                    type: string
+                display_name:
+                    type: string
+                role_id:
+                    type: string
+                role_code:
+                    type: string
+                role_name:
+                    type: string
+                boundary:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                revoked:
+                    type: boolean
+                origin:
+                    type: string
+                revision:
+                    type: string
+        api.usercenter.v1.AssignmentListReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.AssignmentItem'
+                meta:
+                    $ref: '#/components/schemas/api.usercenter.v1.ListMeta'
         api.usercenter.v1.AssignmentsReply:
             type: object
             properties:
@@ -1856,6 +2221,17 @@ components:
                     type: string
                 code:
                     type: string
+        api.usercenter.v1.ConfirmEmailChangeRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                challenge_id:
+                    type: string
+                code:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.ConfirmEmailRequest:
             type: object
             properties:
@@ -1940,6 +2316,35 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.CreateDelegationRequest:
+            type: object
+            properties:
+                manager_role_id:
+                    type: string
+                target_role_id:
+                    type: string
+                target_kind:
+                    type: string
+                actions:
+                    type: array
+                    items:
+                        type: string
+                target_user_scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                grant_ceiling:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DelegationCeiling'
+                can_redelegate:
+                    type: boolean
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.CreateEmailChallengeRequest:
             type: object
             properties:
@@ -1948,6 +2353,36 @@ components:
                 current_password:
                     type: string
                 code:
+                    type: string
+        api.usercenter.v1.CreateEmailChangeChallengeRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                new_email:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.CreateIntegrationClientRequest:
+            type: object
+            properties:
+                code:
+                    type: string
+                service_owner:
+                    type: string
+                allowed_methods:
+                    type: array
+                    items:
+                        type: string
+                event_subscriptions:
+                    type: array
+                    items:
+                        type: string
+                callback_url:
+                    type: string
+                expires_at:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.CreateMenuItemRequest:
             type: object
@@ -2061,6 +2496,62 @@ components:
                     type: string
                 reason:
                     type: string
+        api.usercenter.v1.Delegation:
+            type: object
+            properties:
+                id:
+                    type: string
+                manager_role_id:
+                    type: string
+                target_role_id:
+                    type: string
+                target_kind:
+                    type: string
+                actions:
+                    type: array
+                    items:
+                        type: string
+                target_user_scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                grant_ceiling:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DelegationCeiling'
+                can_redelegate:
+                    type: boolean
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                revision:
+                    type: string
+                created_by:
+                    type: string
+                revoked:
+                    type: boolean
+                revoked_at:
+                    type: string
+        api.usercenter.v1.DelegationCeiling:
+            type: object
+            properties:
+                operation:
+                    type: string
+                scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+        api.usercenter.v1.DelegationsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Delegation'
+        api.usercenter.v1.DisableIntegrationClientRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.DisableMFARequest:
             type: object
             properties:
@@ -2115,6 +2606,33 @@ components:
                     type: boolean
                 revision:
                     type: string
+        api.usercenter.v1.EventDeliveriesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.EventDelivery'
+                meta:
+                    $ref: '#/components/schemas/api.usercenter.v1.ListMeta'
+        api.usercenter.v1.EventDelivery:
+            type: object
+            properties:
+                event_id:
+                    type: string
+                event_type:
+                    type: string
+                subscriber_id:
+                    type: string
+                status:
+                    type: string
+                attempts:
+                    type: integer
+                    format: int32
+                next_retry_at:
+                    type: string
+                last_error:
+                    type: string
         api.usercenter.v1.ExplainAuthorizationReply:
             type: object
             properties:
@@ -2160,6 +2678,8 @@ components:
                         type: string
                 reason:
                     type: string
+                target:
+                    type: string
         api.usercenter.v1.ExportJob:
             type: object
             properties:
@@ -2191,6 +2711,10 @@ components:
                     items:
                         type: string
                 reason:
+                    type: string
+                role_id:
+                    type: string
+                mfa_enabled:
                     type: string
         api.usercenter.v1.ExportsReply:
             type: object
@@ -2252,6 +2776,54 @@ components:
                     type: boolean
                 expires_at:
                     type: string
+        api.usercenter.v1.IntegrationClient:
+            type: object
+            properties:
+                id:
+                    type: string
+                client_id:
+                    type: string
+                code:
+                    type: string
+                service_owner:
+                    type: string
+                status:
+                    type: string
+                    description: active | disabled
+                allowed_methods:
+                    type: array
+                    items:
+                        type: string
+                event_subscriptions:
+                    type: array
+                    items:
+                        type: string
+                callback_url:
+                    type: string
+                credential_version:
+                    type: integer
+                    format: int32
+                expires_at:
+                    type: string
+                created_at:
+                    type: string
+                revision:
+                    type: string
+        api.usercenter.v1.IntegrationClientCredentialReply:
+            type: object
+            properties:
+                client:
+                    $ref: '#/components/schemas/api.usercenter.v1.IntegrationClient'
+                credential:
+                    type: string
+                    description: Returned exactly once; only the digest is stored.
+        api.usercenter.v1.IntegrationClientsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.IntegrationClient'
         api.usercenter.v1.ListMeta:
             type: object
             properties:
@@ -2273,6 +2845,10 @@ components:
                     $ref: '#/components/schemas/api.usercenter.v1.User'
                 session_expires_at:
                     type: string
+                password_change_required:
+                    type: boolean
+                mfa_enrollment_required:
+                    type: boolean
         api.usercenter.v1.LoginRequest:
             type: object
             properties:
@@ -2561,6 +3137,15 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Resource'
+        api.usercenter.v1.RetryEventDeliveryRequest:
+            type: object
+            properties:
+                event_id:
+                    type: string
+                subscriber_id:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.RevokeAssignmentRequest:
             type: object
             properties:
@@ -2569,6 +3154,15 @@ components:
                 reason:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.RevokeDelegationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.RevokeOtherSessionsRequest:
             type: object
@@ -2672,6 +3266,13 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Role'
+        api.usercenter.v1.RotateIntegrationClientCredentialRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.RotateRecoveryCodesRequest:
             type: object
             properties:
@@ -2735,6 +3336,8 @@ components:
                 step_up_expires_at:
                     type: string
                 mfa_required:
+                    type: boolean
+                password_change_required:
                     type: boolean
         api.usercenter.v1.SessionInfo:
             type: object
@@ -2927,6 +3530,31 @@ components:
                     type: string
                 reason:
                     type: string
+        api.usercenter.v1.UpdateDelegationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                actions:
+                    type: array
+                    items:
+                        type: string
+                target_user_scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                grant_ceiling:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DelegationCeiling'
+                can_redelegate:
+                    type: boolean
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.UpdateEmailSettingsRequest:
             type: object
             properties:
@@ -2945,6 +3573,25 @@ components:
                     type: string
                     description: Write-only. Empty keeps the stored secret.
                 update_mask:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateIntegrationClientRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                allowed_methods:
+                    type: array
+                    items:
+                        type: string
+                event_subscriptions:
+                    type: array
+                    items:
+                        type: string
+                callback_url:
                     type: string
                 expected_revision:
                     type: string
@@ -3112,6 +3759,10 @@ tags:
         IAMService is the platform authorization governance surface. Every write
          carries the expected policy revision and a reason; preview responses are
          descriptive and never grant authority.
+    - name: IntegrationAdminService
+      description: |-
+        IntegrationAdminService manages machine clients that may call the internal
+         gRPC API and subscribe to outbox events.
     - name: MeService
       description: MeService owns the authenticated user's self-service surface.
     - name: SettingsService

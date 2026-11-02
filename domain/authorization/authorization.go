@@ -115,6 +115,31 @@ func (s Scope) Matches(actorID, targetUserID int64, wholeObject bool) bool {
 	return false
 }
 
+// Covers reports whether outer contains every element of inner.
+func Covers(outer, inner Scope) bool {
+	if outer.All {
+		return true
+	}
+	if inner.All {
+		return false
+	}
+	if inner.Self {
+		return outer.Self
+	}
+	if inner.Empty() {
+		return false
+	}
+	if outer.Self {
+		return false
+	}
+	for _, id := range inner.UserIDs {
+		if !slices.Contains(outer.UserIDs, id) {
+			return false
+		}
+	}
+	return len(inner.UserIDs) > 0
+}
+
 // Intersect returns the conservative intersection of two scopes. Self joined
 // with a user list narrows to the list because the actor is not known here.
 func Intersect(a, b Scope) Scope {

@@ -32,6 +32,12 @@ var (
 	ErrRootProtected      = kerrors.Forbidden("ROOT_PROTECTED", "不能移除最后一个最高治理账号")
 	ErrMFARequired        = kerrors.New(401, "MFA_REQUIRED", "需要完成多因素验证")
 	ErrNotImplemented     = errors.New("not implemented")
+	ErrPasswordChange     = kerrors.Forbidden("PASSWORD_CHANGE_REQUIRED", "首次登录必须先修改初始密码")
+	ErrDelegationRequired = kerrors.Forbidden("DELEGATION_REQUIRED", "缺少覆盖该操作的委派授权")
+	ErrOAuthNotBound      = kerrors.Conflict("OAUTH_NOT_BOUND", "该第三方账号尚未绑定用户中心账号")
+	ErrOAuthState         = kerrors.BadRequest("OAUTH_STATE_INVALID", "第三方登录状态无效或已过期")
+	ErrOAuthUnavailable   = kerrors.ServiceUnavailable("OAUTH_UNAVAILABLE", "第三方登录暂不可用")
+	ErrOAuthBound         = kerrors.Conflict("OAUTH_ALREADY_BOUND", "该第三方账号已绑定其他用户")
 )
 
 func Validation(msg string) error {

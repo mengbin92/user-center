@@ -25,6 +25,7 @@ const OperationIAMServiceBatchAssign = "/api.usercenter.v1.IAMService/BatchAssig
 const OperationIAMServiceCopyRole = "/api.usercenter.v1.IAMService/CopyRole"
 const OperationIAMServiceCreateAssignment = "/api.usercenter.v1.IAMService/CreateAssignment"
 const OperationIAMServiceCreateConstraint = "/api.usercenter.v1.IAMService/CreateConstraint"
+const OperationIAMServiceCreateDelegation = "/api.usercenter.v1.IAMService/CreateDelegation"
 const OperationIAMServiceCreateMenuItem = "/api.usercenter.v1.IAMService/CreateMenuItem"
 const OperationIAMServiceCreatePermission = "/api.usercenter.v1.IAMService/CreatePermission"
 const OperationIAMServiceCreateRole = "/api.usercenter.v1.IAMService/CreateRole"
@@ -35,7 +36,9 @@ const OperationIAMServiceGetPermissionReferences = "/api.usercenter.v1.IAMServic
 const OperationIAMServiceGetRole = "/api.usercenter.v1.IAMService/GetRole"
 const OperationIAMServiceGetRoleInheritance = "/api.usercenter.v1.IAMService/GetRoleInheritance"
 const OperationIAMServiceGetRolePermissions = "/api.usercenter.v1.IAMService/GetRolePermissions"
+const OperationIAMServiceListAssignments = "/api.usercenter.v1.IAMService/ListAssignments"
 const OperationIAMServiceListConstraints = "/api.usercenter.v1.IAMService/ListConstraints"
+const OperationIAMServiceListDelegations = "/api.usercenter.v1.IAMService/ListDelegations"
 const OperationIAMServiceListMenus = "/api.usercenter.v1.IAMService/ListMenus"
 const OperationIAMServiceListPermissions = "/api.usercenter.v1.IAMService/ListPermissions"
 const OperationIAMServiceListResources = "/api.usercenter.v1.IAMService/ListResources"
@@ -47,10 +50,12 @@ const OperationIAMServicePreviewRoleChange = "/api.usercenter.v1.IAMService/Prev
 const OperationIAMServicePutRoleInheritance = "/api.usercenter.v1.IAMService/PutRoleInheritance"
 const OperationIAMServicePutRolePermissions = "/api.usercenter.v1.IAMService/PutRolePermissions"
 const OperationIAMServiceRevokeAssignment = "/api.usercenter.v1.IAMService/RevokeAssignment"
+const OperationIAMServiceRevokeDelegation = "/api.usercenter.v1.IAMService/RevokeDelegation"
 const OperationIAMServiceSetPermissionStatus = "/api.usercenter.v1.IAMService/SetPermissionStatus"
 const OperationIAMServiceSetRoleStatus = "/api.usercenter.v1.IAMService/SetRoleStatus"
 const OperationIAMServiceSimulateAuthorization = "/api.usercenter.v1.IAMService/SimulateAuthorization"
 const OperationIAMServiceUpdateConstraint = "/api.usercenter.v1.IAMService/UpdateConstraint"
+const OperationIAMServiceUpdateDelegation = "/api.usercenter.v1.IAMService/UpdateDelegation"
 const OperationIAMServiceUpdateMenuItem = "/api.usercenter.v1.IAMService/UpdateMenuItem"
 const OperationIAMServiceUpdatePermission = "/api.usercenter.v1.IAMService/UpdatePermission"
 const OperationIAMServiceUpdateRole = "/api.usercenter.v1.IAMService/UpdateRole"
@@ -63,6 +68,7 @@ type IAMServiceHTTPServer interface {
 	CopyRole(context.Context, *CopyRoleRequest) (*Role, error)
 	CreateAssignment(context.Context, *CreateAssignmentRequest) (*Assignment, error)
 	CreateConstraint(context.Context, *CreateConstraintRequest) (*Constraint, error)
+	CreateDelegation(context.Context, *CreateDelegationRequest) (*Delegation, error)
 	CreateMenuItem(context.Context, *CreateMenuItemRequest) (*MenuItem, error)
 	CreatePermission(context.Context, *CreatePermissionRequest) (*Permission, error)
 	CreateRole(context.Context, *CreateRoleRequest) (*Role, error)
@@ -73,7 +79,9 @@ type IAMServiceHTTPServer interface {
 	GetRole(context.Context, *GetRoleRequest) (*Role, error)
 	GetRoleInheritance(context.Context, *GetRoleInheritanceRequest) (*RoleInheritanceReply, error)
 	GetRolePermissions(context.Context, *GetRolePermissionsRequest) (*RolePermissionsReply, error)
+	ListAssignments(context.Context, *ListAssignmentsRequest) (*AssignmentListReply, error)
 	ListConstraints(context.Context, *ListConstraintsRequest) (*ConstraintsReply, error)
+	ListDelegations(context.Context, *ListDelegationsRequest) (*DelegationsReply, error)
 	ListMenus(context.Context, *ListMenusRequest) (*MenusReply, error)
 	ListPermissions(context.Context, *ListPermissionsRequest) (*PermissionsReply, error)
 	ListResources(context.Context, *ListResourcesRequest) (*ResourcesReply, error)
@@ -85,10 +93,12 @@ type IAMServiceHTTPServer interface {
 	PutRoleInheritance(context.Context, *PutRoleInheritanceRequest) (*RoleInheritanceReply, error)
 	PutRolePermissions(context.Context, *PutRolePermissionsRequest) (*RolePermissionsReply, error)
 	RevokeAssignment(context.Context, *RevokeAssignmentRequest) (*Assignment, error)
+	RevokeDelegation(context.Context, *RevokeDelegationRequest) (*Delegation, error)
 	SetPermissionStatus(context.Context, *SetPermissionStatusRequest) (*Permission, error)
 	SetRoleStatus(context.Context, *SetRoleStatusRequest) (*Role, error)
 	SimulateAuthorization(context.Context, *SimulateAuthorizationRequest) (*SimulateAuthorizationReply, error)
 	UpdateConstraint(context.Context, *UpdateConstraintRequest) (*Constraint, error)
+	UpdateDelegation(context.Context, *UpdateDelegationRequest) (*Delegation, error)
 	UpdateMenuItem(context.Context, *UpdateMenuItemRequest) (*MenuItem, error)
 	UpdatePermission(context.Context, *UpdatePermissionRequest) (*Permission, error)
 	UpdateRole(context.Context, *UpdateRoleRequest) (*Role, error)
@@ -118,8 +128,13 @@ func RegisterIAMServiceHTTPServer(s *http.Server, srv IAMServiceHTTPServer) {
 	r.Handle("PUT", "/api/v1/admin/iam/roles/{id}/inheritance", _IAMService_PutRoleInheritance0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/iam/roles/{id}:preview", _IAMService_PreviewRoleChange0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/admin/users/{id}/roles", _IAMService_ListUserRoles0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/admin/iam/assignments", _IAMService_ListAssignments0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/iam/assignments", _IAMService_CreateAssignment0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/iam/assignments/{id}:revoke", _IAMService_RevokeAssignment0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/admin/iam/delegations", _IAMService_ListDelegations0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/admin/iam/delegations", _IAMService_CreateDelegation0_HTTP_Handler(srv))
+	r.Handle("PATCH", "/api/v1/admin/iam/delegations/{id}", _IAMService_UpdateDelegation0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/admin/iam/delegations/{id}:revoke", _IAMService_RevokeDelegation0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/iam/assignments:batch-preview", _IAMService_PreviewBatchAssign0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/iam/assignments:batch-assign", _IAMService_BatchAssign0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/admin/iam/constraints", _IAMService_ListConstraints0_HTTP_Handler(srv))
@@ -603,6 +618,25 @@ func _IAMService_ListUserRoles0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx 
 	}
 }
 
+func _IAMService_ListAssignments0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ListAssignmentsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationIAMServiceListAssignments)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListAssignments(ctx, req.(*ListAssignmentsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*AssignmentListReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _IAMService_CreateAssignment0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreateAssignmentRequest
@@ -640,6 +674,88 @@ func _IAMService_RevokeAssignment0_HTTP_Handler(srv IAMServiceHTTPServer) func(c
 			return err
 		}
 		reply := out.(*Assignment)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _IAMService_ListDelegations0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ListDelegationsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationIAMServiceListDelegations)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListDelegations(ctx, req.(*ListDelegationsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*DelegationsReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _IAMService_CreateDelegation0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CreateDelegationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationIAMServiceCreateDelegation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CreateDelegation(ctx, req.(*CreateDelegationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*Delegation)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _IAMService_UpdateDelegation0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateDelegationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationIAMServiceUpdateDelegation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateDelegation(ctx, req.(*UpdateDelegationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*Delegation)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _IAMService_RevokeDelegation0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in RevokeDelegationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationIAMServiceRevokeDelegation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.RevokeDelegation(ctx, req.(*RevokeDelegationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*Delegation)
 		return ctx.Result(200, reply)
 	}
 }
@@ -892,6 +1008,7 @@ type IAMServiceHTTPClient interface {
 	CopyRole(ctx context.Context, req *CopyRoleRequest, opts ...http.CallOption) (rsp *Role, err error)
 	CreateAssignment(ctx context.Context, req *CreateAssignmentRequest, opts ...http.CallOption) (rsp *Assignment, err error)
 	CreateConstraint(ctx context.Context, req *CreateConstraintRequest, opts ...http.CallOption) (rsp *Constraint, err error)
+	CreateDelegation(ctx context.Context, req *CreateDelegationRequest, opts ...http.CallOption) (rsp *Delegation, err error)
 	CreateMenuItem(ctx context.Context, req *CreateMenuItemRequest, opts ...http.CallOption) (rsp *MenuItem, err error)
 	CreatePermission(ctx context.Context, req *CreatePermissionRequest, opts ...http.CallOption) (rsp *Permission, err error)
 	CreateRole(ctx context.Context, req *CreateRoleRequest, opts ...http.CallOption) (rsp *Role, err error)
@@ -902,7 +1019,9 @@ type IAMServiceHTTPClient interface {
 	GetRole(ctx context.Context, req *GetRoleRequest, opts ...http.CallOption) (rsp *Role, err error)
 	GetRoleInheritance(ctx context.Context, req *GetRoleInheritanceRequest, opts ...http.CallOption) (rsp *RoleInheritanceReply, err error)
 	GetRolePermissions(ctx context.Context, req *GetRolePermissionsRequest, opts ...http.CallOption) (rsp *RolePermissionsReply, err error)
+	ListAssignments(ctx context.Context, req *ListAssignmentsRequest, opts ...http.CallOption) (rsp *AssignmentListReply, err error)
 	ListConstraints(ctx context.Context, req *ListConstraintsRequest, opts ...http.CallOption) (rsp *ConstraintsReply, err error)
+	ListDelegations(ctx context.Context, req *ListDelegationsRequest, opts ...http.CallOption) (rsp *DelegationsReply, err error)
 	ListMenus(ctx context.Context, req *ListMenusRequest, opts ...http.CallOption) (rsp *MenusReply, err error)
 	ListPermissions(ctx context.Context, req *ListPermissionsRequest, opts ...http.CallOption) (rsp *PermissionsReply, err error)
 	ListResources(ctx context.Context, req *ListResourcesRequest, opts ...http.CallOption) (rsp *ResourcesReply, err error)
@@ -914,10 +1033,12 @@ type IAMServiceHTTPClient interface {
 	PutRoleInheritance(ctx context.Context, req *PutRoleInheritanceRequest, opts ...http.CallOption) (rsp *RoleInheritanceReply, err error)
 	PutRolePermissions(ctx context.Context, req *PutRolePermissionsRequest, opts ...http.CallOption) (rsp *RolePermissionsReply, err error)
 	RevokeAssignment(ctx context.Context, req *RevokeAssignmentRequest, opts ...http.CallOption) (rsp *Assignment, err error)
+	RevokeDelegation(ctx context.Context, req *RevokeDelegationRequest, opts ...http.CallOption) (rsp *Delegation, err error)
 	SetPermissionStatus(ctx context.Context, req *SetPermissionStatusRequest, opts ...http.CallOption) (rsp *Permission, err error)
 	SetRoleStatus(ctx context.Context, req *SetRoleStatusRequest, opts ...http.CallOption) (rsp *Role, err error)
 	SimulateAuthorization(ctx context.Context, req *SimulateAuthorizationRequest, opts ...http.CallOption) (rsp *SimulateAuthorizationReply, err error)
 	UpdateConstraint(ctx context.Context, req *UpdateConstraintRequest, opts ...http.CallOption) (rsp *Constraint, err error)
+	UpdateDelegation(ctx context.Context, req *UpdateDelegationRequest, opts ...http.CallOption) (rsp *Delegation, err error)
 	UpdateMenuItem(ctx context.Context, req *UpdateMenuItemRequest, opts ...http.CallOption) (rsp *MenuItem, err error)
 	UpdatePermission(ctx context.Context, req *UpdatePermissionRequest, opts ...http.CallOption) (rsp *Permission, err error)
 	UpdateRole(ctx context.Context, req *UpdateRoleRequest, opts ...http.CallOption) (rsp *Role, err error)
@@ -1041,6 +1162,23 @@ func (c *IAMServiceHTTPClientImpl) CreateConstraint(ctx context.Context, in *Cre
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationIAMServiceCreateConstraint),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *IAMServiceHTTPClientImpl) CreateDelegation(ctx context.Context, in *CreateDelegationRequest, opts ...http.CallOption) (*Delegation, error) {
+	var out Delegation
+	pattern := "/api/v1/admin/iam/delegations"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationIAMServiceCreateDelegation),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
@@ -1214,6 +1352,22 @@ func (c *IAMServiceHTTPClientImpl) GetRolePermissions(ctx context.Context, in *G
 	return &out, nil
 }
 
+func (c *IAMServiceHTTPClientImpl) ListAssignments(ctx context.Context, in *ListAssignmentsRequest, opts ...http.CallOption) (*AssignmentListReply, error) {
+	var out AssignmentListReply
+	pattern := "/api/v1/admin/iam/assignments"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationIAMServiceListAssignments),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *IAMServiceHTTPClientImpl) ListConstraints(ctx context.Context, in *ListConstraintsRequest, opts ...http.CallOption) (*ConstraintsReply, error) {
 	var out ConstraintsReply
 	pattern := "/api/v1/admin/iam/constraints"
@@ -1221,6 +1375,22 @@ func (c *IAMServiceHTTPClientImpl) ListConstraints(ctx context.Context, in *List
 	opts = append([]http.CallOption{
 		http.Accept("application/protojson"),
 		http.Operation(OperationIAMServiceListConstraints),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *IAMServiceHTTPClientImpl) ListDelegations(ctx context.Context, in *ListDelegationsRequest, opts ...http.CallOption) (*DelegationsReply, error) {
+	var out DelegationsReply
+	pattern := "/api/v1/admin/iam/delegations"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationIAMServiceListDelegations),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
@@ -1411,6 +1581,23 @@ func (c *IAMServiceHTTPClientImpl) RevokeAssignment(ctx context.Context, in *Rev
 	return &out, nil
 }
 
+func (c *IAMServiceHTTPClientImpl) RevokeDelegation(ctx context.Context, in *RevokeDelegationRequest, opts ...http.CallOption) (*Delegation, error) {
+	var out Delegation
+	pattern := "/api/v1/admin/iam/delegations/{id}:revoke"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationIAMServiceRevokeDelegation),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *IAMServiceHTTPClientImpl) SetPermissionStatus(ctx context.Context, in *SetPermissionStatusRequest, opts ...http.CallOption) (*Permission, error) {
 	var out Permission
 	pattern := "/api/v1/admin/iam/permissions/{id}:set-status"
@@ -1470,6 +1657,23 @@ func (c *IAMServiceHTTPClientImpl) UpdateConstraint(ctx context.Context, in *Upd
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationIAMServiceUpdateConstraint),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "PATCH", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *IAMServiceHTTPClientImpl) UpdateDelegation(ctx context.Context, in *UpdateDelegationRequest, opts ...http.CallOption) (*Delegation, error) {
+	var out Delegation
+	pattern := "/api/v1/admin/iam/delegations/{id}"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationIAMServiceUpdateDelegation),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "PATCH", path, in, &out, opts...)

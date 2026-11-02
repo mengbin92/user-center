@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// IntegrationAdminService manages machine clients that may call the internal
+// gRPC API and subscribe to outbox events.
+service IntegrationAdminService {
+  rpc ListIntegrationClients(ListIntegrationClientsRequest) returns (IntegrationClientsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/integration-clients"};
+  }
+  rpc CreateIntegrationClient(CreateIntegrationClientRequest) returns (IntegrationClientCredentialReply) {
+    option (google.api.http) = {post: "/api/v1/admin/integration-clients" body: "*"};
+  }
+  rpc UpdateIntegrationClient(UpdateIntegrationClientRequest) returns (IntegrationClient) {
+    option (google.api.http) = {patch: "/api/v1/admin/integration-clients/{id}" body: "*"};
+  }
+  rpc RotateIntegrationClientCredential(RotateIntegrationClientCredentialRequest) returns (IntegrationClientCredentialReply) {
+    option (google.api.http) = {post: "/api/v1/admin/integration-clients/{id}:rotate-credential" body: "*"};
+  }
+  rpc DisableIntegrationClient(DisableIntegrationClientRequest) returns (IntegrationClient) {
+    option (google.api.http) = {post: "/api/v1/admin/integration-clients/{id}:disable" body: "*"};
+  }
+  rpc ListEventDeliveries(ListEventDeliveriesRequest) returns (EventDeliveriesReply) {
+    option (google.api.http) = {get: "/api/v1/admin/event-deliveries"};
+  }
+  rpc RetryEventDelivery(RetryEventDeliveryRequest) returns (EventDelivery) {
+    option (google.api.http) = {post: "/api/v1/admin/event-deliveries/{event_id}/subscribers/{subscriber_id}:retry" body: "*"};
+  }
+}
+
+message IntegrationClient {
+  string id = 1;
+  string client_id = 2;
+  string code = 3;
+  string service_owner = 4;
+  // active | disabled
+  string status = 5;
+  repeated string allowed_methods = 6;
+  repeated string event_subscriptions = 7;
+  string callback_url = 8;
+  int32 credential_version = 9;
+  string expires_at = 10;
+  string created_at = 11;
+  string revision = 12;
+}
+
+message IntegrationClientCredentialReply {
+  IntegrationClient client = 1;
+  // Returned exactly once; only the digest is stored.
+  string credential = 2;
+}
+
+message ListIntegrationClientsRequest {}
+
+message IntegrationClientsReply {
+  repeated IntegrationClient items = 1;
+}
+
+message CreateIntegrationClientRequest {
+  string code = 1;
+  string service_owner = 2;
+  repeated string allowed_methods = 3;
+  repeated string event_subscriptions = 4;
+  string callback_url = 5;
+  string expires_at = 6;
+  string reason = 7;
+}
+
+message UpdateIntegrationClientRequest {
+  string id = 1;
+  repeated string allowed_methods = 2;
+  repeated string event_subscriptions = 3;
+  string callback_url = 4;
+  string expected_revision = 5;
+  string reason = 6;
+}
+
+message RotateIntegrationClientCredentialRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message DisableIntegrationClientRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message EventDelivery {
+  string event_id = 1;
+  string event_type = 2;
+  string subscriber_id = 3;
+  string status = 4;
+  int32 attempts = 5;
+  string next_retry_at = 6;
+  string last_error = 7;
+}
+
+message ListEventDeliveriesRequest {
+  string status = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message EventDeliveriesReply {
+  repeated EventDelivery items = 1;
+  ListMeta meta = 2;
+}
+
+message RetryEventDeliveryRequest {
+  string event_id = 1;
+  string subscriber_id = 2;
+  string reason = 3;
+}

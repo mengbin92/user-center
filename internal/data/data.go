@@ -191,8 +191,8 @@ func models() []any {
 		&userPO{}, &credentialPO{}, &mfaPO{}, &externalIdentityPO{},
 		&sessionPO{}, &sessionRolePO{}, &securityEventPO{}, &flowCompletionPO{},
 		&policyStatePO{}, &resourcePO{}, &permissionPO{}, &rolePO{},
-		&roleGrantPO{}, &roleInheritancePO{}, &assignmentPO{}, &constraintPO{},
+		&roleGrantPO{}, &roleInheritancePO{}, &assignmentPO{}, &delegationPO{}, &constraintPO{},
 		&menuPO{}, &auditEventPO{}, &authSettingsPO{}, &emailSettingsPO{},
-		&exportJobPO{}, &outboxEventPO{}, &deliveryPO{},
+		&exportJobPO{}, &outboxEventPO{}, &deliveryPO{}, &integrationClientPO{}, &legacyImportBatchPO{},
 	}
 }

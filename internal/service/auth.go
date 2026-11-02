@@ -19,15 +19,22 @@ func NewAuthService(uc *biz.AuthUsecase, deps Deps) *AuthService {
 	return &AuthService{uc: uc, deps: deps}
 }
 
+// Usecase exposes the auth usecase to the raw OAuth redirect handlers.
+func (s *AuthService) Usecase() *biz.AuthUsecase { return s.uc }
+
 func (s *AuthService) GetAuthContext(ctx context.Context, _ *usercv1.GetAuthContextRequest) (*usercv1.AuthContext, error) {
 	settings, err := s.uc.AuthConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
+	providers := s.uc.OAuthProviders()
+	if providers == nil {
+		providers = []string{}
+	}
 	return &usercv1.AuthContext{
 		RegistrationEnabled:       settings.RegistrationEnabled,
 		EmailVerificationRequired: settings.EmailVerificationRequired,
-		Providers:                 settings.Providers,
+		Providers:                 providers,
 		CsrfToken:                 ensureCSRF(ctx, s.deps),
 		PasswordMinLength:         int32(settings.PasswordMinLength),
 		MfaRequiredForAdmins:      settings.MFARequiredForAdmins,
@@ -64,7 +71,10 @@ func (s *AuthService) Login(ctx context.Context, req *usercv1.LoginRequest) (*us
 	if err != nil {
 		return nil, err
 	}
-	reply := &usercv1.LoginReply{Status: result.Status}
+	reply := &usercv1.LoginReply{
+		Status: result.Status, PasswordChangeRequired: result.PasswordChangeRequired,
+		MfaEnrollmentRequired: s.uc.MFAEnrollmentRequired(ctx, result.User),
+	}
 	if result.User != nil {
 		reply.User = userProto(result.User)
 	}
@@ -87,7 +97,8 @@ func (s *AuthService) CompleteMFA(ctx context.Context, req *usercv1.CompleteMFAR
 	setSessionCookie(ctx, s.deps, result.RawToken, result.Session.ExpiresAt)
 	return &usercv1.LoginReply{
 		Status: result.Status, User: userProto(result.User),
-		SessionExpiresAt: result.Session.ExpiresAt.Format(timeLayout),
+		SessionExpiresAt:       result.Session.ExpiresAt.Format(timeLayout),
+		PasswordChangeRequired: result.PasswordChangeRequired,
 	}, nil
 }
 

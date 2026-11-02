@@ -44,11 +44,13 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	outboxRepo := data.NewOutboxRepo(dataData)
 	settingsRepo := data.NewSettingsRepo(dataData)
 	exportRepo := data.NewExportRepo(dataData)
+	integrationClientRepo := data.NewIntegrationClientRepo(dataData)
 	clock := &data.Clock{}
 	iDs := &data.IDs{}
 	secretBox := data.NewSecretBox(security)
+	v := data.NewOAuthRegistry(logger)
 	runtimeConfig := wiring.NewRuntimeConfig(b)
-	services := biz.NewServices(userRepo, credentialRepo, externalIdentityRepo, mfaRepo, sessionRepo, securityEventRepo, flowCompletionRepo, challengeStore, rateLimiter, stepUpStore, mailSender, auditRepo, policyRepo, iamRepo, outboxRepo, settingsRepo, exportRepo, dataData, clock, iDs, secretBox, runtimeConfig)
+	services := biz.NewServices(userRepo, credentialRepo, externalIdentityRepo, mfaRepo, sessionRepo, securityEventRepo, flowCompletionRepo, challengeStore, rateLimiter, stepUpStore, mailSender, auditRepo, policyRepo, iamRepo, outboxRepo, settingsRepo, exportRepo, integrationClientRepo, dataData, clock, iDs, secretBox, v, runtimeConfig)
 	sessionUsecase := biz.NewSessionUsecase(services)
 	middleware := server.NewMiddleware(sessionUsecase, security, logger)
 	authUsecase := biz.NewAuthUsecase(services)
@@ -64,13 +66,15 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	auditService := service.NewAuditService(auditUsecase)
 	settingsUsecase := biz.NewSettingsUsecase(services)
 	settingsService := service.NewSettingsService(settingsUsecase)
+	integrationAdminUsecase := biz.NewIntegrationAdminUsecase(services)
+	integrationAdminService := service.NewIntegrationAdminService(integrationAdminUsecase)
 	artifactDir := server.NewArtifactDir()
-	httpServer := server.NewHTTPServer(confServer, security, middleware, logger, authService, meService, adminUserService, iamService, auditService, settingsService, userUsecase, artifactDir)
+	httpServer := server.NewHTTPServer(confServer, security, middleware, logger, authService, meService, adminUserService, iamService, auditService, settingsService, integrationAdminService, userUsecase, artifactDir)
 	integrationToken := server.NewIntegrationToken()
 	integrationUsecase := biz.NewIntegrationUsecase(services)
 	integrationService := service.NewIntegrationService(integrationUsecase)
 	grpcServer := server.NewGRPCServer(confServer, integrationToken, logger, integrationService)
-	app := wiring.NewApp(httpServer, grpcServer, services, logger)
+	app := wiring.NewApp(httpServer, grpcServer, services, integrationAdminUsecase, logger)
 	return app, func() {
 		cleanup()
 	}, nil

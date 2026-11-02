@@ -158,6 +158,39 @@ export type UsersReply = Schemas['api.usercenter.v1.UsersReply']
 export type VerifySecurityReply = Schemas['api.usercenter.v1.VerifySecurityReply']
 export type VerifySecurityRequest = Schemas['api.usercenter.v1.VerifySecurityRequest']
 
+export type AssignmentItem = Schemas['api.usercenter.v1.AssignmentItem']
+export type AssignmentListReply =
+  Schemas['api.usercenter.v1.AssignmentListReply']
+export type CreateDelegationRequest =
+  Schemas['api.usercenter.v1.CreateDelegationRequest']
+export type Delegation = Schemas['api.usercenter.v1.Delegation']
+export type DelegationCeiling = Schemas['api.usercenter.v1.DelegationCeiling']
+export type DelegationsReply = Schemas['api.usercenter.v1.DelegationsReply']
+export type RevokeDelegationRequest =
+  Schemas['api.usercenter.v1.RevokeDelegationRequest']
+export type IntegrationClient = Schemas['api.usercenter.v1.IntegrationClient']
+export type IntegrationClientsReply =
+  Schemas['api.usercenter.v1.IntegrationClientsReply']
+export type IntegrationClientCredentialReply =
+  Schemas['api.usercenter.v1.IntegrationClientCredentialReply']
+export type CreateIntegrationClientRequest =
+  Schemas['api.usercenter.v1.CreateIntegrationClientRequest']
+export type UpdateIntegrationClientRequest =
+  Schemas['api.usercenter.v1.UpdateIntegrationClientRequest']
+export type RotateIntegrationClientCredentialRequest =
+  Schemas['api.usercenter.v1.RotateIntegrationClientCredentialRequest']
+export type DisableIntegrationClientRequest =
+  Schemas['api.usercenter.v1.DisableIntegrationClientRequest']
+export type EventDelivery = Schemas['api.usercenter.v1.EventDelivery']
+export type EventDeliveriesReply =
+  Schemas['api.usercenter.v1.EventDeliveriesReply']
+export type RetryEventDeliveryRequest =
+  Schemas['api.usercenter.v1.RetryEventDeliveryRequest']
+export type CreateEmailChangeChallengeRequest =
+  Schemas['api.usercenter.v1.CreateEmailChangeChallengeRequest']
+export type ConfirmEmailChangeRequest =
+  Schemas['api.usercenter.v1.ConfirmEmailChangeRequest']
+
 export type ApiList<T> = {
   items: T[]
   meta: ListMeta

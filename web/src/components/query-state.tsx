@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 
-import { isApiError, type ApiError } from '../lib/errors'
+import { isApiError, reasonMessage, type ApiError } from '../lib/errors'
 import { cn } from '../lib/cn'
 import { Button } from './button'
 import { Card } from './card'
@@ -82,10 +82,12 @@ export function ErrorPanel({
 
   if (status === 403) {
     title = '无访问权限'
+    const mappedReason = reasonMessage(apiError?.reason)
     description =
       apiError?.reason === 'STEP_UP_REQUIRED'
         ? '该操作需要近期安全验证。请先在安全中心完成验证，再重试。'
-        : `当前账号未被授予此功能的权限${apiError?.reason ? `（${apiError.reason}）` : ''}。请联系管理员调整角色或数据范围，页面不会展示空数据来掩盖权限问题。`
+        : (mappedReason ??
+          `当前账号未被授予此功能的权限${apiError?.reason ? `（${apiError.reason}）` : ''}。请联系管理员调整角色或数据范围，页面不会展示空数据来掩盖权限问题。`)
     icon = <ShieldX className="h-5 w-5" />
     tone = 'border-rose-200 bg-rose-50 text-rose-700'
   } else if (status === 401) {

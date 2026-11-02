@@ -160,7 +160,40 @@ func (s *Services) Authorize(ctx context.Context, actor ActorContext, operation 
 	if !d.Allowed {
 		return d, ErrPermissionDenied
 	}
+	if err := s.requireAdminMFA(ctx, actor); err != nil {
+		return d, err
+	}
 	return d, nil
+}
+
+// requireAdminMFA enforces the configured policy at the authorization seam.
+// A root/admin can still authenticate and enroll MFA, but management calls are
+// refused until a second factor is active.
+func (s *Services) requireAdminMFA(ctx context.Context, actor ActorContext) error {
+	if actor.User == nil {
+		return nil
+	}
+	isAdmin := false
+	for _, r := range actor.User.Roles {
+		if r.Code == "root" || r.Code == "admin" {
+			isAdmin = true
+			break
+		}
+	}
+	if !isAdmin {
+		return nil
+	}
+	settings, err := s.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return ErrDependency
+	}
+	if !settings.MFARequiredForAdmins {
+		return nil
+	}
+	if state, merr := s.MFA.Get(ctx, nil, actor.User.ID); merr == nil && state.Enabled() {
+		return nil
+	}
+	return ErrMFAEnrollmentReq
 }
 
 func (s *Services) RequireStepUp(ctx context.Context, actor ActorContext) error {
@@ -317,4 +350,46 @@ func CheckConstraints(roleIDs []int64, constraints []*Constraint) error {
 		}
 	}
 	return nil
+}
+
+// checkDelegation requires an active delegation when the actor does not hold
+// an all-scope grant for the assignment action. Delegations never grant
+// permissions by themselves; they only authorize a bounded manager to act.
+func (s *Services) checkDelegation(ctx context.Context, actor ActorContext, targetUserID, targetRoleID int64, action string, boundary authorization.Scope) error {
+	operation := "iam.assignment.create"
+	if action == "revoke" {
+		operation = "iam.assignment.revoke"
+	}
+	scope, err := s.ScopeFor(ctx, actor, operation)
+	if err == nil && scope.All {
+		return nil
+	}
+	delegations, derr := s.IAM.ListDelegations(ctx, nil, DelegationFilter{Status: "active", TargetRoleID: targetRoleID})
+	if derr != nil {
+		return ErrDelegationRequired
+	}
+	if DelegationAllows(delegations, actor.Session.ActiveRoleIDs, targetUserID, targetRoleID, action, boundary, s.Clock.Now()) {
+		return nil
+	}
+	return ErrDelegationRequired
+}
+
+// DelegationAllows is the pure containment check used by assignment guards.
+func DelegationAllows(delegations []*Delegation, activeRoleIDs []int64, targetUserID, targetRoleID int64, action string, boundary authorization.Scope, now time.Time) bool {
+	for _, d := range delegations {
+		if !slices.Contains(activeRoleIDs, d.ManagerRoleID) || !d.Active(now) {
+			continue
+		}
+		if d.TargetRoleID != targetRoleID || !slices.Contains(d.Actions, action) {
+			continue
+		}
+		if !authorization.Covers(d.TargetUserScope, authorization.Scope{UserIDs: []int64{targetUserID}}) {
+			continue
+		}
+		if !authorization.Covers(d.TargetUserScope, boundary) {
+			continue
+		}
+		return true
+	}
+	return false
 }

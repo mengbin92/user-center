@@ -37,6 +37,12 @@ service AdminUserService {
   rpc ResetMFA(ResetMFARequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {post: "/api/v1/admin/users/{id}/mfa:reset" body: "*"};
   }
+  rpc CreateEmailChangeChallenge(CreateEmailChangeChallengeRequest) returns (ChallengeReply) {
+    option (google.api.http) = {post: "/api/v1/admin/users/{id}/email-changes" body: "*"};
+  }
+  rpc ConfirmEmailChange(ConfirmEmailChangeRequest) returns (User) {
+    option (google.api.http) = {post: "/api/v1/admin/users/{id}/email-changes:confirm" body: "*"};
+  }
   rpc ListUserSessions(ListUserSessionsRequest) returns (SessionsReply) {
     option (google.api.http) = {get: "/api/v1/admin/users/{id}/sessions"};
   }
@@ -137,6 +143,19 @@ message ResetMFARequest {
   string reason = 2;
 }
 
+message CreateEmailChangeChallengeRequest {
+  string id = 1;
+  string new_email = 2;
+  string reason = 3;
+}
+
+message ConfirmEmailChangeRequest {
+  string id = 1;
+  string challenge_id = 2;
+  string code = 3;
+  string reason = 4;
+}
+
 message ListUserSessionsRequest {
   string id = 1;
 }
@@ -173,6 +192,8 @@ message ExportUsersRequest {
   string status = 2;
   repeated string fields = 3;
   string reason = 4;
+  string role_id = 5;
+  string mfa_enabled = 6;
 }
 
 message GetExportRequest {

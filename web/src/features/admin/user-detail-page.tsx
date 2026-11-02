@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Ban,
   KeyRound,
+  MailCheck,
   MonitorSmartphone,
   Pencil,
   RefreshCw,
@@ -24,7 +25,7 @@ import {
   InlineAlert,
 } from '../../components/card'
 import { Dialog } from '../../components/dialog'
-import { Field, Input } from '../../components/input'
+import { Field, Input, Textarea } from '../../components/input'
 import { QueryBoundary } from '../../components/query-state'
 import { ReasonDialog } from '../../components/reason-dialog'
 import {
@@ -38,6 +39,7 @@ import {
 import { Tabs } from '../../components/tabs'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import { errorMessage } from '../../lib/errors'
 import {
   formatDate,
   formatDateTime,
@@ -69,6 +71,15 @@ export function AdminUserDetailPage() {
   const [displayName, setDisplayName] = useState('')
   const [editReason, setEditReason] = useState('')
   const [auditDetailId, setAuditDetailId] = useState<string | null>(null)
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [emailReason, setEmailReason] = useState('')
+  const [emailCode, setEmailCode] = useState('')
+  const [emailChallenge, setEmailChallenge] = useState<{
+    id: string
+    expiresAt: string
+    newEmail: string
+  } | null>(null)
 
   const rolesQuery = useAllRoles()
 
@@ -174,6 +185,61 @@ export function AdminUserDetailPage() {
     successMessage: 'MFA 已重置',
     invalidate: [['admin', 'user', id], ['admin', 'users']],
     onSuccess: () => setReasonAction(null),
+  })
+
+  const resetEmailFlow = () => {
+    setEmailChallenge(null)
+    setEmailCode('')
+    setNewEmail('')
+    setEmailReason('')
+  }
+
+  const openEmailChange = () => {
+    resetEmailFlow()
+    setEmailOpen(true)
+  }
+
+  const requestEmailChange = useApiMutation({
+    mutationFn: () =>
+      api.admin.createEmailChange(id, {
+        id,
+        new_email: newEmail.trim(),
+        reason: emailReason.trim(),
+      }),
+    successMessage: '验证码已发送',
+    successDescription: '验证码已发送到新邮箱，请向用户获取后确认。',
+    onSuccess: (data) => {
+      setEmailChallenge({
+        id: data.challenge_id ?? '',
+        expiresAt: data.expires_at ?? '',
+        newEmail: newEmail.trim(),
+      })
+      setEmailCode('')
+      setTab('security')
+    },
+  })
+
+  const confirmEmailChange = useApiMutation({
+    mutationFn: () => {
+      if (!emailChallenge) throw new Error('缺少邮箱变更挑战')
+      return api.admin.confirmEmailChange(id, {
+        id,
+        challenge_id: emailChallenge.id,
+        code: emailCode.trim(),
+        reason: emailReason.trim(),
+      })
+    },
+    successMessage: '邮箱已变更',
+    successDescription: '目标用户的所有会话已撤销。',
+    invalidate: [
+      ['admin', 'user', id],
+      ['admin', 'users'],
+      ['admin', 'overview'],
+    ],
+    onSuccess: () => {
+      setEmailOpen(false)
+      resetEmailFlow()
+    },
   })
 
   const requestPasswordReset = useApiMutation({
@@ -406,6 +472,17 @@ export function AdminUserDetailPage() {
                     </Button>
                   ) : null}
                   {user.status !== 'archived' &&
+                  can('identity.user.email_binding.update') ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={openEmailChange}
+                      icon={<MailCheck className="h-3.5 w-3.5" />}
+                    >
+                      变更邮箱
+                    </Button>
+                  ) : null}
+                  {user.status !== 'archived' &&
                   can(
                     user.status === 'enabled'
                       ? 'identity.user.disable'
@@ -571,9 +648,42 @@ export function AdminUserDetailPage() {
                         identity_version={user.identity_version}
                       </div>
                     </div>
+                    {emailChallenge ? (
+                      <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
+                        <div className="flex flex-wrap items-center gap-1">
+                          待验证新邮箱：
+                          <span className="font-mono">
+                            {emailChallenge.newEmail}
+                          </span>
+                          <Badge tone="warning">未验证</Badge>
+                        </div>
+                        <div className="mt-1 text-[10px] text-amber-700">
+                          验证码发送至新邮箱后才会生效。
+                          {emailChallenge.expiresAt
+                            ? ` 有效期至 ${formatDateTime(emailChallenge.expiresAt)}。`
+                            : ''}
+                        </div>
+                      </div>
+                    ) : null}
                     <p className="mt-2 text-[10px] text-slate-400">
-                      管理员端邮箱变更接口未在当前 OpenAPI 契约中提供。
+                      变更邮箱需要近期安全验证，并向新邮箱发送一次性验证码。确认前新邮箱保持未验证状态。
                     </p>
+                    {can('identity.user.email_binding.update') ? (
+                      <Button
+                        className="mt-2"
+                        size="sm"
+                        variant="secondary"
+                        onClick={openEmailChange}
+                        disabled={user.status === 'archived'}
+                        icon={<MailCheck className="h-3.5 w-3.5" />}
+                      >
+                        变更邮箱
+                      </Button>
+                    ) : (
+                      <p className="mt-2 text-[10px] text-slate-400">
+                        缺少 identity.user.email_binding.update 权限
+                      </p>
+                    )}
                   </div>
 
                   <div className="rounded-lg border border-slate-200 p-3">
@@ -947,6 +1057,146 @@ export function AdminUserDetailPage() {
               <div className="text-[11px] text-slate-500">
                 当前 revision：<span className="font-mono">{user.revision}</span>
               </div>
+            </Dialog>
+
+            <Dialog
+              open={emailOpen}
+              onClose={() => {
+                setEmailOpen(false)
+                resetEmailFlow()
+              }}
+              title={emailChallenge ? '确认邮箱变更' : '变更用户邮箱'}
+              description={
+                emailChallenge
+                  ? '输入新邮箱收到的验证码，确认后立即生效并撤销该用户全部会话。'
+                  : '先填写新邮箱与操作原因，系统会向新邮箱发送一次性验证码。'
+              }
+              size="md"
+              bodyClassName="space-y-3"
+              footer={
+                emailChallenge ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setEmailChallenge(null)
+                        setEmailCode('')
+                      }}
+                      disabled={confirmEmailChange.isPending}
+                    >
+                      返回修改
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => confirmEmailChange.mutate(undefined)}
+                      loading={confirmEmailChange.isPending}
+                      disabled={
+                        emailCode.trim().length < 4 ||
+                        emailReason.trim().length < 2
+                      }
+                    >
+                      确认变更
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setEmailOpen(false)
+                        resetEmailFlow()
+                      }}
+                      disabled={requestEmailChange.isPending}
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => requestEmailChange.mutate(undefined)}
+                      loading={requestEmailChange.isPending}
+                      disabled={
+                        !newEmail.trim().includes('@') ||
+                        emailReason.trim().length < 2
+                      }
+                      icon={<MailCheck className="h-3.5 w-3.5" />}
+                    >
+                      发送验证码
+                    </Button>
+                  </>
+                )
+              }
+            >
+              {!emailChallenge ? (
+                <>
+                  <Field label="新邮箱" htmlFor="admin-new-email" required>
+                    <Input
+                      id="admin-new-email"
+                      type="email"
+                      value={newEmail}
+                      onChange={(event) => setNewEmail(event.target.value)}
+                      placeholder="new@example.com"
+                    />
+                  </Field>
+                  <Field
+                    label="操作原因"
+                    htmlFor="admin-email-reason"
+                    required
+                    hint="至少 2 个字符，会写入审计日志。"
+                  >
+                    <Textarea
+                      id="admin-email-reason"
+                      value={emailReason}
+                      onChange={(event) => setEmailReason(event.target.value)}
+                      rows={3}
+                      placeholder="例如：员工更换邮箱，工单 IT-2048"
+                    />
+                  </Field>
+                  {requestEmailChange.isError ? (
+                    <InlineAlert tone="danger" title="发送失败">
+                      {errorMessage(requestEmailChange.error)}
+                    </InlineAlert>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <InlineAlert tone="info" title="验证码已发送">
+                    新邮箱：
+                    <span className="font-mono">{emailChallenge.newEmail}</span>
+                    <Badge tone="warning" className="ml-1">
+                      未验证
+                    </Badge>
+                    {emailChallenge.expiresAt
+                      ? `，有效期至 ${formatDateTime(emailChallenge.expiresAt)}。`
+                      : '。'}
+                  </InlineAlert>
+                  <Field
+                    label="新邮箱验证码"
+                    htmlFor="admin-email-code"
+                    required
+                    hint="验证码只发送到新邮箱；确认前账号仍保留原邮箱。"
+                  >
+                    <Input
+                      id="admin-email-code"
+                      value={emailCode}
+                      onChange={(event) => setEmailCode(event.target.value)}
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
+                    />
+                  </Field>
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-2.5 text-[11px] text-slate-600">
+                    操作原因：{emailReason || '—'}
+                  </div>
+                  {confirmEmailChange.isError ? (
+                    <InlineAlert tone="danger" title="确认失败">
+                      {errorMessage(confirmEmailChange.error)}
+                    </InlineAlert>
+                  ) : null}
+                </>
+              )}
             </Dialog>
 
             <ReasonDialog

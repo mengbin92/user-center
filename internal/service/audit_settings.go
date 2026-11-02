@@ -96,7 +96,7 @@ func (s *AuditService) ExportAuditEvents(ctx context.Context, req *usercv1.Expor
 	if err != nil {
 		return nil, err
 	}
-	filter := biz.AuditFilter{Action: req.GetAction(), ActorUserID: actorID}
+	filter := biz.AuditFilter{Action: req.GetAction(), ActorUserID: actorID, Target: req.GetTarget()}
 	if !from.IsZero() {
 		filter.From = &from
 	}

@@ -42,8 +42,13 @@ const (
 	IAMService_PutRoleInheritance_FullMethodName      = "/api.usercenter.v1.IAMService/PutRoleInheritance"
 	IAMService_PreviewRoleChange_FullMethodName       = "/api.usercenter.v1.IAMService/PreviewRoleChange"
 	IAMService_ListUserRoles_FullMethodName           = "/api.usercenter.v1.IAMService/ListUserRoles"
+	IAMService_ListAssignments_FullMethodName         = "/api.usercenter.v1.IAMService/ListAssignments"
 	IAMService_CreateAssignment_FullMethodName        = "/api.usercenter.v1.IAMService/CreateAssignment"
 	IAMService_RevokeAssignment_FullMethodName        = "/api.usercenter.v1.IAMService/RevokeAssignment"
+	IAMService_ListDelegations_FullMethodName         = "/api.usercenter.v1.IAMService/ListDelegations"
+	IAMService_CreateDelegation_FullMethodName        = "/api.usercenter.v1.IAMService/CreateDelegation"
+	IAMService_UpdateDelegation_FullMethodName        = "/api.usercenter.v1.IAMService/UpdateDelegation"
+	IAMService_RevokeDelegation_FullMethodName        = "/api.usercenter.v1.IAMService/RevokeDelegation"
 	IAMService_PreviewBatchAssign_FullMethodName      = "/api.usercenter.v1.IAMService/PreviewBatchAssign"
 	IAMService_BatchAssign_FullMethodName             = "/api.usercenter.v1.IAMService/BatchAssign"
 	IAMService_ListConstraints_FullMethodName         = "/api.usercenter.v1.IAMService/ListConstraints"
@@ -88,8 +93,13 @@ type IAMServiceClient interface {
 	PutRoleInheritance(ctx context.Context, in *PutRoleInheritanceRequest, opts ...grpc.CallOption) (*RoleInheritanceReply, error)
 	PreviewRoleChange(ctx context.Context, in *PreviewRoleChangeRequest, opts ...grpc.CallOption) (*PreviewReply, error)
 	ListUserRoles(ctx context.Context, in *ListUserRolesRequest, opts ...grpc.CallOption) (*AssignmentsReply, error)
+	ListAssignments(ctx context.Context, in *ListAssignmentsRequest, opts ...grpc.CallOption) (*AssignmentListReply, error)
 	CreateAssignment(ctx context.Context, in *CreateAssignmentRequest, opts ...grpc.CallOption) (*Assignment, error)
 	RevokeAssignment(ctx context.Context, in *RevokeAssignmentRequest, opts ...grpc.CallOption) (*Assignment, error)
+	ListDelegations(ctx context.Context, in *ListDelegationsRequest, opts ...grpc.CallOption) (*DelegationsReply, error)
+	CreateDelegation(ctx context.Context, in *CreateDelegationRequest, opts ...grpc.CallOption) (*Delegation, error)
+	UpdateDelegation(ctx context.Context, in *UpdateDelegationRequest, opts ...grpc.CallOption) (*Delegation, error)
+	RevokeDelegation(ctx context.Context, in *RevokeDelegationRequest, opts ...grpc.CallOption) (*Delegation, error)
 	PreviewBatchAssign(ctx context.Context, in *PreviewBatchAssignRequest, opts ...grpc.CallOption) (*BatchPreviewReply, error)
 	BatchAssign(ctx context.Context, in *BatchAssignRequest, opts ...grpc.CallOption) (*BatchAssignReply, error)
 	ListConstraints(ctx context.Context, in *ListConstraintsRequest, opts ...grpc.CallOption) (*ConstraintsReply, error)
@@ -332,6 +342,16 @@ func (c *iAMServiceClient) ListUserRoles(ctx context.Context, in *ListUserRolesR
 	return out, nil
 }
 
+func (c *iAMServiceClient) ListAssignments(ctx context.Context, in *ListAssignmentsRequest, opts ...grpc.CallOption) (*AssignmentListReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssignmentListReply)
+	err := c.cc.Invoke(ctx, IAMService_ListAssignments_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *iAMServiceClient) CreateAssignment(ctx context.Context, in *CreateAssignmentRequest, opts ...grpc.CallOption) (*Assignment, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Assignment)
@@ -346,6 +366,46 @@ func (c *iAMServiceClient) RevokeAssignment(ctx context.Context, in *RevokeAssig
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Assignment)
 	err := c.cc.Invoke(ctx, IAMService_RevokeAssignment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iAMServiceClient) ListDelegations(ctx context.Context, in *ListDelegationsRequest, opts ...grpc.CallOption) (*DelegationsReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DelegationsReply)
+	err := c.cc.Invoke(ctx, IAMService_ListDelegations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iAMServiceClient) CreateDelegation(ctx context.Context, in *CreateDelegationRequest, opts ...grpc.CallOption) (*Delegation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Delegation)
+	err := c.cc.Invoke(ctx, IAMService_CreateDelegation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iAMServiceClient) UpdateDelegation(ctx context.Context, in *UpdateDelegationRequest, opts ...grpc.CallOption) (*Delegation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Delegation)
+	err := c.cc.Invoke(ctx, IAMService_UpdateDelegation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iAMServiceClient) RevokeDelegation(ctx context.Context, in *RevokeDelegationRequest, opts ...grpc.CallOption) (*Delegation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Delegation)
+	err := c.cc.Invoke(ctx, IAMService_RevokeDelegation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -502,8 +562,13 @@ type IAMServiceServer interface {
 	PutRoleInheritance(context.Context, *PutRoleInheritanceRequest) (*RoleInheritanceReply, error)
 	PreviewRoleChange(context.Context, *PreviewRoleChangeRequest) (*PreviewReply, error)
 	ListUserRoles(context.Context, *ListUserRolesRequest) (*AssignmentsReply, error)
+	ListAssignments(context.Context, *ListAssignmentsRequest) (*AssignmentListReply, error)
 	CreateAssignment(context.Context, *CreateAssignmentRequest) (*Assignment, error)
 	RevokeAssignment(context.Context, *RevokeAssignmentRequest) (*Assignment, error)
+	ListDelegations(context.Context, *ListDelegationsRequest) (*DelegationsReply, error)
+	CreateDelegation(context.Context, *CreateDelegationRequest) (*Delegation, error)
+	UpdateDelegation(context.Context, *UpdateDelegationRequest) (*Delegation, error)
+	RevokeDelegation(context.Context, *RevokeDelegationRequest) (*Delegation, error)
 	PreviewBatchAssign(context.Context, *PreviewBatchAssignRequest) (*BatchPreviewReply, error)
 	BatchAssign(context.Context, *BatchAssignRequest) (*BatchAssignReply, error)
 	ListConstraints(context.Context, *ListConstraintsRequest) (*ConstraintsReply, error)
@@ -592,11 +657,26 @@ func (UnimplementedIAMServiceServer) PreviewRoleChange(context.Context, *Preview
 func (UnimplementedIAMServiceServer) ListUserRoles(context.Context, *ListUserRolesRequest) (*AssignmentsReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListUserRoles not implemented")
 }
+func (UnimplementedIAMServiceServer) ListAssignments(context.Context, *ListAssignmentsRequest) (*AssignmentListReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAssignments not implemented")
+}
 func (UnimplementedIAMServiceServer) CreateAssignment(context.Context, *CreateAssignmentRequest) (*Assignment, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateAssignment not implemented")
 }
 func (UnimplementedIAMServiceServer) RevokeAssignment(context.Context, *RevokeAssignmentRequest) (*Assignment, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeAssignment not implemented")
+}
+func (UnimplementedIAMServiceServer) ListDelegations(context.Context, *ListDelegationsRequest) (*DelegationsReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDelegations not implemented")
+}
+func (UnimplementedIAMServiceServer) CreateDelegation(context.Context, *CreateDelegationRequest) (*Delegation, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateDelegation not implemented")
+}
+func (UnimplementedIAMServiceServer) UpdateDelegation(context.Context, *UpdateDelegationRequest) (*Delegation, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateDelegation not implemented")
+}
+func (UnimplementedIAMServiceServer) RevokeDelegation(context.Context, *RevokeDelegationRequest) (*Delegation, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeDelegation not implemented")
 }
 func (UnimplementedIAMServiceServer) PreviewBatchAssign(context.Context, *PreviewBatchAssignRequest) (*BatchPreviewReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method PreviewBatchAssign not implemented")
@@ -1051,6 +1131,24 @@ func _IAMService_ListUserRoles_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IAMService_ListAssignments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAssignmentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IAMServiceServer).ListAssignments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IAMService_ListAssignments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IAMServiceServer).ListAssignments(ctx, req.(*ListAssignmentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _IAMService_CreateAssignment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateAssignmentRequest)
 	if err := dec(in); err != nil {
@@ -1083,6 +1181,78 @@ func _IAMService_RevokeAssignment_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IAMServiceServer).RevokeAssignment(ctx, req.(*RevokeAssignmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IAMService_ListDelegations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDelegationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IAMServiceServer).ListDelegations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IAMService_ListDelegations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IAMServiceServer).ListDelegations(ctx, req.(*ListDelegationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IAMService_CreateDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDelegationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IAMServiceServer).CreateDelegation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IAMService_CreateDelegation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IAMServiceServer).CreateDelegation(ctx, req.(*CreateDelegationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IAMService_UpdateDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateDelegationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IAMServiceServer).UpdateDelegation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IAMService_UpdateDelegation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IAMServiceServer).UpdateDelegation(ctx, req.(*UpdateDelegationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IAMService_RevokeDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeDelegationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IAMServiceServer).RevokeDelegation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IAMService_RevokeDelegation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IAMServiceServer).RevokeDelegation(ctx, req.(*RevokeDelegationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1399,12 +1569,32 @@ var IAMService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _IAMService_ListUserRoles_Handler,
 		},
 		{
+			MethodName: "ListAssignments",
+			Handler:    _IAMService_ListAssignments_Handler,
+		},
+		{
 			MethodName: "CreateAssignment",
 			Handler:    _IAMService_CreateAssignment_Handler,
 		},
 		{
 			MethodName: "RevokeAssignment",
 			Handler:    _IAMService_RevokeAssignment_Handler,
+		},
+		{
+			MethodName: "ListDelegations",
+			Handler:    _IAMService_ListDelegations_Handler,
+		},
+		{
+			MethodName: "CreateDelegation",
+			Handler:    _IAMService_CreateDelegation_Handler,
+		},
+		{
+			MethodName: "UpdateDelegation",
+			Handler:    _IAMService_UpdateDelegation_Handler,
+		},
+		{
+			MethodName: "RevokeDelegation",
+			Handler:    _IAMService_RevokeDelegation_Handler,
 		},
 		{
 			MethodName: "PreviewBatchAssign",

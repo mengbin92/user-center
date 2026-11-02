@@ -79,6 +79,8 @@ message LoginReply {
   string challenge_expires_at = 3;
   User user = 4;
   string session_expires_at = 5;
+  bool password_change_required = 6;
+  bool mfa_enrollment_required = 7;
 }
 
 message CompleteMFARequest {

@@ -14,7 +14,9 @@ import {
   LogOut,
   Mail,
   Menu,
+  Plug,
   Settings2,
+  Share2,
   ShieldCheck,
   Users,
   X,
@@ -86,6 +88,13 @@ const GROUPS: NavGroup[] = [
         anyOf: ['iam.assignment.read'],
       },
       {
+        to: '/admin/iam/delegations',
+        label: '委派管理',
+        icon: Share2,
+        menuKey: 'admin/iam/delegations',
+        anyOf: ['iam.delegation.read'],
+      },
+      {
         to: '/admin/iam/constraints',
         label: '职责分离',
         icon: Columns3,
@@ -126,6 +135,13 @@ const GROUPS: NavGroup[] = [
   {
     label: '系统设置',
     items: [
+      {
+        to: '/admin/integrations',
+        label: '接入服务',
+        icon: Plug,
+        menuKey: 'admin/integrations',
+        anyOf: ['integration.client.read', 'integration.delivery.read'],
+      },
       {
         to: '/admin/settings/auth',
         label: '认证配置',

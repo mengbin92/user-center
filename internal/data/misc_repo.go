@@ -103,19 +103,108 @@ func (r *outboxRepo) Append(ctx context.Context, tx biz.Tx, e *biz.Event) error 
 	return r.d.dbOr(tx).WithContext(ctx).Create(p).Error
 }
 
-func (r *outboxRepo) ListPendingDeliveries(ctx context.Context, limit int) ([]*biz.OutboxDelivery, error) {
-	var rows []deliveryPO
-	err := r.d.dbOr(nil).WithContext(ctx).
-		Where("status IN ? AND next_retry_at <= ?", []string{"pending", "retrying"}, time.Now().UTC()).
-		Order("next_retry_at").Limit(limit).Find(&rows).Error
-	out := make([]*biz.OutboxDelivery, 0, len(rows))
+func (r *outboxRepo) ListRecentEvents(ctx context.Context, tx biz.Tx, limit int) ([]*biz.Event, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	var rows []outboxEventPO
+	if err := r.d.dbOr(tx).WithContext(ctx).Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*biz.Event, 0, len(rows))
 	for _, p := range rows {
-		out = append(out, &biz.OutboxDelivery{
-			EventID: p.EventID, SubscriberID: p.SubscriberID, Attempts: p.Attempts,
-			NextRetryAt: p.NextRetryAt, Status: p.Status, LastError: p.LastError,
+		out = append(out, &biz.Event{
+			EventID: p.EventID, AggregateType: p.AggregateType, AggregateID: p.AggregateID,
+			AggregateRevision: p.AggregateRevision, EventType: p.EventType,
+			SchemaVersion: p.SchemaVersion, Payload: p.Payload, OccurredAt: p.CreatedAt.UTC(),
 		})
 	}
-	return out, err
+	return out, nil
+}
+
+func (r *outboxRepo) EnsureDelivery(ctx context.Context, tx biz.Tx, eventID, subscriberID string, next time.Time) error {
+	return r.d.dbOr(tx).WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&deliveryPO{
+		EventID: eventID, SubscriberID: subscriberID, Status: "pending", NextRetryAt: next,
+	}).Error
+}
+
+func (r *outboxRepo) DueDeliveries(ctx context.Context, tx biz.Tx, now time.Time, limit int) ([]*biz.Delivery, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	type row struct {
+		EventID       string
+		SubscriberID  string
+		Status        string
+		Attempts      int
+		NextRetryAt   time.Time
+		LastError     string
+		EventType     string
+		AggregateType string
+		AggregateID   int64
+		SchemaVersion int
+		Payload       string
+		OccurredAt    time.Time
+		CallbackURL   string
+	}
+	var rows []row
+	err := r.d.dbOr(tx).WithContext(ctx).Table("event_deliveries AS d").
+		Select("d.event_id, d.subscriber_id, d.status, d.attempts, d.next_retry_at, d.last_error, e.event_type, e.aggregate_type, e.aggregate_id, e.schema_version, e.payload, e.created_at AS occurred_at, c.callback_url").
+		Joins("JOIN event_outbox AS e ON e.event_id = d.event_id").
+		Joins("JOIN integration_clients AS c ON c.client_id = d.subscriber_id AND c.status = 'active'").
+		Where("d.status IN ? AND d.next_retry_at <= ?", []string{"pending", "retrying"}, now).
+		Order("d.next_retry_at").Limit(limit).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*biz.Delivery, 0, len(rows))
+	for _, x := range rows {
+		out = append(out, &biz.Delivery{
+			EventID: x.EventID, EventType: x.EventType, SubscriberID: x.SubscriberID,
+			Status: x.Status, Attempts: x.Attempts, NextRetryAt: x.NextRetryAt.UTC(),
+			LastError: x.LastError, Payload: x.Payload, AggregateType: x.AggregateType,
+			AggregateID: x.AggregateID, SchemaVersion: x.SchemaVersion,
+			OccurredAt: x.OccurredAt.UTC(), CallbackURL: x.CallbackURL,
+		})
+	}
+	return out, nil
+}
+
+func (r *outboxRepo) ListDeliveries(ctx context.Context, tx biz.Tx, status string, offset, limit int) ([]*biz.Delivery, int64, error) {
+	db := r.d.dbOr(tx).WithContext(ctx).Model(&deliveryPO{})
+	if status != "" {
+		db = db.Where("status = ?", status)
+	}
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []deliveryPO
+	if err := db.Order("next_retry_at DESC").Offset(offset).Limit(limit).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	eventIDs := make([]string, 0, len(rows))
+	for _, p := range rows {
+		eventIDs = append(eventIDs, p.EventID)
+	}
+	types := map[string]string{}
+	if len(eventIDs) > 0 {
+		var events []outboxEventPO
+		if err := r.d.dbOr(tx).WithContext(ctx).Select("event_id, event_type").Where("event_id IN ?", eventIDs).Find(&events).Error; err != nil {
+			return nil, 0, err
+		}
+		for _, e := range events {
+			types[e.EventID] = e.EventType
+		}
+	}
+	out := make([]*biz.Delivery, 0, len(rows))
+	for _, p := range rows {
+		out = append(out, &biz.Delivery{
+			EventID: p.EventID, EventType: types[p.EventID], SubscriberID: p.SubscriberID,
+			Status: p.Status, Attempts: p.Attempts, NextRetryAt: p.NextRetryAt.UTC(), LastError: p.LastError,
+		})
+	}
+	return out, total, nil
 }
 
 func (r *outboxRepo) MarkDelivered(ctx context.Context, eventID, subscriberID string, at time.Time) error {
@@ -133,6 +222,19 @@ func (r *outboxRepo) MarkRetry(ctx context.Context, eventID, subscriberID string
 			"attempts": gorm.Expr("attempts + 1"),
 		}),
 	}).Create(&deliveryPO{EventID: eventID, SubscriberID: subscriberID, Status: "retrying", NextRetryAt: at, LastError: lastError, Attempts: 1}).Error
+}
+
+func (r *outboxRepo) RetryDelivery(ctx context.Context, tx biz.Tx, eventID, subscriberID string) error {
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&deliveryPO{}).
+		Where("event_id = ? AND subscriber_id = ?", eventID, subscriberID).
+		Updates(map[string]any{"status": "pending", "next_retry_at": time.Now().UTC(), "last_error": ""})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return biz.ErrResourceNotFound
+	}
+	return nil
 }
 
 type settingsRepo struct{ d *Data }

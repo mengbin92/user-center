@@ -49,6 +49,13 @@ const (
 	ErrorReason_LAST_LOGIN_METHOD         ErrorReason = 20
 	ErrorReason_ROOT_PROTECTED            ErrorReason = 21
 	ErrorReason_POLICY_CONFLICT           ErrorReason = 22
+	ErrorReason_PASSWORD_CHANGE_REQUIRED  ErrorReason = 23
+	ErrorReason_OAUTH_NOT_BOUND           ErrorReason = 24
+	ErrorReason_OAUTH_STATE_INVALID       ErrorReason = 25
+	ErrorReason_OAUTH_UNAVAILABLE         ErrorReason = 26
+	ErrorReason_DELEGATION_REQUIRED       ErrorReason = 27
+	ErrorReason_INTEGRATION_AUTH_FAILED   ErrorReason = 28
+	ErrorReason_OAUTH_ALREADY_BOUND       ErrorReason = 29
 )
 
 // Enum value maps for ErrorReason.
@@ -77,6 +84,13 @@ var (
 		20: "LAST_LOGIN_METHOD",
 		21: "ROOT_PROTECTED",
 		22: "POLICY_CONFLICT",
+		23: "PASSWORD_CHANGE_REQUIRED",
+		24: "OAUTH_NOT_BOUND",
+		25: "OAUTH_STATE_INVALID",
+		26: "OAUTH_UNAVAILABLE",
+		27: "DELEGATION_REQUIRED",
+		28: "INTEGRATION_AUTH_FAILED",
+		29: "OAUTH_ALREADY_BOUND",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":  0,
@@ -102,6 +116,13 @@ var (
 		"LAST_LOGIN_METHOD":         20,
 		"ROOT_PROTECTED":            21,
 		"POLICY_CONFLICT":           22,
+		"PASSWORD_CHANGE_REQUIRED":  23,
+		"OAUTH_NOT_BOUND":           24,
+		"OAUTH_STATE_INVALID":       25,
+		"OAUTH_UNAVAILABLE":         26,
+		"DELEGATION_REQUIRED":       27,
+		"INTEGRATION_AUTH_FAILED":   28,
+		"OAUTH_ALREADY_BOUND":       29,
 	}
 )
 
@@ -136,7 +157,7 @@ var File_api_usercenter_v1_error_reason_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"$api/usercenter/v1/error_reason.proto\x12\x11api.usercenter.v1*\xa3\x04\n" +
+	"$api/usercenter/v1/error_reason.proto\x12\x11api.usercenter.v1*\xd5\x05\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11VALIDATION_FAILED\x10\x01\x12\x15\n" +
@@ -162,7 +183,14 @@ const file_api_usercenter_v1_error_reason_proto_rawDesc = "" +
 	"\x13INVALID_CREDENTIALS\x10\x13\x12\x15\n" +
 	"\x11LAST_LOGIN_METHOD\x10\x14\x12\x12\n" +
 	"\x0eROOT_PROTECTED\x10\x15\x12\x13\n" +
-	"\x0fPOLICY_CONFLICT\x10\x16B<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
+	"\x0fPOLICY_CONFLICT\x10\x16\x12\x1c\n" +
+	"\x18PASSWORD_CHANGE_REQUIRED\x10\x17\x12\x13\n" +
+	"\x0fOAUTH_NOT_BOUND\x10\x18\x12\x17\n" +
+	"\x13OAUTH_STATE_INVALID\x10\x19\x12\x15\n" +
+	"\x11OAUTH_UNAVAILABLE\x10\x1a\x12\x17\n" +
+	"\x13DELEGATION_REQUIRED\x10\x1b\x12\x1b\n" +
+	"\x17INTEGRATION_AUTH_FAILED\x10\x1c\x12\x17\n" +
+	"\x13OAUTH_ALREADY_BOUND\x10\x1dB<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
 
 var (
 	file_api_usercenter_v1_error_reason_proto_rawDescOnce sync.Once

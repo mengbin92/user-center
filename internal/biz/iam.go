@@ -741,6 +741,9 @@ func (uc *IAMUsecase) CreateAssignment(ctx context.Context, actor ActorContext, 
 	if err := uc.checkRoleCapacity(ctx, nil, role); err != nil {
 		return nil, err
 	}
+	if err := uc.checkDelegation(ctx, actor, a.UserID, a.RoleID, "assign", a.Boundary); err != nil {
+		return nil, err
+	}
 	constraints, err := uc.IAM.ListConstraints(ctx, nil)
 	if err != nil {
 		return nil, ErrDependency
@@ -808,6 +811,11 @@ func (uc *IAMUsecase) checkRoleCapacity(ctx context.Context, tx Tx, role *Role) 
 func (uc *IAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContext, id int64, reason string, expectedPolicy uint64) (*Assignment, error) {
 	if err := uc.guard(ctx, actor, "iam.assignment.revoke", true); err != nil {
 		return nil, err
+	}
+	if a, err := uc.IAM.GetAssignment(ctx, nil, id); err == nil {
+		if err := uc.checkDelegation(ctx, actor, a.UserID, a.RoleID, "revoke", a.Boundary); err != nil {
+			return nil, err
+		}
 	}
 	var out *Assignment
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
@@ -889,6 +897,11 @@ func (uc *IAMUsecase) BatchAssign(ctx context.Context, actor ActorContext, userI
 	}
 	if len(preview.Failures) > 0 {
 		return nil, Validation(fmt.Sprintf("批量授权预检失败 %d 项，请先处理", len(preview.Failures)))
+	}
+	for _, uid := range preview.Eligible {
+		if err := uc.checkDelegation(ctx, actor, uid, roleID, "assign", boundary); err != nil {
+			return nil, err
+		}
 	}
 	var created []*Assignment
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
@@ -1264,3 +1277,185 @@ func (uc *IAMUsecase) Simulate(ctx context.Context, actor ActorContext, userID i
 }
 
 var _ = errors.Is
+
+func (uc *IAMUsecase) Assignments(ctx context.Context, actor ActorContext, filter AssignmentFilter) ([]*AssignmentItem, int64, error) {
+	if err := uc.guard(ctx, actor, "iam.assignment.read", false); err != nil {
+		return nil, 0, err
+	}
+	if filter.Limit <= 0 || filter.Limit > 100 {
+		filter.Limit = 20
+	}
+	return uc.IAM.ListAssignments(ctx, nil, filter)
+}
+
+func (uc *IAMUsecase) Delegation(ctx context.Context, actor ActorContext, id int64) (*Delegation, error) {
+	if err := uc.guard(ctx, actor, "iam.delegation.read", false); err != nil {
+		return nil, err
+	}
+	d, err := uc.IAM.GetDelegation(ctx, nil, id)
+	if err != nil {
+		return nil, ErrResourceNotFound
+	}
+	return d, nil
+}
+
+func (uc *IAMUsecase) Delegations(ctx context.Context, actor ActorContext, filter DelegationFilter) ([]*Delegation, error) {
+	if err := uc.guard(ctx, actor, "iam.delegation.read", false); err != nil {
+		return nil, err
+	}
+	return uc.IAM.ListDelegations(ctx, nil, filter)
+}
+
+func validateDelegation(d *Delegation) error {
+	if d.ManagerRoleID <= 0 || d.TargetRoleID <= 0 {
+		return Validation("管理角色和目标角色不能为空")
+	}
+	if d.ManagerRoleID == d.TargetRoleID {
+		return Validation("管理角色不能委派给自身")
+	}
+	if d.TargetKind == "" {
+		d.TargetKind = "role"
+	}
+	if d.TargetKind != "role" {
+		return Validation("V1 只支持角色委派")
+	}
+	if len(d.Actions) == 0 {
+		return Validation("委派动作不能为空")
+	}
+	for _, a := range d.Actions {
+		if a != "assign" && a != "revoke" {
+			return Validation("委派动作只能是 assign 或 revoke")
+		}
+	}
+	if d.TargetUserScope.Empty() {
+		d.TargetUserScope = authorization.Scope{All: true}
+	}
+	if err := d.TargetUserScope.Validate([]authorization.ScopeKind{authorization.All, authorization.Self, authorization.Users}); err != nil {
+		return Validation("委派目标用户范围不合法")
+	}
+	if d.StartsAt.IsZero() {
+		d.StartsAt = time.Now().UTC()
+	}
+	if d.ExpiresAt != nil && !d.StartsAt.Before(*d.ExpiresAt) {
+		return Validation("委派有效期不合法")
+	}
+	return nil
+}
+
+func (uc *IAMUsecase) CreateDelegation(ctx context.Context, actor ActorContext, d *Delegation, reason string, expectedPolicy uint64) (*Delegation, error) {
+	if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
+		return nil, err
+	}
+	if err := validateDelegation(d); err != nil {
+		return nil, err
+	}
+	roles, err := uc.IAM.ListAllRolesWithGrants(ctx, nil)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	byID := map[int64]*Role{}
+	perms, err := uc.IAM.ListPermissions(ctx, nil, PermissionFilter{})
+	if err != nil {
+		return nil, ErrDependency
+	}
+	permByCode := map[string]*Permission{}
+	for _, p := range perms {
+		permByCode[p.Code] = p
+	}
+	for _, r := range roles {
+		byID[r.ID] = r
+	}
+	manager, target := byID[d.ManagerRoleID], byID[d.TargetRoleID]
+	if manager == nil || manager.Status != RoleStatusActive {
+		return nil, Validation("管理角色不可用")
+	}
+	if target == nil || target.Status != RoleStatusActive {
+		return nil, Validation("目标角色不可用")
+	}
+	for _, c := range d.GrantCeiling {
+		p := permByCode[c.Operation]
+		if p == nil {
+			return nil, Validation("委派上限包含未知权限: " + c.Operation)
+		}
+		if err := c.Scope.Validate(p.ScopeKinds()); err != nil {
+			return nil, Validation("委派上限 scope 不合法: " + c.Operation)
+		}
+	}
+	d.CreatedBy = actor.User.ID
+	var created *Delegation
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		c, err := uc.IAM.CreateDelegation(ctx, tx, d)
+		if err != nil {
+			return err
+		}
+		created = c
+		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+			return err
+		}
+		return uc.audit(ctx, tx, actor, "iam.delegation.create", itoa(c.ID), "{}", "{}", "{}", reason, "success")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+func (uc *IAMUsecase) UpdateDelegation(ctx context.Context, actor ActorContext, d *Delegation, expected uint64, reason string) (*Delegation, error) {
+	if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
+		return nil, err
+	}
+	if err := validateDelegation(d); err != nil {
+		return nil, err
+	}
+	var updated *Delegation
+	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		u, err := uc.IAM.UpdateDelegation(ctx, tx, d, expected)
+		if err != nil {
+			return err
+		}
+		updated = u
+		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+			return err
+		}
+		return uc.audit(ctx, tx, actor, "iam.delegation.update", itoa(d.ID), "{}", "{}", "{}", reason, "success")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
+func (uc *IAMUsecase) RevokeDelegation(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string) (*Delegation, error) {
+	if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
+		return nil, err
+	}
+	var out *Delegation
+	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		d, err := uc.IAM.GetDelegation(ctx, tx, id)
+		if err != nil {
+			return ErrResourceNotFound
+		}
+		if d.RevokedAt != nil {
+			return Validation("委派已撤销")
+		}
+		if err := uc.IAM.RevokeDelegation(ctx, tx, id, expected, actor.User.ID); err != nil {
+			return err
+		}
+		d.RevokedAt = ptrTime(uc.Clock.Now().UTC())
+		d.Revision = expected + 1
+		out = d
+		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+			return err
+		}
+		return uc.audit(ctx, tx, actor, "iam.delegation.revoke", itoa(id), "{}", "{}", "{}", reason, "success")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func ptrTime(t time.Time) *time.Time { return &t }

@@ -70,6 +70,38 @@
 4. API Key 校验：原系统本地校验 Key 状态 + 调用 `ValidateSubject` 组合用户启停与身份版本。
 5. 用户中心事件（`user.status.changed`、`session.revoked` 等）用于投影与缓存失效；即时拒绝仍以 `ValidateSession` / `ValidateSubject` 为准。
 
-## 6. 尚未交付
+## 6. 离线导入工具
 
-`cmd/import-legacy` 与 `legacy_import_batches` 表仍是待交付项。在导入工具完成前，应按本文手工执行小批量导入并记录校验结果；不得跳过第 4 步直接切换。
+`cmd/import-legacy` 已交付，默认 dry-run：
+
+```bash
+go run ./cmd/import-legacy -config configs/config.local.yaml -file legacy.json
+go run ./cmd/import-legacy -config configs/config.local.yaml -file legacy.json -apply
+```
+
+输入格式：
+
+```json
+{
+  "source_commit": "4116899a",
+  "snapshot_position": "mysql-bin.000123:4567",
+  "users": [
+    {
+      "id": 42, "username": "legacy.user", "display_name": "Legacy",
+      "email": "legacy@example.com", "email_verified": true,
+      "status": "1", "password_hash": "$2a$...", "role_codes": ["member"]
+    }
+  ]
+}
+```
+
+行为：
+
+- `status` 支持 `1/2` 或 `enabled/disabled/archived`；
+- 保留用户数值 ID 与 bcrypt 摘要；不导入会话、API Key、余额、路由组；
+- 按 `role_codes` 建立 `legacy_candidate` 分配；
+- 冲突（重复 ID/用户名/邮箱、未知角色、非 bcrypt 摘要）在 dry-run 全部列出，存在冲突时不写入；
+- 成功后写 `legacy_import_batches`（源提交、位点、计数、指纹、终态）；
+- 不自动合并重复邮箱，不替用户改名。
+
+导入后仍需执行第 3 节第 4 步的校验与受限管理员范围重算。

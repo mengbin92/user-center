@@ -166,7 +166,13 @@ type IAMRepo interface {
 	ListRoleMembers(context.Context, Tx, int64) ([]RoleMember, error)
 	CountActiveAssignmentsForRole(context.Context, Tx, int64) (int64, error)
 	ListAllRolesWithGrants(context.Context, Tx) ([]*Role, error)
+	ListAssignments(context.Context, Tx, AssignmentFilter) ([]*AssignmentItem, int64, error)
 	ListConstraints(context.Context, Tx) ([]*Constraint, error)
+	ListDelegations(context.Context, Tx, DelegationFilter) ([]*Delegation, error)
+	GetDelegation(context.Context, Tx, int64) (*Delegation, error)
+	CreateDelegation(context.Context, Tx, *Delegation) (*Delegation, error)
+	UpdateDelegation(context.Context, Tx, *Delegation, uint64) (*Delegation, error)
+	RevokeDelegation(context.Context, Tx, int64, uint64, int64) error
 	GetConstraint(context.Context, Tx, int64) (*Constraint, error)
 	CreateConstraint(context.Context, Tx, *Constraint) (*Constraint, error)
 	UpdateConstraint(context.Context, Tx, *Constraint, uint64) (*Constraint, error)
@@ -183,16 +189,52 @@ type PermissionFilter struct {
 	Keyword  string
 }
 
+type DelegationFilter struct {
+	ManagerRoleID int64
+	TargetRoleID  int64
+	Status        string
+}
+
 type RoleFilter struct {
 	Status  string
 	Keyword string
 }
 
+type AssignmentFilter struct {
+	UserID int64
+	RoleID int64
+	Status string
+	Offset int
+	Limit  int
+}
+
+type AssignmentItem struct {
+	Assignment  *Assignment
+	Username    string
+	DisplayName string
+	RoleCode    string
+	RoleName    string
+}
+
 type OutboxRepo interface {
 	Append(context.Context, Tx, *Event) error
-	ListPendingDeliveries(context.Context, int) ([]*OutboxDelivery, error)
+	ListRecentEvents(context.Context, Tx, int) ([]*Event, error)
+	EnsureDelivery(context.Context, Tx, string, string, time.Time) error
+	DueDeliveries(context.Context, Tx, time.Time, int) ([]*Delivery, error)
+	ListDeliveries(context.Context, Tx, string, int, int) ([]*Delivery, int64, error)
+	RetryDelivery(context.Context, Tx, string, string) error
 	MarkDelivered(context.Context, string, string, time.Time) error
 	MarkRetry(context.Context, string, string, time.Time, string) error
+}
+
+type IntegrationClientRepo interface {
+	List(context.Context, Tx) ([]*IntegrationClient, error)
+	Get(context.Context, Tx, int64) (*IntegrationClient, error)
+	GetByClientID(context.Context, Tx, string) (*IntegrationClient, error)
+	Create(context.Context, Tx, *IntegrationClient) (*IntegrationClient, error)
+	Update(context.Context, Tx, *IntegrationClient, uint64) (*IntegrationClient, error)
+	RotateCredential(context.Context, Tx, int64, string, int) (*IntegrationClient, error)
+	Disable(context.Context, Tx, int64) error
 }
 
 type SettingsRepo interface {

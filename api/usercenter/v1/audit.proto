@@ -46,4 +46,5 @@ message ExportAuditEventsRequest {
   string to = 4;
   repeated string fields = 5;
   string reason = 6;
+  string target = 7;
 }

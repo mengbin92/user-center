@@ -29,6 +29,8 @@ const (
 	AdminUserService_ArchiveUser_FullMethodName                 = "/api.usercenter.v1.AdminUserService/ArchiveUser"
 	AdminUserService_CreatePasswordResetRequest_FullMethodName  = "/api.usercenter.v1.AdminUserService/CreatePasswordResetRequest"
 	AdminUserService_ResetMFA_FullMethodName                    = "/api.usercenter.v1.AdminUserService/ResetMFA"
+	AdminUserService_CreateEmailChangeChallenge_FullMethodName  = "/api.usercenter.v1.AdminUserService/CreateEmailChangeChallenge"
+	AdminUserService_ConfirmEmailChange_FullMethodName          = "/api.usercenter.v1.AdminUserService/ConfirmEmailChange"
 	AdminUserService_ListUserSessions_FullMethodName            = "/api.usercenter.v1.AdminUserService/ListUserSessions"
 	AdminUserService_RevokeUserSessions_FullMethodName          = "/api.usercenter.v1.AdminUserService/RevokeUserSessions"
 	AdminUserService_GetUserEffectivePermissions_FullMethodName = "/api.usercenter.v1.AdminUserService/GetUserEffectivePermissions"
@@ -52,6 +54,8 @@ type AdminUserServiceClient interface {
 	ArchiveUser(ctx context.Context, in *ArchiveUserRequest, opts ...grpc.CallOption) (*User, error)
 	CreatePasswordResetRequest(ctx context.Context, in *CreatePasswordResetTaskRequest, opts ...grpc.CallOption) (*PasswordResetTaskReply, error)
 	ResetMFA(ctx context.Context, in *ResetMFARequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CreateEmailChangeChallenge(ctx context.Context, in *CreateEmailChangeChallengeRequest, opts ...grpc.CallOption) (*ChallengeReply, error)
+	ConfirmEmailChange(ctx context.Context, in *ConfirmEmailChangeRequest, opts ...grpc.CallOption) (*User, error)
 	ListUserSessions(ctx context.Context, in *ListUserSessionsRequest, opts ...grpc.CallOption) (*SessionsReply, error)
 	RevokeUserSessions(ctx context.Context, in *RevokeUserSessionsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetUserEffectivePermissions(ctx context.Context, in *GetUserEffectivePermissionsRequest, opts ...grpc.CallOption) (*EffectivePermissionsReply, error)
@@ -158,6 +162,26 @@ func (c *adminUserServiceClient) ResetMFA(ctx context.Context, in *ResetMFAReque
 	return out, nil
 }
 
+func (c *adminUserServiceClient) CreateEmailChangeChallenge(ctx context.Context, in *CreateEmailChangeChallengeRequest, opts ...grpc.CallOption) (*ChallengeReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChallengeReply)
+	err := c.cc.Invoke(ctx, AdminUserService_CreateEmailChangeChallenge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminUserServiceClient) ConfirmEmailChange(ctx context.Context, in *ConfirmEmailChangeRequest, opts ...grpc.CallOption) (*User, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(User)
+	err := c.cc.Invoke(ctx, AdminUserService_ConfirmEmailChange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *adminUserServiceClient) ListUserSessions(ctx context.Context, in *ListUserSessionsRequest, opts ...grpc.CallOption) (*SessionsReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SessionsReply)
@@ -233,6 +257,8 @@ type AdminUserServiceServer interface {
 	ArchiveUser(context.Context, *ArchiveUserRequest) (*User, error)
 	CreatePasswordResetRequest(context.Context, *CreatePasswordResetTaskRequest) (*PasswordResetTaskReply, error)
 	ResetMFA(context.Context, *ResetMFARequest) (*emptypb.Empty, error)
+	CreateEmailChangeChallenge(context.Context, *CreateEmailChangeChallengeRequest) (*ChallengeReply, error)
+	ConfirmEmailChange(context.Context, *ConfirmEmailChangeRequest) (*User, error)
 	ListUserSessions(context.Context, *ListUserSessionsRequest) (*SessionsReply, error)
 	RevokeUserSessions(context.Context, *RevokeUserSessionsRequest) (*emptypb.Empty, error)
 	GetUserEffectivePermissions(context.Context, *GetUserEffectivePermissionsRequest) (*EffectivePermissionsReply, error)
@@ -275,6 +301,12 @@ func (UnimplementedAdminUserServiceServer) CreatePasswordResetRequest(context.Co
 }
 func (UnimplementedAdminUserServiceServer) ResetMFA(context.Context, *ResetMFARequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResetMFA not implemented")
+}
+func (UnimplementedAdminUserServiceServer) CreateEmailChangeChallenge(context.Context, *CreateEmailChangeChallengeRequest) (*ChallengeReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateEmailChangeChallenge not implemented")
+}
+func (UnimplementedAdminUserServiceServer) ConfirmEmailChange(context.Context, *ConfirmEmailChangeRequest) (*User, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmEmailChange not implemented")
 }
 func (UnimplementedAdminUserServiceServer) ListUserSessions(context.Context, *ListUserSessionsRequest) (*SessionsReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListUserSessions not implemented")
@@ -477,6 +509,42 @@ func _AdminUserService_ResetMFA_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminUserService_CreateEmailChangeChallenge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateEmailChangeChallengeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminUserServiceServer).CreateEmailChangeChallenge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminUserService_CreateEmailChangeChallenge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminUserServiceServer).CreateEmailChangeChallenge(ctx, req.(*CreateEmailChangeChallengeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminUserService_ConfirmEmailChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfirmEmailChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminUserServiceServer).ConfirmEmailChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminUserService_ConfirmEmailChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminUserServiceServer).ConfirmEmailChange(ctx, req.(*ConfirmEmailChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AdminUserService_ListUserSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListUserSessionsRequest)
 	if err := dec(in); err != nil {
@@ -627,6 +695,14 @@ var AdminUserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResetMFA",
 			Handler:    _AdminUserService_ResetMFA_Handler,
+		},
+		{
+			MethodName: "CreateEmailChangeChallenge",
+			Handler:    _AdminUserService_CreateEmailChangeChallenge_Handler,
+		},
+		{
+			MethodName: "ConfirmEmailChange",
+			Handler:    _AdminUserService_ConfirmEmailChange_Handler,
 		},
 		{
 			MethodName: "ListUserSessions",

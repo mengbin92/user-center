@@ -3,9 +3,9 @@ package data
 import (
 	"context"
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mengbin92/user-center/pkg/jsonx"
 	"mime"
 	"net/smtp"
 	"strings"
@@ -37,7 +37,7 @@ func NewChallengeStore(d *Data) biz.ChallengeStore {
 func challengeKey(purpose, id string) string { return "uc:challenge:" + purpose + ":" + id }
 
 func (s *challengeStore) Put(ctx context.Context, c biz.Challenge) error {
-	raw, err := json.Marshal(c)
+	raw, err := jsonx.Marshal(c)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (s *challengeStore) load(ctx context.Context, purpose, id string) (biz.Chal
 		return biz.Challenge{}, nil, biz.ErrDependency
 	}
 	var c biz.Challenge
-	if err := json.Unmarshal(raw, &c); err != nil {
+	if err := jsonx.Unmarshal(raw, &c); err != nil {
 		return biz.Challenge{}, nil, biz.ErrChallengeInvalid
 	}
 	if time.Now().UTC().After(c.ExpiresAt) {

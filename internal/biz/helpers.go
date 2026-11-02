@@ -19,12 +19,13 @@ import (
 
 // ActorContext is the verified transport identity handed to every usecase.
 type ActorContext struct {
-	User      *User
-	Session   *Session
-	Actor     authorization.Actor
-	RequestID string
-	IP        string
-	UserAgent string
+	User                   *User
+	Session                *Session
+	Actor                  authorization.Actor
+	RequestID              string
+	IP                     string
+	UserAgent              string
+	PasswordChangeRequired bool
 }
 
 type actorKey struct{}

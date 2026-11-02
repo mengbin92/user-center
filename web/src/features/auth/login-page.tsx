@@ -8,10 +8,12 @@ import { Button } from '../../components/button'
 import { InlineAlert } from '../../components/card'
 import { Checkbox, Field, Input } from '../../components/input'
 import { AuthShell } from './auth-shell'
+import { ProviderButtons } from './provider-buttons'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { errorMessage, isApiError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
+import { oauthErrorMessage } from '../../lib/oauth'
 import { safeNext } from '../../lib/paths'
 
 function describeAuthError(error: unknown): string {
@@ -39,12 +41,15 @@ export function LoginPage() {
   const { status, hasAdmin, signIn } = useAuth()
   const [searchParams] = useSearchParams()
   const next = safeNext(searchParams.get('next'))
+  const oauthErrorParam = searchParams.get('oauth_error')
+  const oauthMfaChallenge = searchParams.get('mfa_challenge')
 
+  const [postLoginPath, setPostLoginPath] = useState<string | null>(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
-  const [phase, setPhase] = useState<'password' | 'mfa'>('password')
-  const [challengeId, setChallengeId] = useState('')
+  const [phase, setPhase] = useState<'password' | 'mfa'>(oauthMfaChallenge ? 'mfa' : 'password')
+  const [challengeId, setChallengeId] = useState(oauthMfaChallenge ?? '')
   const [challengeExpiresAt, setChallengeExpiresAt] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +63,22 @@ export function LoginPage() {
   })
 
   if (status === 'authenticated') {
-    return <Navigate to={next ?? (hasAdmin ? '/admin' : '/account')} replace />
+    // The backend redirects OAuth start failures to /login even for an
+    // authenticated bind request; forward them to the account security page.
+    if (oauthErrorParam) {
+      return (
+        <Navigate
+          to={`/account/security?oauth_error=${encodeURIComponent(oauthErrorParam)}`}
+          replace
+        />
+      )
+    }
+    return (
+      <Navigate
+        to={postLoginPath ?? next ?? (hasAdmin ? '/admin' : '/account')}
+        replace
+      />
+    )
   }
 
   const submitPassword = async (event: FormEvent<HTMLFormElement>) => {
@@ -79,6 +99,9 @@ export function LoginPage() {
         setPhase('mfa')
         return
       }
+      if (reply.password_change_required) {
+        setPostLoginPath('/account/security?password_change_required=1')
+      }
       await signIn()
     } catch (loginError) {
       setError(describeAuthError(loginError))
@@ -97,7 +120,13 @@ export function LoginPage() {
     setBusy(true)
     setError(null)
     try {
-      await api.auth.completeMfa({ challenge_id: challengeId, code: code.trim() })
+      const reply = await api.auth.completeMfa({
+        challenge_id: challengeId,
+        code: code.trim(),
+      })
+      if (reply.password_change_required) {
+        setPostLoginPath('/account/security?password_change_required=1')
+      }
       await signIn()
     } catch (mfaError) {
       setError(describeAuthError(mfaError))
@@ -184,6 +213,12 @@ export function LoginPage() {
             </Link>
           </div>
 
+          {oauthErrorParam ? (
+            <InlineAlert tone="danger" title="第三方登录失败">
+              {oauthErrorMessage(oauthErrorParam)}
+            </InlineAlert>
+          ) : null}
+
           {error ? (
             <InlineAlert tone="danger" title="登录失败">
               {error}
@@ -207,19 +242,9 @@ export function LoginPage() {
                 第三方身份提供方
                 <span className="h-px flex-1 bg-slate-100" />
               </div>
-              <div className="flex flex-wrap gap-2">
-                {contextQuery.data.providers.map((provider) => (
-                  <Link
-                    key={provider}
-                    to={`/auth/callback/${encodeURIComponent(provider)}`}
-                    className="flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-[11px] font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    使用 {provider} 登录
-                  </Link>
-                ))}
-              </div>
+              <ProviderButtons providers={contextQuery.data.providers} />
               <p className="text-center text-[10px] text-slate-400">
-                第三方回调为占位页，接入配置完成后生效
+                将跳转到身份提供方完成授权，回调由服务端校验状态。
               </p>
             </div>
           ) : null}

@@ -44,11 +44,16 @@ func (uc *SessionUsecase) ValidateSession(ctx context.Context, raw string) (Acto
 	if userRoles, rerr := uc.Users.RolesForUser(ctx, nil, user.ID); rerr == nil {
 		user.Roles = userRoles
 	}
+	passwordChangeRequired := false
+	if cred, cerr := uc.Credentials.Get(ctx, nil, user.ID); cerr == nil {
+		passwordChangeRequired = cred.MustChangePassword
+	}
 	idle := uc.IdleTimeout
 	_ = uc.Sessions.Touch(ctx, nil, session.ID, now, now.Add(idle))
 	return ActorContext{
-		User:    user,
-		Session: session,
+		User:                   user,
+		Session:                session,
+		PasswordChangeRequired: passwordChangeRequired,
 		Actor: authorization.Actor{
 			UserID:    user.ID,
 			SessionID: session.ID,

@@ -52,6 +52,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/event-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IntegrationAdminService_ListEventDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/event-deliveries/{event_id}/subscribers/{subscriber_id}:retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["IntegrationAdminService_RetryEventDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/exports": {
         parameters: {
             query?: never;
@@ -91,7 +123,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["IAMService_ListAssignments"];
         put?: never;
         post: operations["IAMService_CreateAssignment"];
         delete?: never;
@@ -210,6 +242,54 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["IAMService_UpdateConstraint"];
+        trace?: never;
+    };
+    "/api/v1/admin/iam/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IAMService_ListDelegations"];
+        put?: never;
+        post: operations["IAMService_CreateDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/iam/delegations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["IAMService_UpdateDelegation"];
+        trace?: never;
+    };
+    "/api/v1/admin/iam/delegations/{id}:revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["IAMService_RevokeDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/iam/menus": {
@@ -500,6 +580,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/integration-clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IntegrationAdminService_ListIntegrationClients"];
+        put?: never;
+        post: operations["IntegrationAdminService_CreateIntegrationClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/integration-clients/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["IntegrationAdminService_UpdateIntegrationClient"];
+        trace?: never;
+    };
+    "/api/v1/admin/integration-clients/{id}:disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["IntegrationAdminService_DisableIntegrationClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/integration-clients/{id}:rotate-credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["IntegrationAdminService_RotateIntegrationClientCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/overview": {
         parameters: {
             query?: never;
@@ -590,6 +734,38 @@ export interface paths {
         get: operations["AdminUserService_GetUserEffectivePermissions"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}/email-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminUserService_CreateEmailChangeChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}/email-changes:confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminUserService_ConfirmEmailChange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1176,6 +1352,25 @@ export interface components {
             revision?: string;
             assigned_by?: string;
         };
+        "api.usercenter.v1.AssignmentItem": {
+            id?: string;
+            user_id?: string;
+            username?: string;
+            display_name?: string;
+            role_id?: string;
+            role_code?: string;
+            role_name?: string;
+            boundary?: components["schemas"]["api.usercenter.v1.Scope"];
+            starts_at?: string;
+            expires_at?: string;
+            revoked?: boolean;
+            origin?: string;
+            revision?: string;
+        };
+        "api.usercenter.v1.AssignmentListReply": {
+            items?: components["schemas"]["api.usercenter.v1.AssignmentItem"][];
+            meta?: components["schemas"]["api.usercenter.v1.ListMeta"];
+        };
         "api.usercenter.v1.AssignmentsReply": {
             items?: components["schemas"]["api.usercenter.v1.Assignment"][];
         };
@@ -1260,6 +1455,12 @@ export interface components {
             challenge_id?: string;
             code?: string;
         };
+        "api.usercenter.v1.ConfirmEmailChangeRequest": {
+            id?: string;
+            challenge_id?: string;
+            code?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.ConfirmEmailRequest": {
             challenge_id?: string;
             code?: string;
@@ -1303,10 +1504,37 @@ export interface components {
             reason?: string;
             expected_policy_revision?: string;
         };
+        "api.usercenter.v1.CreateDelegationRequest": {
+            manager_role_id?: string;
+            target_role_id?: string;
+            target_kind?: string;
+            actions?: string[];
+            target_user_scope?: components["schemas"]["api.usercenter.v1.Scope"];
+            grant_ceiling?: components["schemas"]["api.usercenter.v1.DelegationCeiling"][];
+            can_redelegate?: boolean;
+            starts_at?: string;
+            expires_at?: string;
+            reason?: string;
+            expected_policy_revision?: string;
+        };
         "api.usercenter.v1.CreateEmailChallengeRequest": {
             new_email?: string;
             current_password?: string;
             code?: string;
+        };
+        "api.usercenter.v1.CreateEmailChangeChallengeRequest": {
+            id?: string;
+            new_email?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.CreateIntegrationClientRequest": {
+            code?: string;
+            service_owner?: string;
+            allowed_methods?: string[];
+            event_subscriptions?: string[];
+            callback_url?: string;
+            expires_at?: string;
+            reason?: string;
         };
         "api.usercenter.v1.CreateMenuItemRequest": {
             parent_id?: string;
@@ -1362,6 +1590,33 @@ export interface components {
             initial_password?: string;
             reason?: string;
         };
+        "api.usercenter.v1.Delegation": {
+            id?: string;
+            manager_role_id?: string;
+            target_role_id?: string;
+            target_kind?: string;
+            actions?: string[];
+            target_user_scope?: components["schemas"]["api.usercenter.v1.Scope"];
+            grant_ceiling?: components["schemas"]["api.usercenter.v1.DelegationCeiling"][];
+            can_redelegate?: boolean;
+            starts_at?: string;
+            expires_at?: string;
+            revision?: string;
+            created_by?: string;
+            revoked?: boolean;
+            revoked_at?: string;
+        };
+        "api.usercenter.v1.DelegationCeiling": {
+            operation?: string;
+            scope?: components["schemas"]["api.usercenter.v1.Scope"];
+        };
+        "api.usercenter.v1.DelegationsReply": {
+            items?: components["schemas"]["api.usercenter.v1.Delegation"][];
+        };
+        "api.usercenter.v1.DisableIntegrationClientRequest": {
+            id?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.DisableMFARequest": {
             current_password?: string;
             code?: string;
@@ -1391,6 +1646,20 @@ export interface components {
             password_configured?: boolean;
             revision?: string;
         };
+        "api.usercenter.v1.EventDeliveriesReply": {
+            items?: components["schemas"]["api.usercenter.v1.EventDelivery"][];
+            meta?: components["schemas"]["api.usercenter.v1.ListMeta"];
+        };
+        "api.usercenter.v1.EventDelivery": {
+            event_id?: string;
+            event_type?: string;
+            subscriber_id?: string;
+            status?: string;
+            /** Format: int32 */
+            attempts?: number;
+            next_retry_at?: string;
+            last_error?: string;
+        };
         "api.usercenter.v1.ExplainAuthorizationReply": {
             allowed?: boolean;
             reason?: string;
@@ -1412,6 +1681,7 @@ export interface components {
             to?: string;
             fields?: string[];
             reason?: string;
+            target?: string;
         };
         "api.usercenter.v1.ExportJob": {
             id?: string;
@@ -1428,6 +1698,8 @@ export interface components {
             status?: string;
             fields?: string[];
             reason?: string;
+            role_id?: string;
+            mfa_enabled?: string;
         };
         "api.usercenter.v1.ExportsReply": {
             items?: components["schemas"]["api.usercenter.v1.ExportJob"][];
@@ -1459,6 +1731,30 @@ export interface components {
             active?: boolean;
             expires_at?: string;
         };
+        "api.usercenter.v1.IntegrationClient": {
+            id?: string;
+            client_id?: string;
+            code?: string;
+            service_owner?: string;
+            /** @description active | disabled */
+            status?: string;
+            allowed_methods?: string[];
+            event_subscriptions?: string[];
+            callback_url?: string;
+            /** Format: int32 */
+            credential_version?: number;
+            expires_at?: string;
+            created_at?: string;
+            revision?: string;
+        };
+        "api.usercenter.v1.IntegrationClientCredentialReply": {
+            client?: components["schemas"]["api.usercenter.v1.IntegrationClient"];
+            /** @description Returned exactly once; only the digest is stored. */
+            credential?: string;
+        };
+        "api.usercenter.v1.IntegrationClientsReply": {
+            items?: components["schemas"]["api.usercenter.v1.IntegrationClient"][];
+        };
         "api.usercenter.v1.ListMeta": {
             next_page_token?: string;
             total_size?: string;
@@ -1470,6 +1766,8 @@ export interface components {
             challenge_expires_at?: string;
             user?: components["schemas"]["api.usercenter.v1.User"];
             session_expires_at?: string;
+            password_change_required?: boolean;
+            mfa_enrollment_required?: boolean;
         };
         "api.usercenter.v1.LoginRequest": {
             username?: string;
@@ -1610,10 +1908,20 @@ export interface components {
         "api.usercenter.v1.ResourcesReply": {
             items?: components["schemas"]["api.usercenter.v1.Resource"][];
         };
+        "api.usercenter.v1.RetryEventDeliveryRequest": {
+            event_id?: string;
+            subscriber_id?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.RevokeAssignmentRequest": {
             id?: string;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.RevokeDelegationRequest": {
+            id?: string;
+            expected_revision?: string;
+            reason?: string;
         };
         "api.usercenter.v1.RevokeOtherSessionsRequest": Record<string, never>;
         "api.usercenter.v1.RevokeUserSessionsRequest": {
@@ -1663,6 +1971,10 @@ export interface components {
         "api.usercenter.v1.RolesReply": {
             items?: components["schemas"]["api.usercenter.v1.Role"][];
         };
+        "api.usercenter.v1.RotateIntegrationClientCredentialRequest": {
+            id?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.RotateRecoveryCodesRequest": {
             current_password?: string;
             code?: string;
@@ -1695,6 +2007,7 @@ export interface components {
             step_up_verified?: boolean;
             step_up_expires_at?: string;
             mfa_required?: boolean;
+            password_change_required?: boolean;
         };
         "api.usercenter.v1.SessionInfo": {
             id?: string;
@@ -1790,6 +2103,17 @@ export interface components {
             expected_revision?: string;
             reason?: string;
         };
+        "api.usercenter.v1.UpdateDelegationRequest": {
+            id?: string;
+            actions?: string[];
+            target_user_scope?: components["schemas"]["api.usercenter.v1.Scope"];
+            grant_ceiling?: components["schemas"]["api.usercenter.v1.DelegationCeiling"][];
+            can_redelegate?: boolean;
+            starts_at?: string;
+            expires_at?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.UpdateEmailSettingsRequest": {
             driver?: string;
             from?: string;
@@ -1800,6 +2124,14 @@ export interface components {
             /** @description Write-only. Empty keeps the stored secret. */
             smtp_password?: string;
             update_mask?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.UpdateIntegrationClientRequest": {
+            id?: string;
+            allowed_methods?: string[];
+            event_subscriptions?: string[];
+            callback_url?: string;
             expected_revision?: string;
             reason?: string;
         };
@@ -1963,6 +2295,57 @@ export interface operations {
             };
         };
     };
+    IntegrationAdminService_ListEventDeliveries: {
+        parameters: {
+            query?: {
+                status?: string;
+                page_size?: number;
+                page_token?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.EventDeliveriesReply"];
+                };
+            };
+        };
+    };
+    IntegrationAdminService_RetryEventDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+                subscriber_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.RetryEventDeliveryRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.EventDelivery"];
+                };
+            };
+        };
+    };
     AdminUserService_ListExports: {
         parameters: {
             query?: {
@@ -2004,6 +2387,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.ExportJob"];
+                };
+            };
+        };
+    };
+    IAMService_ListAssignments: {
+        parameters: {
+            query?: {
+                user_id?: string;
+                role_id?: string;
+                status?: string;
+                page_size?: number;
+                page_token?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.AssignmentListReply"];
                 };
             };
         };
@@ -2243,6 +2652,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.Constraint"];
+                };
+            };
+        };
+    };
+    IAMService_ListDelegations: {
+        parameters: {
+            query?: {
+                manager_role_id?: string;
+                target_role_id?: string;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DelegationsReply"];
+                };
+            };
+        };
+    };
+    IAMService_CreateDelegation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateDelegationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Delegation"];
+                };
+            };
+        };
+    };
+    IAMService_UpdateDelegation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateDelegationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Delegation"];
+                };
+            };
+        };
+    };
+    IAMService_RevokeDelegation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.RevokeDelegationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Delegation"];
                 };
             };
         };
@@ -2850,6 +3359,128 @@ export interface operations {
             };
         };
     };
+    IntegrationAdminService_ListIntegrationClients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.IntegrationClientsReply"];
+                };
+            };
+        };
+    };
+    IntegrationAdminService_CreateIntegrationClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateIntegrationClientRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.IntegrationClientCredentialReply"];
+                };
+            };
+        };
+    };
+    IntegrationAdminService_UpdateIntegrationClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateIntegrationClientRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.IntegrationClient"];
+                };
+            };
+        };
+    };
+    IntegrationAdminService_DisableIntegrationClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.DisableIntegrationClientRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.IntegrationClient"];
+                };
+            };
+        };
+    };
+    IntegrationAdminService_RotateIntegrationClientCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.RotateIntegrationClientCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.IntegrationClientCredentialReply"];
+                };
+            };
+        };
+    };
     AdminUserService_GetOverview: {
         parameters: {
             query?: never;
@@ -3076,6 +3707,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.EffectivePermissionsReply"];
+                };
+            };
+        };
+    };
+    AdminUserService_CreateEmailChangeChallenge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateEmailChangeChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.ChallengeReply"];
+                };
+            };
+        };
+    };
+    AdminUserService_ConfirmEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.ConfirmEmailChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.User"];
                 };
             };
         };

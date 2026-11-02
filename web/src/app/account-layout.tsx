@@ -9,11 +9,13 @@ import {
   ShieldCheck,
   UserRound,
 } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useLocation } from 'react-router'
 
 import { cn } from '../lib/cn'
 import { useAuth } from '../lib/auth'
+import { useSecurityStatus } from '../lib/security'
 import { Button } from '../components/button'
+import { PasswordChangeNotice } from '../features/account/password-change-notice'
 
 type NavItem = {
   to: string
@@ -53,6 +55,12 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AccountLayout() {
   const { user, menuKeys, hasAdmin, signOut } = useAuth()
+  const location = useLocation()
+  const security = useSecurityStatus()
+  const passwordChangeRequired =
+    security.data?.password_change_required === true
+  const showPasswordNotice =
+    passwordChangeRequired && location.pathname !== '/account/security'
 
   const items = NAV_ITEMS.filter((item) => menuKeys.has(item.menuKey))
 
@@ -94,7 +102,7 @@ export function AccountLayout() {
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {hasAdmin ? (
+            {hasAdmin && !passwordChangeRequired ? (
               <NavLink
                 to="/admin"
                 className="hidden items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:flex"
@@ -142,7 +150,7 @@ export function AccountLayout() {
                 {item.label}
               </NavLink>
             ))}
-            {hasAdmin ? (
+            {hasAdmin && !passwordChangeRequired ? (
               <NavLink
                 to="/admin"
                 className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-slate-600"
@@ -156,6 +164,11 @@ export function AccountLayout() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-6">
+        {showPasswordNotice ? (
+          <div className="mb-4">
+            <PasswordChangeNotice required showLink />
+          </div>
+        ) : null}
         <Outlet />
       </main>
 

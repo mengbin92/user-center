@@ -22,8 +22,10 @@ import { SessionsPage } from '../features/account/sessions-page'
 import { AdminAssignmentsPage } from '../features/admin/assignments-page'
 import { AdminAuditsPage } from '../features/admin/audits-page'
 import { AdminConstraintsPage } from '../features/admin/constraints-page'
+import { AdminDelegationsPage } from '../features/admin/delegations-page'
 import { AdminExplainPage } from '../features/admin/explain-page'
 import { AdminExportsPage } from '../features/admin/exports-page'
+import { AdminIntegrationsPage } from '../features/admin/integrations-page'
 import { AdminMenusPage } from '../features/admin/menus-page'
 import { AdminOverviewPage } from '../features/admin/overview-page'
 import { AdminPermissionsPage } from '../features/admin/permissions-page'
@@ -121,6 +123,14 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="iam/delegations"
+            element={
+              <RequirePermission permission="iam.delegation.read">
+                <AdminDelegationsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
             path="iam/constraints"
             element={
               <RequirePermission permission="iam.constraint.read">
@@ -157,6 +167,16 @@ export function AppRoutes() {
             element={
               <RequirePermission anyOf={['identity.user.export', 'audit.export']}>
                 <AdminExportsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="integrations"
+            element={
+              <RequirePermission
+                anyOf={['integration.client.read', 'integration.delivery.read']}
+              >
+                <AdminIntegrationsPage />
               </RequirePermission>
             }
           />

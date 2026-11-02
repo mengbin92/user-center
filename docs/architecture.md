@@ -20,8 +20,10 @@
 | `cmd/migrate` | MySQL 版本化 DDL；SQLite 开发 AutoMigrate；权限目录种子 |
 | `cmd/admin-rescue` | 离线 root 创建/凭据恢复，必须拥有数据库与主机权限 |
 | MySQL | 权威身份、IAM、审计、Outbox；账号隔离，运行账号无建表权限（生产建议） |
-| Redis | 注册/重置/换绑验证码、登录限流、Step-up 证明；不可用时退化为进程内存储（见安全文档） |
-| 邮件适配器 | `console`（开发）或 SMTP；不依赖原 `notify-worker` |
+| Redis | 注册/重置/换绑验证码、登录限流、Step-up 证明、OAuth state；不可用时退化为进程内存储（见安全文档） |
+| 邮件适配器 | `console`（开发）或 SMTP；配置可在管理端热更新；不依赖原 `notify-worker` |
+| 第三方身份 | GitHub/Google OAuth2，服务端 code 交换；浏览器不接触 provider token |
+| Outbox worker | 随主进程启动，订阅客户端 Webhook 投递，HMAC 签名 + 指数退避 |
 | SPA | 用户门户 + 管理控制台，仅消费 `/api/v1` |
 
 ## 3. 分层契约
@@ -80,6 +82,13 @@ sequenceDiagram
 3. `authorization.Evaluate` 依次检查身份、操作已绑定/启用、约束、allow 覆盖、deny 命中、业务规则；
 4. 返回 `Decision{Allowed, Reason, Sources, ValidUntil}`；`Sources` 用于解释与审计。
 
+管理操作在决策通过后还会执行两项治理拦截：
+
+- `MFARequiredForAdmins` 为真时，root/admin 未绑定 TOTP 返回 `MFA_ENROLLMENT_REQUIRED`（认证与安全中心仍可用，以便完成绑定）；
+- `must_change_password` 账号由 HTTP 中间件拦截 `/api/v1/admin/*`，返回 `PASSWORD_CHANGE_REQUIRED`。
+
+受限角色（非 All scope）执行分配/撤销时，还必须命中一条有效委派：管理角色、目标角色、动作、目标用户范围与分配边界同时满足；root/All scope 不受此额外约束。
+
 列表查询把 allow Scope 的粗粒度并集下推到 SQL（`all` / `self` / `id IN (...)`），随后逐行执行 deny 与 self 判定。`total_size` 是粗过滤结果；受限管理员可能看到略大的总数，但不会看到范围外数据。该差异已记录在安全文档。
 
 ## 7. 事务与幂等
@@ -94,9 +103,17 @@ sequenceDiagram
 
 验证码使用“数据库完成记录唯一键 + Redis 校验后删除”的方式：重复提交被唯一键拒绝，数据库失败可在验证码删除前重试。
 
-## 8. Outbox
+## 8. Outbox 与接入客户端
 
-业务写在同一事务写 `event_outbox`；`event_deliveries` 保存每个订阅者的投递状态。当前实现持久化事件与投递骨架，Webhook 投递器与订阅管理属于 V1.1。事件载荷不含密码摘要、验证码、TOTP 秘钥、恢复码或第三方令牌。
+业务写在同一事务写 `event_outbox`。管理员创建的 `integration_clients` 保存允许的 gRPC 方法、事件订阅、回调 URL 与凭据摘要；凭据只在创建/轮换时返回一次。
+
+工作线程每 15 秒：
+
+1. 为订阅该事件类型的客户端创建 `event_deliveries`（唯一键去重，只投递客户端创建后的事件）；
+2. 拉取到期的 pending/retrying 投递，向回调 URL POST JSON；
+3. 成功写 `delivered`，失败按指数退避重写 `retrying` 与 `attempts`，最多保留历史，支持管理员重试。
+
+请求头 `X-UserCenter-Signature: sha256=...` 对原始 body 做 HMAC（`OUTBOX_SIGNING_SECRET`）。投递为至少一次，消费端按 `event_id` 去重。事件载荷不含密码摘要、验证码、TOTP 秘钥、恢复码或第三方令牌。
 
 ## 9. 可观测性
 

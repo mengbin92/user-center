@@ -10,6 +10,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +27,31 @@ import (
 	"github.com/mengbin92/user-center/pkg/totp"
 )
 
+type captureMail struct {
+	mu   sync.Mutex
+	msgs []capturedMail
+}
+
+type capturedMail struct {
+	to, subject, body string
+}
+
+func (m *captureMail) Send(_ context.Context, to, subject, body string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.msgs = append(m.msgs, capturedMail{to: to, subject: subject, body: body})
+	return nil
+}
+
+func (m *captureMail) last() capturedMail {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.msgs) == 0 {
+		return capturedMail{}
+	}
+	return m.msgs[len(m.msgs)-1]
+}
+
 type harness struct {
 	t      *testing.T
 	srv    http.Handler
@@ -34,6 +62,7 @@ type harness struct {
 	auth   *biz.AuthUsecase
 	svc    *biz.Services
 	artDir string
+	mail   *captureMail
 }
 
 func newHarness(t *testing.T) *harness {
@@ -51,6 +80,12 @@ func newHarness(t *testing.T) *harness {
 	t.Cleanup(cleanup)
 	require.NoError(t, d.AutoMigrate())
 	require.NoError(t, data.SeedCatalog(d.DB()))
+	settingsRepo := data.NewSettingsRepo(d)
+	baseSettings, err := settingsRepo.GetAuth(context.Background(), nil)
+	require.NoError(t, err)
+	baseSettings.MFARequiredForAdmins = false
+	_, err = settingsRepo.SaveAuth(context.Background(), nil, baseSettings, baseSettings.Revision)
+	require.NoError(t, err)
 
 	runtime := &biz.RuntimeConfig{
 		SessionTTL: time.Hour, IdleTimeout: time.Hour, StepUpTTL: 5 * time.Minute,
@@ -58,14 +93,17 @@ func newHarness(t *testing.T) *harness {
 		ActivationTTL: time.Hour, ArtifactDir: filepath.Join(dir, "artifacts"),
 		PublicBaseURL: "http://localhost:5173", CodeSecret: sec.SessionSecret,
 	}
+	mailer := &captureMail{}
 	svc := biz.NewServices(
 		data.NewUserRepo(d), data.NewCredentialRepo(d), data.NewExternalIdentityRepo(d),
 		data.NewMFARepo(d), data.NewSessionRepo(d), data.NewSecurityEventRepo(d),
 		data.NewFlowCompletionRepo(d), data.NewChallengeStore(d), data.NewRateLimiter(d),
-		data.NewStepUpStore(d), data.NewMailSender(d, zap.NewNop(), &conf.Mail{Driver: "console"}),
+		data.NewStepUpStore(d), mailer,
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
-		data.NewSettingsRepo(d), data.NewExportRepo(d), d,
-		data.Clock{}, data.IDs{}, data.NewSecretBox(sec), runtime,
+		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d), d,
+		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
+		map[string]biz.OAuthProvider{"mock": &mockOAuthProvider{}},
+		runtime,
 	)
 	users := biz.NewUserUsecase(svc)
 	auth := biz.NewAuthUsecase(svc)
@@ -75,6 +113,7 @@ func newHarness(t *testing.T) *harness {
 	audit := biz.NewAuditUsecase(svc)
 	settings := biz.NewSettingsUsecase(svc)
 	integration := biz.NewIntegrationUsecase(svc)
+	integrationAdmin := biz.NewIntegrationAdminUsecase(svc)
 
 	_, err = svc.BootstrapRoot(context.Background(), "root", "root@example.com", "ChangeMe-12345")
 	require.NoError(t, err)
@@ -90,12 +129,13 @@ func newHarness(t *testing.T) *harness {
 		service.NewIAMService(iam),
 		service.NewAuditService(audit),
 		service.NewSettingsService(settings),
+		service.NewIntegrationAdminService(integrationAdmin),
 		users,
 		server.ArtifactDir(runtime.ArtifactDir),
 	)
 	_ = integration
 	jar, _ := cookiejar.New(nil)
-	h := &harness{t: t, srv: hs.Server, jar: jar, users: users, iam: iam, auth: auth, svc: svc, artDir: runtime.ArtifactDir}
+	h := &harness{t: t, srv: hs.Server, jar: jar, users: users, iam: iam, auth: auth, svc: svc, artDir: runtime.ArtifactDir, mail: mailer}
 	h.refreshCSRF()
 	return h
 }
@@ -373,6 +413,10 @@ func TestIAMRoleAssignmentEnablesScopedAccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	require.Equal(t, http.StatusOK, h.login("carol", "CarolPass-123").Code)
+	rec = h.do(http.MethodPost, "/api/v1/me/password:change", map[string]any{
+		"current_password": "CarolPass-123", "new_password": "CarolPass-456",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	rec = h.do(http.MethodGet, "/api/v1/me/authorization", nil, "", false)
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Contains(t, rec.Body.String(), "audit.read")
@@ -381,4 +425,263 @@ func TestIAMRoleAssignmentEnablesScopedAccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	rec = h.do(http.MethodGet, "/api/v1/admin/users", nil, "", false)
 	require.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestAdminMFAEnforcement(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	rec := h.do(http.MethodGet, "/api/v1/admin/overview", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	settings, err := h.svc.Settings.GetAuth(context.Background(), nil)
+	require.NoError(t, err)
+	settings.MFARequiredForAdmins = true
+	_, err = h.svc.Settings.SaveAuth(context.Background(), nil, settings, settings.Revision)
+	require.NoError(t, err)
+
+	rec = h.do(http.MethodGet, "/api/v1/admin/overview", nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	require.Contains(t, rec.Body.String(), "MFA_ENROLLMENT_REQUIRED")
+
+	secret := enrollMFA(t, h, "ChangeMe-12345")
+	_ = secret
+	rec = h.do(http.MethodGet, "/api/v1/admin/overview", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
+
+func TestForcedPasswordChange(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	rec := h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+		"username": "forced", "email": "forced@example.com", "initial_password": "ForcedPass-123", "reason": "test",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	rec = h.login("forced", "ForcedPass-123")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	login := decode[map[string]any](t, rec)
+	require.Equal(t, true, login["password_change_required"])
+
+	rec = h.do(http.MethodGet, "/api/v1/admin/users", nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	require.Contains(t, rec.Body.String(), "PASSWORD_CHANGE_REQUIRED")
+	rec = h.do(http.MethodGet, "/api/v1/me", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	rec = h.do(http.MethodPost, "/api/v1/me/password:change", map[string]any{
+		"current_password": "ForcedPass-123", "new_password": "ForcedPass-456",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	rec = h.do(http.MethodGet, "/api/v1/admin/users", nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	require.Contains(t, rec.Body.String(), "PERMISSION_DENIED")
+}
+
+type mockOAuthProvider struct{}
+
+func (mockOAuthProvider) Name() string { return "mock" }
+func (mockOAuthProvider) AuthCodeURL(state, redirectURI string) string {
+	return "https://mock.example/authorize?state=" + state
+}
+func (mockOAuthProvider) Exchange(ctx context.Context, code, redirectURI string) (biz.OAuthProfile, error) {
+	return biz.OAuthProfile{Subject: "subject-1", Issuer: "mock", Display: "Mock User", Email: "mock@example.com"}, nil
+}
+
+func TestOAuthBindAndLogin(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+
+	rec := h.do(http.MethodGet, "/api/v1/auth/providers/mock/start?mode=bind", nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	state := ""
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "uc_oauth_state" {
+			state = c.Value
+		}
+	}
+	require.NotEmpty(t, state)
+
+	rec = h.do(http.MethodGet, "/api/v1/auth/providers/mock/callback?state="+state+"&code=ok", nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	require.Contains(t, rec.Header().Get("Location"), "bound=mock")
+
+	rec = h.do(http.MethodGet, "/api/v1/me/external-identities", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "mock")
+
+	// Logout and log back in through the bound provider.
+	rec = h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true)
+	require.Equal(t, http.StatusOK, rec.Code)
+	rec = h.do(http.MethodGet, "/api/v1/auth/providers/mock/start?mode=login", nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	state = ""
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "uc_oauth_state" {
+			state = c.Value
+		}
+	}
+	rec = h.do(http.MethodGet, "/api/v1/auth/providers/mock/callback?state="+state+"&code=ok", nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	require.Contains(t, rec.Header().Get("Location"), "status=success")
+	rec = h.do(http.MethodGet, "/api/v1/me", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
+
+func TestIntegrationClientAndOutboxDelivery(t *testing.T) {
+	t.Setenv("OUTBOX_SIGNING_SECRET", "test-webhook-secret")
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	secret := enrollMFA(t, h, "ChangeMe-12345")
+	stepUp(t, h, "ChangeMe-12345", secret, 1)
+
+	var received int
+	var signature string
+	webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received++
+		signature = r.Header.Get("X-UserCenter-Signature")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer webhook.Close()
+
+	rec := h.do(http.MethodPost, "/api/v1/admin/integration-clients", map[string]any{
+		"code": "billing-adapter", "service_owner": "billing",
+		"allowed_methods":     []string{"ValidateSession", "GetUser"},
+		"event_subscriptions": []string{"user.created"},
+		"callback_url":        webhook.URL, "reason": "test integration",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	created := decode[map[string]any](t, rec)
+	credential := created["credential"].(string)
+	require.Contains(t, credential, ".")
+	client := created["client"].(map[string]any)
+	clientID := client["client_id"].(string)
+
+	integration := biz.NewIntegrationUsecase(h.svc)
+	got, err := integration.AuthenticateClient(context.Background(), credential)
+	require.NoError(t, err)
+	require.Equal(t, clientID, got.ClientID)
+	require.True(t, integration.AllowedMethod(got, "/api.usercenter.v1.IntegrationService/ValidateSession"))
+	require.False(t, integration.AllowedMethod(got, "/api.usercenter.v1.IntegrationService/RevokeSession"))
+	_, err = integration.AuthenticateClient(context.Background(), credential+"x")
+	require.Error(t, err)
+
+	rec = h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+		"username": "evented", "email": "evented@example.com",
+		"initial_password": "EventedPass-123", "reason": "emit event",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	admin := biz.NewIntegrationAdminUsecase(h.svc)
+	require.NoError(t, admin.Dispatch(context.Background()))
+	require.Equal(t, 1, received)
+	require.NotEmpty(t, signature)
+
+	deliveries, total, err := h.svc.Outbox.ListDeliveries(context.Background(), nil, "delivered", 0, 10)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, total, int64(1))
+	require.NotEmpty(t, deliveries)
+}
+
+func TestAdminEmailChange(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	secret := enrollMFA(t, h, "ChangeMe-12345")
+	stepUp(t, h, "ChangeMe-12345", secret, 1)
+
+	rec := h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+		"username": "emailchange", "email": "old@example.com", "initial_password": "EmailPass-123", "reason": "test",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	user := decode[map[string]any](t, rec)
+	userID := user["id"].(string)
+
+	rec = h.do(http.MethodPost, "/api/v1/admin/users/"+userID+"/email-changes", map[string]any{
+		"new_email": "new@example.com", "reason": "test email change",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	challenge := decode[map[string]any](t, rec)["challenge_id"].(string)
+	require.NotEmpty(t, challenge)
+	code := regexp.MustCompile(`[0-9]{6}`).FindString(h.mail.last().body)
+	require.NotEmpty(t, code, "verification code must be mailed")
+
+	rec = h.do(http.MethodPost, "/api/v1/admin/users/"+userID+"/email-changes:confirm", map[string]any{
+		"challenge_id": challenge, "code": code, "reason": "test email change",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	updated := decode[map[string]any](t, rec)
+	require.Equal(t, "new@example.com", updated["email"])
+}
+
+func TestRegistrationAndPasswordReset(t *testing.T) {
+	h := newHarness(t)
+	rec := h.do(http.MethodPost, "/api/v1/auth/registration-challenges", map[string]any{
+		"email": "newbie@example.com",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	challenge := decode[map[string]any](t, rec)["challenge_id"].(string)
+	code := regexp.MustCompile(`[0-9]{6}`).FindString(h.mail.last().body)
+	require.NotEmpty(t, code)
+
+	rec = h.do(http.MethodPost, "/api/v1/auth/register", map[string]any{
+		"username": "newbie", "email": "newbie@example.com", "password": "NewbiePass-123",
+		"code": code, "challenge_id": challenge, "terms_version": "v1",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, http.StatusOK, h.login("newbie", "NewbiePass-123").Code)
+
+	rec = h.do(http.MethodPost, "/api/v1/auth/password-reset-challenges", map[string]any{
+		"identifier": "newbie@example.com",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code)
+	challenge = decode[map[string]any](t, rec)["challenge_id"].(string)
+	code = regexp.MustCompile(`[0-9]{6}`).FindString(h.mail.last().body)
+	require.NotEmpty(t, code)
+
+	rec = h.do(http.MethodPost, "/api/v1/auth/password-reset", map[string]any{
+		"challenge_id": challenge, "code": code, "new_password": "NewbiePass-456",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, http.StatusUnauthorized, h.login("newbie", "NewbiePass-123").Code)
+	require.Equal(t, http.StatusOK, h.login("newbie", "NewbiePass-456").Code)
+}
+
+func TestOAuthLoginRequiresMFA(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	secret := enrollMFA(t, h, "ChangeMe-12345")
+
+	rec := h.do(http.MethodGet, "/api/v1/auth/providers/mock/start?mode=bind", nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	state := ""
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "uc_oauth_state" {
+			state = c.Value
+		}
+	}
+	rec = h.do(http.MethodGet, "/api/v1/auth/providers/mock/callback?state="+state+"&code=ok", nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+
+	rec = h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true)
+	require.Equal(t, http.StatusOK, rec.Code)
+	rec = h.do(http.MethodGet, "/api/v1/auth/providers/mock/start?mode=login", nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	state = ""
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "uc_oauth_state" {
+			state = c.Value
+		}
+	}
+	rec = h.do(http.MethodGet, "/api/v1/auth/providers/mock/callback?state="+state+"&code=ok", nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	require.Contains(t, rec.Header().Get("Location"), "mfa_challenge=")
+	challenge := rec.Header().Get("Location")
+	challenge = challenge[strings.Index(challenge, "mfa_challenge=")+len("mfa_challenge="):]
+	code, err := totp.Code(secret, time.Now().Unix()/30+1, 6)
+	require.NoError(t, err)
+	rec = h.do(http.MethodPost, "/api/v1/auth/mfa/complete", map[string]any{
+		"challenge_id": challenge, "code": code,
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	rec = h.do(http.MethodGet, "/api/v1/me", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
 }

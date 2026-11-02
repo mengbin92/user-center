@@ -147,6 +147,7 @@ func (s *MeService) GetSecurity(ctx context.Context, _ *usercv1.GetSecurityReque
 		MfaEnabled: enabled, PasswordAvailable: passwordAvailable,
 		RecoveryCodesRemaining: int32(remaining), StepUpVerified: !until.IsZero(),
 		StepUpExpiresAt: ts(until), MfaRequired: mfaRequired,
+		PasswordChangeRequired: actor.PasswordChangeRequired,
 	}, nil
 }
 

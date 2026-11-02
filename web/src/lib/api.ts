@@ -94,6 +94,23 @@ import type {
   UsersReply,
   VerifySecurityReply,
   VerifySecurityRequest,
+  AssignmentListReply,
+  ConfirmEmailChangeRequest,
+  CreateDelegationRequest,
+  CreateEmailChangeChallengeRequest,
+  CreateIntegrationClientRequest,
+  Delegation,
+  DelegationsReply,
+  DisableIntegrationClientRequest,
+  EventDeliveriesReply,
+  EventDelivery,
+  IntegrationClient,
+  IntegrationClientCredentialReply,
+  IntegrationClientsReply,
+  RetryEventDeliveryRequest,
+  RevokeDelegationRequest,
+  RotateIntegrationClientCredentialRequest,
+  UpdateIntegrationClientRequest,
 } from './types'
 
 type QueryValue = string | number | boolean | null | undefined
@@ -187,6 +204,26 @@ export type PageParams = {
   page_token?: string
 }
 
+export type ListAssignmentsParams = {
+  user_id?: string
+  role_id?: string
+  status?: string
+  page_size?: number
+  page_token?: string
+}
+
+export type ListDelegationsParams = {
+  manager_role_id?: string
+  target_role_id?: string
+  status?: string
+}
+
+export type ListEventDeliveriesParams = {
+  status?: string
+  page_size?: number
+  page_token?: string
+}
+
 export const api = {
   auth: {
     context: () => get<AuthContext>('/api/v1/auth/context'),
@@ -266,6 +303,19 @@ export const api = {
       ),
     resetMfa: (id: string, body: ResetMFARequest) =>
       post<void>(`/api/v1/admin/users/${enc(id)}/mfa:reset`, body),
+    createEmailChange: (
+      id: string,
+      body: CreateEmailChangeChallengeRequest,
+    ) =>
+      post<ChallengeReply>(
+        `/api/v1/admin/users/${enc(id)}/email-changes`,
+        body,
+      ),
+    confirmEmailChange: (id: string, body: ConfirmEmailChangeRequest) =>
+      post<User>(
+        `/api/v1/admin/users/${enc(id)}/email-changes:confirm`,
+        body,
+      ),
     userSessions: (id: string) =>
       get<SessionsReply>(`/api/v1/admin/users/${enc(id)}/sessions`),
     revokeUserSessions: (id: string, body: RevokeUserSessionsRequest) =>
@@ -378,6 +428,8 @@ export const api = {
     deleteConstraint: (id: string, params: { expected_revision?: string; reason?: string }) =>
       del(`/api/v1/admin/iam/constraints/${enc(id)}`, params),
 
+    listAssignments: (params?: ListAssignmentsParams) =>
+      get<AssignmentListReply>('/api/v1/admin/iam/assignments', params),
     createAssignment: (body: CreateAssignmentRequest) =>
       post<Assignment>('/api/v1/admin/iam/assignments', body),
     revokeAssignment: (id: string, body: RevokeAssignmentRequest) =>
@@ -393,6 +445,16 @@ export const api = {
     batchAssign: (body: BatchAssignRequest) =>
       post<BatchAssignReply>('/api/v1/admin/iam/assignments:batch-assign', body),
 
+    listDelegations: (params?: ListDelegationsParams) =>
+      get<DelegationsReply>('/api/v1/admin/iam/delegations', params),
+    createDelegation: (body: CreateDelegationRequest) =>
+      post<Delegation>('/api/v1/admin/iam/delegations', body),
+    revokeDelegation: (id: string, body: RevokeDelegationRequest) =>
+      post<Delegation>(
+        `/api/v1/admin/iam/delegations/${enc(id)}:revoke`,
+        body,
+      ),
+
     explain: (body: ExplainAuthorizationRequest) =>
       post<ExplainAuthorizationReply>(
         '/api/v1/admin/iam/authorization:explain',
@@ -401,6 +463,45 @@ export const api = {
     simulate: (body: SimulateAuthorizationRequest) =>
       post<SimulateAuthorizationReply>(
         '/api/v1/admin/iam/authorization:simulate',
+        body,
+      ),
+  },
+
+  integrations: {
+    listClients: () =>
+      get<IntegrationClientsReply>('/api/v1/admin/integration-clients'),
+    createClient: (body: CreateIntegrationClientRequest) =>
+      post<IntegrationClientCredentialReply>(
+        '/api/v1/admin/integration-clients',
+        body,
+      ),
+    updateClient: (id: string, body: UpdateIntegrationClientRequest) =>
+      patch<IntegrationClient>(
+        `/api/v1/admin/integration-clients/${enc(id)}`,
+        body,
+      ),
+    rotateCredential: (
+      id: string,
+      body: RotateIntegrationClientCredentialRequest,
+    ) =>
+      post<IntegrationClientCredentialReply>(
+        `/api/v1/admin/integration-clients/${enc(id)}:rotate-credential`,
+        body,
+      ),
+    disableClient: (id: string, body: DisableIntegrationClientRequest) =>
+      post<IntegrationClient>(
+        `/api/v1/admin/integration-clients/${enc(id)}:disable`,
+        body,
+      ),
+    listEventDeliveries: (params?: ListEventDeliveriesParams) =>
+      get<EventDeliveriesReply>('/api/v1/admin/event-deliveries', params),
+    retryEventDelivery: (
+      eventId: string,
+      subscriberId: string,
+      body: RetryEventDeliveryRequest,
+    ) =>
+      post<EventDelivery>(
+        `/api/v1/admin/event-deliveries/${enc(eventId)}/subscribers/${enc(subscriberId)}:retry`,
         body,
       ),
   },

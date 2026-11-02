@@ -122,6 +122,7 @@ message SecurityStatus {
   bool step_up_verified = 4;
   string step_up_expires_at = 5;
   bool mfa_required = 6;
+  bool password_change_required = 7;
 }
 
 message SetupMFARequest {

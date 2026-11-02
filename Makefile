@@ -47,6 +47,10 @@ test-race:
 web:
 	cd web && npm ci && npm run build
 
+.PHONY: import-legacy
+import-legacy:
+	$(GO) run ./cmd/import-legacy -config $${CONF_PATH:-configs/config.yaml} -file $${FILE:?set FILE=/path/to/snapshot.json} $${APPLY:+ -apply}
+
 .PHONY: migrate
 migrate:
 	$(GO) run ./cmd/migrate -config $${CONF_PATH:-configs/config.yaml}

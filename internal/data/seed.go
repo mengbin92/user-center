@@ -49,13 +49,15 @@ var seededPermissions = []seedPermission{
 	{"iam.role.create", "创建角色", "iam", "high", "创建或复制角色", []string{"all"}, 250},
 	{"iam.role.update", "修改角色", "iam", "high", "修改角色权限、继承与状态", []string{"all"}, 260},
 	{"iam.assignment.read", "查看授权分配", "iam", "low", "读取用户角色分配", []string{"all"}, 270},
-	{"iam.assignment.create", "分配角色", "iam", "high", "授予用户角色", []string{"all"}, 280},
-	{"iam.assignment.revoke", "撤销授权", "iam", "high", "撤销用户角色分配", []string{"all"}, 290},
+	{"iam.assignment.create", "分配角色", "iam", "high", "授予用户角色", []string{"all", "user_ids"}, 280},
+	{"iam.assignment.revoke", "撤销授权", "iam", "high", "撤销用户角色分配", []string{"all", "user_ids"}, 290},
 	{"iam.constraint.read", "查看职责分离", "iam", "low", "读取互斥与数量约束", []string{"all"}, 300},
 	{"iam.constraint.update", "修改职责分离", "iam", "critical", "修改互斥与数量约束", []string{"all"}, 310},
 	{"iam.menu.read", "查看菜单", "iam", "low", "读取菜单投影", []string{"all"}, 320},
 	{"iam.menu.update", "修改菜单", "iam", "medium", "修改菜单投影", []string{"all"}, 330},
 	{"iam.authorization.explain", "解释授权", "iam", "medium", "解释与模拟授权结果", []string{"all"}, 340},
+	{"iam.delegation.read", "查看委派", "iam", "low", "读取角色委派", []string{"all"}, 350},
+	{"iam.delegation.update", "管理委派", "iam", "critical", "创建、修改与撤销委派", []string{"all"}, 360},
 
 	{"audit.read", "查看审计", "audit", "medium", "读取授权审计", []string{"all"}, 400},
 	{"audit.export", "导出审计", "audit", "high", "导出授权审计", []string{"all"}, 410},
@@ -64,6 +66,10 @@ var seededPermissions = []seedPermission{
 	{"settings.auth.update", "修改认证配置", "settings", "high", "修改注册与安全策略", []string{"all"}, 510},
 	{"settings.email.read", "查看邮件配置", "settings", "medium", "读取邮件配置（不含密钥）", []string{"all"}, 520},
 	{"settings.email.update", "修改邮件配置", "settings", "high", "修改邮件配置或轮换密钥", []string{"all"}, 530},
+	{"integration.client.read", "查看接入服务", "settings", "medium", "读取接入客户端", []string{"all"}, 600},
+	{"integration.client.update", "管理接入服务", "settings", "critical", "创建、轮换与停用接入客户端", []string{"all"}, 610},
+	{"integration.delivery.read", "查看事件投递", "settings", "medium", "读取 Outbox 投递状态", []string{"all"}, 620},
+	{"integration.delivery.update", "重试事件投递", "settings", "high", "重试失败的事件投递", []string{"all"}, 630},
 }
 
 var seededMenus = []menuPO{
@@ -77,8 +83,10 @@ var seededMenus = []menuPO{
 	{RouteKey: "admin/iam/roles", Name: "角色管理", IconKey: "shield", Sort: 120, RequiredAll: `["iam.role.read"]`},
 	{RouteKey: "admin/iam/permissions", Name: "权限目录", IconKey: "list", Sort: 130, RequiredAll: `["iam.permission.read"]`},
 	{RouteKey: "admin/iam/assignments", Name: "授权分配", IconKey: "key", Sort: 140, RequiredAll: `["iam.assignment.read"]`},
+	{RouteKey: "admin/iam/delegations", Name: "委派管理", IconKey: "share", Sort: 145, RequiredAll: `["iam.delegation.read"]`},
 	{RouteKey: "admin/audits", Name: "审计", IconKey: "file", Sort: 150, RequiredAll: `["audit.read"]`},
 	{RouteKey: "admin/settings/auth", Name: "认证配置", IconKey: "settings", Sort: 160, RequiredAll: `["settings.auth.read"]`},
+	{RouteKey: "admin/integrations", Name: "接入服务", IconKey: "plug", Sort: 170, RequiredAll: `["integration.client.read"]`},
 }
 
 // SeedCatalog installs the platform resource/permission catalog and the three
@@ -118,6 +126,17 @@ func SeedCatalog(db *gorm.DB) error {
 				existing = po
 			} else if err != nil {
 				return err
+			} else {
+				// Catalog metadata is owned by the seed. Status/binding remain
+				// operator-controlled, but scope support must follow the binary.
+				if err := tx.Model(&permissionPO{}).Where("id = ?", existing.ID).Updates(map[string]any{
+					"resource_id": po.ResourceID, "name": po.Name, "category": po.Category,
+					"risk_level": po.RiskLevel, "supported_scopes": po.SupportedScopes,
+					"context_types": po.ContextTypes, "description": po.Description, "sort": po.Sort,
+				}).Error; err != nil {
+					return err
+				}
+				existing.SupportedScopes = po.SupportedScopes
 			}
 			permissions = append(permissions, existing)
 		}

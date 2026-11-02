@@ -34,9 +34,13 @@ POST /auth/mfa/complete                 {challenge_id,code} → authenticated + 
 POST /auth/logout                       撤销当前会话 + 清 Cookie
 POST /auth/password-reset-challenges     {identifier} → 统一响应，不泄露账号是否存在
 POST /auth/password-reset                {challenge_id,code,new_password}
+GET  /auth/providers/{provider}/start    ?mode=login|bind → 302 到提供方
+GET  /auth/providers/{provider}/callback ?state&code → 302 / Set-Cookie
 ```
 
-登录成功后服务端设置 Cookie；响应不返回任何 bearer token。MFA 登录时先返回短期 challenge，不建立完整会话。
+登录成功后服务端设置 Cookie；响应不返回任何 bearer token。MFA 登录时先返回短期 challenge，不建立完整会话。`LoginReply` 还包含 `password_change_required` 和 `mfa_enrollment_required`：前者要求先改初始密码，后者要求管理员先绑定 TOTP。
+
+OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必须已登录。回调只接受服务端交换，不把 provider access token 返回浏览器。未绑定账号登录返回 `OAUTH_NOT_BOUND`，不回退为按邮箱自动合并。若账号已启用 MFA，OAuth 登录不会直接建立会话，而是重定向到 `/login?mfa_challenge=...` 完成第二因素。
 
 ## 4. 本人接口
 
@@ -47,6 +51,8 @@ POST /auth/password-reset                {challenge_id,code,new_password}
 | POST | `/me/password:change` | 当前密码 + 新密码；成功后其他会话撤销 |
 | POST | `/me/email-challenges` | 新邮箱 + 当前密码；验证码发往新邮箱 |
 | POST | `/me/email:confirm` | 完成换绑；提升身份版本 |
+| GET | `/auth/providers/{provider}/start` | 第三方登录/绑定入口（`?mode=bind` 需登录） |
+| GET | `/auth/providers/{provider}/callback` | 服务端 code 交换、绑定或建立会话 |
 | GET | `/me/external-identities` | 绑定列表（subject 脱敏） |
 | DELETE | `/me/external-identities/{id}` | 不能移除最后一种登录方式；要求 Step-up |
 | GET | `/me/security` | MFA/密码可用性/恢复码数量/Step-up 状态 |
@@ -75,6 +81,8 @@ POST /auth/password-reset                {challenge_id,code,new_password}
 | POST | `/admin/users/{id}:archive` | 归档；要求 Step-up；root 受保护 |
 | POST | `/admin/users/{id}/password-reset-requests` | 发送重置链接；不返回密码 |
 | POST | `/admin/users/{id}/mfa:reset` | 要求 Step-up；提升身份版本 |
+| POST | `/admin/users/{id}/email-changes` | 新邮箱变更挑战；要求 Step-up；验证码发往新邮箱 |
+| POST | `/admin/users/{id}/email-changes:confirm` | 校验验证码、更新邮箱、撤销该用户会话 |
 | GET | `/admin/users/{id}/sessions` | 范围受限的会话读取 |
 | POST | `/admin/users/{id}/sessions:revoke` | 指定或全部撤销，写审计 |
 | GET | `/admin/users/{id}/effective-permissions` | 角色、继承、Scope、拒绝解释 |
@@ -91,7 +99,8 @@ POST /auth/password-reset                {challenge_id,code,new_password}
 | 资源/权限 | `GET /admin/iam/resources`；`/admin/iam/permissions` list/get/create/patch；`{id}:set-status`、`{id}:archive`、`{id}/references` |
 | 角色 | `/admin/iam/roles` list/create/get/patch；`{id}:copy`、`{id}:set-status`、`{id}:archive`、`{id}/members` |
 | 角色关系 | `GET/PUT /admin/iam/roles/{id}/permissions`、`/inheritance`；`POST /admin/iam/roles/{id}:preview` |
-| 分配 | `GET /admin/users/{id}/roles`；`POST /admin/iam/assignments`；`{id}:revoke`；`assignments:batch-preview`、`assignments:batch-assign`（≤100，整批原子） |
+| 分配 | `GET /admin/users/{id}/roles`；`GET /admin/iam/assignments`（用户/角色/状态筛选）；`POST /admin/iam/assignments`；`{id}:revoke`；`assignments:batch-preview`、`assignments:batch-assign`（≤100，整批原子） |
+| 委派 | `GET/POST /admin/iam/delegations`；`PATCH /{id}`；`POST /{id}:revoke`（目标角色、用户范围、assign/revoke、有效期；V1 列表不分页） |
 | 约束 | `GET/POST /admin/iam/constraints`；`PATCH/DELETE /admin/iam/constraints/{id}` |
 | 菜单 | `GET/POST /admin/iam/menus`；`PATCH /admin/iam/menus/{id}`；`{id}:archive` |
 | 解释/模拟 | `POST /admin/iam/authorization:explain`、`authorization:simulate` |
@@ -118,9 +127,11 @@ POST /auth/password-reset                {challenge_id,code,new_password}
 | 400 | `VALIDATION_FAILED`、`CHALLENGE_INVALID` | 字段提示；挑战失败不区分账号存在性 |
 | 401 | `UNAUTHENTICATED`、`SESSION_REVOKED`、`INVALID_CREDENTIALS` | 清缓存并登录 |
 | 403 | `PERMISSION_DENIED`、`PROTECTED_ACCOUNT`、`ROOT_PROTECTED` | 明确无权；不降级为旧角色模式 |
-| 403 | `STEP_UP_REQUIRED`、`MFA_ENROLLMENT_REQUIRED` | 进入验证流程 |
+| 403 | `STEP_UP_REQUIRED`、`MFA_ENROLLMENT_REQUIRED`、`PASSWORD_CHANGE_REQUIRED` | 进入验证/改密流程 |
+| 403 | `DELEGATION_REQUIRED` | 当前角色未被委派覆盖该目标/动作 |
 | 404 | `USER_NOT_FOUND`、`RESOURCE_NOT_FOUND` | 无权获知存在性的对象统一不存在 |
-| 409 | `REVISION_CONFLICT`、`USERNAME_EXISTS`、`ROLE_CONSTRAINT_VIOLATION`、`POLICY_CONFLICT` | 回读、展示差异、重新提交 |
+| 409 | `REVISION_CONFLICT`、`USERNAME_EXISTS`、`ROLE_CONSTRAINT_VIOLATION`、`POLICY_CONFLICT`、`OAUTH_NOT_BOUND`、`OAUTH_ALREADY_BOUND` | 回读、展示差异、重新提交 |
+| 401 | `INTEGRATION_AUTH_FAILED`（gRPC 映射为 Unauthenticated） | 检查接入客户端凭据、允许方法与有效期 |
 | 429 | `RATE_LIMITED`、`MFA_LOCKED` | 使用 Retry-After/倒计时，不高速重试 |
 | 503 | `DEPENDENCY_UNAVAILABLE`、`AUTHORIZATION_UNAVAILABLE` | 显示服务异常并保持拒绝，不显示空权限 |
 

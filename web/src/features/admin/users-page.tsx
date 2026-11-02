@@ -186,6 +186,8 @@ export function AdminUsersPage() {
       api.admin.exportUsers({
         keyword: keyword || undefined,
         status: status || undefined,
+        role_id: roleId || undefined,
+        mfa_enabled: mfa === 'any' ? undefined : mfa,
         fields: [...exportFields],
         reason,
       }),
@@ -596,7 +598,7 @@ export function AdminUsersPage() {
           if (exportFields.size > 0) exportUsers.mutate(reason)
         }}
         title="导出用户 CSV"
-        description="按关键字与状态生成导出文件（角色与 MFA 过滤不参与导出），产物 24 小时内可下载。"
+        description="应用当前的关键字、状态、角色与 MFA 筛选生成导出文件，产物 24 小时内可下载。"
         confirmLabel="创建导出任务"
         busy={exportUsers.isPending}
         hint="导出原因会写入审计日志。"

@@ -7,6 +7,7 @@ import { Navigate, Outlet } from 'react-router'
 import { ErrorPanel, PermissionDenied } from '../components/query-state'
 import { useAuth } from '../lib/auth'
 import { loginPath } from '../lib/paths'
+import { useSecurityStatus } from '../lib/security'
 
 export function FullPageLoading({ label = '正在加载账号信息…' }: { label?: string }) {
   return (
@@ -49,12 +50,24 @@ export function RequireAuth() {
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { hasAdmin } = useAuth()
+  const security = useSecurityStatus({ enabled: hasAdmin })
   if (!hasAdmin) {
     return (
       <PermissionDenied
         title="无法进入管理控制台"
         description="当前账号没有任一项管理端权限。可以返回账号中心，或联系管理员分配角色。"
         backTo="/account"
+      />
+    )
+  }
+  if (security.isPending) {
+    return <FullPageLoading label="检查账号安全状态…" />
+  }
+  if (security.data?.password_change_required) {
+    return (
+      <Navigate
+        to="/account/security?password_change_required=1"
+        replace
       />
     )
   }

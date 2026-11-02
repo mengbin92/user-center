@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
+	"github.com/mengbin92/user-center/pkg/jsonx"
 	"strconv"
 	"strings"
 )
@@ -53,7 +53,7 @@ func decodePageToken(token, fingerprint string, pageSize int) (int, error) {
 }
 
 func fingerprint(parts ...any) string {
-	b, _ := json.Marshal(parts)
+	b, _ := jsonx.Marshal(parts)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:8])
 }

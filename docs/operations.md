@@ -13,7 +13,10 @@
 | `SESSION_SECRET` | 验证码 HMAC 与内部签名材料；变更会使未完成验证码失效 |
 | `CSRF_SECRET` | 保留给签名型 CSRF 扩展；当前双提交不依赖它，但生产必须设置 |
 | `MFA_ENCRYPTION_KEY` | TOTP secret AES-GCM 密钥；**丢失将无法解密现有 MFA** |
-| `USER_CENTER_INTEGRATION_TOKEN` | 内部 gRPC 调用方 Bearer 令牌；为空时内部 API 不鉴权（仅开发） |
+| `USER_CENTER_INTEGRATION_TOKEN` | 内部 gRPC 应急/自举 Bearer 令牌；生产优先使用数据库接入客户端 |
+| `OUTBOX_SIGNING_SECRET` | Outbox Webhook HMAC-SHA256 签名密钥；为空时不签名（仅开发） |
+| `OAUTH_GITHUB_CLIENT_ID/SECRET` | GitHub 登录；两者都设置才启用 |
+| `OAUTH_GOOGLE_CLIENT_ID/SECRET` | Google 登录；两者都设置才启用 |
 | `COOKIE_SECURE` | 生产 `true` |
 | `COOKIE_DOMAIN` | 门户域名；留空表示 host-only |
 | `PUBLIC_BASE_URL` | 邮件链接基址 |
@@ -49,6 +52,10 @@ docker compose run --rm user-center /app/admin-rescue \
 
 或在 `.env` 设置 `USER_CENTER_BOOTSTRAP_USERNAME/PASSWORD`，主服务启动时自举（仅当用户名不存在时）。生产建议使用离线 `admin-rescue`，不要在长期环境变量中保留初始密码。
 
+> 管理员默认受 `MFARequiredForAdmins` 约束：root 首次登录后必须先到 `/account/security` 绑定 TOTP，之后 `/admin/*` 才会放行；否则返回 `MFA_ENROLLMENT_REQUIRED`。管理员新建用户若设置了初始密码，用户首次登录会被要求改密。
+
+第三方登录回调地址为 `PUBLIC_BASE_URL + /api/v1/auth/providers/{provider}/callback`，需要在 GitHub/Google 控制台登记。
+
 ## 4. 反向代理
 
 要求：
@@ -77,7 +84,21 @@ location / {
 - 日志为 zap JSON；关注 `open database`、`send mail failed`、`run migrations`。
 - 每个请求的 `X-Request-ID` 会写入安全事件与审计；排障时先取该 ID。
 
-## 6. 备份与恢复
+## 6. 离线导入与事件投递
+
+```bash
+# 先 dry-run（默认），输出冲突与计数；无冲突后加 -apply
+go run ./cmd/import-legacy -config configs/config.local.yaml -file legacy.json
+go run ./cmd/import-legacy -config configs/config.local.yaml -file legacy.json -apply
+
+# 查看/重试 Outbox 投递（管理员 API）
+curl ... /api/v1/admin/event-deliveries
+curl -X POST ... /api/v1/admin/event-deliveries/{event_id}/subscribers/{subscriber_id}:retry
+```
+
+Webhook 工作线程随主服务启动，每 15 秒拉取一次；`X-UserCenter-Signature: sha256=<hex>` 对**原始请求体**做 HMAC。消费端必须按 `event_id` 去重，并拒绝旧 `aggregate_revision` 覆盖新状态。`integration-clients` 的凭据只在创建/轮换响应中出现一次。
+
+## 7. 备份与恢复
 
 ```bash
 # 数据库
@@ -98,7 +119,7 @@ docker run --rm -v user-center_artifacts:/data -v "$PWD":/backup alpine \
 
 审计表不允许通过恢复旧备份回滚来“消除”事件；如有合规要求，应在恢复后记录恢复操作本身。
 
-## 7. 紧急恢复 root
+## 8. 紧急恢复 root
 
 ```bash
 # 主机/数据库权限 + 离线命令，不接受 HTTP 万能口令
@@ -108,7 +129,7 @@ docker compose run --rm user-center /app/admin-rescue \
 
 `reset` 会校验目标确实是 root 角色成员，更新密码、提升身份版本、撤销全部会话并写审计。若 root 账号被归档/禁用，`reset` 会恢复为 `enabled`。
 
-## 8. 常见故障
+## 9. 常见故障
 
 | 现象 | 排查 |
 |---|---|
@@ -120,7 +141,7 @@ docker compose run --rm user-center /app/admin-rescue \
 | MFA 验证码无效 | 设备时钟漂移 > 30s；检查 `last_step` 与锁定时间 |
 | 邮件未发送 | `console` 驱动只打日志；SMTP 驱动检查 host/port/凭据/发件人 |
 
-## 9. 升级
+## 10. 升级
 
 1. 备份数据库与制品；
 2. 构建/拉取新镜像（`migrate` 与主服务同版本）；
@@ -129,7 +150,7 @@ docker compose run --rm user-center /app/admin-rescue \
 5. 验证登录、`/me/authorization`、用户列表、审计写入；
 6. 保留上一版本镜像用于回退。回退二进制前确认新迁移未引入不可逆列删除。
 
-## 10. 容量与扩展
+## 11. 容量与扩展
 
 - 服务无状态；会话/验证码/限流在 MySQL/Redis。可水平扩展，但 `USER_CENTER_INTEGRATION_TOKEN` 需所有实例一致。
 - 授权事实每次请求实时读取 DB；用户/角色规模增大后应加入带版本失效的缓存，缓存键必须包含 policy/user/session revision。

@@ -197,6 +197,25 @@ type assignmentPO struct {
 
 func (assignmentPO) TableName() string { return "iam_user_roles" }
 
+type delegationPO struct {
+	ID              int64      `gorm:"column:id;primaryKey;autoIncrement"`
+	ManagerRoleID   int64      `gorm:"column:manager_role_id;not null;index"`
+	TargetRoleID    int64      `gorm:"column:target_role_id;not null;index"`
+	TargetKind      string     `gorm:"column:target_kind;size:32;not null"`
+	Actions         string     `gorm:"column:actions;type:text;not null"`
+	TargetUserScope string     `gorm:"column:target_user_scope;type:text;not null"`
+	GrantCeiling    string     `gorm:"column:grant_ceiling;type:text;not null"`
+	CanRedelegate   bool       `gorm:"column:can_redelegate;not null;default:false"`
+	StartsAt        time.Time  `gorm:"column:starts_at;not null"`
+	ExpiresAt       *time.Time `gorm:"column:expires_at"`
+	RevokedAt       *time.Time `gorm:"column:revoked_at"`
+	Revision        uint64     `gorm:"column:revision;not null;default:1"`
+	CreatedBy       int64      `gorm:"column:created_by;not null;default:0"`
+	CreatedAt       time.Time  `gorm:"column:created_at;not null"`
+}
+
+func (delegationPO) TableName() string { return "iam_delegations" }
+
 type constraintPO struct {
 	ID       int64  `gorm:"column:id;primaryKey;autoIncrement"`
 	Kind     string `gorm:"column:kind;size:32;not null"`
@@ -290,6 +309,39 @@ type outboxEventPO struct {
 }
 
 func (outboxEventPO) TableName() string { return "event_outbox" }
+
+type integrationClientPO struct {
+	ID                 int64      `gorm:"column:id;primaryKey;autoIncrement"`
+	ClientID           string     `gorm:"column:client_id;size:64;not null;uniqueIndex"`
+	Code               string     `gorm:"column:code;size:64;not null;uniqueIndex"`
+	ServiceOwner       string     `gorm:"column:service_owner;size:64;not null"`
+	Status             string     `gorm:"column:status;size:16;not null"`
+	CredentialHash     string     `gorm:"column:credential_hash;size:64;not null"`
+	CredentialVersion  int        `gorm:"column:credential_version;not null;default:1"`
+	AllowedMethods     string     `gorm:"column:allowed_methods;type:text"`
+	EventSubscriptions string     `gorm:"column:event_subscriptions;type:text"`
+	CallbackURL        string     `gorm:"column:callback_url;size:512"`
+	ExpiresAt          *time.Time `gorm:"column:expires_at"`
+	Revision           uint64     `gorm:"column:revision;not null;default:1"`
+	CreatedAt          time.Time  `gorm:"column:created_at;not null"`
+	UpdatedAt          time.Time  `gorm:"column:updated_at;not null"`
+}
+
+func (integrationClientPO) TableName() string { return "integration_clients" }
+
+type legacyImportBatchPO struct {
+	BatchID          string     `gorm:"column:batch_id;size:64;primaryKey"`
+	SourceCommit     string     `gorm:"column:source_commit;size:64"`
+	SnapshotPosition string     `gorm:"column:snapshot_position;size:128"`
+	Counts           string     `gorm:"column:counts;type:text"`
+	Fingerprint      string     `gorm:"column:fingerprint;size:128"`
+	State            string     `gorm:"column:state;size:24;not null"`
+	Error            string     `gorm:"column:error;size:512"`
+	CreatedAt        time.Time  `gorm:"column:created_at;not null"`
+	CompletedAt      *time.Time `gorm:"column:completed_at"`
+}
+
+func (legacyImportBatchPO) TableName() string { return "legacy_import_batches" }
 
 type deliveryPO struct {
 	EventID      string    `gorm:"column:event_id;size:64;primaryKey"`
