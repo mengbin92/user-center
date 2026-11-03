@@ -202,8 +202,7 @@ docker compose up -d --build
 - [前端说明](docs/frontend.md)
 - [v0.3.0 发布说明](docs/releases/release-v0.3.0.md)
 - [v0.2.1 发布说明](docs/releases/release-v0.2.1.md)
-- [安全审查记录](docs/code-review-2026-11-03.md)
-- [代码审查与修复记录（2026-11-03）](docs/code-review-2026-11-03.md)
+- [安全审查记录（2026-11-03）](docs/code-review-2026-11-03.md)
 
 ## License
 
