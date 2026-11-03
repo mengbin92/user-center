@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mengbin92/user-center/domain/authorization"
 	"golang.org/x/crypto/bcrypt"
@@ -26,6 +27,8 @@ type ActorContext struct {
 	IP                     string
 	UserAgent              string
 	PasswordChangeRequired bool
+	ExpectedTargetRevision uint64
+	ExpectedPolicyRevision uint64
 }
 
 type actorKey struct{}
@@ -79,7 +82,7 @@ func ParseRevision(raw, field string) (uint64, error) {
 		return 0, Validation(field + " 不能为空")
 	}
 	n, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil {
+	if err != nil || n == 0 {
 		return 0, Validation(field + " 不合法")
 	}
 	return n, nil
@@ -143,11 +146,11 @@ func ValidatePassword(pw string, minLen int) error {
 	if minLen < 8 {
 		minLen = 8
 	}
-	if len(pw) < minLen {
+	if utf8.RuneCountInString(pw) < minLen {
 		return Validation(fmt.Sprintf("密码至少需要 %d 个字符", minLen))
 	}
-	if len(pw) > 128 {
-		return Validation("密码不能超过 128 个字符")
+	if len(pw) > 72 {
+		return Validation("密码不能超过 72 个字节")
 	}
 	if strings.TrimSpace(pw) != pw {
 		return Validation("密码首尾不能包含空白字符")
@@ -258,6 +261,11 @@ func (s *Services) audit(ctx context.Context, tx Tx, actor ActorContext, action,
 }
 
 func (s *Services) emit(ctx context.Context, tx Tx, aggregateType string, aggregateID int64, revision uint64, eventType, payload string) error {
+	var err error
+	payload, err = eventWirePayload(payload)
+	if err != nil {
+		return ErrDependency
+	}
 	return s.Outbox.Append(ctx, tx, &Event{
 		EventID:           s.IDs.NewID(),
 		AggregateType:     aggregateType,

@@ -104,6 +104,8 @@ message ResourceAuthorizationReply {
 }
 
 message IntegrationRevokeSessionRequest {
+  // Proof of the user whose session is being revoked.
+  string session_token = 3;
   string session_id = 1;
   string reason = 2;
 }

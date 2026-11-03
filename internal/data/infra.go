@@ -3,10 +3,12 @@ package data
 import (
 	"context"
 	"crypto/subtle"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/mengbin92/user-center/pkg/jsonx"
 	"mime"
+	"net"
 	"net/smtp"
 	"strings"
 	"sync"
@@ -28,6 +30,7 @@ func decryptString(v string, key []byte) (string, error) { return aesgcm.Decrypt
 type challengeStore struct {
 	d   *Data
 	mem *memoryKV
+	mu  sync.Mutex
 }
 
 func NewChallengeStore(d *Data) biz.ChallengeStore {
@@ -91,6 +94,57 @@ func (s *challengeStore) Get(ctx context.Context, purpose, id string) (biz.Chall
 }
 
 func (s *challengeStore) Verify(ctx context.Context, purpose, id, code string) (biz.Challenge, error) {
+	// Serialize the complete read/modify/write in memory. Redis uses WATCH so
+	// attempts cannot be lost when different processes verify concurrently.
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.d.redis != nil {
+		var challenge biz.Challenge
+		var verificationErr error
+		key := challengeKey(purpose, id)
+		for range 20 {
+			err := s.d.redis.Watch(ctx, func(tx *redis.Tx) error {
+				raw, err := tx.Get(ctx, key).Bytes()
+				if errors.Is(err, redis.Nil) {
+					return biz.ErrChallengeInvalid
+				}
+				if err != nil {
+					return biz.ErrDependency
+				}
+				var c biz.Challenge
+				if err := jsonx.Unmarshal(raw, &c); err != nil || !time.Now().Before(c.ExpiresAt) || c.Attempts >= 10 || c.CodeHash == "" {
+					return biz.ErrChallengeInvalid
+				}
+				verificationErr = nil
+				if subtle.ConstantTimeCompare([]byte(c.CodeHash), []byte(biz.HMACCode(s.d.challengeSecret(), purpose, code))) == 1 {
+					challenge = c
+					return nil
+				}
+				c.Attempts++
+				raw, err = jsonx.Marshal(c)
+				if err != nil {
+					return biz.ErrDependency
+				}
+				_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+					pipe.Set(ctx, key, raw, time.Until(c.ExpiresAt))
+					return nil
+				})
+				verificationErr = biz.ErrChallengeInvalid
+				return err
+			}, key)
+			if errors.Is(err, redis.TxFailedErr) {
+				continue
+			}
+			if err != nil {
+				if errors.Is(err, biz.ErrChallengeInvalid) {
+					return biz.Challenge{}, err
+				}
+				return biz.Challenge{}, biz.ErrDependency
+			}
+			return challenge, verificationErr
+		}
+		return biz.Challenge{}, biz.ErrDependency
+	}
 	c, raw, err := s.load(ctx, purpose, id)
 	if err != nil {
 		return biz.Challenge{}, err
@@ -104,6 +158,10 @@ func (s *challengeStore) Verify(ctx context.Context, purpose, id, code string) (
 	}
 	if subtle.ConstantTimeCompare([]byte(c.CodeHash), []byte(biz.HMACCode(s.d.challengeSecret(), purpose, code))) != 1 {
 		c.Attempts++
+		raw, err = jsonx.Marshal(c)
+		if err != nil {
+			return biz.Challenge{}, biz.ErrDependency
+		}
 		if err := s.save(ctx, c, raw); err != nil {
 			return biz.Challenge{}, biz.ErrDependency
 		}
@@ -153,6 +211,8 @@ func (l *rateLimiter) Allow(ctx context.Context, key string, limit int, window t
 		}
 		return n <= int64(limit), nil
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	raw, _ := l.mem.get(k)
 	n := 0
 	if len(raw) > 0 {
@@ -224,20 +284,26 @@ func NewMailSender(d *Data, log *zap.Logger, mailConf *conf.Mail) biz.MailSender
 
 func (m *mailSender) Send(ctx context.Context, to, subject, body string) error {
 	driver, from, host, port, username, password := "console", "no-reply@localhost", "", 587, "", ""
-	if settings, secret, err := NewSettingsRepo(m.d).GetEmail(ctx, nil); err == nil {
-		driver, from, host, port, username = settings.Driver, settings.From, settings.SMTPHost, settings.SMTPPort, settings.SMTPUsername
-		if secret != "" {
-			if plain, derr := NewSecretBox(m.d.secure).Decrypt(secret); derr == nil {
-				password = plain
-			}
+	settings, secret, err := NewSettingsRepo(m.d).GetEmail(ctx, nil)
+	if err != nil {
+		return biz.ErrDependency
+	}
+	driver, from, host, port, username = settings.Driver, settings.From, settings.SMTPHost, settings.SMTPPort, settings.SMTPUsername
+	if secret != "" {
+		password, err = NewSecretBox(m.d.secure).Decrypt(secret)
+		if err != nil {
+			return biz.ErrDependency
 		}
 	}
-	if (driver == "" || host == "") && m.conf != nil && m.conf.Smtp != nil && m.conf.Smtp.Host != "" {
+	if settings.Revision == 1 && m.conf != nil && m.conf.Driver == "smtp" && m.conf.Smtp != nil {
 		driver, from, host, port = "smtp", m.conf.From, m.conf.Smtp.Host, int(m.conf.Smtp.Port)
 		username, password = m.conf.Smtp.Username, m.conf.Smtp.Password
 	}
-	if driver == "smtp" && host != "" {
-		addr := fmt.Sprintf("%s:%d", host, port)
+	if driver == "smtp" {
+		if host == "" || port <= 0 || port > 65535 || strings.ContainsAny(from+to, "\r\n") {
+			return biz.ErrDependency
+		}
+		addr := net.JoinHostPort(host, fmt.Sprint(port))
 		var auth smtp.Auth
 		if username != "" {
 			auth = smtp.PlainAuth("", username, password, host)
@@ -250,14 +316,68 @@ func (m *mailSender) Send(ctx context.Context, to, subject, body string) error {
 			"Subject: " + mime.QEncoding.Encode("utf-8", subject) + "\r\n" +
 			"MIME-Version: 1.0\r\n" +
 			"Content-Type: text/plain; charset=UTF-8\r\n\r\n" + body + "\r\n")
-		if err := smtp.SendMail(addr, auth, from, []string{to}, msg); err != nil {
-			m.log.Error("send mail failed", zap.String("to", to), zap.Error(err))
+		if err := sendSMTP(ctx, addr, host, auth, from, to, msg); err != nil {
+			// SMTP peers may echo rejected message data in their error text.
+			m.log.Error("send mail failed", zap.String("to", to))
 			return err
 		}
 		return nil
 	}
-	m.log.Info("mail (console driver)", zap.String("to", to), zap.String("subject", subject), zap.String("body", body))
+	if driver != "console" {
+		return biz.ErrDependency
+	}
+	m.log.Info("mail (console driver)", zap.String("to", to), zap.String("subject", subject))
 	return nil
+}
+
+func sendSMTP(ctx context.Context, addr, host string, auth smtp.Auth, from, to string, msg []byte) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := conn.SetDeadline(deadline); err != nil {
+			return err
+		}
+	}
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
+			return err
+		}
+	}
+	if auth != nil {
+		if err := client.Auth(auth); err != nil {
+			return err
+		}
+	}
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	if err := client.Rcpt(to); err != nil {
+		return err
+	}
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write(msg); err != nil {
+		_ = writer.Close()
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	return client.Quit()
 }
 
 // ---------------------------------------------------------------- memory KV

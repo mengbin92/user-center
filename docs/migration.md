@@ -99,8 +99,11 @@ go run ./cmd/import-legacy -config configs/config.local.yaml -file legacy.json -
 
 - `status` 支持 `1/2` 或 `enabled/disabled/archived`；
 - 保留用户数值 ID 与 bcrypt 摘要；不导入会话、API Key、余额、路由组；
-- 按 `role_codes` 建立 `legacy_candidate` 分配；
-- 冲突（重复 ID/用户名/邮箱、未知角色、非 bcrypt 摘要）在 dry-run 全部列出，存在冲突时不写入；
+- 按 `role_codes` 建立 `legacy_candidate` 分配：仅 `member` 在 `self` 边界内默认生效，其余角色均为 `pending`，不产生治理权限；原始快照缺少分配边界，必须在迁移核对后通过管理授权流程明确范围、原因和版本重新授予；
+- 快照 JSON 上限 4 MiB；拒绝未知字段、重复键及尾随内容，防止把 MFA/外部身份字段静默丢弃；
+- 必须提供 `source_commit`，`batch_id` 默认使用 UUID，dry-run 不修改输入快照；
+- 冲突（重复 ID/用户名/邮箱/角色、未知角色、无登录凭据、bcrypt 格式/成本无效、非法邮箱或超长字段）在 dry-run 列出，存在冲突时不写入；
+- 此工具目前只导入密码登录账号；含 MFA 或外部身份的账号必须先完成对应凭据迁移方案，不能用空密码伪造已完成导入；
 - 成功后写 `legacy_import_batches`（源提交、位点、计数、指纹、终态）；
 - 不自动合并重复邮箱，不替用户改名。
 

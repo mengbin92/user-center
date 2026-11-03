@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
 } from 'react'
@@ -11,6 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { errorMessage } from '../lib/errors'
 import { formatDateTime } from '../lib/format'
 import { Button } from './button'
@@ -32,7 +34,9 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const resolver = useRef<((verified: boolean) => void) | null>(null)
+  const challengeVersion = useRef(0)
   const toast = useToast()
+  const { sessionGeneration, getSessionGeneration } = useAuth()
 
   const security = useQuery({
     queryKey: ['me', 'security'],
@@ -42,8 +46,12 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
     retry: false,
   })
 
+  const passwordAvailable = security.data?.password_available !== false
+
   const requestStepUp = useCallback(() => {
     return new Promise<boolean>((resolve) => {
+      challengeVersion.current += 1
+      resolver.current?.(false)
       setPassword('')
       setCode('')
       setError(null)
@@ -53,14 +61,30 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const finish = useCallback((verified: boolean) => {
+    challengeVersion.current += 1
     resolver.current?.(verified)
     resolver.current = null
     setOpen(false)
+    setPassword('')
+    setCode('')
+    setBusy(false)
   }, [])
+
+  useEffect(() => {
+    finish(false)
+    return () => {
+      resolver.current?.(false)
+      resolver.current = null
+    }
+  }, [sessionGeneration, finish])
 
   const submit = async () => {
     if (busy) return
-    if (!password.trim()) {
+    if (!security.data) {
+      setError('请先等待读取账号安全状态')
+      return
+    }
+    if (passwordAvailable && !password.trim()) {
       setError('请输入当前密码')
       return
     }
@@ -68,13 +92,16 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
       setError('请输入动态验证码或恢复码')
       return
     }
+    const generation = getSessionGeneration()
+    const challenge = challengeVersion.current
     setBusy(true)
     setError(null)
     try {
       const reply = await api.me.verifySecurity({
-        current_password: password,
+        current_password: passwordAvailable ? password : '',
         code: code.trim(),
       })
+      if (generation !== getSessionGeneration() || challenge !== challengeVersion.current) return
       if (!reply.verified) {
         setError('安全验证未通过，请重试')
         return
@@ -85,9 +112,10 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
       )
       finish(true)
     } catch (verifyError) {
+      if (generation !== getSessionGeneration() || challenge !== challengeVersion.current) return
       setError(errorMessage(verifyError))
     } finally {
-      setBusy(false)
+      if (challenge === challengeVersion.current) setBusy(false)
     }
   }
 
@@ -96,6 +124,7 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
       {children}
       <Dialog
         open={open}
+        dismissible={!busy}
         onClose={() => finish(false)}
         title="需要近期安全验证"
         description="该操作属于高风险变更。验证通过后本次操作会自动重试一次。"
@@ -136,11 +165,12 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
             启用 MFA，再重新执行此操作。
           </InlineAlert>
         ) : (
-          <InlineAlert tone="info" title="使用当前密码 + MFA 验证">
+          <InlineAlert tone="info" title={passwordAvailable ? "使用当前密码 + MFA 验证" : "使用第三方身份 + MFA 验证"}>
             支持输入身份验证器 6 位动态码，或使用一枚未使用的恢复码。
           </InlineAlert>
         )}
-        <Field label="当前密码" htmlFor="step-up-password" required>
+        {!passwordAvailable ? <InlineAlert tone="info" title="使用已绑定的第三方身份验证">请先前往 <Link to="/account/security" onClick={() => finish(false)} className="font-medium underline">安全中心重新验证绑定身份</Link>，返回后输入动态码完成近期验证。</InlineAlert> : null}
+        {passwordAvailable ? <Field label="当前密码" htmlFor="step-up-password" required>
           <Input
             id="step-up-password"
             type="password"
@@ -149,7 +179,7 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
             onChange={(event) => setPassword(event.target.value)}
             placeholder="输入当前登录密码"
           />
-        </Field>
+        </Field> : null}
         <Field
           label="动态验证码 / 恢复码"
           htmlFor="step-up-code"

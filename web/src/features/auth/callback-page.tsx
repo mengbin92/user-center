@@ -5,7 +5,7 @@ import {
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 
@@ -24,6 +24,7 @@ export function AuthCallbackPage() {
   const oauthError = searchParams.get('oauth_error')
   const bound = searchParams.get('bound')
   const [settled, setSettled] = useState(false)
+  const attemptedSession = useRef(false)
 
   const needsSession =
     resultStatus === 'success' || Boolean(bound) || Boolean(oauthError)
@@ -38,7 +39,8 @@ export function AuthCallbackPage() {
       setSettled(true)
       return
     }
-    if (status === 'anonymous') {
+    if (status === 'anonymous' && !attemptedSession.current) {
+      attemptedSession.current = true
       let active = true
       void signIn().finally(() => {
         if (active) setSettled(true)

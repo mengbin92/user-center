@@ -9,6 +9,7 @@ import { InlineAlert } from '../../components/card'
 import { Checkbox, Field, Input } from '../../components/input'
 import { AuthShell } from './auth-shell'
 import { api } from '../../lib/api'
+import { passwordValidationError } from '../../lib/password'
 import { errorMessage, isApiError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import type { RegisterReply } from '../../lib/types'
@@ -96,6 +97,11 @@ export function RegisterPage() {
   const submitRegistration = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
+    const passwordError = passwordValidationError(password, minLength)
+    if (passwordError) {
+      setError(passwordError)
+      return
+    }
     if (password !== confirmPassword) {
       setError('两次输入的密码不一致')
       return

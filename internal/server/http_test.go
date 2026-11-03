@@ -215,7 +215,8 @@ func TestAuthAndAuthorizationFlow(t *testing.T) {
 	require.Equal(t, "root", me["username"])
 
 	// Root sees the full user list and can create a member.
-	rec = h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+	fixtureStepUp(h)
+	rec = h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "alice", "email": "alice@example.com", "display_name": "Alice",
 		"initial_password": "AlicePass-123", "reason": "test create",
 	}, "", true)
@@ -225,7 +226,7 @@ func TestAuthAndAuthorizationFlow(t *testing.T) {
 	require.NotEmpty(t, aliceID)
 
 	// Duplicate username is a stable conflict reason.
-	rec = h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+	rec = h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "alice", "initial_password": "AlicePass-123", "reason": "duplicate",
 	}, "", true)
 	require.Equal(t, http.StatusConflict, rec.Code)
@@ -252,7 +253,8 @@ func TestAuthAndAuthorizationFlow(t *testing.T) {
 	member := decode[map[string]any](t, rec)
 	revision := member["revision"].(string)
 
-	rec = h.do(http.MethodPost, "/api/v1/admin/users/"+aliceID+":set-status", map[string]any{
+	fixtureStepUp(h)
+	rec = h.management(http.MethodPost, "/api/v1/admin/users/"+aliceID+":set-status", map[string]any{
 		"status": "disabled", "expected_revision": revision, "reason": "test disable",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -275,7 +277,8 @@ func TestConcurrencyAndExport(t *testing.T) {
 	h := newHarness(t)
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 
-	rec := h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+	fixtureStepUp(h)
+	rec := h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "bob", "email": "bob@example.com", "initial_password": "BobPass-12345", "reason": "test",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -283,18 +286,18 @@ func TestConcurrencyAndExport(t *testing.T) {
 	bobID := bob["id"].(string)
 	stale := bob["revision"].(string)
 
-	rec = h.do(http.MethodPatch, "/api/v1/admin/users/"+bobID, map[string]any{
+	rec = h.management(http.MethodPatch, "/api/v1/admin/users/"+bobID, map[string]any{
 		"display_name": "Bob", "expected_revision": stale, "reason": "rename",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
-	rec = h.do(http.MethodPatch, "/api/v1/admin/users/"+bobID, map[string]any{
+	rec = h.management(http.MethodPatch, "/api/v1/admin/users/"+bobID, map[string]any{
 		"display_name": "Bob2", "expected_revision": stale, "reason": "stale rename",
 	}, "", true)
 	require.Equal(t, http.StatusConflict, rec.Code)
 	require.Contains(t, rec.Body.String(), "REVISION_CONFLICT")
 
-	rec = h.do(http.MethodPost, "/api/v1/admin/users:export", map[string]any{
+	rec = h.management(http.MethodPost, "/api/v1/admin/users:export", map[string]any{
 		"fields": []string{"id", "username", "status"}, "reason": "test export",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -316,7 +319,8 @@ func TestConcurrencyAndExport(t *testing.T) {
 func TestMFAEnrollmentAndLogin(t *testing.T) {
 	h := newHarness(t)
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
-	rec := h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+	fixtureStepUp(h)
+	rec := h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "mfa.user", "email": "mfa@example.com", "initial_password": "MfaPass-12345", "reason": "test",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -388,7 +392,7 @@ func TestIAMRoleAssignmentEnablesScopedAccess(t *testing.T) {
 	secret := enrollMFA(t, h, "ChangeMe-12345")
 	stepUp(t, h, "ChangeMe-12345", secret, 1)
 
-	rec := h.do(http.MethodPost, "/api/v1/admin/iam/roles", map[string]any{
+	rec := h.management(http.MethodPost, "/api/v1/admin/iam/roles", map[string]any{
 		"code": "auditor", "name": "审计员", "description": "只读审计",
 		"grants": []any{map[string]any{
 			"operation": "audit.read", "effect": "allow", "scope": map[string]any{"all": true},
@@ -399,14 +403,14 @@ func TestIAMRoleAssignmentEnablesScopedAccess(t *testing.T) {
 	role := decode[map[string]any](t, rec)
 	roleID := role["id"].(string)
 
-	rec = h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+	rec = h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "carol", "email": "carol@example.com", "initial_password": "CarolPass-123", "reason": "test",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	carol := decode[map[string]any](t, rec)
 	carolID := carol["id"].(string)
 
-	rec = h.do(http.MethodPost, "/api/v1/admin/iam/assignments", map[string]any{
+	rec = h.management(http.MethodPost, "/api/v1/admin/iam/assignments", map[string]any{
 		"user_id": carolID, "role_id": roleID, "boundary": map[string]any{"all": true},
 		"reason": "test assignment",
 	}, "", true)
@@ -452,7 +456,8 @@ func TestAdminMFAEnforcement(t *testing.T) {
 func TestForcedPasswordChange(t *testing.T) {
 	h := newHarness(t)
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
-	rec := h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+	fixtureStepUp(h)
+	rec := h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "forced", "email": "forced@example.com", "initial_password": "ForcedPass-123", "reason": "test",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -543,7 +548,7 @@ func TestIntegrationClientAndOutboxDelivery(t *testing.T) {
 	}))
 	defer webhook.Close()
 
-	rec := h.do(http.MethodPost, "/api/v1/admin/integration-clients", map[string]any{
+	rec := h.management(http.MethodPost, "/api/v1/admin/integration-clients", map[string]any{
 		"code": "billing-adapter", "service_owner": "billing",
 		"allowed_methods":     []string{"ValidateSession", "GetUser"},
 		"event_subscriptions": []string{"user.created"},
@@ -565,7 +570,7 @@ func TestIntegrationClientAndOutboxDelivery(t *testing.T) {
 	_, err = integration.AuthenticateClient(context.Background(), credential+"x")
 	require.Error(t, err)
 
-	rec = h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+	rec = h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "evented", "email": "evented@example.com",
 		"initial_password": "EventedPass-123", "reason": "emit event",
 	}, "", true)
@@ -588,14 +593,14 @@ func TestAdminEmailChange(t *testing.T) {
 	secret := enrollMFA(t, h, "ChangeMe-12345")
 	stepUp(t, h, "ChangeMe-12345", secret, 1)
 
-	rec := h.do(http.MethodPost, "/api/v1/admin/users", map[string]any{
+	rec := h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "emailchange", "email": "old@example.com", "initial_password": "EmailPass-123", "reason": "test",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	user := decode[map[string]any](t, rec)
 	userID := user["id"].(string)
 
-	rec = h.do(http.MethodPost, "/api/v1/admin/users/"+userID+"/email-changes", map[string]any{
+	rec = h.management(http.MethodPost, "/api/v1/admin/users/"+userID+"/email-changes", map[string]any{
 		"new_email": "new@example.com", "reason": "test email change",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -604,7 +609,7 @@ func TestAdminEmailChange(t *testing.T) {
 	code := regexp.MustCompile(`[0-9]{6}`).FindString(h.mail.last().body)
 	require.NotEmpty(t, code, "verification code must be mailed")
 
-	rec = h.do(http.MethodPost, "/api/v1/admin/users/"+userID+"/email-changes:confirm", map[string]any{
+	rec = h.management(http.MethodPost, "/api/v1/admin/users/"+userID+"/email-changes:confirm", map[string]any{
 		"challenge_id": challenge, "code": code, "reason": "test email change",
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())

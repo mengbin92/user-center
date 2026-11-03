@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -40,13 +39,13 @@ func validateClient(c *IntegrationClient) error {
 		return Validation("至少需要允许一个 gRPC 方法")
 	}
 	for _, m := range c.AllowedMethods {
-		if !strings.HasPrefix(m, "/api.usercenter.v1.IntegrationService/") && !isIntegrationMethod(m) {
+		if !isIntegrationMethod(strings.TrimPrefix(m, "/api.usercenter.v1.IntegrationService/")) {
 			return Validation("不允许的方法: " + m)
 		}
 	}
 	if c.CallbackURL != "" {
 		u, err := url.Parse(c.CallbackURL)
-		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil || u.Fragment != "" {
 			return Validation("callback_url 不合法")
 		}
 	}
@@ -161,6 +160,16 @@ func (uc *IntegrationAdminUsecase) Rotate(ctx context.Context, actor ActorContex
 	}
 	var updated *IntegrationClient
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		current, err := uc.IntegrationClients.Get(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if actor.ExpectedTargetRevision == 0 {
+			return Validation("expected_revision 不能为空")
+		}
+		if _, err := uc.IntegrationClients.Update(ctx, tx, current, actor.ExpectedTargetRevision); err != nil {
+			return err
+		}
 		row, err := uc.IntegrationClients.RotateCredential(ctx, tx, id, HashToken(secret), existing.CredentialVersion+1)
 		if err != nil {
 			return err
@@ -183,6 +192,16 @@ func (uc *IntegrationAdminUsecase) Disable(ctx context.Context, actor ActorConte
 	}
 	var out *IntegrationClient
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		current, err := uc.IntegrationClients.Get(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if actor.ExpectedTargetRevision == 0 {
+			return Validation("expected_revision 不能为空")
+		}
+		if _, err := uc.IntegrationClients.Update(ctx, tx, current, actor.ExpectedTargetRevision); err != nil {
+			return err
+		}
 		existing, err := uc.IntegrationClients.Get(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -250,10 +269,12 @@ func (uc *IntegrationAdminUsecase) RetryDelivery(ctx context.Context, actor Acto
 	if eventID == "" || subscriberID == "" {
 		return Validation("event_id 和 subscriber_id 不能为空")
 	}
-	if err := uc.Outbox.RetryDelivery(ctx, nil, eventID, subscriberID); err != nil {
-		return ErrResourceNotFound
-	}
-	return uc.audit(ctx, nil, actor, "integration.delivery.retry", eventID+"/"+subscriberID, "{}", "{}", "{}", reason, "success")
+	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.Outbox.RetryDelivery(ctx, tx, eventID, subscriberID); err != nil {
+			return err
+		}
+		return uc.audit(ctx, tx, actor, "integration.delivery.retry", eventID+"/"+subscriberID, "{}", "{}", "{}", reason, "success")
+	})
 }
 
 // Dispatch fans events out to subscribed clients and delivers due webhooks with
@@ -265,26 +286,23 @@ func (uc *IntegrationAdminUsecase) Dispatch(ctx context.Context) error {
 	}
 	var subscribers []*IntegrationClient
 	for _, c := range clients {
-		if c.Status == "active" && c.CallbackURL != "" && len(c.EventSubscriptions) > 0 {
+		if c.Status == "active" && (c.ExpiresAt == nil || uc.Clock.Now().Before(*c.ExpiresAt)) && c.CallbackURL != "" && len(c.EventSubscriptions) > 0 {
 			subscribers = append(subscribers, c)
 		}
 	}
 	if len(subscribers) == 0 {
 		return nil
 	}
-	events, err := uc.Outbox.ListRecentEvents(ctx, nil, 200)
-	if err != nil {
-		return err
+	if os.Getenv("OUTBOX_SIGNING_SECRET") == "" {
+		return Validation("OUTBOX_SIGNING_SECRET 未配置")
 	}
 	now := uc.Clock.Now().UTC()
-	for _, e := range events {
-		for _, c := range subscribers {
-			if e.OccurredAt.Before(c.CreatedAt) {
-				continue
-			}
-			if !eventSubscribed(c.EventSubscriptions, e.EventType) {
-				continue
-			}
+	for _, c := range subscribers {
+		events, err := uc.Outbox.PendingEventsForClient(ctx, nil, c, 200)
+		if err != nil {
+			return err
+		}
+		for _, e := range events {
 			if err := uc.Outbox.EnsureDelivery(ctx, nil, e.EventID, c.ClientID, now); err != nil {
 				return err
 			}
@@ -296,15 +314,19 @@ func (uc *IntegrationAdminUsecase) Dispatch(ctx context.Context) error {
 	}
 	for _, d := range due {
 		if err := uc.deliver(ctx, d); err != nil {
-			attempts := d.Attempts + 1
+			attempts := d.Attempts
 			delay := time.Duration(1<<minInt(attempts, 7)) * 30 * time.Second
 			if attempts >= 8 {
 				delay = 6 * time.Hour
 			}
-			_ = uc.Outbox.MarkRetry(ctx, d.EventID, d.SubscriberID, now.Add(delay), truncateError(err.Error()))
+			if markErr := uc.Outbox.MarkRetry(ctx, d.EventID, d.SubscriberID, now.Add(delay), truncateError(err.Error())); markErr != nil {
+				return markErr
+			}
 			continue
 		}
-		_ = uc.Outbox.MarkDelivered(ctx, d.EventID, d.SubscriberID, now)
+		if err := uc.Outbox.MarkDelivered(ctx, d.EventID, d.SubscriberID, now); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -319,17 +341,24 @@ func eventSubscribed(subs []string, eventType string) bool {
 }
 
 func (uc *IntegrationAdminUsecase) deliver(ctx context.Context, d *Delivery) error {
+	current, err := uc.IntegrationClients.GetByClientID(ctx, nil, d.SubscriberID)
+	if err != nil {
+		return ErrDependency
+	}
+	if current.Status != "active" || current.ExpiresAt != nil && !uc.Clock.Now().Before(*current.ExpiresAt) || !eventSubscribed(current.EventSubscriptions, d.EventType) || current.CallbackURL == "" {
+		return ErrPermissionDenied
+	}
 	payload := jsonx.RawMessage(d.Payload)
 	body, err := jsonx.Marshal(map[string]any{
 		"event_id": d.EventID, "event_type": d.EventType,
-		"aggregate_type": d.AggregateType, "aggregate_id": d.AggregateID,
+		"aggregate_type": d.AggregateType, "aggregate_id": itoa(d.AggregateID), "aggregate_revision": uitoa(d.AggregateRevision),
 		"schema_version": d.SchemaVersion, "occurred_at": d.OccurredAt.Format(time.RFC3339),
 		"payload": payload,
 	})
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.CallbackURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, current.CallbackURL, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -341,7 +370,7 @@ func (uc *IntegrationAdminUsecase) deliver(ctx context.Context, d *Delivery) err
 		mac.Write(body)
 		req.Header.Set("X-UserCenter-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -383,5 +412,3 @@ func truncateError(s string) string {
 	}
 	return s
 }
-
-var _ = errors.New

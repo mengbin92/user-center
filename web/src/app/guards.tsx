@@ -63,6 +63,9 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   if (security.isPending) {
     return <FullPageLoading label="检查账号安全状态…" />
   }
+  if (security.isError) {
+    return <ErrorPanel error={security.error} onRetry={() => void security.refetch()} />
+  }
   if (security.data?.password_change_required) {
     return (
       <Navigate
@@ -70,6 +73,9 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
         replace
       />
     )
+  }
+  if (security.data?.mfa_required && !security.data?.mfa_enabled) {
+    return <Navigate to="/account/security?mfa_enrollment_required=1" replace />
   }
   return <>{children}</>
 }

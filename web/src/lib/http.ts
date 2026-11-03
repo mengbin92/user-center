@@ -18,6 +18,13 @@ const AUTH_PATHS = [
   '/api/v1/auth/context',
 ]
 
+let sessionGeneration = 0
+const requestGenerations = new WeakMap<InternalAxiosRequestConfig, number>()
+
+export function invalidateHttpSession(): void {
+  sessionGeneration += 1
+}
+
 let csrfBootstrap: Promise<string | null> | null = null
 let unauthorizedHandler: ((error: ApiError) => void) | null = null
 
@@ -139,6 +146,7 @@ export function createHttpClient(options: HttpClientOptions = {}): AxiosInstance
   })
 
   client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+    requestGenerations.set(config, sessionGeneration)
     config.headers.set(REQUEST_ID_HEADER, newRequestId())
 
     const method = (config.method ?? 'get').toLowerCase()
@@ -150,13 +158,19 @@ export function createHttpClient(options: HttpClientOptions = {}): AxiosInstance
   })
 
   client.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      if (requestGenerations.get(response.config) !== sessionGeneration) {
+        return Promise.reject(new ApiError({ status: 401, reason: 'SESSION_CHANGED', message: '登录会话已变化，请重新发起请求' }))
+      }
+      return response
+    },
     (error: unknown) => {
       const apiError = toApiError(error)
       const requestURL = isAxiosError(error) ? error.config?.url : undefined
 
       if (
         apiError.status === 401 &&
+        (!isAxiosError(error) || !error.config || requestGenerations.get(error.config) === sessionGeneration) &&
         !isAuthExempt(requestURL) &&
         apiError.reason !== 'INVALID_CREDENTIALS' &&
         apiError.reason !== 'MFA_REQUIRED' &&

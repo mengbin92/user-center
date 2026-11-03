@@ -5,14 +5,20 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/mail"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
+
+var legacyBcryptHash = regexp.MustCompile(`^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$`)
 
 type LegacyUser struct {
 	ID            int64    `json:"id"`
@@ -47,9 +53,21 @@ func ImportLegacy(ctx context.Context, d *Data, spec LegacyImportSpec, batchID s
 		return nil, fmt.Errorf("snapshot contains no users")
 	}
 	if batchID == "" {
-		batchID = "batch-" + time.Now().UTC().Format("20060102T150405")
+		batchID = "batch-" + uuid.NewString()
 	}
-	raw, _ := jsonx.Marshal(spec)
+	if len(batchID) > 64 || len(spec.SourceCommit) > 64 || len(spec.SnapshotPosition) > 128 {
+		return nil, fmt.Errorf("import provenance exceeds its storage limit")
+	}
+	if strings.TrimSpace(spec.SourceCommit) == "" {
+		return nil, fmt.Errorf("source_commit is required")
+	}
+	// Validation must not modify the caller's snapshot or change a later
+	// apply fingerprint merely because dry-run normalized its slice.
+	spec.Users = append([]LegacyUser(nil), spec.Users...)
+	raw, err := jsonx.Marshal(spec)
+	if err != nil {
+		return nil, fmt.Errorf("encode snapshot: %w", err)
+	}
 	sum := sha256.Sum256(raw)
 	fingerprint := hex.EncodeToString(sum[:])
 	result := &LegacyImportResult{BatchID: batchID, Fingerprint: fingerprint, Counts: map[string]int{}}
@@ -90,19 +108,28 @@ func ImportLegacy(ctx context.Context, d *Data, spec LegacyImportSpec, batchID s
 		default:
 			result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: invalid status %q", u.ID, u.Status))
 		}
-		if u.PasswordHash != "" && !strings.HasPrefix(u.PasswordHash, "$2") {
-			result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: password hash is not bcrypt", u.ID))
+		if !legacyBcryptHash.MatchString(u.PasswordHash) {
+			result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: a valid bcrypt login credential is required", u.ID))
+		} else if _, err := bcrypt.Cost([]byte(u.PasswordHash)); err != nil {
+			result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: invalid bcrypt credential", u.ID))
+		}
+		if u.Email != "" {
+			address, err := mail.ParseAddress(u.Email)
+			if err != nil || address.Address != u.Email || len(u.Email) > 254 {
+				result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: invalid email", u.ID))
+			}
+		} else if u.EmailVerified {
+			result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: an empty email cannot be verified", u.ID))
 		}
 		if u.DisplayName == "" {
 			u.DisplayName = u.Username
 		}
+		if len(u.DisplayName) > 128 {
+			result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: display name exceeds storage limit", u.ID))
+		}
 	}
 	if len(result.Conflicts) > 0 {
 		return result, nil
-	}
-	var existing int64
-	if err := d.db.WithContext(ctx).Model(&userPO{}).Where("id <= ?", maxLegacyID(spec.Users)).Count(&existing).Error; err != nil {
-		return nil, err
 	}
 	// Explicit conflict checks by id, username, email.
 	for _, u := range spec.Users {
@@ -129,7 +156,12 @@ func ImportLegacy(ctx context.Context, d *Data, spec LegacyImportSpec, batchID s
 		roleByCode[roles[i].Code] = &roles[i]
 	}
 	for _, u := range spec.Users {
+		seenRoles := map[string]bool{}
 		for _, code := range u.RoleCodes {
+			if seenRoles[code] {
+				result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: duplicate role %s", u.ID, code))
+			}
+			seenRoles[code] = true
 			r := roleByCode[code]
 			if r == nil || r.Status != "active" {
 				result.Conflicts = append(result.Conflicts, fmt.Sprintf("user %d: unknown/disabled role %s", u.ID, code))
@@ -146,7 +178,7 @@ func ImportLegacy(ctx context.Context, d *Data, spec LegacyImportSpec, batchID s
 		return result, nil
 	}
 	now := time.Now().UTC()
-	err := d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, u := range spec.Users {
 			verified := (*time.Time)(nil)
 			if u.EmailVerified {
@@ -172,10 +204,17 @@ func ImportLegacy(ctx context.Context, d *Data, spec LegacyImportSpec, batchID s
 				return err
 			}
 			for _, code := range u.RoleCodes {
-				boundary, _ := jsonx.Marshal(authorization.Scope{All: true})
+				// The snapshot does not carry the old assignment boundary.
+				// Governance roles remain candidates until explicitly reviewed
+				// and regranted; missing scope must never become global access.
+				status, scope := "pending", authorization.Scope{}
+				if code == "member" {
+					status, scope = "active", authorization.Scope{Self: true}
+				}
+				boundary, _ := jsonx.Marshal(scope)
 				if err := tx.Create(&assignmentPO{
 					UserID: u.ID, RoleID: roleByCode[code].ID, Boundary: string(boundary),
-					StartsAt: now, Status: "active", Origin: "legacy_candidate",
+					StartsAt: now, Status: status, Origin: "legacy_candidate",
 					Revision: 1, CreatedAt: now,
 				}).Error; err != nil {
 					return err
@@ -193,20 +232,10 @@ func ImportLegacy(ctx context.Context, d *Data, spec LegacyImportSpec, batchID s
 		return nil, err
 	}
 	result.Applied = true
-	if d.conf != nil && d.conf.Database != nil && d.conf.Database.Driver == "mysql" {
-		_ = d.db.Exec("ALTER TABLE users AUTO_INCREMENT = ?", maxLegacyID(spec.Users)+1).Error
-	}
+	// MySQL and SQLite both advance their generated-ID sequence when an
+	// explicit larger ID is inserted. Avoid a separate, nontransactional DDL
+	// operation (and an int64 overflow for the largest imported identifier).
 	return result, nil
-}
-
-func maxLegacyID(users []LegacyUser) int64 {
-	var max int64
-	for _, u := range users {
-		if u.ID > max {
-			max = u.ID
-		}
-	}
-	return max
 }
 
 func countHashes(users []LegacyUser) int {

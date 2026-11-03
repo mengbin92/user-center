@@ -1,11 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"github.com/mengbin92/user-center/pkg/jsonx"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -76,6 +78,28 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	w.Header().Set("X-Frame-Options", "DENY")
+	if isUnsafe(r.Method) && strings.HasPrefix(r.URL.Path, "/api/v1/") {
+		const maxRequestBody = 1 << 20
+		if r.ContentLength > maxRequestBody {
+			writeError(w, http.StatusRequestEntityTooLarge, "REQUEST_TOO_LARGE", "请求内容不能超过 1 MiB")
+			return ctx, false
+		}
+		if r.Body != nil {
+			body := http.MaxBytesReader(w, r.Body, maxRequestBody)
+			raw, err := io.ReadAll(body)
+			_ = body.Close()
+			var limitErr *http.MaxBytesError
+			if errors.As(err, &limitErr) {
+				writeError(w, http.StatusRequestEntityTooLarge, "REQUEST_TOO_LARGE", "请求内容不能超过 1 MiB")
+				return ctx, false
+			}
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "无法读取请求内容")
+				return ctx, false
+			}
+			r.Body = io.NopCloser(bytes.NewReader(raw))
+		}
+	}
 
 	info := httpx.Info{
 		RequestID: requestID,
@@ -117,6 +141,9 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 				Name: service.SessionCookie, Value: "", Path: "/", HttpOnly: true,
 				Secure: m.secure, SameSite: http.SameSiteLaxMode, Domain: m.domain, MaxAge: -1,
 			})
+		} else if requiresAuth(r.URL.Path) {
+			writeError(w, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "依赖服务暂不可用")
+			return ctx, false
 		}
 	}
 

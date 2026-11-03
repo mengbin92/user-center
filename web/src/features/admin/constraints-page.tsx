@@ -95,7 +95,8 @@ export function AdminConstraintsPage() {
         max_count: editMaxCount.trim() || undefined,
         enabled: editEnabled,
         expected_revision: editTarget.revision ?? '0',
-        reason: editReason.trim() || 'update constraint',
+        expected_policy_revision: authorization?.policy_revision,
+        reason: editReason.trim(),
       })
     },
     successMessage: '约束已更新',
@@ -108,6 +109,7 @@ export function AdminConstraintsPage() {
     mutationFn: (input: { constraint: Constraint; reason: string }) =>
       api.iam.deleteConstraint(input.constraint.id ?? '', {
         expected_revision: input.constraint.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: '约束已删除',
@@ -439,6 +441,7 @@ export function AdminConstraintsPage() {
               size="sm"
               onClick={submitEdit}
               loading={updateConstraint.isPending}
+              disabled={!editReason.trim()}
             >
               保存
             </Button>
@@ -495,7 +498,7 @@ export function AdminConstraintsPage() {
             id="edit-constraint-reason"
             value={editReason}
             onChange={(event) => setEditReason(event.target.value)}
-            placeholder="可选，写入审计"
+            placeholder="请填写本次变更的原因" required
           />
         </Field>
         {formError ? (

@@ -16,7 +16,7 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   oauth_unavailable: '第三方身份提供方暂不可用，请稍后重试或使用密码登录。',
 }
 
-export type OAuthMode = 'login' | 'bind'
+export type OAuthMode = 'login' | 'bind' | 'verify'
 
 export function providerLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? provider
@@ -32,7 +32,7 @@ export function providerStartPath(
   mode: OAuthMode = 'login',
 ): string {
   const path = `/api/v1/auth/providers/${encodeURIComponent(provider)}/start`
-  return mode === 'bind' ? `${path}?mode=bind` : path
+  return mode === 'login' ? path : `${path}?mode=${mode}`
 }
 
 export function oauthErrorMessage(raw?: string | null): string {

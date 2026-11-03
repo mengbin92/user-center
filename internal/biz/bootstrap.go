@@ -125,3 +125,55 @@ func (s *Services) ResetRoot(ctx context.Context, username, password string) err
 		return s.audit(ctx, tx, ActorContext{Actor: authorization.Actor{ServiceID: "admin-rescue"}}, "account.rescue", itoa(u.ID), "{}", "{}", "{}", "offline root rescue", "success")
 	})
 }
+
+// ResetRootMFA is an explicit offline recovery action for a lost second factor.
+// It is never exposed by a browser or integration service.
+func (s *Services) ResetRootMFA(ctx context.Context, username string) error {
+	u, err := s.Users.GetByUsername(ctx, nil, NormalizeUsername(username))
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return ErrUserNotFound
+		}
+		return ErrDependency
+	}
+	root, err := s.IAM.GetRoleByCode(ctx, nil, "root")
+	if err != nil {
+		return ErrDependency
+	}
+	roles, err := s.Users.RolesForUser(ctx, nil, u.ID)
+	if err != nil {
+		return ErrDependency
+	}
+	isRoot := false
+	for _, role := range roles {
+		if role.ID == root.ID {
+			isRoot = true
+			break
+		}
+	}
+	if !isRoot {
+		return ErrProtectedAccount
+	}
+	now := s.Clock.Now().UTC()
+	return s.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := s.Users.Update(ctx, tx, u, u.Revision); err != nil {
+			return err
+		}
+		if err := s.MFA.Delete(ctx, tx, u.ID); err != nil {
+			return err
+		}
+		version, err := s.Users.BumpIdentityVersion(ctx, tx, u.ID)
+		if err != nil {
+			return err
+		}
+		if err := s.Sessions.RevokeAllForUser(ctx, tx, u.ID, &now); err != nil {
+			return err
+		}
+		actor := ActorContext{Actor: authorization.Actor{ServiceID: "admin-rescue"}}
+		if err := s.audit(ctx, tx, actor, "account.rescue.mfa_reset", itoa(u.ID), "{}", "{}", "{}", "offline root MFA rescue", "success"); err != nil {
+			return err
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"user_id": itoa(u.ID), "identity_version": uitoa(version), "mfa_enabled": false})
+		return s.emit(ctx, tx, "user", u.ID, version, "credential.changed", string(payload))
+	})
+}

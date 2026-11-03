@@ -174,6 +174,7 @@ export function AdminDelegationsPage() {
       api.iam.revokeDelegation(input.delegation.id ?? '', {
         id: input.delegation.id,
         expected_revision: input.delegation.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: '委派已撤销',

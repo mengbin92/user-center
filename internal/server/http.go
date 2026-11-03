@@ -66,6 +66,7 @@ func NewHTTPServer(
 	srv := khttp.NewServer(
 		khttp.Address(addr),
 		khttp.Timeout(time.Duration(timeout)*time.Second),
+		khttp.ErrorEncoder(encodeError),
 		khttp.Filter(mw.Filter),
 	)
 	usercv1.RegisterAuthServiceHTTPServer(srv, auth)

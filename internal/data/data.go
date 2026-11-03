@@ -36,6 +36,17 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 	if dataConf != nil && dataConf.Database != nil {
 		driver = dataConf.Database.Driver
 	}
+	if driver == "" {
+		driver = "mysql"
+	}
+	if driver != "mysql" && driver != "sqlite" && driver != "sqlite3" {
+		return nil, nil, fmt.Errorf("unsupported database driver %q", driver)
+	}
+	if driver == "mysql" || sec != nil && sec.CookieSecure {
+		if err := validateProductionSecrets(sec); err != nil {
+			return nil, nil, err
+		}
+	}
 	var dial gorm.Dialector
 	switch driver {
 	case "sqlite", "sqlite3":
@@ -97,10 +108,9 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		if err := rc.Ping(ctx).Err(); err != nil {
-			if log != nil {
-				log.Warn("redis unavailable; falling back to in-memory challenge store", zap.Error(err))
-			}
 			_ = rc.Close()
+			_ = sqlDB.Close()
+			return nil, nil, fmt.Errorf("configured redis is unavailable: %w", err)
 		} else {
 			d.redis = rc
 			cleanupRedis = func() { _ = rc.Close() }
@@ -111,6 +121,23 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 		_ = sqlDB.Close()
 	}
 	return d, cleanup, nil
+}
+
+func validateProductionSecrets(sec *conf.Security) error {
+	if sec == nil {
+		return fmt.Errorf("production security configuration is required")
+	}
+	for _, field := range []struct{ name, value string }{
+		{"SESSION_SECRET", sec.SessionSecret},
+		{"CSRF_SECRET", sec.CsrfSecret},
+		{"MFA_ENCRYPTION_KEY", sec.MfaEncryptionKey},
+	} {
+		value := strings.TrimSpace(field.value)
+		if len(value) < 32 || strings.HasPrefix(value, "sample-") || strings.HasPrefix(value, "dev-") || strings.HasPrefix(value, "development-") {
+			return fmt.Errorf("%s must be a non-sample secret of at least 32 bytes in production", field.name)
+		}
+	}
+	return nil
 }
 
 func (d *Data) DB() *gorm.DB { return d.db }

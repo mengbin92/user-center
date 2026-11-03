@@ -16,6 +16,8 @@ function authValue(permissions: Parameters<typeof buildPermissionSet>[0]): AuthC
   const permissionSet = buildPermissionSet(permissions)
   return {
     status: 'authenticated',
+    sessionGeneration: 0,
+    getSessionGeneration: () => 0,
     user: null,
     authorization: null,
     permissions: permissionSet,

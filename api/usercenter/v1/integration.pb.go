@@ -840,9 +840,11 @@ func (x *ResourceAuthorizationReply) GetValidUntil() string {
 }
 
 type IntegrationRevokeSessionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Proof of the user whose session is being revoked.
+	SessionToken  string `protobuf:"bytes,3,opt,name=session_token,json=sessionToken,proto3" json:"session_token,omitempty"`
+	SessionId     string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -875,6 +877,13 @@ func (x *IntegrationRevokeSessionRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use IntegrationRevokeSessionRequest.ProtoReflect.Descriptor instead.
 func (*IntegrationRevokeSessionRequest) Descriptor() ([]byte, []int) {
 	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *IntegrationRevokeSessionRequest) GetSessionToken() string {
+	if x != nil {
+		return x.SessionToken
+	}
+	return ""
 }
 
 func (x *IntegrationRevokeSessionRequest) GetSessionId() string {
@@ -952,8 +961,9 @@ const file_api_usercenter_v1_integration_proto_rawDesc = "" +
 	"\x05scope\x18\x03 \x01(\v2\x18.api.usercenter.v1.ScopeR\x05scope\x12'\n" +
 	"\x0fpolicy_revision\x18\x04 \x01(\tR\x0epolicyRevision\x12\x1f\n" +
 	"\vvalid_until\x18\x05 \x01(\tR\n" +
-	"validUntil\"X\n" +
-	"\x1fIntegrationRevokeSessionRequest\x12\x1d\n" +
+	"validUntil\"}\n" +
+	"\x1fIntegrationRevokeSessionRequest\x12#\n" +
+	"\rsession_token\x18\x03 \x01(\tR\fsessionToken\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason2\xfa\x05\n" +

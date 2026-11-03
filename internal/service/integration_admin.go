@@ -40,6 +40,10 @@ func (s *IntegrationAdminService) ListIntegrationClients(ctx context.Context, _ 
 }
 
 func (s *IntegrationAdminService) CreateIntegrationClient(ctx context.Context, req *usercv1.CreateIntegrationClientRequest) (*usercv1.IntegrationClientCredentialReply, error) {
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
 	expires, err := biz.ParseTime(req.GetExpiresAt(), "expires_at")
 	if err != nil {
 		return nil, err
@@ -48,7 +52,7 @@ func (s *IntegrationAdminService) CreateIntegrationClient(ctx context.Context, r
 	if !expires.IsZero() {
 		expPtr = &expires
 	}
-	result, err := s.uc.CreateClient(ctx, requestMeta(ctx), &biz.IntegrationClient{
+	result, err := s.uc.CreateClient(ctx, actor, &biz.IntegrationClient{
 		Code: req.GetCode(), ServiceOwner: req.GetServiceOwner(),
 		AllowedMethods: req.GetAllowedMethods(), EventSubscriptions: req.GetEventSubscriptions(),
 		CallbackURL: req.GetCallbackUrl(), ExpiresAt: expPtr,
@@ -62,6 +66,10 @@ func (s *IntegrationAdminService) CreateIntegrationClient(ctx context.Context, r
 }
 
 func (s *IntegrationAdminService) UpdateIntegrationClient(ctx context.Context, req *usercv1.UpdateIntegrationClientRequest) (*usercv1.IntegrationClient, error) {
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
 	clientID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -70,7 +78,7 @@ func (s *IntegrationAdminService) UpdateIntegrationClient(ctx context.Context, r
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.uc.UpdateClient(ctx, requestMeta(ctx), &biz.IntegrationClient{
+	c, err := s.uc.UpdateClient(ctx, actor, &biz.IntegrationClient{
 		ID: clientID, AllowedMethods: req.GetAllowedMethods(),
 		EventSubscriptions: req.GetEventSubscriptions(), CallbackURL: req.GetCallbackUrl(),
 	}, expected, reasonOr(req.GetReason(), "update integration client"))
@@ -81,11 +89,15 @@ func (s *IntegrationAdminService) UpdateIntegrationClient(ctx context.Context, r
 }
 
 func (s *IntegrationAdminService) RotateIntegrationClientCredential(ctx context.Context, req *usercv1.RotateIntegrationClientCredentialRequest) (*usercv1.IntegrationClientCredentialReply, error) {
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
 	clientID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.uc.Rotate(ctx, requestMeta(ctx), clientID, reasonOr(req.GetReason(), "rotate integration credential"))
+	result, err := s.uc.Rotate(ctx, actor, clientID, reasonOr(req.GetReason(), "rotate integration credential"))
 	if err != nil {
 		return nil, err
 	}
@@ -95,11 +107,15 @@ func (s *IntegrationAdminService) RotateIntegrationClientCredential(ctx context.
 }
 
 func (s *IntegrationAdminService) DisableIntegrationClient(ctx context.Context, req *usercv1.DisableIntegrationClientRequest) (*usercv1.IntegrationClient, error) {
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
 	clientID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.uc.Disable(ctx, requestMeta(ctx), clientID, reasonOr(req.GetReason(), "disable integration client"))
+	c, err := s.uc.Disable(ctx, actor, clientID, reasonOr(req.GetReason(), "disable integration client"))
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +151,11 @@ func (s *IntegrationAdminService) ListEventDeliveries(ctx context.Context, req *
 }
 
 func (s *IntegrationAdminService) RetryEventDelivery(ctx context.Context, req *usercv1.RetryEventDeliveryRequest) (*usercv1.EventDelivery, error) {
-	if err := s.uc.RetryDelivery(ctx, requestMeta(ctx), req.GetEventId(), req.GetSubscriberId(), reasonOr(req.GetReason(), "retry delivery")); err != nil {
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+	if err := s.uc.RetryDelivery(ctx, actor, req.GetEventId(), req.GetSubscriberId(), reasonOr(req.GetReason(), "retry delivery")); err != nil {
 		return nil, err
 	}
 	return &usercv1.EventDelivery{EventId: req.GetEventId(), SubscriberId: req.GetSubscriberId(), Status: "pending"}, nil

@@ -81,7 +81,11 @@ func bizFingerprint(parts ...any) string {
 }
 
 func (s *AdminUserService) CreateUser(ctx context.Context, req *usercv1.CreateUserRequest) (*usercv1.User, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	var roleIDs []int64
 	for _, raw := range req.GetRoleIds() {
 		roleID, err := parseIDField(raw, "role_id")
@@ -115,7 +119,11 @@ func (s *AdminUserService) GetUser(ctx context.Context, req *usercv1.GetUserRequ
 }
 
 func (s *AdminUserService) UpdateUser(ctx context.Context, req *usercv1.UpdateUserRequest) (*usercv1.User, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	userID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -143,7 +151,11 @@ func (s *AdminUserService) UpdateUser(ctx context.Context, req *usercv1.UpdateUs
 }
 
 func (s *AdminUserService) SetUserStatus(ctx context.Context, req *usercv1.SetUserStatusRequest) (*usercv1.User, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	userID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -160,7 +172,11 @@ func (s *AdminUserService) SetUserStatus(ctx context.Context, req *usercv1.SetUs
 }
 
 func (s *AdminUserService) ArchiveUser(ctx context.Context, req *usercv1.ArchiveUserRequest) (*usercv1.User, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	userID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -177,7 +193,11 @@ func (s *AdminUserService) ArchiveUser(ctx context.Context, req *usercv1.Archive
 }
 
 func (s *AdminUserService) CreatePasswordResetRequest(ctx context.Context, req *usercv1.CreatePasswordResetTaskRequest) (*usercv1.PasswordResetTaskReply, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	userID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -190,7 +210,11 @@ func (s *AdminUserService) CreatePasswordResetRequest(ctx context.Context, req *
 }
 
 func (s *AdminUserService) ResetMFA(ctx context.Context, req *usercv1.ResetMFARequest) (*emptypb.Empty, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	userID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -202,7 +226,11 @@ func (s *AdminUserService) ResetMFA(ctx context.Context, req *usercv1.ResetMFARe
 }
 
 func (s *AdminUserService) CreateEmailChangeChallenge(ctx context.Context, req *usercv1.CreateEmailChangeChallengeRequest) (*usercv1.ChallengeReply, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	userID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -215,7 +243,11 @@ func (s *AdminUserService) CreateEmailChangeChallenge(ctx context.Context, req *
 }
 
 func (s *AdminUserService) ConfirmEmailChange(ctx context.Context, req *usercv1.ConfirmEmailChangeRequest) (*usercv1.User, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	userID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -245,7 +277,11 @@ func (s *AdminUserService) ListUserSessions(ctx context.Context, req *usercv1.Li
 }
 
 func (s *AdminUserService) RevokeUserSessions(ctx context.Context, req *usercv1.RevokeUserSessionsRequest) (*emptypb.Empty, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	userID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -281,7 +317,11 @@ func (s *AdminUserService) GetUserEffectivePermissions(ctx context.Context, req 
 }
 
 func (s *AdminUserService) ExportUsers(ctx context.Context, req *usercv1.ExportUsersRequest) (*usercv1.ExportJob, error) {
-	actor := requestMeta(ctx)
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
+
 	var roleID int64
 	var err error
 	if req.GetRoleId() != "" {

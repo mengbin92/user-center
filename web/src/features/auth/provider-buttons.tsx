@@ -41,7 +41,9 @@ export function ProviderButtons({
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-[11px] font-medium text-slate-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-700"
           >
             <Icon className="h-3.5 w-3.5" />
-            {mode === 'bind'
+            {mode === 'verify'
+              ? `重新验证 ${providerLabel(provider)}`
+              : mode === 'bind'
               ? `绑定 ${providerLabel(provider)}`
               : `使用 ${providerLabel(provider)} 登录`}
           </a>

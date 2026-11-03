@@ -6,6 +6,26 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- Enforce actor-aware scopes, root protection, delegation ceilings, atomic
+  batch authorization, current policy/target revisions and non-empty reasons.
+- Prevent challenge, TOTP, recovery-code and stale step-up replay; fail closed
+  on authentication dependencies and keep sensitive writes with their audit.
+- Recheck export authority, restrict integration callers and session revocation,
+  remove the static integration-token bypass, and harden mail and startup secrets.
+- Isolate frontend sessions and cached authorization; keep legacy governance
+  roles pending until explicitly reassigned with a verified boundary.
+
+### Changed
+
+- Use strict ProtoJSON and decimal-string 64-bit values; update generated API
+  types and management preconditions together.
+- Add OAuth-only identity re-verification and explicit offline root MFA rescue.
+- Recover Outbox leases and historical backlog; fix Docker command overrides.
+- Record findings, compatibility changes and validation in
+  [the review report](docs/code-review-2026-11-03.md).
+
 ## [0.2.0] - 2026-11-02
 
 Completes the remaining V1 governance, integration and migration capabilities

@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+	"github.com/mattn/go-sqlite3"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/internal/biz"
 )
@@ -205,7 +206,6 @@ func (r *mfaRepo) Get(ctx context.Context, tx biz.Tx, userID int64) (*biz.MFASta
 }
 
 func (r *mfaRepo) Save(ctx context.Context, tx biz.Tx, s *biz.MFAState) error {
-	now := time.Now().UTC()
 	var pending, locked *time.Time
 	if !s.PendingUntil.IsZero() {
 		t := s.PendingUntil.UTC()
@@ -228,18 +228,44 @@ func (r *mfaRepo) Save(ctx context.Context, tx biz.Tx, s *biz.MFAState) error {
 	if p.Revision == 0 {
 		p.Revision = 1
 	}
-	_ = now
-	return r.d.dbOr(tx).WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"secret_ciphertext", "key_version", "pending_secret", "pending_session",
-			"pending_until", "recovery_hashes", "last_step", "failures", "locked_until", "revision",
-		}),
-	}).Create(p).Error
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if p.Revision == 1 {
+		err := db.Create(p).Error
+		if isDuplicateKeyError(err) {
+			return biz.ErrRevisionConflict
+		}
+		if err != nil {
+			return biz.ErrDependency
+		}
+		return nil
+	}
+	// Every mutation carries the next revision. Consuming a TOTP step or a
+	// recovery code must lose if another request already changed this state.
+	res := db.Model(&mfaPO{}).Where("user_id = ? AND revision = ?", p.UserID, p.Revision-1).Updates(map[string]any{
+		"secret_ciphertext": p.Secret, "key_version": p.KeyVersion,
+		"pending_secret": p.PendingSecret, "pending_session": p.PendingSession,
+		"pending_until": p.PendingUntil, "recovery_hashes": p.RecoveryHashes,
+		"last_step": p.LastStep, "failures": p.Failures,
+		"locked_until": p.LockedUntil, "revision": p.Revision,
+	})
+	if res.Error != nil {
+		return biz.ErrDependency
+	}
+	if res.RowsAffected != 1 {
+		return biz.ErrRevisionConflict
+	}
+	return nil
 }
 
 func (r *mfaRepo) Delete(ctx context.Context, tx biz.Tx, userID int64) error {
-	return r.d.dbOr(tx).WithContext(ctx).Where("user_id = ?", userID).Delete(&mfaPO{}).Error
+	// Preserve the monotonic revision after reset. Physically deleting the
+	// row would restart at revision 1 and allow a delayed pre-reset write to
+	// match a newly enrolled factor's revision (an ABA race).
+	return r.d.dbOr(tx).WithContext(ctx).Model(&mfaPO{}).Where("user_id = ?", userID).Updates(map[string]any{
+		"secret_ciphertext": "", "pending_secret": "", "pending_session": "",
+		"pending_until": nil, "recovery_hashes": "", "last_step": 0,
+		"failures": 0, "locked_until": nil, "revision": gorm.Expr("revision + 1"),
+	}).Error
 }
 
 type sessionRepo struct{ d *Data }
@@ -247,6 +273,9 @@ type sessionRepo struct{ d *Data }
 func NewSessionRepo(d *Data) biz.SessionRepo { return &sessionRepo{d: d} }
 
 func (r *sessionRepo) Create(ctx context.Context, tx biz.Tx, s *biz.Session) error {
+	if tx == nil {
+		return r.d.InTx(ctx, func(ctx context.Context, tx biz.Tx) error { return r.Create(ctx, tx, s) })
+	}
 	db := r.d.dbOr(tx).WithContext(ctx)
 	p := &sessionPO{
 		ID: s.ID, UserID: s.UserID, ApplicationCode: s.ApplicationCode,
@@ -360,8 +389,21 @@ func (r *sessionRepo) ListActiveRoleIDs(ctx context.Context, tx biz.Tx, sessionI
 	return out, nil
 }
 
-func (r *sessionRepo) SetActiveRoleIDs(ctx context.Context, tx biz.Tx, sessionID string, ids []int64) error {
+func (r *sessionRepo) SetActiveRoleIDs(ctx context.Context, tx biz.Tx, sessionID string, ids []int64, expected uint64) error {
+	if tx == nil {
+		return r.d.InTx(ctx, func(ctx context.Context, tx biz.Tx) error {
+			return r.SetActiveRoleIDs(ctx, tx, sessionID, ids, expected)
+		})
+	}
 	db := r.d.dbOr(tx).WithContext(ctx)
+	res := db.Model(&sessionPO{}).Where("id = ? AND revision = ? AND revoked_at IS NULL", sessionID, expected).
+		Update("revision", expected+1)
+	if res.Error != nil {
+		return biz.ErrDependency
+	}
+	if res.RowsAffected != 1 {
+		return biz.ErrRevisionConflict
+	}
 	if err := db.Where("session_id = ?", sessionID).Delete(&sessionRolePO{}).Error; err != nil {
 		return err
 	}
@@ -371,9 +413,7 @@ func (r *sessionRepo) SetActiveRoleIDs(ctx context.Context, tx biz.Tx, sessionID
 			return err
 		}
 	}
-	return db.Model(&sessionPO{}).Where("id = ?", sessionID).Updates(map[string]any{
-		"revision": gorm.Expr("revision + 1"),
-	}).Error
+	return nil
 }
 
 func (r *sessionRepo) SetIdentityVersion(ctx context.Context, tx biz.Tx, id string, version uint64) error {
@@ -441,5 +481,24 @@ func (r *flowRepo) Complete(ctx context.Context, tx biz.Tx, challengeID, purpose
 		ChallengeID: challengeID, Purpose: purpose, UserID: userID,
 		ResultRef: resultRef, CompletedAt: time.Now().UTC(),
 	}
-	return r.d.dbOr(tx).WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(p).Error
+	err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error
+	if isDuplicateKeyError(err) {
+		return biz.ErrChallengeInvalid
+	}
+	if err != nil {
+		return biz.ErrDependency
+	}
+	return nil
+}
+
+func isDuplicateKeyError(err error) bool {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+		return true
+	}
+	var sqliteErr sqlite3.Error
+	return errors.As(err, &sqliteErr) && (sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey || sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique)
 }

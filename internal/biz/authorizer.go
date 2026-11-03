@@ -60,24 +60,50 @@ func (s *Services) LoadAuthzFacts(ctx context.Context, userID int64, activeRoleI
 		ActiveRoleIDs:  activeRoleIDs,
 		Constraints:    constraints,
 	}
-	edges := make(map[int64][]int64, len(roles))
 	for _, r := range roles {
 		f.Roles[r.ID] = r
+	}
+	if err := f.resolveSources(s.Clock.Now()); err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+func (f *AuthzFacts) resolveSources(now time.Time) error {
+	f.Sources = nil
+	edges := make(map[int64][]int64, len(f.Roles))
+	for _, r := range f.Roles {
 		edges[r.ID] = r.Inherits
 	}
 	if err := authorization.ValidateInheritance(edges); err != nil {
-		return nil, fmt.Errorf("role graph: %w", err)
+		return fmt.Errorf("role graph: %w", err)
 	}
-	active := make(map[int64]bool, len(activeRoleIDs))
-	for _, id := range activeRoleIDs {
-		active[id] = true
-	}
-	now := s.Clock.Now()
-	for _, a := range assignments {
-		if !a.Active(now) {
+	// Disabled roles also break inheritance paths; an active grandparent must
+	// not remain reachable through a disabled intermediate role.
+	activeEdges := make(map[int64][]int64, len(edges))
+	for id, inherited := range edges {
+		if f.Roles[id].Status != RoleStatusActive {
 			continue
 		}
-		closure := authorization.ResolveInheritance(a.RoleID, edges)
+		for _, child := range inherited {
+			if f.Roles[child] != nil && f.Roles[child].Status == RoleStatusActive {
+				activeEdges[id] = append(activeEdges[id], child)
+			}
+		}
+	}
+	active := make(map[int64]bool, len(f.ActiveRoleIDs))
+	for _, id := range f.ActiveRoleIDs {
+		active[id] = true
+	}
+	for _, a := range f.Assignments {
+		if a.Revoked || a.ExpiresAt != nil && !now.Before(*a.ExpiresAt) {
+			continue
+		}
+		assignedRole := f.Roles[a.RoleID]
+		if assignedRole == nil || assignedRole.Status != RoleStatusActive {
+			continue
+		}
+		closure := authorization.ResolveInheritance(a.RoleID, activeEdges)
 		for _, roleID := range closure {
 			role := f.Roles[roleID]
 			if role == nil || role.Status != RoleStatusActive {
@@ -97,12 +123,12 @@ func (s *Services) LoadAuthzFacts(ctx context.Context, userID int64, activeRoleI
 						StartsAt:  a.StartsAt,
 						ExpiresAt: a.ExpiresAt,
 					},
-					Active: active[roleID],
+					Active: active[a.RoleID],
 				})
 			}
 		}
 	}
-	return f, nil
+	return nil
 }
 
 func (s *Services) permission(ctx context.Context, operation string) (*Permission, error) {
@@ -200,7 +226,7 @@ func (s *Services) RequireStepUp(ctx context.Context, actor ActorContext) error 
 	if actor.Session == nil {
 		return ErrUnauthenticated
 	}
-	until, err := s.StepUp.Get(ctx, actor.Session.ID)
+	until, err := s.StepUp.Get(ctx, StepUpKey(actor.Session))
 	if err != nil || until.IsZero() || !s.Clock.Now().Before(until) {
 		return ErrStepUpRequired
 	}
@@ -211,7 +237,7 @@ func (s *Services) stepUpUntil(ctx context.Context, actor ActorContext) time.Tim
 	if actor.Session == nil {
 		return time.Time{}
 	}
-	until, err := s.StepUp.Get(ctx, actor.Session.ID)
+	until, err := s.StepUp.Get(ctx, StepUpKey(actor.Session))
 	if err != nil || !s.Clock.Now().Before(until) {
 		return time.Time{}
 	}
@@ -238,12 +264,12 @@ func scopeForFacts(facts *AuthzFacts, actor ActorContext, operation string, now 
 		if !src.Validity.Contains(now) {
 			continue
 		}
-		effective := authorization.Intersect(src.RoleScope, src.Boundary)
+		effective := authorization.IntersectForActor(src.RoleScope, src.Boundary, actor.User.ID)
 		if effective.All {
 			return authorization.Scope{All: true}
 		}
-		if effective.Self {
-			out.Self = true
+		if effective.Self && !slices.Contains(out.UserIDs, actor.User.ID) {
+			out.UserIDs = append(out.UserIDs, actor.User.ID)
 		}
 		for _, id := range effective.UserIDs {
 			if !slices.Contains(out.UserIDs, id) {
@@ -255,45 +281,47 @@ func scopeForFacts(facts *AuthzFacts, actor ActorContext, operation string, now 
 }
 
 func (s *Services) EffectivePermissions(ctx context.Context, userID int64, activeRoleIDs []int64) ([]AuthorizationGrant, uint64, error) {
+	if activeRoleIDs == nil {
+		assignments, err := s.IAM.ListAssignmentsForUser(ctx, nil, userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		activeRoleIDs = []int64{}
+		for _, a := range assignments {
+			if a.Active(s.Clock.Now()) {
+				activeRoleIDs = append(activeRoleIDs, a.RoleID)
+			}
+		}
+	}
 	facts, err := s.LoadAuthzFacts(ctx, userID, activeRoleIDs)
 	if err != nil {
 		return nil, 0, err
 	}
-	if len(activeRoleIDs) == 0 {
-		for _, a := range facts.Assignments {
-			if a.Active(s.Clock.Now()) {
-				facts.ActiveRoleIDs = append(facts.ActiveRoleIDs, a.RoleID)
-			}
-		}
+	permissions, err := s.IAM.ListPermissions(ctx, nil, PermissionFilter{Status: PermissionStatusActive})
+	if err != nil {
+		return nil, 0, err
 	}
-	active := map[int64]bool{}
-	for _, id := range facts.ActiveRoleIDs {
-		active[id] = true
+	enabled := map[string]bool{}
+	for _, p := range permissions {
+		enabled[p.Code] = p.Binding == BindingBound
 	}
 	seen := map[string]bool{}
 	var out []AuthorizationGrant
 	for _, src := range facts.Sources {
-		if !src.Active && !active[src.RoleID] {
+		if !src.Validity.Contains(s.Clock.Now()) || !enabled[src.Operation] || src.Effect == authorization.Allow && !src.Active {
 			continue
 		}
-		if src.Effect == authorization.Deny {
-			key := "deny|" + src.Operation + "|" + src.RoleCode
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-			out = append(out, AuthorizationGrant{Operation: src.Operation, Effect: string(src.Effect), Scope: scopeString(src), RoleID: src.RoleID, RoleCode: src.RoleCode})
+		effective := authorization.IntersectForActor(src.RoleScope, src.Boundary, userID)
+		if effective.Empty() {
 			continue
 		}
-		if !active[src.RoleID] {
-			continue
-		}
-		key := "allow|" + src.Operation + "|" + src.RoleCode
+		scope := scopeString(src, userID)
+		key := string(src.Effect) + "|" + src.Operation + "|" + src.RoleCode + "|" + scope
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		out = append(out, AuthorizationGrant{Operation: src.Operation, Effect: string(src.Effect), Scope: scopeString(src), RoleID: src.RoleID, RoleCode: src.RoleCode})
+		out = append(out, AuthorizationGrant{Operation: src.Operation, Effect: string(src.Effect), Scope: scope, RoleID: src.RoleID, RoleCode: src.RoleCode})
 	}
 	return out, facts.PolicyRevision, nil
 }
@@ -306,8 +334,8 @@ type AuthorizationGrant struct {
 	RoleCode  string
 }
 
-func scopeString(src authorization.GrantSource) string {
-	eff := authorization.Intersect(src.RoleScope, src.Boundary)
+func scopeString(src authorization.GrantSource, userID int64) string {
+	eff := authorization.IntersectForActor(src.RoleScope, src.Boundary, userID)
 	if eff.All {
 		return "all"
 	}
@@ -329,8 +357,10 @@ func CheckConstraints(roleIDs []int64, constraints []*Constraint) error {
 			continue
 		}
 		n := 0
+		seen := map[int64]bool{}
 		for _, id := range roleIDs {
-			if slices.Contains(c.RoleIDs, id) {
+			if !seen[id] && slices.Contains(c.RoleIDs, id) {
+				seen[id] = true
 				n++
 			}
 		}
@@ -352,30 +382,121 @@ func CheckConstraints(roleIDs []int64, constraints []*Constraint) error {
 	return nil
 }
 
-// checkDelegation requires an active delegation when the actor does not hold
-// an all-scope grant for the assignment action. Delegations never grant
-// permissions by themselves; they only authorize a bounded manager to act.
-func (s *Services) checkDelegation(ctx context.Context, actor ActorContext, targetUserID, targetRoleID int64, action string, boundary authorization.Scope) error {
+// checkDelegation requires either direct authority over both the assignment
+// operation and the role capabilities, or a valid delegation with a matching
+// grant ceiling. An assignment operation alone never implies grant authority.
+func (s *Services) checkDelegation(ctx context.Context, actor ActorContext, targetUserID, targetRoleID int64, action string, boundary authorization.Scope, starts time.Time, expires *time.Time) error {
+	currentActor, err := s.currentIAMActor(ctx, actor)
+	if err != nil {
+		return err
+	}
+	actor = currentActor
 	operation := "iam.assignment.create"
 	if action == "revoke" {
 		operation = "iam.assignment.revoke"
 	}
 	scope, err := s.ScopeFor(ctx, actor, operation)
-	if err == nil && scope.All {
-		return nil
+	if err != nil {
+		return ErrAuthorizationDown
 	}
 	delegations, derr := s.IAM.ListDelegations(ctx, nil, DelegationFilter{Status: "active", TargetRoleID: targetRoleID})
 	if derr != nil {
 		return ErrDelegationRequired
 	}
-	if DelegationAllows(delegations, actor.Session.ActiveRoleIDs, targetUserID, targetRoleID, action, boundary, s.Clock.Now()) {
+	roles, err := s.IAM.ListAllRolesWithGrants(ctx, nil)
+	if err != nil {
+		return ErrAuthorizationDown
+	}
+	byID := map[int64]*Role{}
+	edges := map[int64][]int64{}
+	for _, r := range roles {
+		byID[r.ID], edges[r.ID] = r, r.Inherits
+	}
+	assignments, err := s.IAM.ListAssignmentsForUser(ctx, nil, actor.User.ID)
+	if err != nil {
+		return ErrAuthorizationDown
+	}
+	managerRoleIDs := []int64{}
+	for _, assignment := range assignments {
+		role := byID[assignment.RoleID]
+		if assignment.Active(s.Clock.Now()) && role != nil && role.Status == RoleStatusActive && slices.Contains(actor.Session.ActiveRoleIDs, assignment.RoleID) {
+			managerRoleIDs = append(managerRoleIDs, assignment.RoleID)
+		}
+	}
+	var targetGrants []Grant
+	for _, id := range authorization.ResolveInheritance(targetRoleID, edges) {
+		r := byID[id]
+		if r == nil || r.Status != RoleStatusActive {
+			continue
+		}
+		for _, g := range r.Grants {
+			effective := authorization.IntersectForActor(g.Scope, boundary, targetUserID)
+			if effective.Self {
+				effective.Self = false
+				if !slices.Contains(effective.UserIDs, targetUserID) {
+					effective.UserIDs = append(effective.UserIDs, targetUserID)
+				}
+			}
+			if !effective.Empty() {
+				targetGrants = append(targetGrants, Grant{Operation: g.Operation, Effect: authorization.Allow, Scope: effective})
+			}
+		}
+	}
+	if scope.All && s.checkGrantAuthority(ctx, actor, targetGrants) == nil {
 		return nil
+	}
+	for _, d := range delegations {
+		if !delegationAllowsForActor([]*Delegation{d}, managerRoleIDs, actor.User.ID, targetUserID, targetRoleID, action, boundary, s.Clock.Now()) {
+			continue
+		}
+		if action == "assign" && (starts.Before(d.StartsAt) || d.ExpiresAt != nil && (expires == nil || expires.After(*d.ExpiresAt))) {
+			continue
+		}
+		covered := true
+		for _, g := range targetGrants {
+			found := false
+			for _, ceiling := range d.GrantCeiling {
+				ceilingScope := ceiling.Scope
+				if ceilingScope.Self {
+					ceilingScope.Self = false
+					if !slices.Contains(ceilingScope.UserIDs, targetUserID) {
+						ceilingScope.UserIDs = append(slices.Clone(ceilingScope.UserIDs), targetUserID)
+					}
+				}
+				if ceiling.Operation == g.Operation && authorization.Covers(ceilingScope, g.Scope) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				covered = false
+				break
+			}
+		}
+
+		if covered {
+			return nil
+		}
 	}
 	return ErrDelegationRequired
 }
 
 // DelegationAllows is the pure containment check used by assignment guards.
 func DelegationAllows(delegations []*Delegation, activeRoleIDs []int64, targetUserID, targetRoleID int64, action string, boundary authorization.Scope, now time.Time) bool {
+	return delegationAllowsForActor(delegations, activeRoleIDs, 0, targetUserID, targetRoleID, action, boundary, now)
+}
+
+func delegationAllowsForActor(delegations []*Delegation, activeRoleIDs []int64, actorID, targetUserID, targetRoleID int64, action string, boundary authorization.Scope, now time.Time) bool {
+	resolveSelf := func(scope authorization.Scope, userID int64) authorization.Scope {
+		if scope.Self {
+			scope.Self = false
+			if userID > 0 && !slices.Contains(scope.UserIDs, userID) {
+				scope.UserIDs = append(slices.Clone(scope.UserIDs), userID)
+			}
+		}
+		return scope
+	}
+	boundary = resolveSelf(boundary, targetUserID)
 	for _, d := range delegations {
 		if !slices.Contains(activeRoleIDs, d.ManagerRoleID) || !d.Active(now) {
 			continue
@@ -383,10 +504,11 @@ func DelegationAllows(delegations []*Delegation, activeRoleIDs []int64, targetUs
 		if d.TargetRoleID != targetRoleID || !slices.Contains(d.Actions, action) {
 			continue
 		}
-		if !authorization.Covers(d.TargetUserScope, authorization.Scope{UserIDs: []int64{targetUserID}}) {
+		targetScope := resolveSelf(d.TargetUserScope, actorID)
+		if !authorization.Covers(targetScope, authorization.Scope{UserIDs: []int64{targetUserID}}) {
 			continue
 		}
-		if !authorization.Covers(d.TargetUserScope, boundary) {
+		if !authorization.Covers(targetScope, boundary) {
 			continue
 		}
 		return true

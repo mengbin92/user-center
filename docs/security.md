@@ -9,7 +9,7 @@
 | 验证码 | HMAC 后存 Redis/内存；邮件正文外不落库 |
 | 授权事实 | MySQL 为权威；前端只消费 `/me/authorization` 投影 |
 | 审计 | 追加写；普通管理员不能删除 |
-| 集成令牌 | 环境变量；gRPC Bearer |
+| 接入客户端凭据 | 仅创建/轮换时展示；DB 存摘要；gRPC Bearer 与方法白名单 |
 
 浏览器、反向代理、数据库、Redis、SMTP 均视为独立信任域；跨域只通过明确契约。
 
@@ -28,7 +28,7 @@
 | 越权 | 操作权限 + Scope 边界 + 显式 deny + 有效期 + 约束；资源 owner 执行点校验 |
 | 数据范围绕过 | 列表/详情/导出/会话接口统一 Scope 过滤；受限管理员不能通过分页/导出扩大范围 |
 | 并发覆盖 | 用户 revision、policy revision、角色/分配 revision CAS |
-| 高风险操作 | Step-up（密码 + 第二因素，绑定 session，5 分钟） |
+| 高风险操作 | Step-up（主认证 + 第二因素，绑定 session 与 identity_version，5 分钟） |
 | 管理员未绑定 MFA | 管理授权入口强制 `MFA_ENROLLMENT_REQUIRED`，但保留安全中心完成绑定 |
 | 初始密码 | `password_change_required` + 中间件阻断 `/admin/*`，改密后清除 |
 | 第三方登录 | 单次 state（Redis + HttpOnly Cookie）、服务端 code 交换、不按邮箱自动合并、已启用 MFA 时仍要求第二因素 |
@@ -44,29 +44,31 @@
 - 无效/过期/未激活 grant 不参与 allow；deny 不受会话激活影响，只要有效期命中即拒绝。
 - 角色继承在写入和决策读取时都验证无环。
 - 管理员邮箱字段按 `identity.user.contact.read` 单独授权；无权限时返回空字符串，而不是遮罩字符串。
-- 导出下载每次重新检查 actor、任务归属、任务状态与过期时间；文件名经过 `filepath.Base`。
-- 内部 gRPC 与浏览器 HTTP 分离；HTTP 不注册内部 RPC 方法。
-- 错误不返回内部 SQL/驱动信息；Kratos 错误 reason 为稳定枚举。
+- 列表与概览在 SQL 计数/分页前应用 allow 与 deny；邮箱关键词检索也要求完整联系方式读取权限。
+- 导出下载检查当前会话、任务归属、导出权限、policy/session-role revision 和授权有效期；权限变化后必须重新导出。CSV 公式前缀被转义，文件名经过 `filepath.Base`。
+- 内部 gRPC 只接受数据库接入客户端凭据，不保留静态令牌旁路。资源授权验证调用方 service_owner、资源 owner 和执行点；会话撤销需要用户会话证明，禁止跨用户/应用。
+- 错误不返回内部 SQL/驱动信息。JSON 请求上限 1 MiB，未知字段拒绝；ProtoJSON 保留 64 位整数精度。
+- MySQL 或 Secure Cookie 配置要求三个安全密钥至少 32 字节并拒绝开发样例；配置 Redis 后连接失败拒绝启动。只有未配置 Redis 的开发环境使用内存临时状态。
+- TOTP/恢复码与会话角色使用 CAS；MFA 清空状态时保留 revision，防止删除重建后的 ABA 竞态。密码、邮箱和 MFA 变更使旧近期证明失效。
+- console 邮件仅记录收件人和主题；邮件正文、验证码及 SMTP 错误原文不写日志。配置读取/解密失败不伪装投递成功。
+- 纯 OAuth 账号的 `mode=verify` 只接受当前已绑定身份；主认证证明与完整 Step-up 分离，均绑定会话和身份版本。主认证证明可用于首设密码或 MFA，有 MFA 时仍必须验证当前第二因素。
 
 ## 4. 已知限制（必须在上线评审中确认）
 
 1. **OAuth 真实提供方尚未做生产沙箱验收**：GitHub/Google 适配器、state、绑定与登录流程已实现并有 mock 测试；上线前必须用真实 Client ID/Secret、HTTPS 回调和账号完成一轮验收。
 2. **委派只约束角色分配/撤销**：委派校验覆盖目标角色、目标用户范围、动作与有效期；通过委派不能修改角色 Grant、继承或创建角色，策略变更仍要求直接权限。
-3. **列表 `total_size` 为粗过滤值**：deny/self 在逐行决策中应用，受限管理员的总数可能略大于可见行数；不泄露用户内容，但可能与实际可见数不一致。
-4. **Redis 不可用时退化为进程内存储**：多实例部署下限流/验证码/Step-up/OAuth state 不共享；生产必须监控 Redis 可用性。
-5. **Outbox 为至少一次投递**：消费端必须按 `event_id` 去重；`OUTBOX_SIGNING_SECRET` 为空时不签名（仅开发），生产必须配置并校验 `X-UserCenter-Signature`。
-6. **静态集成令牌仍可绕过客户端方法白名单**：`USER_CENTER_INTEGRATION_TOKEN` 是部署方应急/自举通道；生产应优先使用数据库接入客户端并定期轮换，或限制静态令牌的网络来源。
-7. **审计读取本身不写审计**：当前只记录写操作与安全事件；高合规场景需增加读取审计。
-8. **无组织/多租户**：仅 platform 授权域，组织相关输入会被拒绝（V2）。
-9. **同步导出**：单次最多 100000 行，生成期间占用请求；超大导出需异步任务。
-10. **管理员邮箱变更依赖新邮箱可达**：验证码发送到新邮箱，管理员权限 + Step-up 防止误操作，但无法证明旧邮箱归属；需要旧邮箱确认的场景应走用户自助流程。
-11. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。
+3. **Outbox 为至少一次投递**：消费端按 `event_id` 去重；有订阅客户端时必须配置 `OUTBOX_SIGNING_SECRET`，为空则拒绝投递。队列按订阅方读取未入队历史事件，并使用可过期领取租约，进程中断后可恢复。
+4. **审计读取本身不写审计**：当前只记录写操作与安全事件；有读取审计需求时需增加相应实现。
+5. **无组织/多租户**：仅 platform 授权域，组织相关输入会被拒绝（V2）。
+6. **同步导出**：单次最多 100000 行，生成期间占用请求；超大导出需异步任务。
+7. **管理员邮箱变更依赖新邮箱可达**：验证码发送到新邮箱，管理员权限 + Step-up 防止误操作，但无法证明旧邮箱归属；需要旧邮箱确认的场景应走用户自助流程。
+8. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。
 
 ## 5. 上线检查
 
 - [ ] `COOKIE_SECURE=true`，全站 HTTPS，HSTS 已配置
 - [ ] `SESSION_SECRET`、`CSRF_SECRET`、`MFA_ENCRYPTION_KEY` 为随机值且已备份
-- [ ] `USER_CENTER_INTEGRATION_TOKEN` 非空，gRPC 端口只对受信网络开放
+- [ ] 接入客户端已创建并配置最小方法白名单，gRPC 端口只对受信网络开放
 - [ ] root 已创建且密码不在仓库/镜像/Compose 中
 - [ ] MySQL 运行账号无 DDL/跨库权限
 - [ ] Redis 持久化与监控已配置

@@ -226,7 +226,7 @@ export function AdminRolesPage() {
                       {role.inherits?.length ?? 0}
                     </TD>
                     <TD className="text-xs text-slate-600">
-                      {role.max_members || '不限'}
+                      {role.max_members && role.max_members !== '0' ? role.max_members : '不限'}
                     </TD>
                     <TD className="font-mono text-[11px] text-slate-500">
                       {role.revision}

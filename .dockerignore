@@ -9,3 +9,5 @@ web/test-results
 *.log
 .env
 .DS_Store
+.env.*
+configs/config.local.yaml

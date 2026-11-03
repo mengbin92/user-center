@@ -30,7 +30,7 @@ func TestScopeValidateAndMatch(t *testing.T) {
 func TestIntersect(t *testing.T) {
 	require.Equal(t, Scope{UserIDs: []int64{2}}, Intersect(Scope{All: true}, Scope{UserIDs: []int64{2}}))
 	require.Equal(t, Scope{Self: true}, Intersect(Scope{Self: true}, Scope{Self: true}))
-	require.Equal(t, Scope{UserIDs: []int64{9}}, Intersect(Scope{Self: true}, Scope{UserIDs: []int64{9}}))
+	require.True(t, Intersect(Scope{Self: true}, Scope{UserIDs: []int64{9}}).Empty())
 	require.Equal(t, Scope{UserIDs: []int64{2}}, Intersect(Scope{UserIDs: []int64{1, 2}}, Scope{UserIDs: []int64{2, 3}}))
 	require.True(t, Intersect(Scope{UserIDs: []int64{1}}, Scope{UserIDs: []int64{2}}).Empty())
 }

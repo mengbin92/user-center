@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-gofmt -l . | grep -v '^$' && { echo "gofmt required"; exit 1; } || true
+unformatted="$(gofmt -l .)"
+if [[ -n "$unformatted" ]]; then
+  echo "$unformatted"
+  echo "gofmt required"
+  exit 1
+fi
 go vet ./...
 go test ./...
-cd web && npm run build
+cd web
+npm test
+npm run build

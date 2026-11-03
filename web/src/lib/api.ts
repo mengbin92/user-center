@@ -1,4 +1,5 @@
 import { http } from './http'
+import type { operations } from './api-types'
 import type {
   ArchiveMenuItemRequest,
   ArchivePermissionRequest,
@@ -425,7 +426,7 @@ export const api = {
       post<Constraint>('/api/v1/admin/iam/constraints', body),
     updateConstraint: (id: string, body: UpdateConstraintRequest) =>
       patch<Constraint>(`/api/v1/admin/iam/constraints/${enc(id)}`, body),
-    deleteConstraint: (id: string, params: { expected_revision?: string; reason?: string }) =>
+    deleteConstraint: (id: string, params: NonNullable<operations['IAMService_DeleteConstraint']['parameters']['query']>) =>
       del(`/api/v1/admin/iam/constraints/${enc(id)}`, params),
 
     listAssignments: (params?: ListAssignmentsParams) =>

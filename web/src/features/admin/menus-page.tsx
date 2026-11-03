@@ -84,6 +84,7 @@ export function AdminMenusPage() {
         sort: Number(form.sort) || 0,
         required_all: splitList(form.requiredAll),
         required_any: splitList(form.requiredAny),
+        expected_policy_revision: authorization?.policy_revision,
         reason: form.reason.trim(),
       }),
     successMessage: '菜单项已创建',
@@ -107,7 +108,8 @@ export function AdminMenusPage() {
         required_all: splitList(editForm.requiredAll),
         required_any: splitList(editForm.requiredAny),
         expected_revision: editTarget.revision ?? '0',
-        reason: editForm.reason.trim() || 'update menu item',
+        expected_policy_revision: authorization?.policy_revision,
+        reason: editForm.reason.trim(),
       })
     },
     successMessage: '菜单项已更新',
@@ -121,6 +123,7 @@ export function AdminMenusPage() {
       api.iam.archiveMenuItem(input.menu.id ?? '', {
         id: input.menu.id,
         expected_revision: input.menu.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: '菜单项已归档',
@@ -468,6 +471,7 @@ export function AdminMenusPage() {
               size="sm"
               onClick={submitEdit}
               loading={updateMenu.isPending}
+              disabled={!editForm.reason.trim()}
             >
               保存
             </Button>
@@ -557,7 +561,7 @@ export function AdminMenusPage() {
             onChange={(event) =>
               setEditForm({ ...editForm, reason: event.target.value })
             }
-            placeholder="可选，写入审计"
+            placeholder="请填写本次变更的原因" required
           />
         </Field>
         {formError ? (

@@ -122,7 +122,7 @@ func TestSessionAndCatalogRepos(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int64{role.ID}, roles)
 
-	require.NoError(t, sessions.SetActiveRoleIDs(ctx, nil, "sess-1", nil))
+	require.NoError(t, sessions.SetActiveRoleIDs(ctx, nil, "sess-1", nil, 1))
 	roles, err = sessions.ListActiveRoleIDs(ctx, nil, "sess-1")
 	require.NoError(t, err)
 	require.Empty(t, roles)
@@ -137,7 +137,7 @@ func TestSessionAndCatalogRepos(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, auth.RegistrationEnabled)
 	auth.PasswordMinLength = 12
-	saved, err := settings.SaveAuth(ctx, nil, auth, 0)
+	saved, err := settings.SaveAuth(ctx, nil, auth, auth.Revision)
 	require.NoError(t, err)
 	require.EqualValues(t, 2, saved.Revision)
 	_, err = settings.SaveAuth(ctx, nil, auth, 1)

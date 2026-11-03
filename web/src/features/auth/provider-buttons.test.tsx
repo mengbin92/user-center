@@ -39,3 +39,8 @@ describe('provider buttons', () => {
     )
   })
 })
+
+it('uses the dedicated bound-identity verification flow', () => {
+  render(<ProviderButtons providers={['github']} mode="verify" />)
+  expect(screen.getByText('重新验证 GitHub')).toHaveAttribute('href', '/api/v1/auth/providers/github/start?mode=verify')
+})

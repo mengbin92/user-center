@@ -7,5 +7,4 @@ var ProviderSet = wire.NewSet(
 	NewHTTPServer,
 	NewGRPCServer,
 	NewArtifactDir,
-	NewIntegrationToken,
 )

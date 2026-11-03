@@ -52,7 +52,7 @@ type PendingAction = {
 }
 
 export function AdminPermissionsPage() {
-  const { can } = useAuth()
+  const { can, authorization } = useAuth()
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [category, setCategory] = useState('')
@@ -115,6 +115,7 @@ export function AdminPermissionsPage() {
         context_types: ['platform'],
         description: description.trim(),
         sort: Number(sort) || 0,
+        expected_policy_revision: authorization?.policy_revision,
         reason: reason.trim(),
       }),
     successMessage: '权限已创建',
@@ -138,11 +139,13 @@ export function AdminPermissionsPage() {
         description: editDescription.trim(),
         sort: Number(editSort) || 0,
         expected_revision: editTarget.revision ?? '0',
-        reason: editReason.trim() || 'update permission',
+        expected_policy_revision: authorization?.policy_revision,
+        reason: editReason.trim(),
       })
     },
     successMessage: '权限已更新',
     invalidate: [['admin', 'iam', 'permissions']],
+    refreshAuth: true,
     onSuccess: () => setEditTarget(null),
   })
 
@@ -152,10 +155,12 @@ export function AdminPermissionsPage() {
         id: input.permission.id,
         status: input.status,
         expected_revision: input.permission.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: '权限状态已更新',
     invalidate: [['admin', 'iam', 'permissions']],
+    refreshAuth: true,
     onSuccess: () => setPending(null),
   })
 
@@ -164,10 +169,12 @@ export function AdminPermissionsPage() {
       api.iam.archivePermission(input.permission.id ?? '', {
         id: input.permission.id,
         expected_revision: input.permission.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: '权限已归档',
     invalidate: [['admin', 'iam', 'permissions']],
+    refreshAuth: true,
     onSuccess: () => setPending(null),
   })
 
@@ -669,7 +676,7 @@ export function AdminPermissionsPage() {
               size="sm"
               onClick={() => updatePermission.mutate(undefined)}
               loading={updatePermission.isPending}
-              disabled={!editName.trim() || editScopes.size === 0}
+              disabled={!editName.trim() || editScopes.size === 0 || !editReason.trim()}
             >
               保存
             </Button>
@@ -743,7 +750,7 @@ export function AdminPermissionsPage() {
             id="edit-permission-reason"
             value={editReason}
             onChange={(event) => setEditReason(event.target.value)}
-            placeholder="可选，写入审计日志"
+            placeholder="请填写本次变更的原因" required
           />
         </Field>
         <div className="text-[11px] text-slate-500">

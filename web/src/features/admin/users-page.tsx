@@ -34,6 +34,7 @@ import {
   Table,
 } from '../../components/table'
 import { api } from '../../lib/api'
+import { passwordValidationError } from '../../lib/password'
 import { useAuth } from '../../lib/auth'
 import { formatDateTime } from '../../lib/format'
 import { useApiMutation } from '../../lib/mutations'
@@ -54,8 +55,15 @@ const EXPORT_FIELDS: Array<{ key: string; label: string; hint?: string }> = [
 
 export function AdminUsersPage() {
   const navigate = useNavigate()
-  const { can } = useAuth()
+  const { can, authorization } = useAuth()
   const rolesQuery = useAllRoles()
+  const authContext = useQuery({
+    queryKey: ['auth', 'context'],
+    queryFn: () => api.auth.context(),
+    retry: false,
+    staleTime: 60_000,
+  })
+  const passwordMinimum = authContext.data?.password_min_length ?? 10
 
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -106,7 +114,6 @@ export function AdminUsersPage() {
   const [displayName, setDisplayName] = useState('')
   const [initialPassword, setInitialPassword] = useState('')
   const [sendActivation, setSendActivation] = useState(true)
-  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set())
   const [createReason, setCreateReason] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -118,7 +125,7 @@ export function AdminUsersPage() {
         display_name: displayName.trim() || undefined,
         initial_password: initialPassword || undefined,
         send_activation: sendActivation,
-        role_ids: [...selectedRoles],
+        expected_policy_revision: authorization?.policy_revision,
         reason: createReason.trim(),
       }),
     successMessage: '用户已创建',
@@ -140,7 +147,6 @@ export function AdminUsersPage() {
     setDisplayName('')
     setInitialPassword('')
     setSendActivation(true)
-    setSelectedRoles(new Set())
     setCreateReason('')
     setFormError(null)
   }
@@ -151,8 +157,13 @@ export function AdminUsersPage() {
       setFormError('请输入用户名')
       return
     }
-    if (!sendActivation && initialPassword.length < 10) {
-      setFormError('不发送激活邮件时，必须设置至少 10 位的初始密码')
+    if (!sendActivation && !initialPassword) {
+      setFormError('不发送激活邮件时，必须设置初始密码')
+      return
+    }
+    const passwordError = initialPassword ? passwordValidationError(initialPassword, passwordMinimum) : null
+    if (passwordError) {
+      setFormError(passwordError)
       return
     }
     if (sendActivation && !email.trim()) {
@@ -164,15 +175,6 @@ export function AdminUsersPage() {
       return
     }
     createUser.mutate(undefined)
-  }
-
-  const toggleRole = (id: string) => {
-    setSelectedRoles((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
   }
 
   // Export
@@ -471,7 +473,7 @@ export function AdminUsersPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         title="创建用户"
-        description="创建后会写入审计。未选择角色时默认授予 member。"
+        description="新用户默认授予 member。其他角色请通过授权分配流程配置。"
         size="lg"
         bodyClassName="space-y-3"
         footer={
@@ -524,15 +526,16 @@ export function AdminUsersPage() {
           <Field
             label="初始密码"
             htmlFor="create-password"
-            hint="留空则不设置本地密码"
+            hint="需凭据治理权限与近期安全验证；留空通过激活邮件设置"
           >
             <Input
               id="create-password"
               type="password"
               autoComplete="new-password"
+              disabled={!can('identity.user.credential.update')}
               value={initialPassword}
               onChange={(event) => setInitialPassword(event.target.value)}
-              placeholder="至少 10 位"
+              placeholder={`至少 ${passwordMinimum} 个字符，最多 72 字节`}
             />
           </Field>
         </div>
@@ -543,33 +546,6 @@ export function AdminUsersPage() {
           label="发送激活邮件（用户通过邮件设置密码）"
         />
 
-        <div>
-          <div className="mb-1.5 text-xs font-medium text-slate-700">
-            分配角色
-          </div>
-          <div className="grid max-h-40 gap-1 overflow-y-auto rounded-md border border-slate-200 p-2 sm:grid-cols-2">
-            {roles.map((role) => (
-              <label
-                key={role.id}
-                className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[11px] hover:bg-slate-50"
-              >
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 rounded border-slate-300 accent-indigo-600"
-                  checked={selectedRoles.has(role.id ?? '')}
-                  onChange={() => toggleRole(role.id ?? '')}
-                />
-                <span className="truncate text-slate-700">{role.name}</span>
-                <span className="font-mono text-[10px] text-slate-400">
-                  {role.code}
-                </span>
-              </label>
-            ))}
-            {roles.length === 0 ? (
-              <span className="text-[11px] text-slate-500">暂无可用角色</span>
-            ) : null}
-          </div>
-        </div>
 
         <Field
           label="操作原因"

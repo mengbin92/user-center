@@ -164,6 +164,9 @@ func (r *userRepo) BumpIdentityVersion(ctx context.Context, tx biz.Tx, id int64)
 }
 
 func (r *userRepo) scoped(db *gorm.DB, f biz.UserFilter) *gorm.DB {
+	if len(f.ExcludedIDs) > 0 {
+		db = db.Where("id NOT IN ?", f.ExcludedIDs)
+	}
 	if !f.Scope.All {
 		q := db
 		switch {
@@ -185,13 +188,17 @@ func (r *userRepo) List(ctx context.Context, tx biz.Tx, f biz.UserFilter) ([]*bi
 	db := r.scoped(r.d.dbOr(tx).WithContext(ctx).Model(&userPO{}), f)
 	if f.Keyword != "" {
 		like := "%" + escapeLike(strings.ToLower(f.Keyword)) + "%"
-		db = db.Where("(LOWER(username) LIKE ? ESCAPE '\\\\' OR LOWER(display_name) LIKE ? ESCAPE '\\\\' OR LOWER(COALESCE(email, '')) LIKE ? ESCAPE '\\\\')", like, like, like)
+		if f.SearchEmail {
+			db = db.Where("(LOWER(username) LIKE ? ESCAPE '!' OR LOWER(display_name) LIKE ? ESCAPE '!' OR LOWER(COALESCE(email, '')) LIKE ? ESCAPE '!')", like, like, like)
+		} else {
+			db = db.Where("(LOWER(username) LIKE ? ESCAPE '!' OR LOWER(display_name) LIKE ? ESCAPE '!')", like, like)
+		}
 	}
 	if f.Status != "" {
 		db = db.Where("status = ?", f.Status)
 	}
 	if f.RoleID > 0 {
-		db = db.Where("id IN (?)", r.d.dbOr(tx).Model(&assignmentPO{}).Select("user_id").Where("role_id = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?)", f.RoleID, "active", time.Now().UTC()))
+		db = db.Where("id IN (?)", r.d.dbOr(tx).Model(&assignmentPO{}).Select("user_id").Where("role_id = ? AND status = ? AND starts_at <= ? AND (expires_at IS NULL OR expires_at > ?)", f.RoleID, "active", time.Now().UTC(), time.Now().UTC()))
 	}
 	if f.MFA != nil {
 		sub := r.d.dbOr(tx).Model(&mfaPO{}).Select("user_id").Where("secret_ciphertext <> ''")
@@ -254,7 +261,7 @@ func (r *userRepo) RolesForUser(ctx context.Context, tx biz.Tx, userID int64) ([
 	err := db.Table("iam_user_roles AS ur").
 		Select("r.id, r.code, r.name").
 		Joins("JOIN iam_roles AS r ON r.id = ur.role_id").
-		Where("ur.user_id = ? AND ur.status = ? AND r.status = ? AND (ur.expires_at IS NULL OR ur.expires_at > ?)", userID, "active", "active", now).
+		Where("ur.user_id = ? AND ur.status = ? AND r.status = ? AND ur.starts_at <= ? AND (ur.expires_at IS NULL OR ur.expires_at > ?)", userID, "active", "active", now, now).
 		Order("r.id").Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -270,14 +277,15 @@ func (r *userRepo) CountsByRole(ctx context.Context, tx biz.Tx, roleID int64) (i
 	var n int64
 	now := time.Now().UTC()
 	err := r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).
-		Where("role_id = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?)", roleID, "active", now).
-		Count(&n).Error
+		Where("role_id = ? AND status = ? AND starts_at <= ? AND (expires_at IS NULL OR expires_at > ?)", roleID, "active", now, now).
+		Where("user_id IN (?)", r.d.dbOr(tx).Model(&userPO{}).Select("id").Where("status = ?", biz.UserStatusEnabled)).
+		Distinct("user_id").Count(&n).Error
 	return n, err
 }
 
 func escapeLike(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "%", "\\%")
-	s = strings.ReplaceAll(s, "_", "\\_")
+	s = strings.ReplaceAll(s, "!", "!!")
+	s = strings.ReplaceAll(s, "%", "!%")
+	s = strings.ReplaceAll(s, "_", "!_")
 	return s
 }

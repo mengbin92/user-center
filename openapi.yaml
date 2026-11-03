@@ -374,6 +374,10 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: expected_policy_revision
+                  in: query
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -1960,6 +1964,8 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.ArchivePermissionRequest:
             type: object
             properties:
@@ -1968,6 +1974,8 @@ components:
                 expected_revision:
                     type: string
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.ArchiveRoleRequest:
             type: object
@@ -1978,6 +1986,8 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.ArchiveUserRequest:
             type: object
             properties:
@@ -1986,6 +1996,8 @@ components:
                 expected_revision:
                     type: string
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.Assignment:
             type: object
@@ -2232,6 +2244,10 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_revision:
+                    type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.ConfirmEmailRequest:
             type: object
             properties:
@@ -2281,6 +2297,10 @@ components:
                 name:
                     type: string
                 reason:
+                    type: string
+                expected_revision:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.CreateAssignmentRequest:
             type: object
@@ -2363,6 +2383,10 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_revision:
+                    type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.CreateIntegrationClientRequest:
             type: object
             properties:
@@ -2408,6 +2432,8 @@ components:
                         type: string
                 reason:
                     type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.CreatePasswordResetChallengeRequest:
             type: object
             properties:
@@ -2420,6 +2446,10 @@ components:
                 id:
                     type: string
                 reason:
+                    type: string
+                expected_revision:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.CreatePermissionRequest:
             type: object
@@ -2448,6 +2478,8 @@ components:
                     type: integer
                     format: int32
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.CreateRegistrationChallengeRequest:
             type: object
@@ -2495,6 +2527,8 @@ components:
                 initial_password:
                     type: string
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.Delegation:
             type: object
@@ -2551,6 +2585,8 @@ components:
                 id:
                     type: string
                 reason:
+                    type: string
+                expected_revision:
                     type: string
         api.usercenter.v1.DisableMFARequest:
             type: object
@@ -3108,6 +3144,10 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_revision:
+                    type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.ResetPasswordRequest:
             type: object
             properties:
@@ -3155,6 +3195,8 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+                expected_revision:
+                    type: string
         api.usercenter.v1.RevokeDelegationRequest:
             type: object
             properties:
@@ -3163,6 +3205,8 @@ components:
                 expected_revision:
                     type: string
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.RevokeOtherSessionsRequest:
             type: object
@@ -3179,6 +3223,10 @@ components:
                 revoke_all:
                     type: boolean
                 reason:
+                    type: string
+                expected_revision:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.Role:
             type: object
@@ -3272,6 +3320,8 @@ components:
                 id:
                     type: string
                 reason:
+                    type: string
+                expected_revision:
                     type: string
         api.usercenter.v1.RotateRecoveryCodesRequest:
             type: object
@@ -3406,6 +3456,8 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.SetRoleStatusRequest:
             type: object
             properties:
@@ -3416,6 +3468,8 @@ components:
                 expected_revision:
                     type: string
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.SetUserStatusRequest:
             type: object
@@ -3428,6 +3482,8 @@ components:
                 expected_revision:
                     type: string
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.SetupMFAReply:
             type: object
@@ -3530,6 +3586,8 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.UpdateDelegationRequest:
             type: object
             properties:
@@ -3554,6 +3612,8 @@ components:
                 expected_revision:
                     type: string
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.UpdateEmailSettingsRequest:
             type: object
@@ -3632,6 +3692,8 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.UpdatePermissionRequest:
             type: object
             properties:
@@ -3656,6 +3718,8 @@ components:
                     type: string
                 reason:
                     type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.UpdateRoleRequest:
             type: object
             properties:
@@ -3670,6 +3734,8 @@ components:
                 expected_revision:
                     type: string
                 reason:
+                    type: string
+                expected_policy_revision:
                     type: string
         api.usercenter.v1.UpdateUserRequest:
             type: object

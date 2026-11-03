@@ -93,8 +93,8 @@ export function AdminAuthSettingsPage() {
     const passwordMin = Number(form.passwordMinLength)
     const sessionTtl = Number(form.sessionTtlMinutes)
     const idle = Number(form.idleTimeoutMinutes)
-    if (!Number.isInteger(passwordMin) || passwordMin < 8 || passwordMin > 128) {
-      return '密码最小长度必须为 8-128'
+    if (!Number.isInteger(passwordMin) || passwordMin < 8 || passwordMin > 72) {
+      return '密码最小长度必须为 8-72'
     }
     if (!Number.isInteger(sessionTtl) || sessionTtl < 5 || sessionTtl > 43200) {
       return '会话有效期必须为 5-43200 分钟'
@@ -187,7 +187,7 @@ export function AdminAuthSettingsPage() {
                 <Field
                   label="密码最小长度"
                   htmlFor="settings-password-min"
-                  hint="8-128"
+                  hint="8-72"
                 >
                   <Input
                     id="settings-password-min"

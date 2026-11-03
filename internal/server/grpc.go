@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"os"
 	"strings"
 	"time"
 
@@ -21,14 +20,7 @@ type GRPCServer struct {
 	*kgrpc.Server
 }
 
-// IntegrationToken is a named Wire provider for the internal gRPC credential.
-type IntegrationToken string
-
-func NewIntegrationToken() IntegrationToken {
-	return IntegrationToken(os.Getenv("USER_CENTER_INTEGRATION_TOKEN"))
-}
-
-func NewGRPCServer(cfg *conf.Server, integrationToken IntegrationToken, log *zap.Logger, integration *service.IntegrationService) *GRPCServer {
+func NewGRPCServer(cfg *conf.Server, log *zap.Logger, integration *service.IntegrationService) *GRPCServer {
 	addr := ":9090"
 	timeout := 30
 	if cfg != nil && cfg.Grpc != nil {
@@ -42,13 +34,13 @@ func NewGRPCServer(cfg *conf.Server, integrationToken IntegrationToken, log *zap
 	srv := kgrpc.NewServer(
 		kgrpc.Address(addr),
 		kgrpc.Timeout(time.Duration(timeout)*time.Second),
-		kgrpc.Options(grpc.ChainUnaryInterceptor(integrationAuth(string(integrationToken), integration.Usecase()))),
+		kgrpc.Options(grpc.ChainUnaryInterceptor(integrationAuth(integration.Usecase()))),
 	)
 	usercv1.RegisterIntegrationServiceServer(srv, integration)
 	return &GRPCServer{Server: srv}
 }
 
-func integrationAuth(staticToken string, uc *biz.IntegrationUsecase) grpc.UnaryServerInterceptor {
+func integrationAuth(uc *biz.IntegrationUsecase) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if !strings.HasPrefix(info.FullMethod, "/api.usercenter.v1.IntegrationService/") {
 			return handler(ctx, req)
@@ -59,10 +51,10 @@ func integrationAuth(staticToken string, uc *biz.IntegrationUsecase) grpc.UnaryS
 			return nil, biz.ErrUnauthenticated
 		}
 		raw := strings.TrimSpace(values[0])
-		raw = strings.TrimPrefix(raw, "Bearer ")
-		if staticToken != "" && raw == staticToken {
-			return handler(ctx, req)
+		if !strings.HasPrefix(raw, "Bearer ") {
+			return nil, biz.ErrUnauthenticated
 		}
+		raw = strings.TrimPrefix(raw, "Bearer ")
 		client, err := uc.AuthenticateClient(ctx, raw)
 		if err != nil {
 			return nil, biz.ErrUnauthenticated
@@ -70,6 +62,10 @@ func integrationAuth(staticToken string, uc *biz.IntegrationUsecase) grpc.UnaryS
 		if !uc.AllowedMethod(client, info.FullMethod) {
 			return nil, biz.ErrPermissionDenied
 		}
-		return handler(ctx, req)
+		reply, err := handler(biz.WithIntegrationClient(ctx, client), req)
+		if err != nil {
+			return nil, publicError(err)
+		}
+		return reply, nil
 	}
 }

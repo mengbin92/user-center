@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
 	"github.com/mengbin92/user-center/pkg/jsonx"
+	"io"
 	"os"
 	"time"
 
@@ -26,19 +28,28 @@ func main() {
 	if *file == "" {
 		log.Fatal("-file is required")
 	}
-	raw, err := os.ReadFile(*file)
+	snapshot, err := os.Open(*file)
+	if err != nil {
+		log.Fatal("open snapshot", zap.Error(err))
+	}
+	defer snapshot.Close()
+	raw, err := io.ReadAll(io.LimitReader(snapshot, (4<<20)+1))
 	if err != nil {
 		log.Fatal("read snapshot", zap.Error(err))
 	}
-	var spec data.LegacyImportSpec
-	if err := jsonx.Unmarshal(raw, &spec); err != nil {
-		log.Fatal("parse snapshot", zap.Error(err))
+	spec, err := decodeSnapshot(raw)
+	if err != nil {
+		// JSON decoder errors may quote password hashes from the input.
+		log.Fatal("parse snapshot: invalid, oversized, duplicate or unknown JSON fields")
 	}
 	conf, err := config.Load(*confPath)
 	if err != nil {
 		log.Fatal("load config", zap.Error(err))
 	}
-	d, cleanup, err := data.NewData(wiring.ProvideData(conf), wiring.ProvideSecurity(conf), log)
+	dataConf := wiring.ProvideData(conf)
+	// Offline import only needs the database and must work before Redis starts.
+	dataConf.Redis = nil
+	d, cleanup, err := data.NewData(dataConf, wiring.ProvideSecurity(conf), log)
 	if err != nil {
 		log.Fatal("open database", zap.Error(err))
 	}
@@ -61,4 +72,19 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// decodeSnapshot refuses silently dropped MFA/external-identity fields and
+// ambiguous duplicate keys; its errors never reproduce credential material.
+func decodeSnapshot(raw []byte) (data.LegacyImportSpec, error) {
+	var spec data.LegacyImportSpec
+	if err := jsonx.ValidateUnique(raw); err != nil {
+		return spec, fmt.Errorf("invalid snapshot JSON")
+	}
+	decoder := jsonx.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&spec); err != nil {
+		return spec, fmt.Errorf("invalid snapshot fields")
+	}
+	return spec, nil
 }

@@ -19,7 +19,10 @@ func (uc *SessionUsecase) ValidateSession(ctx context.Context, raw string) (Acto
 	hash := HashToken(raw)
 	session, err := uc.Sessions.GetByTokenHash(ctx, nil, hash)
 	if err != nil {
-		return ActorContext{}, ErrUnauthenticated
+		if errors.Is(err, ErrResourceNotFound) {
+			return ActorContext{}, ErrUnauthenticated
+		}
+		return ActorContext{}, ErrDependency
 	}
 	now := uc.Clock.Now()
 	if !session.Valid(now) {
@@ -27,7 +30,10 @@ func (uc *SessionUsecase) ValidateSession(ctx context.Context, raw string) (Acto
 	}
 	user, err := uc.Users.Get(ctx, nil, session.UserID)
 	if err != nil {
-		return ActorContext{}, ErrUnauthenticated
+		if errors.Is(err, ErrUserNotFound) {
+			return ActorContext{}, ErrUnauthenticated
+		}
+		return ActorContext{}, ErrDependency
 	}
 	if user.Status != UserStatusEnabled {
 		return ActorContext{}, ErrUnauthenticated
@@ -41,14 +47,25 @@ func (uc *SessionUsecase) ValidateSession(ctx context.Context, raw string) (Acto
 		return ActorContext{}, ErrDependency
 	}
 	session.ActiveRoleIDs = roles
-	if userRoles, rerr := uc.Users.RolesForUser(ctx, nil, user.ID); rerr == nil {
-		user.Roles = userRoles
+	userRoles, err := uc.Users.RolesForUser(ctx, nil, user.ID)
+	if err != nil {
+		return ActorContext{}, ErrDependency
 	}
+	user.Roles = userRoles
 	passwordChangeRequired := false
 	if cred, cerr := uc.Credentials.Get(ctx, nil, user.ID); cerr == nil {
 		passwordChangeRequired = cred.MustChangePassword
+	} else if !errors.Is(cerr, ErrResourceNotFound) {
+		return ActorContext{}, ErrDependency
 	}
 	idle := uc.IdleTimeout
+	settings, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return ActorContext{}, ErrDependency
+	}
+	if settings.IdleTimeoutMinutes > 0 {
+		idle = time.Duration(settings.IdleTimeoutMinutes) * time.Minute
+	}
 	_ = uc.Sessions.Touch(ctx, nil, session.ID, now, now.Add(idle))
 	return ActorContext{
 		User:                   user,
@@ -86,7 +103,7 @@ func (uc *SessionUsecase) RevokeOwn(ctx context.Context, actor ActorContext, id 
 	if err := uc.Sessions.Revoke(ctx, nil, id, &now); err != nil {
 		return ErrDependency
 	}
-	_ = uc.StepUp.Delete(ctx, id)
+	_ = uc.StepUp.Delete(ctx, StepUpKey(s))
 	uc.recordSecurity(ctx, actor.User.ID, actor.Session.ID, "session_revoke", "success", actor.IP, actor.UserAgent, actor.RequestID)
 	return nil
 }
@@ -104,7 +121,7 @@ func (uc *SessionUsecase) RevokeOthers(ctx context.Context, actor ActorContext) 
 		if err := uc.Sessions.Revoke(ctx, nil, s.ID, &now); err != nil {
 			return ErrDependency
 		}
-		_ = uc.StepUp.Delete(ctx, s.ID)
+		_ = uc.StepUp.Delete(ctx, StepUpKey(s))
 	}
 	return nil
 }
@@ -188,8 +205,8 @@ func (uc *SessionUsecase) PutRoles(ctx context.Context, actor ActorContext, role
 	if err := CheckConstraints(unique, constraints); err != nil {
 		return nil, 0, err
 	}
-	if err := uc.Sessions.SetActiveRoleIDs(ctx, nil, actor.Session.ID, unique); err != nil {
-		return nil, 0, ErrDependency
+	if err := uc.Sessions.SetActiveRoleIDs(ctx, nil, actor.Session.ID, unique, expectedRevision); err != nil {
+		return nil, 0, err
 	}
 	actor.Session.ActiveRoleIDs = unique
 	actor.Session.Revision++
@@ -241,7 +258,11 @@ var _ = time.Now
 // keys. It is the authoritative source for the SPA; the client never infers
 // permissions from role numbers.
 func (uc *SessionUsecase) Authorization(ctx context.Context, actor ActorContext) ([]AuthorizationGrant, []string, uint64, uint64, error) {
-	grants, policy, err := uc.EffectivePermissions(ctx, actor.User.ID, actor.Session.ActiveRoleIDs)
+	activeRoles := actor.Session.ActiveRoleIDs
+	if activeRoles == nil {
+		activeRoles = []int64{}
+	}
+	grants, policy, err := uc.EffectivePermissions(ctx, actor.User.ID, activeRoles)
 	if err != nil {
 		return nil, nil, 0, 0, err
 	}

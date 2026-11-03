@@ -2,7 +2,7 @@
 
 ## 1. 前置条件
 
-- MySQL 8.x（生产唯一验收数据库）、Redis 7.x（推荐；不可用时退化为进程内存储）。
+- MySQL 8.x（生产唯一验收数据库）、Redis 7.x（多实例部署必需；仅未配置 Redis 的单进程开发环境可使用内存存储）。
 - HTTPS 反向代理（Nginx/Caddy/网关），负责 TLS、请求体上限、基础 WAF。
 - 独立数据库账号；生产账号不应具备跨库读取或 DDL 权限（DDL 由 `migrate` 专用账号执行）。
 
@@ -13,8 +13,7 @@
 | `SESSION_SECRET` | 验证码 HMAC 与内部签名材料；变更会使未完成验证码失效 |
 | `CSRF_SECRET` | 保留给签名型 CSRF 扩展；当前双提交不依赖它，但生产必须设置 |
 | `MFA_ENCRYPTION_KEY` | TOTP secret AES-GCM 密钥；**丢失将无法解密现有 MFA** |
-| `USER_CENTER_INTEGRATION_TOKEN` | 内部 gRPC 应急/自举 Bearer 令牌；生产优先使用数据库接入客户端 |
-| `OUTBOX_SIGNING_SECRET` | Outbox Webhook HMAC-SHA256 签名密钥；为空时不签名（仅开发） |
+| `OUTBOX_SIGNING_SECRET` | Outbox Webhook HMAC-SHA256 签名密钥；启用订阅时必须配置独立的至少 32 字节随机密钥 |
 | `OAUTH_GITHUB_CLIENT_ID/SECRET` | GitHub 登录；两者都设置才启用 |
 | `OAUTH_GOOGLE_CLIENT_ID/SECRET` | Google 登录；两者都设置才启用 |
 | `COOKIE_SECURE` | 生产 `true` |
@@ -40,7 +39,7 @@ docker compose ps
 docker compose logs -f user-center
 ```
 
-顺序：`mysql` 健康 → `migrate` 一次性执行（DDL + 权限目录）→ `user-center` 启动 → `redis` 健康。
+顺序：`mysql` 健康 → `migrate` 一次性执行（DDL + 权限目录）；`migrate` 成功且 `redis` 健康后启动 `user-center`。默认 HTTP/gRPC 仅映射到宿主机 `127.0.0.1`，供本机反向代理和受信接入使用。MySQL 密码必须显式配置；镜像构建会排除 `.env`、`.env.*` 与 `configs/config.local.yaml`。镜像默认命令可被 Compose 的 `command` 和 `docker compose run` 覆盖，支持 `/app/migrate`、`/app/admin-rescue` 与 `/app/import-legacy`。
 
 首次初始化 root：
 
@@ -127,7 +126,7 @@ docker compose run --rm user-center /app/admin-rescue \
   -config /app/configs/config.docker.yaml -action reset -username root -password '...'
 ```
 
-`reset` 会校验目标确实是 root 角色成员，更新密码、提升身份版本、撤销全部会话并写审计。若 root 账号被归档/禁用，`reset` 会恢复为 `enabled`。
+`reset` 会校验目标确实是 root 角色成员，更新密码、提升身份版本、撤销全部会话并写审计。若 root 账号被归档/禁用，`reset` 会恢复为 `enabled`。遗失 MFA 设备且无恢复码时，另行执行 `-action reset-mfa -username root`；该动作移除 MFA、提升身份版本、撤销会话并同事务写入审计和事件，不隐含在密码重置中。离线迁移、导入与救援命令不依赖 Redis。
 
 ## 9. 常见故障
 
@@ -139,7 +138,7 @@ docker compose run --rm user-center /app/admin-rescue \
 | 409 反复出现 | 前端未回读最新 revision；不要自动重放高风险写 |
 | 验证码总是无效 | Redis key 前缀/DB 不一致、时钟漂移、验证码过期或已消费；检查 `SESSION_SECRET` 是否变更 |
 | MFA 验证码无效 | 设备时钟漂移 > 30s；检查 `last_step` 与锁定时间 |
-| 邮件未发送 | `console` 驱动只打日志；SMTP 驱动检查 host/port/凭据/发件人 |
+| 邮件未发送 | `console` 驱动只记录收件人和主题，不输出正文/验证码；开发收信应使用本地 SMTP。SMTP 驱动检查 host/port/凭据/发件人 |
 
 ## 10. 升级
 
@@ -152,7 +151,7 @@ docker compose run --rm user-center /app/admin-rescue \
 
 ## 11. 容量与扩展
 
-- 服务无状态；会话/验证码/限流在 MySQL/Redis。可水平扩展，但 `USER_CENTER_INTEGRATION_TOKEN` 需所有实例一致。
+- 会话保存在 MySQL；多实例部署必须共享 Redis 以存储挑战、限流与 Step-up。配置 Redis 后连接失败会阻止启动。gRPC 仅接受数据库管理的接入客户端凭据；所有实例使用同一数据库与密钥。
 - 授权事实每次请求实时读取 DB；用户/角色规模增大后应加入带版本失效的缓存，缓存键必须包含 policy/user/session revision。
 - 导出为同步生成，大表导出应迁移到异步 worker（当前限制 100000 行）。
 - 审计表增长快，建议按月分区或归档到只读存储；不要删除普通管理员可见的审计证据。

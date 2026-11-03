@@ -61,7 +61,9 @@ func (uc *AuthUsecase) CreateRegistrationChallenge(ctx context.Context, email, i
 	if !emailDomainAllowed(email, settings.AllowedEmailDomains) {
 		return "", time.Time{}, Validation("该邮箱域名不允许注册")
 	}
-	if ok, _ := uc.Limiter.Allow(ctx, "reg:"+ip, 10, time.Hour); !ok {
+	if ok, err := uc.Limiter.Allow(ctx, "reg:"+ip, 10, time.Hour); err != nil {
+		return "", time.Time{}, ErrDependency
+	} else if !ok {
 		return "", time.Time{}, ErrRateLimited
 	}
 	code, err := GenerateCode()
@@ -110,7 +112,9 @@ func (uc *AuthUsecase) Register(ctx context.Context, in RegisterInput) (*User, e
 	if in.TermsVersion == "" {
 		return nil, Validation("必须同意服务条款")
 	}
-	if ok, _ := uc.Limiter.Allow(ctx, "register:"+in.Email, 10, time.Hour); !ok {
+	if ok, err := uc.Limiter.Allow(ctx, "register:"+in.Email, 10, time.Hour); err != nil {
+		return nil, ErrDependency
+	} else if !ok {
 		return nil, ErrRateLimited
 	}
 
@@ -216,7 +220,9 @@ func (uc *AuthUsecase) Register(ctx context.Context, in RegisterInput) (*User, e
 }
 
 func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, error) {
-	if ok, _ := uc.Limiter.Allow(ctx, "login:"+in.IP, 30, 5*time.Minute); !ok {
+	if ok, err := uc.Limiter.Allow(ctx, "login:"+in.IP, 30, 5*time.Minute); err != nil {
+		return nil, ErrDependency
+	} else if !ok {
 		return nil, ErrRateLimited
 	}
 	identifier := strings.TrimSpace(in.Username)
@@ -228,10 +234,21 @@ func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, 
 		user, err = uc.Users.GetByUsername(ctx, nil, NormalizeUsername(identifier))
 	}
 	if err != nil {
+		if !errors.Is(err, ErrUserNotFound) {
+			return nil, ErrDependency
+		}
 		uc.recordSecurity(ctx, 0, "", "login", "failure", in.IP, in.UserAgent, "")
 		return nil, ErrInvalidCredentials
 	}
+	if ok, err := uc.Limiter.Allow(ctx, fmt.Sprintf("login-user:%d", user.ID), uc.MaxLoginAttempts, 5*time.Minute); err != nil {
+		return nil, ErrDependency
+	} else if !ok {
+		return nil, ErrRateLimited
+	}
 	cred, err := uc.Credentials.Get(ctx, nil, user.ID)
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
+		return nil, ErrDependency
+	}
 	if err != nil || cred.PasswordHash == "" || !VerifyPassword(cred.PasswordHash, in.Password) {
 		uc.recordSecurity(ctx, user.ID, "", "login", "failure", in.IP, in.UserAgent, "")
 		return nil, ErrInvalidCredentials
@@ -240,10 +257,6 @@ func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, 
 		uc.recordSecurity(ctx, user.ID, "", "login", "denied", in.IP, in.UserAgent, "")
 		return nil, ErrUnauthenticated
 	}
-	if ok, _ := uc.Limiter.Allow(ctx, fmt.Sprintf("login-user:%d", user.ID), 10, 5*time.Minute); !ok {
-		return nil, ErrRateLimited
-	}
-
 	mfa, err := uc.MFA.Get(ctx, nil, user.ID)
 	if err != nil && !errors.Is(err, ErrResourceNotFound) {
 		return nil, ErrDependency
@@ -251,7 +264,7 @@ func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, 
 	if mfa != nil && mfa.Enabled() {
 		challengeID := uc.IDs.NewID()
 		expires := uc.Clock.Now().Add(5 * time.Minute)
-		payload, _ := jsonx.Marshal(map[string]any{"user_id": user.ID, "ip": in.IP, "ua": SummizeAgent(in.UserAgent), "remember": in.Remember})
+		payload, _ := jsonx.Marshal(map[string]any{"identity_version": user.IdentityVersion, "ip": in.IP, "ua": SummizeAgent(in.UserAgent), "remember": in.Remember})
 		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
 			return nil, ErrDependency
 		}
@@ -269,7 +282,9 @@ func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, 
 }
 
 func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, ua string) (*LoginResult, error) {
-	if ok, _ := uc.Limiter.Allow(ctx, "mfa:"+ip, 20, 5*time.Minute); !ok {
+	if ok, err := uc.Limiter.Allow(ctx, "mfa:"+ip, 20, 5*time.Minute); err != nil {
+		return nil, ErrDependency
+	} else if !ok {
 		return nil, ErrRateLimited
 	}
 	c, err := uc.Challenges.Get(ctx, "mfa", challengeID)
@@ -284,11 +299,14 @@ func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, u
 		return nil, ErrUnauthenticated
 	}
 	var payload struct {
-		IP       string `json:"ip"`
-		UA       string `json:"ua"`
-		Remember bool   `json:"remember"`
+		IdentityVersion uint64 `json:"identity_version"`
+		IP              string `json:"ip"`
+		UA              string `json:"ua"`
+		Remember        bool   `json:"remember"`
 	}
-	_ = jsonx.Unmarshal([]byte(c.Payload), &payload)
+	if err := jsonx.Unmarshal([]byte(c.Payload), &payload); err != nil || payload.IdentityVersion != user.IdentityVersion {
+		return nil, ErrChallengeInvalid
+	}
 	if err := uc.verifyMFA(ctx, user.ID, code); err != nil {
 		uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
 		return nil, err
@@ -299,11 +317,24 @@ func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, u
 	if payload.UA == "" {
 		payload.UA = ua
 	}
-	cred, _ := uc.Credentials.Get(ctx, nil, user.ID)
-	session, raw, err := uc.issueSession(ctx, user, payload.UA, payload.IP)
+	cred, err := uc.Credentials.Get(ctx, nil, user.ID)
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
+		return nil, ErrDependency
+	}
+	var session *Session
+	var raw string
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.Flows.Complete(ctx, tx, challengeID, "mfa", user.ID, "session"); err != nil {
+			return err
+		}
+		var err error
+		session, raw, err = uc.issueSessionTx(ctx, tx, user, payload.UA, payload.IP)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
+	uc.recordSecurity(ctx, user.ID, session.ID, "login", "success", payload.IP, payload.UA, "")
 	_ = uc.Challenges.Delete(ctx, challengeID)
 	result := &LoginResult{Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw}
 	if cred != nil {
@@ -313,6 +344,10 @@ func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, u
 }
 
 func (uc *AuthUsecase) issueSession(ctx context.Context, user *User, ua, ip string) (*Session, string, error) {
+	return uc.issueSessionTx(ctx, nil, user, ua, ip)
+}
+
+func (uc *AuthUsecase) issueSessionTx(ctx context.Context, tx Tx, user *User, ua, ip string) (*Session, string, error) {
 	settings, err := uc.Settings.GetAuth(ctx, nil)
 	if err != nil {
 		return nil, "", ErrDependency
@@ -349,10 +384,12 @@ func (uc *AuthUsecase) issueSession(ctx context.Context, user *User, ua, ip stri
 		Revision:        1,
 		ActiveRoleIDs:   activeRoles,
 	}
-	if err := uc.Sessions.Create(ctx, nil, s); err != nil {
+	if err := uc.Sessions.Create(ctx, tx, s); err != nil {
 		return nil, "", ErrDependency
 	}
-	uc.recordSecurity(ctx, user.ID, s.ID, "login", "success", ip, ua, "")
+	if tx == nil {
+		uc.recordSecurity(ctx, user.ID, s.ID, "login", "success", ip, ua, "")
+	}
 	return s, raw, nil
 }
 
@@ -399,12 +436,14 @@ func (uc *AuthUsecase) Logout(ctx context.Context, actor ActorContext) error {
 	if err := uc.Sessions.Revoke(ctx, nil, actor.Session.ID, &now); err != nil {
 		return ErrDependency
 	}
-	_ = uc.StepUp.Delete(ctx, actor.Session.ID)
+	_ = uc.StepUp.Delete(ctx, StepUpKey(actor.Session))
 	return nil
 }
 
 func (uc *AuthUsecase) CreatePasswordResetChallenge(ctx context.Context, identifier, ip string) (string, time.Time, error) {
-	if ok, _ := uc.Limiter.Allow(ctx, "reset:"+ip, 10, time.Hour); !ok {
+	if ok, err := uc.Limiter.Allow(ctx, "reset:"+ip, 10, time.Hour); err != nil {
+		return "", time.Time{}, ErrDependency
+	} else if !ok {
 		return "", time.Time{}, ErrRateLimited
 	}
 	identifier = strings.TrimSpace(identifier)
@@ -414,6 +453,9 @@ func (uc *AuthUsecase) CreatePasswordResetChallenge(ctx context.Context, identif
 		user, err = uc.Users.GetByEmail(ctx, nil, NormalizeEmail(identifier))
 	} else {
 		user, err = uc.Users.GetByUsername(ctx, nil, NormalizeUsername(identifier))
+	}
+	if err != nil && !errors.Is(err, ErrUserNotFound) {
+		return "", time.Time{}, ErrDependency
 	}
 	// Always return a challenge-shaped response to avoid account enumeration.
 	id := uc.IDs.NewID()
@@ -458,7 +500,14 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 	}
 	now := uc.Clock.Now().UTC()
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		version, err := uc.Credentials.UpdatePassword(ctx, tx, user.ID, hash, "bcrypt", 1, false)
+		if err := uc.Flows.Complete(ctx, tx, challenge.ID, "password_reset", user.ID, "password_reset"); err != nil {
+			return err
+		}
+		credential, err := uc.Credentials.Get(ctx, tx, user.ID)
+		if err != nil {
+			return ErrDependency
+		}
+		version, err := uc.Credentials.UpdatePassword(ctx, tx, user.ID, hash, "bcrypt", credential.Revision, false)
 		if err != nil {
 			return err
 		}
@@ -468,9 +517,6 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 			return err
 		}
 		if err := uc.Sessions.RevokeAllForUser(ctx, tx, user.ID, &now); err != nil {
-			return err
-		}
-		if err := uc.Flows.Complete(ctx, tx, challenge.ID, "password_reset", user.ID, "password_reset"); err != nil {
 			return err
 		}
 		if err := uc.audit(ctx, tx, ActorContext{}, "credential.password.reset", itoa(user.ID), "{}", "{}", "{}", "self-service password reset", "success"); err != nil {

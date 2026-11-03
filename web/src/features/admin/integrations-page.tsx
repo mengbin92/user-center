@@ -185,6 +185,7 @@ export function AdminIntegrationsPage() {
     mutationFn: (input: { client: IntegrationClient; reason: string }) =>
       api.integrations.rotateCredential(input.client.id ?? '', {
         id: input.client.id,
+        expected_revision: input.client.revision,
         reason: input.reason,
       }),
     successMessage: '凭据已轮换',
@@ -202,6 +203,7 @@ export function AdminIntegrationsPage() {
     mutationFn: (input: { client: IntegrationClient; reason: string }) =>
       api.integrations.disableClient(input.client.id ?? '', {
         id: input.client.id,
+        expected_revision: input.client.revision,
         reason: input.reason,
       }),
     successMessage: '接入客户端已停用',

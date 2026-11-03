@@ -104,7 +104,9 @@ func (s *AuthService) CompleteMFA(ctx context.Context, req *usercv1.CompleteMFAR
 
 func (s *AuthService) Logout(ctx context.Context, _ *usercv1.LogoutRequest) (*emptypb.Empty, error) {
 	actor, _ := biz.ActorFromContext(ctx)
-	_ = s.uc.Logout(ctx, actor)
+	if err := s.uc.Logout(ctx, actor); err != nil {
+		return nil, err
+	}
 	clearSessionCookie(ctx, s.deps)
 	return &emptypb.Empty{}, nil
 }

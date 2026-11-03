@@ -80,6 +80,10 @@ func (s *AuditService) GetAuditEvent(ctx context.Context, req *usercv1.GetAuditE
 }
 
 func (s *AuditService) ExportAuditEvents(ctx context.Context, req *usercv1.ExportAuditEventsRequest) (*usercv1.ExportJob, error) {
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
 	var actorID int64
 	var err error
 	if req.GetActorUserId() != "" {
@@ -103,7 +107,7 @@ func (s *AuditService) ExportAuditEvents(ctx context.Context, req *usercv1.Expor
 	if !to.IsZero() {
 		filter.To = &to
 	}
-	job, err := s.uc.Export(ctx, requestMeta(ctx), filter, req.GetFields(), reasonOr(req.GetReason(), "export audit events"))
+	job, err := s.uc.Export(ctx, actor, filter, req.GetFields(), reasonOr(req.GetReason(), "export audit events"))
 	if err != nil {
 		return nil, err
 	}
@@ -135,11 +139,15 @@ func (s *SettingsService) GetAuthSettings(ctx context.Context, _ *usercv1.GetAut
 }
 
 func (s *SettingsService) UpdateAuthSettings(ctx context.Context, req *usercv1.UpdateAuthSettingsRequest) (*usercv1.AuthSettings, error) {
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
 	expected, err := parseRevisionField(req.GetExpectedRevision(), "expected_revision")
 	if err != nil {
 		return nil, err
 	}
-	settings, err := s.uc.UpdateAuth(ctx, requestMeta(ctx), &biz.AuthSettings{
+	settings, err := s.uc.UpdateAuth(ctx, actor, &biz.AuthSettings{
 		RegistrationEnabled: req.GetRegistrationEnabled(), EmailVerificationRequired: req.GetEmailVerificationRequired(),
 		PasswordMinLength: int(req.GetPasswordMinLength()), SessionTTLMinutes: int(req.GetSessionTtlMinutes()),
 		IdleTimeoutMinutes: int(req.GetIdleTimeoutMinutes()), MFARequiredForAdmins: req.GetMfaRequiredForAdmins(),
@@ -167,11 +175,15 @@ func (s *SettingsService) GetEmailSettings(ctx context.Context, _ *usercv1.GetEm
 }
 
 func (s *SettingsService) UpdateEmailSettings(ctx context.Context, req *usercv1.UpdateEmailSettingsRequest) (*usercv1.EmailSettings, error) {
+	actor, metaErr := managementMeta(ctx, req)
+	if metaErr != nil {
+		return nil, metaErr
+	}
 	expected, err := parseRevisionField(req.GetExpectedRevision(), "expected_revision")
 	if err != nil {
 		return nil, err
 	}
-	settings, err := s.uc.UpdateEmail(ctx, requestMeta(ctx), &biz.EmailSettings{
+	settings, err := s.uc.UpdateEmail(ctx, actor, &biz.EmailSettings{
 		Driver: req.GetDriver(), From: req.GetFrom(), SMTPHost: req.GetSmtpHost(),
 		SMTPPort: int(req.GetSmtpPort()), SMTPUsername: req.GetSmtpUsername(),
 	}, req.GetSmtpPassword(), req.GetUpdateMask(), expected, reasonOr(req.GetReason(), "update email settings"))

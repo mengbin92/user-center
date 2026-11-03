@@ -117,19 +117,13 @@ func (s Scope) Matches(actorID, targetUserID int64, wholeObject bool) bool {
 
 // Covers reports whether outer contains every element of inner.
 func Covers(outer, inner Scope) bool {
-	if outer.All {
-		return true
-	}
-	if inner.All {
-		return false
-	}
-	if inner.Self {
-		return outer.Self
-	}
 	if inner.Empty() {
 		return false
 	}
-	if outer.Self {
+	if outer.All {
+		return true
+	}
+	if inner.All || inner.Self && !outer.Self {
 		return false
 	}
 	for _, id := range inner.UserIDs {
@@ -137,11 +131,12 @@ func Covers(outer, inner Scope) bool {
 			return false
 		}
 	}
-	return len(inner.UserIDs) > 0
+	return true
 }
 
-// Intersect returns the conservative intersection of two scopes. Self joined
-// with a user list narrows to the list because the actor is not known here.
+// Intersect returns the part of the intersection that can be represented
+// without knowing the actor. Use IntersectForActor for authorization decisions
+// involving both self and explicit user IDs.
 func Intersect(a, b Scope) Scope {
 	if a.Empty() || b.Empty() {
 		return Scope{}
@@ -152,22 +147,30 @@ func Intersect(a, b Scope) Scope {
 	if b.All {
 		return a
 	}
-	switch {
-	case a.Self && b.Self:
-		return Scope{Self: true}
-	case a.Self:
-		return Scope{UserIDs: slices.Clone(b.UserIDs)}
-	case b.Self:
-		return Scope{UserIDs: slices.Clone(a.UserIDs)}
-	default:
-		out := Scope{}
-		for _, id := range a.UserIDs {
-			if slices.Contains(b.UserIDs, id) {
-				out.UserIDs = append(out.UserIDs, id)
-			}
+	out := Scope{Self: a.Self && b.Self}
+	for _, id := range a.UserIDs {
+		if slices.Contains(b.UserIDs, id) && !slices.Contains(out.UserIDs, id) {
+			out.UserIDs = append(out.UserIDs, id)
 		}
-		return out
 	}
+	return out
+}
+
+// IntersectForActor computes the exact intersection of two scope unions. A
+// self predicate is resolved against the subject whose grants are evaluated.
+func IntersectForActor(a, b Scope, actorID int64) Scope {
+	resolve := func(s Scope) Scope {
+		if s.Self && actorID > 0 && !slices.Contains(s.UserIDs, actorID) {
+			s.UserIDs = append(slices.Clone(s.UserIDs), actorID)
+		}
+		s.Self = false
+		return s
+	}
+	// Preserve the useful self projection when no explicit IDs are involved.
+	if len(a.UserIDs) == 0 && len(b.UserIDs) == 0 {
+		return Intersect(a, b)
+	}
+	return Intersect(resolve(a), resolve(b))
 }
 
 func (s Scope) String() string {
@@ -277,13 +280,16 @@ func Evaluate(in Input) Decision {
 		if s.Validity.Validate() != nil || s.RoleScope.Validate(in.SupportedScopes) != nil || s.Boundary.Validate(in.SupportedScopes) != nil {
 			return Decision{Reason: "SCOPE_INVALID", Operation: in.Operation}
 		}
-		if s.Validity.ExpiresAt != nil && s.Validity.ExpiresAt.Before(until) {
-			until = *s.Validity.ExpiresAt
+		if s.Effect == Deny && in.Now.Before(s.Validity.StartsAt) && s.Validity.StartsAt.Before(until) {
+			until = s.Validity.StartsAt
 		}
 		if !s.Validity.Contains(in.Now) {
 			continue
 		}
-		effective := Intersect(s.RoleScope, s.Boundary)
+		if (s.Effect == Deny || s.Active) && s.Validity.ExpiresAt != nil && s.Validity.ExpiresAt.Before(until) {
+			until = *s.Validity.ExpiresAt
+		}
+		effective := IntersectForActor(s.RoleScope, s.Boundary, in.Actor.UserID)
 		if s.Effect == Deny {
 			denies = append(denies, effective)
 			d.Sources = append(d.Sources, s)
@@ -334,7 +340,7 @@ func ValidateInheritance(edges map[int64][]int64) error {
 		}
 		state[id] = 1
 		for _, next := range edges[id] {
-			if next == id {
+			if _, exists := edges[next]; !exists || next == id {
 				return ErrGraph
 			}
 			if err := visit(next); err != nil {

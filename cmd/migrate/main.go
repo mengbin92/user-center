@@ -29,6 +29,8 @@ func main() {
 		log.Fatal("load config", zap.Error(err))
 	}
 	dataConf := wiring.ProvideData(bootstrap)
+	// Schema migration has no Redis dependency and precedes service startup.
+	dataConf.Redis = nil
 	sec := wiring.ProvideSecurity(bootstrap)
 	d, cleanup, err := data.NewData(dataConf, sec, log)
 	if err != nil {

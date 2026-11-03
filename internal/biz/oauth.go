@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -26,10 +27,12 @@ type OAuthProvider interface {
 }
 
 type oauthState struct {
-	Provider    string `json:"provider"`
-	Mode        string `json:"mode"`
-	UserID      int64  `json:"user_id"`
-	RedirectURI string `json:"redirect_uri"`
+	Provider        string `json:"provider"`
+	Mode            string `json:"mode"`
+	UserID          int64  `json:"user_id"`
+	SessionID       string `json:"session_id"`
+	IdentityVersion uint64 `json:"identity_version"`
+	RedirectURI     string `json:"redirect_uri"`
 }
 
 type OAuthResult struct {
@@ -75,15 +78,33 @@ func (uc *AuthUsecase) StartOAuth(ctx context.Context, provider, mode string, ac
 	if mode == "" {
 		mode = "login"
 	}
-	if mode != "login" && mode != "bind" {
+	if mode != "login" && mode != "bind" && mode != "verify" {
 		return "", "", time.Time{}, Validation("不支持的第三方登录模式")
 	}
 	state := oauthState{Provider: provider, Mode: mode, RedirectURI: uc.oauthRedirectURI(provider)}
-	if mode == "bind" {
-		if actor == nil || actor.User == nil {
+	if mode == "bind" || mode == "verify" {
+		if actor == nil || actor.User == nil || actor.Session == nil {
 			return "", "", time.Time{}, ErrUnauthenticated
 		}
 		state.UserID = actor.User.ID
+		state.SessionID = actor.Session.ID
+		state.IdentityVersion = actor.Session.IdentityVersion
+		if mode == "verify" {
+			identities, err := uc.Identities.ListByUser(ctx, nil, actor.User.ID)
+			if err != nil {
+				return "", "", time.Time{}, ErrDependency
+			}
+			bound := false
+			for _, identity := range identities {
+				if identity.Provider == provider {
+					bound = true
+					break
+				}
+			}
+			if !bound {
+				return "", "", time.Time{}, ErrOAuthNotBound
+			}
+		}
 	}
 	raw, _ := jsonx.Marshal(state)
 	id := uc.IDs.NewID()
@@ -110,6 +131,9 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 	if err := jsonx.Unmarshal([]byte(c.Payload), &st); err != nil || st.Provider != provider || st.RedirectURI == "" {
 		return nil, ErrOAuthState
 	}
+	if err := uc.Flows.Complete(ctx, nil, state, "oauth_state", st.UserID, "oauth"); err != nil {
+		return nil, ErrOAuthState
+	}
 	profile, err := p.Exchange(ctx, code, st.RedirectURI)
 	if err != nil {
 		return nil, ErrOAuthUnavailable
@@ -120,10 +144,27 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 	if profile.Issuer == "" {
 		profile.Issuer = provider
 	}
-	if st.Mode == "bind" {
-		if actor == nil || actor.User == nil || actor.User.ID != st.UserID {
+	if st.Mode == "bind" || st.Mode == "verify" {
+		if actor == nil || actor.User == nil || actor.Session == nil || actor.User.ID != st.UserID || actor.Session.ID != st.SessionID || actor.Session.IdentityVersion != st.IdentityVersion {
 			return nil, ErrUnauthenticated
 		}
+	}
+	if st.Mode == "verify" {
+		identity, err := uc.Identities.FindBySubject(ctx, nil, provider, profile.Issuer, profile.Subject)
+		if errors.Is(err, ErrResourceNotFound) || err == nil && identity.UserID != st.UserID {
+			return nil, ErrOAuthNotBound
+		}
+		if err != nil {
+			return nil, ErrDependency
+		}
+		until := uc.Clock.Now().Add(5 * time.Minute)
+		if err := uc.StepUp.Put(ctx, primaryProofKey(actor.Session), until); err != nil {
+			return nil, ErrDependency
+		}
+		uc.recordSecurity(ctx, actor.User.ID, actor.Session.ID, "external_identity_verify", "success", ip, ua, actor.RequestID)
+		return &OAuthResult{Redirect: "/account/security?verified=" + provider}, nil
+	}
+	if st.Mode == "bind" {
 		err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 			if existing, ferr := uc.Identities.FindBySubject(ctx, tx, provider, profile.Issuer, profile.Subject); ferr == nil {
 				if existing.UserID == st.UserID {
@@ -159,20 +200,27 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 	if user.Status != UserStatusEnabled {
 		return nil, ErrUnauthenticated
 	}
-	if state, merr := uc.MFA.Get(ctx, nil, user.ID); merr == nil && state.Enabled() {
+	mfa, merr := uc.MFA.Get(ctx, nil, user.ID)
+	if merr != nil && !errors.Is(merr, ErrResourceNotFound) {
+		return nil, ErrDependency
+	}
+	if mfa != nil && mfa.Enabled() {
 		challengeID := uc.IDs.NewID()
 		expires := uc.Clock.Now().Add(5 * time.Minute)
-		payload, _ := jsonx.Marshal(map[string]any{"user_id": user.ID, "ip": ip, "ua": SummizeAgent(ua)})
+		payload, _ := jsonx.Marshal(map[string]any{"identity_version": user.IdentityVersion, "ip": ip, "ua": SummizeAgent(ua)})
 		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
 			return nil, ErrDependency
 		}
 		return &OAuthResult{Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires, Redirect: "/login?mfa_challenge=" + challengeID}, nil
 	}
+	cred, err := uc.Credentials.Get(ctx, nil, user.ID)
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
+		return nil, ErrDependency
+	}
 	session, raw, err := uc.issueSession(ctx, user, ua, ip)
 	if err != nil {
 		return nil, err
 	}
-	cred, _ := uc.Credentials.Get(ctx, nil, user.ID)
 	result := &OAuthResult{
 		Session: session, RawToken: raw, User: uc.publicUser(ctx, user),
 		Redirect: "/auth/callback/" + provider + "?status=success",

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/internal/biz"
@@ -21,6 +22,9 @@ func NewPolicyRepo(d *Data) biz.PolicyRepo { return &iamRepo{d: d} }
 
 func (r *iamRepo) PolicyRevision(ctx context.Context, tx biz.Tx) (uint64, error) {
 	db := r.d.dbOr(tx).WithContext(ctx)
+	if tx != nil {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
 	var p policyStatePO
 	err := db.Where("id = 1").First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -323,6 +327,13 @@ func (r *iamRepo) PutRoleGrants(ctx context.Context, tx biz.Tx, roleID int64, gr
 	if role.Revision != expected {
 		return role.Revision, biz.ConflictRevision(role.Revision)
 	}
+	res := db.Model(&rolePO{}).Where("id = ? AND revision = ?", roleID, expected).Update("revision", expected+1)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return 0, biz.ConflictRevision(role.Revision)
+	}
 	if err := db.Where("role_id = ?", roleID).Delete(&roleGrantPO{}).Error; err != nil {
 		return 0, err
 	}
@@ -334,9 +345,6 @@ func (r *iamRepo) PutRoleGrants(ctx context.Context, tx biz.Tx, roleID int64, gr
 		if err := db.Create(&roleGrantPO{RoleID: roleID, Operation: g.Operation, Effect: string(g.Effect), Scope: string(scope)}).Error; err != nil {
 			return 0, err
 		}
-	}
-	if err := db.Model(&rolePO{}).Where("id = ?", roleID).Update("revision", gorm.Expr("revision + 1")).Error; err != nil {
-		return 0, err
 	}
 	return expected + 1, nil
 }
@@ -353,6 +361,13 @@ func (r *iamRepo) PutRoleInheritance(ctx context.Context, tx biz.Tx, roleID int6
 	if role.Revision != expected {
 		return role.Revision, biz.ConflictRevision(role.Revision)
 	}
+	res := db.Model(&rolePO{}).Where("id = ? AND revision = ?", roleID, expected).Update("revision", expected+1)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return 0, biz.ConflictRevision(role.Revision)
+	}
 	if err := db.Where("role_id = ?", roleID).Delete(&roleInheritancePO{}).Error; err != nil {
 		return 0, err
 	}
@@ -360,9 +375,6 @@ func (r *iamRepo) PutRoleInheritance(ctx context.Context, tx biz.Tx, roleID int6
 		if err := db.Create(&roleInheritancePO{RoleID: roleID, InheritsID: id}).Error; err != nil {
 			return 0, err
 		}
-	}
-	if err := db.Model(&rolePO{}).Where("id = ?", roleID).Update("revision", gorm.Expr("revision + 1")).Error; err != nil {
-		return 0, err
 	}
 	return expected + 1, nil
 }

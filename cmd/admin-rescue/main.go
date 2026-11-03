@@ -17,7 +17,7 @@ import (
 // never exposes an HTTP bypass, and every action is audited by the services.
 func main() {
 	confPath := flag.String("config", envOr("CONF_PATH", "configs/config.yaml"), "config path")
-	action := flag.String("action", "bootstrap", "bootstrap | reset")
+	action := flag.String("action", "bootstrap", "bootstrap | reset | reset-mfa")
 	username := flag.String("username", "root", "root username")
 	password := flag.String("password", "", "new password (required)")
 	email := flag.String("email", "", "root email (bootstrap only)")
@@ -25,14 +25,16 @@ func main() {
 	log, _ := zap.NewProduction()
 	defer func() { _ = log.Sync() }()
 
-	if *password == "" {
+	if (*action == "bootstrap" || *action == "reset") && *password == "" {
 		log.Fatal("-password is required")
 	}
 	bootstrap, err := config.Load(*confPath)
 	if err != nil {
 		log.Fatal("load config", zap.Error(err))
 	}
-	d, cleanup, err := data.NewData(wiring.ProvideData(bootstrap), wiring.ProvideSecurity(bootstrap), log)
+	dataConfig := wiring.ProvideData(bootstrap)
+	dataConfig.Redis = nil // Offline recovery uses only the authoritative database.
+	d, cleanup, err := data.NewData(dataConfig, wiring.ProvideSecurity(bootstrap), log)
 	if err != nil {
 		log.Fatal("open database", zap.Error(err))
 	}
@@ -53,6 +55,11 @@ func main() {
 			log.Fatal("reset root", zap.Error(err))
 		}
 		log.Info("root credential reset", zap.String("username", *username))
+	case "reset-mfa":
+		if err := services.ResetRootMFA(ctx, *username); err != nil {
+			log.Fatal("reset root MFA", zap.Error(err))
+		}
+		log.Info("root MFA reset", zap.String("username", *username))
 	default:
 		log.Fatal("unknown action", zap.String("action", *action))
 	}

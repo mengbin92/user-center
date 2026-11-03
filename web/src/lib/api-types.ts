@@ -1324,21 +1324,25 @@ export interface components {
             id?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.ArchivePermissionRequest": {
             id?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.ArchiveRoleRequest": {
             id?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.ArchiveUserRequest": {
             id?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.Assignment": {
             id?: string;
@@ -1460,6 +1464,8 @@ export interface components {
             challenge_id?: string;
             code?: string;
             reason?: string;
+            expected_revision?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.ConfirmEmailRequest": {
             challenge_id?: string;
@@ -1486,6 +1492,8 @@ export interface components {
             code?: string;
             name?: string;
             reason?: string;
+            expected_revision?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.CreateAssignmentRequest": {
             user_id?: string;
@@ -1526,6 +1534,8 @@ export interface components {
             id?: string;
             new_email?: string;
             reason?: string;
+            expected_revision?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.CreateIntegrationClientRequest": {
             code?: string;
@@ -1546,6 +1556,7 @@ export interface components {
             required_all?: string[];
             required_any?: string[];
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.CreatePasswordResetChallengeRequest": {
             /** @description Username or email. The response never reveals whether the account exists. */
@@ -1554,6 +1565,8 @@ export interface components {
         "api.usercenter.v1.CreatePasswordResetTaskRequest": {
             id?: string;
             reason?: string;
+            expected_revision?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.CreatePermissionRequest": {
             resource_id?: string;
@@ -1567,6 +1580,7 @@ export interface components {
             /** Format: int32 */
             sort?: number;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.CreateRegistrationChallengeRequest": {
             email?: string;
@@ -1589,6 +1603,7 @@ export interface components {
             send_activation?: boolean;
             initial_password?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.Delegation": {
             id?: string;
@@ -1616,6 +1631,7 @@ export interface components {
         "api.usercenter.v1.DisableIntegrationClientRequest": {
             id?: string;
             reason?: string;
+            expected_revision?: string;
         };
         "api.usercenter.v1.DisableMFARequest": {
             current_password?: string;
@@ -1892,6 +1908,8 @@ export interface components {
         "api.usercenter.v1.ResetMFARequest": {
             id?: string;
             reason?: string;
+            expected_revision?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.ResetPasswordRequest": {
             challenge_id?: string;
@@ -1917,11 +1935,13 @@ export interface components {
             id?: string;
             reason?: string;
             expected_policy_revision?: string;
+            expected_revision?: string;
         };
         "api.usercenter.v1.RevokeDelegationRequest": {
             id?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.RevokeOtherSessionsRequest": Record<string, never>;
         "api.usercenter.v1.RevokeUserSessionsRequest": {
@@ -1929,6 +1949,8 @@ export interface components {
             session_ids?: string[];
             revoke_all?: boolean;
             reason?: string;
+            expected_revision?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.Role": {
             id?: string;
@@ -1974,6 +1996,7 @@ export interface components {
         "api.usercenter.v1.RotateIntegrationClientCredentialRequest": {
             id?: string;
             reason?: string;
+            expected_revision?: string;
         };
         "api.usercenter.v1.RotateRecoveryCodesRequest": {
             current_password?: string;
@@ -2041,12 +2064,14 @@ export interface components {
             status?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.SetRoleStatusRequest": {
             id?: string;
             status?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.SetUserStatusRequest": {
             id?: string;
@@ -2054,6 +2079,7 @@ export interface components {
             status?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.SetupMFAReply": {
             secret?: string;
@@ -2102,6 +2128,7 @@ export interface components {
             enabled?: boolean;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.UpdateDelegationRequest": {
             id?: string;
@@ -2113,6 +2140,7 @@ export interface components {
             expires_at?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.UpdateEmailSettingsRequest": {
             driver?: string;
@@ -2151,6 +2179,7 @@ export interface components {
             required_any?: string[];
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.UpdatePermissionRequest": {
             id?: string;
@@ -2163,6 +2192,7 @@ export interface components {
             sort?: number;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.UpdateRoleRequest": {
             id?: string;
@@ -2171,6 +2201,7 @@ export interface components {
             max_members?: string;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.UpdateUserRequest": {
             id?: string;
@@ -2612,6 +2643,7 @@ export interface operations {
             query?: {
                 expected_revision?: string;
                 reason?: string;
+                expected_policy_revision?: string;
             };
             header?: never;
             path: {

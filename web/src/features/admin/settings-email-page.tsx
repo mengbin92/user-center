@@ -142,7 +142,7 @@ export function AdminEmailSettingsPage() {
           <Card>
             <CardHeader
               title="发送通道"
-              description="console 驱动会把邮件内容写入后端日志，适合本地开发。"
+              description="console 驱动仅记录发送元信息，不投递邮件。实际验证流程请配置 SMTP。"
               actions={
                 <Badge
                   tone={
@@ -165,7 +165,7 @@ export function AdminEmailSettingsPage() {
                       setForm({ ...form, driver: event.target.value })
                     }
                   >
-                    <option value="console">console（日志输出）</option>
+                    <option value="console">console（仅记录元信息）</option>
                     <option value="smtp">smtp</option>
                   </Select>
                 </Field>
@@ -273,7 +273,7 @@ export function AdminEmailSettingsPage() {
                 </span>
               </div>
               <InlineAlert tone="info" title="验证码发送">
-                开发环境使用 console 驱动时，验证码与重置链接会打印在后端日志中，不会返回给浏览器。
+                console 驱动不会投递邮件，也不会记录验证码或重置链接。验证注册、换绑或找回密码时请使用 SMTP 测试邮箱。
               </InlineAlert>
               <div className="flex items-center gap-1 text-[10px] text-slate-400">
                 <Mail className="h-3 w-3" />

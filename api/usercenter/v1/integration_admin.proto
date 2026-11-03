@@ -83,11 +83,13 @@ message UpdateIntegrationClientRequest {
 message RotateIntegrationClientCredentialRequest {
   string id = 1;
   string reason = 2;
+  string expected_revision = 3;
 }
 
 message DisableIntegrationClientRequest {
   string id = 1;
   string reason = 2;
+  string expected_revision = 3;
 }
 
 message EventDelivery {

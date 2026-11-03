@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"time"
 
@@ -103,12 +104,18 @@ func (r *outboxRepo) Append(ctx context.Context, tx biz.Tx, e *biz.Event) error 
 	return r.d.dbOr(tx).WithContext(ctx).Create(p).Error
 }
 
-func (r *outboxRepo) ListRecentEvents(ctx context.Context, tx biz.Tx, limit int) ([]*biz.Event, error) {
+func (r *outboxRepo) PendingEventsForClient(ctx context.Context, tx biz.Tx, client *biz.IntegrationClient, limit int) ([]*biz.Event, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200
 	}
 	var rows []outboxEventPO
-	if err := r.d.dbOr(tx).WithContext(ctx).Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+	query := r.d.dbOr(tx).WithContext(ctx).Model(&outboxEventPO{}).
+		Where("created_at >= ?", client.CreatedAt).
+		Where("NOT EXISTS (SELECT 1 FROM event_deliveries d WHERE d.event_id = event_outbox.event_id AND d.subscriber_id = ?)", client.ClientID)
+	if !slices.Contains(client.EventSubscriptions, "*") {
+		query = query.Where("event_type IN ?", client.EventSubscriptions)
+	}
+	if err := query.Order("created_at ASC, event_id ASC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*biz.Event, 0, len(rows))
@@ -133,37 +140,61 @@ func (r *outboxRepo) DueDeliveries(ctx context.Context, tx biz.Tx, now time.Time
 		limit = 50
 	}
 	type row struct {
-		EventID       string
-		SubscriberID  string
-		Status        string
-		Attempts      int
-		NextRetryAt   time.Time
-		LastError     string
-		EventType     string
-		AggregateType string
-		AggregateID   int64
-		SchemaVersion int
-		Payload       string
-		OccurredAt    time.Time
-		CallbackURL   string
+		EventID            string
+		SubscriberID       string
+		Status             string
+		Attempts           int
+		NextRetryAt        time.Time
+		LastError          string
+		EventType          string
+		AggregateType      string
+		AggregateID        int64
+		AggregateRevision  uint64
+		SchemaVersion      int
+		Payload            string
+		OccurredAt         time.Time
+		CallbackURL        string
+		EventSubscriptions string
 	}
 	var rows []row
 	err := r.d.dbOr(tx).WithContext(ctx).Table("event_deliveries AS d").
-		Select("d.event_id, d.subscriber_id, d.status, d.attempts, d.next_retry_at, d.last_error, e.event_type, e.aggregate_type, e.aggregate_id, e.schema_version, e.payload, e.created_at AS occurred_at, c.callback_url").
+		Select("d.event_id, d.subscriber_id, d.status, d.attempts, d.next_retry_at, d.last_error, e.event_type, e.aggregate_type, e.aggregate_id, e.aggregate_revision, e.schema_version, e.payload, e.created_at AS occurred_at, c.callback_url, c.event_subscriptions").
 		Joins("JOIN event_outbox AS e ON e.event_id = d.event_id").
-		Joins("JOIN integration_clients AS c ON c.client_id = d.subscriber_id AND c.status = 'active'").
-		Where("d.status IN ? AND d.next_retry_at <= ?", []string{"pending", "retrying"}, now).
+		Joins("JOIN integration_clients AS c ON c.client_id = d.subscriber_id AND c.status = 'active' AND (c.expires_at IS NULL OR c.expires_at > ?)", now).
+		Where("d.status IN ? AND d.next_retry_at <= ?", []string{"pending", "retrying", "delivering"}, now).
 		Order("d.next_retry_at").Limit(limit).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
 	out := make([]*biz.Delivery, 0, len(rows))
 	for _, x := range rows {
+		var subscriptions []string
+		if err := jsonx.Unmarshal([]byte(x.EventSubscriptions), &subscriptions); err != nil {
+			return nil, biz.ErrDependency
+		}
+		if !slices.Contains(subscriptions, "*") && !slices.Contains(subscriptions, x.EventType) {
+			if err := r.d.dbOr(tx).WithContext(ctx).Model(&deliveryPO{}).
+				Where("event_id = ? AND subscriber_id = ? AND status IN ? AND next_retry_at <= ?", x.EventID, x.SubscriberID, []string{"pending", "retrying", "delivering"}, now).
+				Update("status", "cancelled").Error; err != nil {
+				return nil, err
+			}
+			continue
+		}
+		claim := r.d.dbOr(tx).WithContext(ctx).Model(&deliveryPO{}).
+			Where("event_id = ? AND subscriber_id = ? AND status IN ? AND next_retry_at <= ?", x.EventID, x.SubscriberID, []string{"pending", "retrying", "delivering"}, now).
+			Updates(map[string]any{"status": "delivering", "next_retry_at": now.Add(time.Minute), "attempts": gorm.Expr("attempts + 1")})
+		if claim.Error != nil {
+			return nil, claim.Error
+		}
+		if claim.RowsAffected == 0 {
+			continue
+		}
+		x.Attempts++
 		out = append(out, &biz.Delivery{
 			EventID: x.EventID, EventType: x.EventType, SubscriberID: x.SubscriberID,
 			Status: x.Status, Attempts: x.Attempts, NextRetryAt: x.NextRetryAt.UTC(),
 			LastError: x.LastError, Payload: x.Payload, AggregateType: x.AggregateType,
-			AggregateID: x.AggregateID, SchemaVersion: x.SchemaVersion,
+			AggregateID: x.AggregateID, AggregateRevision: x.AggregateRevision, SchemaVersion: x.SchemaVersion,
 			OccurredAt: x.OccurredAt.UTC(), CallbackURL: x.CallbackURL,
 		})
 	}
@@ -208,20 +239,15 @@ func (r *outboxRepo) ListDeliveries(ctx context.Context, tx biz.Tx, status strin
 }
 
 func (r *outboxRepo) MarkDelivered(ctx context.Context, eventID, subscriberID string, at time.Time) error {
-	return r.d.dbOr(nil).WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "event_id"}, {Name: "subscriber_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status", "next_retry_at"}),
-	}).Create(&deliveryPO{EventID: eventID, SubscriberID: subscriberID, Status: "delivered", NextRetryAt: at}).Error
+	return r.d.dbOr(nil).WithContext(ctx).Model(&deliveryPO{}).
+		Where("event_id = ? AND subscriber_id = ?", eventID, subscriberID).
+		Updates(map[string]any{"status": "delivered", "next_retry_at": at, "last_error": ""}).Error
 }
 
 func (r *outboxRepo) MarkRetry(ctx context.Context, eventID, subscriberID string, at time.Time, lastError string) error {
-	return r.d.dbOr(nil).WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "event_id"}, {Name: "subscriber_id"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"status": "retrying", "next_retry_at": at, "last_error": lastError,
-			"attempts": gorm.Expr("attempts + 1"),
-		}),
-	}).Create(&deliveryPO{EventID: eventID, SubscriberID: subscriberID, Status: "retrying", NextRetryAt: at, LastError: lastError, Attempts: 1}).Error
+	return r.d.dbOr(nil).WithContext(ctx).Model(&deliveryPO{}).
+		Where("event_id = ? AND subscriber_id = ? AND status <> ?", eventID, subscriberID, "delivered").
+		Updates(map[string]any{"status": "retrying", "next_retry_at": at, "last_error": lastError}).Error
 }
 
 func (r *outboxRepo) RetryDelivery(ctx context.Context, tx biz.Tx, eventID, subscriberID string) error {
@@ -277,8 +303,8 @@ func (r *settingsRepo) SaveAuth(ctx context.Context, tx biz.Tx, s *biz.AuthSetti
 	err = db.Where("name = ?", "auth").First(&p).Error
 	now := time.Now().UTC()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if expected == 0 {
-			expected = 1
+		if expected != 1 {
+			return nil, biz.ConflictRevision(1)
 		}
 		p = authSettingsPO{Key: "auth", Value: string(payload), Revision: expected + 1, UpdatedAt: now}
 		if err := db.Create(&p).Error; err != nil {
@@ -339,8 +365,8 @@ func (r *settingsRepo) SaveEmail(ctx context.Context, tx biz.Tx, s *biz.EmailSet
 	err = db.Where("name = ?", "email").First(&p).Error
 	now := time.Now().UTC()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if expected == 0 {
-			expected = 1
+		if expected != 1 {
+			return nil, biz.ConflictRevision(1)
 		}
 		p = emailSettingsPO{Key: "email", Value: string(payload), Secret: secret, Revision: expected + 1, UpdatedAt: now}
 		if err := db.Create(&p).Error; err != nil {
@@ -391,14 +417,14 @@ func exportToBiz(p exportJobPO) *biz.ExportJob {
 	}
 }
 
-func (r *exportRepo) Create(ctx context.Context, job *biz.ExportJob) (*biz.ExportJob, error) {
+func (r *exportRepo) Create(ctx context.Context, tx biz.Tx, job *biz.ExportJob) (*biz.ExportJob, error) {
 	fields, _ := jsonx.Marshal(job.RequestedFields)
 	p := &exportJobPO{
 		Kind: job.Kind, ActorUserID: job.ActorUserID, ActorSessionID: job.ActorSessionID,
 		ScopeSnapshot: job.ScopeSnapshot, RequestedFields: string(fields), Status: job.Status,
 		ArtifactName: job.ArtifactName, Error: job.Error, CreatedAt: job.CreatedAt, ExpiresAt: job.ExpiresAt,
 	}
-	if err := r.d.db.WithContext(ctx).Create(p).Error; err != nil {
+	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
 	}
 	return exportToBiz(*p), nil

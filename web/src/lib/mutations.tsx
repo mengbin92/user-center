@@ -6,7 +6,7 @@ import {
 import type { ReactNode } from 'react'
 
 import { useAuth } from './auth'
-import { errorMessage, isApiError, type ApiError } from './errors'
+import { ApiError, errorMessage, isApiError } from './errors'
 import { useConflict } from '../components/conflict'
 import { useStepUp } from '../components/step-up'
 import { useToast } from '../components/toast'
@@ -31,10 +31,12 @@ export function useApiMutation<TData, TVariables>(
   const toast = useToast()
   const { requestStepUp } = useStepUp()
   const { showConflict } = useConflict()
-  const { refresh } = useAuth()
+  const { refresh, getSessionGeneration } = useAuth()
 
-  return useMutation<TData, unknown, TVariables>({
+  return useMutation<TData, unknown, TVariables, number>({
+    onMutate: () => getSessionGeneration(),
     mutationFn: async (variables: TVariables) => {
+      const generation = getSessionGeneration()
       try {
         return await options.mutationFn(variables)
       } catch (error) {
@@ -45,13 +47,17 @@ export function useApiMutation<TData, TVariables>(
         ) {
           const verified = await requestStepUp()
           if (verified) {
+            if (generation !== getSessionGeneration()) {
+              throw new ApiError({ status: 401, reason: 'SESSION_CHANGED', message: '登录会话已变化，请重新确认操作' })
+            }
             return await options.mutationFn(variables)
           }
         }
         throw error
       }
     },
-    onSuccess: async (data, variables) => {
+    onSuccess: async (data, variables, generation) => {
+      if (generation !== getSessionGeneration()) return
       if (options.invalidate?.length) {
         await Promise.all(
           options.invalidate.map((queryKey) =>
@@ -59,9 +65,11 @@ export function useApiMutation<TData, TVariables>(
           ),
         )
       }
+      if (generation !== getSessionGeneration()) return
       if (options.refreshAuth) {
         await refresh(true)
       }
+      if (generation !== getSessionGeneration()) return
       if (options.successMessage) {
         const message =
           typeof options.successMessage === 'function'
@@ -71,7 +79,8 @@ export function useApiMutation<TData, TVariables>(
       }
       await options.onSuccess?.(data, variables)
     },
-    onError: (error) => {
+    onError: (error, _variables, generation) => {
+      if (generation !== undefined && generation !== getSessionGeneration()) return
       if (!isApiError(error)) {
         toast.error('操作失败', '发生未知错误，请稍后重试')
         return

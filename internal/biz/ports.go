@@ -25,20 +25,23 @@ type UserRepo interface {
 	List(context.Context, Tx, UserFilter) ([]*User, int64, error)
 	CountByStatus(context.Context, Tx, authorization.Scope) (map[string]int64, error)
 	CountMFA(context.Context, Tx, authorization.Scope) (int64, error)
+	Overview(context.Context, Tx, UserFilter, time.Time, time.Time) (*Overview, error)
 	RolesForUser(context.Context, Tx, int64) ([]RoleRef, error)
 	CountsByRole(context.Context, Tx, int64) (int64, error)
 }
 
 type UserFilter struct {
-	Keyword string
-	Status  string
-	RoleID  int64
-	MFA     *bool
-	Scope   authorization.Scope
-	ActorID int64
-	Offset  int
-	Limit   int
-	Fields  []string
+	Keyword     string
+	Status      string
+	RoleID      int64
+	MFA         *bool
+	Scope       authorization.Scope
+	ActorID     int64
+	Offset      int
+	Limit       int
+	Fields      []string
+	ExcludedIDs []int64
+	SearchEmail bool
 }
 
 type CredentialRepo interface {
@@ -73,7 +76,7 @@ type SessionRepo interface {
 	RevokeAllForUser(context.Context, Tx, int64, *time.Time) error
 	CountActive(context.Context, Tx) (int64, error)
 	ListActiveRoleIDs(context.Context, Tx, string) ([]int64, error)
-	SetActiveRoleIDs(context.Context, Tx, string, []int64) error
+	SetActiveRoleIDs(context.Context, Tx, string, []int64, uint64) error
 	SetIdentityVersion(context.Context, Tx, string, uint64) error
 }
 
@@ -218,7 +221,7 @@ type AssignmentItem struct {
 
 type OutboxRepo interface {
 	Append(context.Context, Tx, *Event) error
-	ListRecentEvents(context.Context, Tx, int) ([]*Event, error)
+	PendingEventsForClient(context.Context, Tx, *IntegrationClient, int) ([]*Event, error)
 	EnsureDelivery(context.Context, Tx, string, string, time.Time) error
 	DueDeliveries(context.Context, Tx, time.Time, int) ([]*Delivery, error)
 	ListDeliveries(context.Context, Tx, string, int, int) ([]*Delivery, int64, error)
@@ -245,7 +248,7 @@ type SettingsRepo interface {
 }
 
 type ExportRepo interface {
-	Create(context.Context, *ExportJob) (*ExportJob, error)
+	Create(context.Context, Tx, *ExportJob) (*ExportJob, error)
 	Get(context.Context, int64) (*ExportJob, error)
 	ListByActor(context.Context, int64, int, string) ([]*ExportJob, string, error)
 }

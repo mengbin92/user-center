@@ -1073,19 +1073,20 @@ func (x *GetPermissionRequest) GetId() string {
 }
 
 type CreatePermissionRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	ResourceId      string                 `protobuf:"bytes,1,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
-	Code            string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Name            string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Category        string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`
-	RiskLevel       string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
-	SupportedScopes []string               `protobuf:"bytes,6,rep,name=supported_scopes,json=supportedScopes,proto3" json:"supported_scopes,omitempty"`
-	ContextTypes    []string               `protobuf:"bytes,7,rep,name=context_types,json=contextTypes,proto3" json:"context_types,omitempty"`
-	Description     string                 `protobuf:"bytes,8,opt,name=description,proto3" json:"description,omitempty"`
-	Sort            int32                  `protobuf:"varint,9,opt,name=sort,proto3" json:"sort,omitempty"`
-	Reason          string                 `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	ResourceId             string                 `protobuf:"bytes,1,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	Code                   string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name                   string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Category               string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`
+	RiskLevel              string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	SupportedScopes        []string               `protobuf:"bytes,6,rep,name=supported_scopes,json=supportedScopes,proto3" json:"supported_scopes,omitempty"`
+	ContextTypes           []string               `protobuf:"bytes,7,rep,name=context_types,json=contextTypes,proto3" json:"context_types,omitempty"`
+	Description            string                 `protobuf:"bytes,8,opt,name=description,proto3" json:"description,omitempty"`
+	Sort                   int32                  `protobuf:"varint,9,opt,name=sort,proto3" json:"sort,omitempty"`
+	Reason                 string                 `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,11,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CreatePermissionRequest) Reset() {
@@ -1188,19 +1189,27 @@ func (x *CreatePermissionRequest) GetReason() string {
 	return ""
 }
 
+func (x *CreatePermissionRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type UpdatePermissionRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Category         string                 `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
-	RiskLevel        string                 `protobuf:"bytes,4,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
-	SupportedScopes  []string               `protobuf:"bytes,5,rep,name=supported_scopes,json=supportedScopes,proto3" json:"supported_scopes,omitempty"`
-	Description      string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
-	Sort             int32                  `protobuf:"varint,7,opt,name=sort,proto3" json:"sort,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,8,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Category               string                 `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
+	RiskLevel              string                 `protobuf:"bytes,4,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	SupportedScopes        []string               `protobuf:"bytes,5,rep,name=supported_scopes,json=supportedScopes,proto3" json:"supported_scopes,omitempty"`
+	Description            string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Sort                   int32                  `protobuf:"varint,7,opt,name=sort,proto3" json:"sort,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,8,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,10,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *UpdatePermissionRequest) Reset() {
@@ -1296,14 +1305,22 @@ func (x *UpdatePermissionRequest) GetReason() string {
 	return ""
 }
 
+func (x *UpdatePermissionRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type SetPermissionStatusRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Status           string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Status                 string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,5,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *SetPermissionStatusRequest) Reset() {
@@ -1364,13 +1381,21 @@ func (x *SetPermissionStatusRequest) GetReason() string {
 	return ""
 }
 
+func (x *SetPermissionStatusRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type ArchivePermissionRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,4,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *ArchivePermissionRequest) Reset() {
@@ -1420,6 +1445,13 @@ func (x *ArchivePermissionRequest) GetExpectedRevision() string {
 func (x *ArchivePermissionRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *ArchivePermissionRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
 	}
 	return ""
 }
@@ -1813,15 +1845,16 @@ func (x *CreateRoleRequest) GetExpectedPolicyRevision() string {
 }
 
 type UpdateRoleRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description      string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	MaxMembers       int64                  `protobuf:"varint,4,opt,name=max_members,json=maxMembers,proto3" json:"max_members,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,5,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description            string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	MaxMembers             int64                  `protobuf:"varint,4,opt,name=max_members,json=maxMembers,proto3" json:"max_members,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,5,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,7,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *UpdateRoleRequest) Reset() {
@@ -1896,14 +1929,23 @@ func (x *UpdateRoleRequest) GetReason() string {
 	return ""
 }
 
+func (x *UpdateRoleRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type CopyRoleRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Code                   string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name                   string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Reason                 string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,5,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,6,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CopyRoleRequest) Reset() {
@@ -1964,14 +2006,29 @@ func (x *CopyRoleRequest) GetReason() string {
 	return ""
 }
 
+func (x *CopyRoleRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return ""
+}
+
+func (x *CopyRoleRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type SetRoleStatusRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Status           string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Status                 string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,5,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *SetRoleStatusRequest) Reset() {
@@ -2032,13 +2089,21 @@ func (x *SetRoleStatusRequest) GetReason() string {
 	return ""
 }
 
+func (x *SetRoleStatusRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type ArchiveRoleRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,4,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *ArchiveRoleRequest) Reset() {
@@ -2088,6 +2153,13 @@ func (x *ArchiveRoleRequest) GetExpectedRevision() string {
 func (x *ArchiveRoleRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *ArchiveRoleRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
 	}
 	return ""
 }
@@ -3437,18 +3509,19 @@ func (x *CreateDelegationRequest) GetExpectedPolicyRevision() string {
 }
 
 type UpdateDelegationRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Actions          []string               `protobuf:"bytes,2,rep,name=actions,proto3" json:"actions,omitempty"`
-	TargetUserScope  *Scope                 `protobuf:"bytes,3,opt,name=target_user_scope,json=targetUserScope,proto3" json:"target_user_scope,omitempty"`
-	GrantCeiling     []*DelegationCeiling   `protobuf:"bytes,4,rep,name=grant_ceiling,json=grantCeiling,proto3" json:"grant_ceiling,omitempty"`
-	CanRedelegate    bool                   `protobuf:"varint,5,opt,name=can_redelegate,json=canRedelegate,proto3" json:"can_redelegate,omitempty"`
-	StartsAt         string                 `protobuf:"bytes,6,opt,name=starts_at,json=startsAt,proto3" json:"starts_at,omitempty"`
-	ExpiresAt        string                 `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,8,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Actions                []string               `protobuf:"bytes,2,rep,name=actions,proto3" json:"actions,omitempty"`
+	TargetUserScope        *Scope                 `protobuf:"bytes,3,opt,name=target_user_scope,json=targetUserScope,proto3" json:"target_user_scope,omitempty"`
+	GrantCeiling           []*DelegationCeiling   `protobuf:"bytes,4,rep,name=grant_ceiling,json=grantCeiling,proto3" json:"grant_ceiling,omitempty"`
+	CanRedelegate          bool                   `protobuf:"varint,5,opt,name=can_redelegate,json=canRedelegate,proto3" json:"can_redelegate,omitempty"`
+	StartsAt               string                 `protobuf:"bytes,6,opt,name=starts_at,json=startsAt,proto3" json:"starts_at,omitempty"`
+	ExpiresAt              string                 `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,8,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,10,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *UpdateDelegationRequest) Reset() {
@@ -3544,13 +3617,21 @@ func (x *UpdateDelegationRequest) GetReason() string {
 	return ""
 }
 
+func (x *UpdateDelegationRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type RevokeDelegationRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,4,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *RevokeDelegationRequest) Reset() {
@@ -3600,6 +3681,13 @@ func (x *RevokeDelegationRequest) GetExpectedRevision() string {
 func (x *RevokeDelegationRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *RevokeDelegationRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
 	}
 	return ""
 }
@@ -3701,6 +3789,7 @@ type RevokeAssignmentRequest struct {
 	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Reason                 string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
 	ExpectedPolicyRevision string                 `protobuf:"bytes,3,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,4,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -3752,6 +3841,13 @@ func (x *RevokeAssignmentRequest) GetReason() string {
 func (x *RevokeAssignmentRequest) GetExpectedPolicyRevision() string {
 	if x != nil {
 		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
+func (x *RevokeAssignmentRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
 	}
 	return ""
 }
@@ -4229,16 +4325,17 @@ func (x *CreateConstraintRequest) GetExpectedPolicyRevision() string {
 }
 
 type UpdateConstraintRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	RoleIds          []string               `protobuf:"bytes,3,rep,name=role_ids,json=roleIds,proto3" json:"role_ids,omitempty"`
-	MaxCount         int64                  `protobuf:"varint,4,opt,name=max_count,json=maxCount,proto3" json:"max_count,omitempty"`
-	Enabled          bool                   `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,6,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	RoleIds                []string               `protobuf:"bytes,3,rep,name=role_ids,json=roleIds,proto3" json:"role_ids,omitempty"`
+	MaxCount               int64                  `protobuf:"varint,4,opt,name=max_count,json=maxCount,proto3" json:"max_count,omitempty"`
+	Enabled                bool                   `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,6,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,8,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *UpdateConstraintRequest) Reset() {
@@ -4320,13 +4417,21 @@ func (x *UpdateConstraintRequest) GetReason() string {
 	return ""
 }
 
+func (x *UpdateConstraintRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type DeleteConstraintRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,4,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *DeleteConstraintRequest) Reset() {
@@ -4376,6 +4481,13 @@ func (x *DeleteConstraintRequest) GetExpectedRevision() string {
 func (x *DeleteConstraintRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *DeleteConstraintRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
 	}
 	return ""
 }
@@ -4461,17 +4573,18 @@ func (x *MenusReply) GetItems() []*MenuItem {
 }
 
 type CreateMenuItemRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ParentId      string                 `protobuf:"bytes,1,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
-	RouteKey      string                 `protobuf:"bytes,2,opt,name=route_key,json=routeKey,proto3" json:"route_key,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	IconKey       string                 `protobuf:"bytes,4,opt,name=icon_key,json=iconKey,proto3" json:"icon_key,omitempty"`
-	Sort          int32                  `protobuf:"varint,5,opt,name=sort,proto3" json:"sort,omitempty"`
-	RequiredAll   []string               `protobuf:"bytes,6,rep,name=required_all,json=requiredAll,proto3" json:"required_all,omitempty"`
-	RequiredAny   []string               `protobuf:"bytes,7,rep,name=required_any,json=requiredAny,proto3" json:"required_any,omitempty"`
-	Reason        string                 `protobuf:"bytes,8,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	ParentId               string                 `protobuf:"bytes,1,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	RouteKey               string                 `protobuf:"bytes,2,opt,name=route_key,json=routeKey,proto3" json:"route_key,omitempty"`
+	Name                   string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	IconKey                string                 `protobuf:"bytes,4,opt,name=icon_key,json=iconKey,proto3" json:"icon_key,omitempty"`
+	Sort                   int32                  `protobuf:"varint,5,opt,name=sort,proto3" json:"sort,omitempty"`
+	RequiredAll            []string               `protobuf:"bytes,6,rep,name=required_all,json=requiredAll,proto3" json:"required_all,omitempty"`
+	RequiredAny            []string               `protobuf:"bytes,7,rep,name=required_any,json=requiredAny,proto3" json:"required_any,omitempty"`
+	Reason                 string                 `protobuf:"bytes,8,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,9,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CreateMenuItemRequest) Reset() {
@@ -4560,19 +4673,27 @@ func (x *CreateMenuItemRequest) GetReason() string {
 	return ""
 }
 
+func (x *CreateMenuItemRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type UpdateMenuItemRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	IconKey          string                 `protobuf:"bytes,3,opt,name=icon_key,json=iconKey,proto3" json:"icon_key,omitempty"`
-	Sort             int32                  `protobuf:"varint,4,opt,name=sort,proto3" json:"sort,omitempty"`
-	Enabled          bool                   `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	RequiredAll      []string               `protobuf:"bytes,6,rep,name=required_all,json=requiredAll,proto3" json:"required_all,omitempty"`
-	RequiredAny      []string               `protobuf:"bytes,7,rep,name=required_any,json=requiredAny,proto3" json:"required_any,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,8,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	IconKey                string                 `protobuf:"bytes,3,opt,name=icon_key,json=iconKey,proto3" json:"icon_key,omitempty"`
+	Sort                   int32                  `protobuf:"varint,4,opt,name=sort,proto3" json:"sort,omitempty"`
+	Enabled                bool                   `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	RequiredAll            []string               `protobuf:"bytes,6,rep,name=required_all,json=requiredAll,proto3" json:"required_all,omitempty"`
+	RequiredAny            []string               `protobuf:"bytes,7,rep,name=required_any,json=requiredAny,proto3" json:"required_any,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,8,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,10,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *UpdateMenuItemRequest) Reset() {
@@ -4668,13 +4789,21 @@ func (x *UpdateMenuItemRequest) GetReason() string {
 	return ""
 }
 
+func (x *UpdateMenuItemRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type ArchiveMenuItemRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Reason           string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason                 string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,4,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *ArchiveMenuItemRequest) Reset() {
@@ -4724,6 +4853,13 @@ func (x *ArchiveMenuItemRequest) GetExpectedRevision() string {
 func (x *ArchiveMenuItemRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *ArchiveMenuItemRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
 	}
 	return ""
 }
@@ -5252,7 +5388,7 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\x10PermissionsReply\x123\n" +
 	"\x05items\x18\x01 \x03(\v2\x1d.api.usercenter.v1.PermissionR\x05items\"&\n" +
 	"\x14GetPermissionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xbb\x02\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xf5\x02\n" +
 	"\x17CreatePermissionRequest\x12\x1f\n" +
 	"\vresource_id\x18\x01 \x01(\tR\n" +
 	"resourceId\x12\x12\n" +
@@ -5266,7 +5402,8 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\vdescription\x18\b \x01(\tR\vdescription\x12\x12\n" +
 	"\x04sort\x18\t \x01(\x05R\x04sort\x12\x16\n" +
 	"\x06reason\x18\n" +
-	" \x01(\tR\x06reason\"\x9e\x02\n" +
+	" \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\v \x01(\tR\x16expectedPolicyRevision\"\xd8\x02\n" +
 	"\x17UpdatePermissionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
@@ -5277,16 +5414,20 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x12\n" +
 	"\x04sort\x18\a \x01(\x05R\x04sort\x12+\n" +
 	"\x11expected_revision\x18\b \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\t \x01(\tR\x06reason\"\x89\x01\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\n" +
+	" \x01(\tR\x16expectedPolicyRevision\"\xc3\x01\n" +
 	"\x1aSetPermissionStatusRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12+\n" +
 	"\x11expected_revision\x18\x03 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"o\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\x05 \x01(\tR\x16expectedPolicyRevision\"\xa9\x01\n" +
 	"\x18ArchivePermissionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"0\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\x04 \x01(\tR\x16expectedPolicyRevision\"0\n" +
 	"\x1eGetPermissionReferencesRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"H\n" +
 	"\tReference\x12\x12\n" +
@@ -5312,7 +5453,7 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\vmax_members\x18\x06 \x01(\x03R\n" +
 	"maxMembers\x12\x16\n" +
 	"\x06reason\x18\a \x01(\tR\x06reason\x128\n" +
-	"\x18expected_policy_revision\x18\b \x01(\tR\x16expectedPolicyRevision\"\xbf\x01\n" +
+	"\x18expected_policy_revision\x18\b \x01(\tR\x16expectedPolicyRevision\"\xf9\x01\n" +
 	"\x11UpdateRoleRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -5320,21 +5461,26 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\vmax_members\x18\x04 \x01(\x03R\n" +
 	"maxMembers\x12+\n" +
 	"\x11expected_revision\x18\x05 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x06 \x01(\tR\x06reason\"a\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\a \x01(\tR\x16expectedPolicyRevision\"\xc8\x01\n" +
 	"\x0fCopyRoleRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"\x83\x01\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12+\n" +
+	"\x11expected_revision\x18\x05 \x01(\tR\x10expectedRevision\x128\n" +
+	"\x18expected_policy_revision\x18\x06 \x01(\tR\x16expectedPolicyRevision\"\xbd\x01\n" +
 	"\x14SetRoleStatusRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12+\n" +
 	"\x11expected_revision\x18\x03 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"i\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\x05 \x01(\tR\x16expectedPolicyRevision\"\xa3\x01\n" +
 	"\x12ArchiveRoleRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"(\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\x04 \x01(\tR\x16expectedPolicyRevision\"(\n" +
 	"\x16ListRoleMembersRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"G\n" +
 	"\x10RoleMembersReply\x123\n" +
@@ -5444,7 +5590,7 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"expires_at\x18\t \x01(\tR\texpiresAt\x12\x16\n" +
 	"\x06reason\x18\n" +
 	" \x01(\tR\x06reason\x128\n" +
-	"\x18expected_policy_revision\x18\v \x01(\tR\x16expectedPolicyRevision\"\xfc\x02\n" +
+	"\x18expected_policy_revision\x18\v \x01(\tR\x16expectedPolicyRevision\"\xb6\x03\n" +
 	"\x17UpdateDelegationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aactions\x18\x02 \x03(\tR\aactions\x12D\n" +
@@ -5455,11 +5601,14 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\n" +
 	"expires_at\x18\a \x01(\tR\texpiresAt\x12+\n" +
 	"\x11expected_revision\x18\b \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\t \x01(\tR\x06reason\"n\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\n" +
+	" \x01(\tR\x16expectedPolicyRevision\"\xa8\x01\n" +
 	"\x17RevokeDelegationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"\x8f\x02\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\x04 \x01(\tR\x16expectedPolicyRevision\"\x8f\x02\n" +
 	"\x17CreateAssignmentRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\arole_id\x18\x02 \x01(\tR\x06roleId\x124\n" +
@@ -5468,11 +5617,12 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\n" +
 	"expires_at\x18\x05 \x01(\tR\texpiresAt\x12\x16\n" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x128\n" +
-	"\x18expected_policy_revision\x18\a \x01(\tR\x16expectedPolicyRevision\"{\n" +
+	"\x18expected_policy_revision\x18\a \x01(\tR\x16expectedPolicyRevision\"\xa8\x01\n" +
 	"\x17RevokeAssignmentRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x128\n" +
-	"\x18expected_policy_revision\x18\x03 \x01(\tR\x16expectedPolicyRevision\"\xa4\x01\n" +
+	"\x18expected_policy_revision\x18\x03 \x01(\tR\x16expectedPolicyRevision\x12+\n" +
+	"\x11expected_revision\x18\x04 \x01(\tR\x10expectedRevision\"\xa4\x01\n" +
 	"\x19PreviewBatchAssignRequest\x12\x19\n" +
 	"\buser_ids\x18\x01 \x03(\tR\auserIds\x12\x17\n" +
 	"\arole_id\x18\x02 \x01(\tR\x06roleId\x124\n" +
@@ -5505,7 +5655,7 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\brole_ids\x18\x03 \x03(\tR\aroleIds\x12\x1b\n" +
 	"\tmax_count\x18\x04 \x01(\x03R\bmaxCount\x12\x16\n" +
 	"\x06reason\x18\x05 \x01(\tR\x06reason\x128\n" +
-	"\x18expected_policy_revision\x18\x06 \x01(\tR\x16expectedPolicyRevision\"\xd4\x01\n" +
+	"\x18expected_policy_revision\x18\x06 \x01(\tR\x16expectedPolicyRevision\"\x8e\x02\n" +
 	"\x17UpdateConstraintRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -5513,15 +5663,17 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\tmax_count\x18\x04 \x01(\x03R\bmaxCount\x12\x18\n" +
 	"\aenabled\x18\x05 \x01(\bR\aenabled\x12+\n" +
 	"\x11expected_revision\x18\x06 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\a \x01(\tR\x06reason\"n\n" +
+	"\x06reason\x18\a \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\b \x01(\tR\x16expectedPolicyRevision\"\xa8\x01\n" +
 	"\x17DeleteConstraintRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"\x12\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\x04 \x01(\tR\x16expectedPolicyRevision\"\x12\n" +
 	"\x10ListMenusRequest\"?\n" +
 	"\n" +
 	"MenusReply\x121\n" +
-	"\x05items\x18\x01 \x03(\v2\x1b.api.usercenter.v1.MenuItemR\x05items\"\xf2\x01\n" +
+	"\x05items\x18\x01 \x03(\v2\x1b.api.usercenter.v1.MenuItemR\x05items\"\xac\x02\n" +
 	"\x15CreateMenuItemRequest\x12\x1b\n" +
 	"\tparent_id\x18\x01 \x01(\tR\bparentId\x12\x1b\n" +
 	"\troute_key\x18\x02 \x01(\tR\brouteKey\x12\x12\n" +
@@ -5530,7 +5682,8 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\x04sort\x18\x05 \x01(\x05R\x04sort\x12!\n" +
 	"\frequired_all\x18\x06 \x03(\tR\vrequiredAll\x12!\n" +
 	"\frequired_any\x18\a \x03(\tR\vrequiredAny\x12\x16\n" +
-	"\x06reason\x18\b \x01(\tR\x06reason\"\x8f\x02\n" +
+	"\x06reason\x18\b \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\t \x01(\tR\x16expectedPolicyRevision\"\xc9\x02\n" +
 	"\x15UpdateMenuItemRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -5540,11 +5693,14 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\frequired_all\x18\x06 \x03(\tR\vrequiredAll\x12!\n" +
 	"\frequired_any\x18\a \x03(\tR\vrequiredAny\x12+\n" +
 	"\x11expected_revision\x18\b \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\t \x01(\tR\x06reason\"m\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\n" +
+	" \x01(\tR\x16expectedPolicyRevision\"\xa7\x01\n" +
 	"\x16ArchiveMenuItemRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"\xb0\x02\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\x04 \x01(\tR\x16expectedPolicyRevision\"\xb0\x02\n" +
 	"\vGrantSource\x12\x17\n" +
 	"\arole_id\x18\x01 \x01(\tR\x06roleId\x12\x1b\n" +
 	"\trole_code\x18\x02 \x01(\tR\broleCode\x12\x1c\n" +

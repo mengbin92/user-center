@@ -3,12 +3,11 @@ package biz
 import (
 	"context"
 	"encoding/csv"
-	"fmt"
+	"net/mail"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
-
-	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
 func (uc *AuditUsecase) List(ctx context.Context, actor ActorContext, filter AuditFilter) ([]*AuditEvent, int64, error) {
@@ -36,6 +35,10 @@ func (uc *AuditUsecase) Export(ctx context.Context, actor ActorContext, filter A
 	if _, err := uc.Authorize(ctx, actor, "audit.export", 0, true); err != nil {
 		return nil, err
 	}
+	snapshot, err := uc.exportSnapshot(ctx, actor)
+	if err != nil {
+		return nil, err
+	}
 	if len(fields) == 0 {
 		fields = []string{"event_id", "occurred_at", "actor_user_id", "action", "target", "result", "reason", "request_id"}
 	}
@@ -54,11 +57,17 @@ func (uc *AuditUsecase) Export(ctx context.Context, actor ActorContext, filter A
 		return nil, ErrDependency
 	}
 	job := &ExportJob{
-		Kind: "audits", ActorUserID: actor.User.ID, ActorSessionID: actor.Session.ID,
+		Kind: "audits", ScopeSnapshot: snapshot, ActorUserID: actor.User.ID, ActorSessionID: actor.Session.ID,
 		RequestedFields: fields, Status: ExportPending, CreatedAt: uc.Clock.Now().UTC(),
 		ExpiresAt: uc.Clock.Now().Add(24 * time.Hour), ArtifactName: uc.IDs.NewID() + ".csv",
 	}
 	path := filepath.Join(uc.ArtifactDir, job.ArtifactName)
+	keepArtifact := false
+	defer func() {
+		if !keepArtifact {
+			_ = os.Remove(path)
+		}
+	}()
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, ErrDependency
@@ -95,7 +104,7 @@ func (uc *AuditUsecase) Export(ctx context.Context, actor ActorContext, filter A
 				row = append(row, e.Diff)
 			}
 		}
-		_ = w.Write(row)
+		_ = w.Write(csvSafeRow(row))
 	}
 	w.Flush()
 	if err := w.Error(); err != nil {
@@ -106,11 +115,19 @@ func (uc *AuditUsecase) Export(ctx context.Context, actor ActorContext, filter A
 		return nil, ErrDependency
 	}
 	job.Status = ExportReady
-	saved, err := uc.Exports.Create(ctx, job)
+	var saved *ExportJob
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		var err error
+		saved, err = uc.Exports.Create(ctx, tx, job)
+		if err != nil {
+			return err
+		}
+		return uc.audit(ctx, tx, actor, "audit.export", "audits", "{}", "{}", string(mustJSON(map[string]any{"fields": fields})), reason, "success")
+	})
 	if err != nil {
-		return nil, ErrDependency
+		return nil, err
 	}
-	_ = uc.audit(ctx, nil, actor, "audit.export", "audits", "{}", "{}", string(mustJSON(map[string]any{"fields": fields})), reason, "success")
+	keepArtifact = true
 	return saved, nil
 }
 
@@ -129,8 +146,45 @@ func (uc *SettingsUsecase) UpdateAuth(ctx context.Context, actor ActorContext, i
 	if _, err := uc.Authorize(ctx, actor, "settings.auth.update", 0, true); err != nil {
 		return nil, err
 	}
-	if in.PasswordMinLength < 8 || in.PasswordMinLength > 128 {
-		return nil, Validation("密码最小长度必须为 8-128")
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
+		return nil, err
+	}
+	fields, err := mutationFields(updateMask, "registration_enabled", "email_verification_required", "password_min_length", "session_ttl_minutes", "idle_timeout_minutes", "mfa_required_for_admins", "allowed_email_domains", "providers")
+	if err != nil {
+		return nil, err
+	}
+	before, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	merged := *before
+	if fields["registration_enabled"] {
+		merged.RegistrationEnabled = in.RegistrationEnabled
+	}
+	if fields["email_verification_required"] {
+		merged.EmailVerificationRequired = in.EmailVerificationRequired
+	}
+	if fields["password_min_length"] {
+		merged.PasswordMinLength = in.PasswordMinLength
+	}
+	if fields["session_ttl_minutes"] {
+		merged.SessionTTLMinutes = in.SessionTTLMinutes
+	}
+	if fields["idle_timeout_minutes"] {
+		merged.IdleTimeoutMinutes = in.IdleTimeoutMinutes
+	}
+	if fields["mfa_required_for_admins"] {
+		merged.MFARequiredForAdmins = in.MFARequiredForAdmins
+	}
+	if fields["allowed_email_domains"] {
+		merged.AllowedEmailDomains = in.AllowedEmailDomains
+	}
+	if fields["providers"] {
+		merged.Providers = in.Providers
+	}
+	in = &merged
+	if in.PasswordMinLength < 8 || in.PasswordMinLength > 72 {
+		return nil, Validation("密码最小长度必须为 8-72 字节")
 	}
 	if in.SessionTTLMinutes < 5 || in.SessionTTLMinutes > 60*24*30 {
 		return nil, Validation("会话有效期不合法")
@@ -138,9 +192,17 @@ func (uc *SettingsUsecase) UpdateAuth(ctx context.Context, actor ActorContext, i
 	if in.IdleTimeoutMinutes < 5 || in.IdleTimeoutMinutes > in.SessionTTLMinutes {
 		return nil, Validation("闲置超时不能大于会话有效期")
 	}
-	before, err := uc.Settings.GetAuth(ctx, nil)
-	if err != nil {
-		return nil, ErrDependency
+	for _, provider := range in.Providers {
+		if uc.OAuth[provider] == nil {
+			return nil, Validation("登录提供方尚未配置: " + provider)
+		}
+	}
+	for i, domain := range in.AllowedEmailDomains {
+		domain = strings.ToLower(strings.TrimSpace(domain))
+		if domain == "" || strings.ContainsAny(domain, "@ \t\r\n/") {
+			return nil, Validation("邮箱域名不合法")
+		}
+		in.AllowedEmailDomains[i] = domain
 	}
 	in.Revision = before.Revision
 	in.UpdatedAt = uc.Clock.Now().UTC()
@@ -177,10 +239,47 @@ func (uc *SettingsUsecase) UpdateEmail(ctx context.Context, actor ActorContext, 
 	if _, err := uc.Authorize(ctx, actor, "settings.email.update", 0, true); err != nil {
 		return nil, err
 	}
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
+		return nil, err
+	}
+	fields, err := mutationFields(updateMask, "driver", "from", "smtp_host", "smtp_port", "smtp_username", "smtp_password")
+	if err != nil {
+		return nil, err
+	}
+	before, _, err := uc.Settings.GetEmail(ctx, nil)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	merged := *before
+	if fields["driver"] {
+		merged.Driver = in.Driver
+	}
+	if fields["from"] {
+		merged.From = in.From
+	}
+	if fields["smtp_host"] {
+		merged.SMTPHost = in.SMTPHost
+	}
+	if fields["smtp_port"] {
+		merged.SMTPPort = in.SMTPPort
+	}
+	if fields["smtp_username"] {
+		merged.SMTPUsername = in.SMTPUsername
+	}
+	if !fields["smtp_password"] {
+		secret = ""
+	}
+	in = &merged
 	if in.Driver != "console" && in.Driver != "smtp" {
 		return nil, Validation("邮件驱动只能是 console 或 smtp")
 	}
-	if in.Driver == "smtp" && (in.SMTPHost == "" || in.SMTPPort <= 0) {
+	if strings.ContainsAny(in.From, "\r\n") {
+		return nil, Validation("发件人不合法")
+	}
+	if _, err := mail.ParseAddress(in.From); err != nil {
+		return nil, Validation("发件人邮箱不合法")
+	}
+	if in.Driver == "smtp" && (in.SMTPHost == "" || in.SMTPPort <= 0 || in.SMTPPort > 65535 || strings.ContainsAny(in.SMTPHost, "\r\n")) {
 		return nil, Validation("SMTP 主机和端口不能为空")
 	}
 	if secret != "" {
@@ -191,7 +290,7 @@ func (uc *SettingsUsecase) UpdateEmail(ctx context.Context, actor ActorContext, 
 		secret = enc
 	}
 	var saved *EmailSettings
-	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		s, err := uc.Settings.SaveEmail(ctx, tx, in, secret, expected)
 		if err != nil {
 			return err
@@ -204,6 +303,3 @@ func (uc *SettingsUsecase) UpdateEmail(ctx context.Context, actor ActorContext, 
 	}
 	return saved, nil
 }
-
-var _ = fmt.Sprintf
-var _ = jsonx.Marshal

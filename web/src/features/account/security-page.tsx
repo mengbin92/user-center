@@ -33,6 +33,7 @@ import { ErrorPanel } from '../../components/query-state'
 import { Field, Input } from '../../components/input'
 import { useToast } from '../../components/toast'
 import { api } from '../../lib/api'
+import { passwordValidationError } from '../../lib/password'
 import { useAuth } from '../../lib/auth'
 import { errorMessage } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
@@ -68,6 +69,7 @@ export function SecurityPage() {
   const [searchParams] = useSearchParams()
   const boundProvider = searchParams.get('bound')
   const oauthError = searchParams.get('oauth_error')
+  const verifiedProvider = searchParams.get('verified')
   const passwordChangeParam =
     searchParams.get('password_change_required') === '1'
 
@@ -87,6 +89,8 @@ export function SecurityPage() {
 
   const security = securityQuery.data
   const mfaEnabled = security?.mfa_enabled ?? false
+  const passwordAvailable = security?.password_available !== false
+  const boundProviders = [...new Set((identitiesQuery.data?.items ?? []).map((identity) => identity.provider).filter((provider): provider is string => Boolean(provider)))].filter((provider) => contextQuery.data?.providers?.includes(provider))
   const passwordChangeRequired =
     security?.password_change_required === true ||
     (passwordChangeParam && security?.password_change_required !== false)
@@ -107,7 +111,7 @@ export function SecurityPage() {
   const changePassword = useApiMutation({
     mutationFn: () =>
       api.me.changePassword({
-        current_password: currentPassword,
+        current_password: passwordAvailable ? currentPassword : '',
         new_password: newPassword,
       }),
     successMessage: '密码已更新',
@@ -167,7 +171,7 @@ export function SecurityPage() {
   const disableMfa = useApiMutation({
     mutationFn: () =>
       api.me.disableMfa({
-        current_password: disablePassword,
+        current_password: passwordAvailable ? disablePassword : '',
         code: disableCode.trim(),
       }),
     successMessage: '多因素认证已关闭',
@@ -188,7 +192,7 @@ export function SecurityPage() {
   const rotateCodes = useApiMutation({
     mutationFn: () =>
       api.me.rotateRecoveryCodes({
-        current_password: rotatePassword,
+        current_password: passwordAvailable ? rotatePassword : '',
         code: rotateCode.trim(),
       }),
     successMessage: '恢复码已轮换',
@@ -209,7 +213,7 @@ export function SecurityPage() {
   const verifyStepUp = useApiMutation({
     mutationFn: () =>
       api.me.verifySecurity({
-        current_password: stepPassword,
+        current_password: passwordAvailable ? stepPassword : '',
         code: stepCode.trim(),
       }),
     successMessage: '安全验证通过',
@@ -301,8 +305,9 @@ export function SecurityPage() {
   const submitPassword = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setPasswordError(null)
-    if (newPassword.length < minPasswordLength) {
-      setPasswordError(`新密码至少需要 ${minPasswordLength} 位`)
+    const policyError = passwordValidationError(newPassword, minPasswordLength)
+    if (policyError) {
+      setPasswordError(policyError)
       return
     }
     if (newPassword !== confirmPassword) {
@@ -341,6 +346,17 @@ export function SecurityPage() {
       </div>
 
       <PasswordChangeNotice required={passwordChangeRequired} />
+
+      {!passwordAvailable ? (
+        <SectionCard title="重新验证绑定身份" description="当前账号使用第三方身份登录。设置密码或启用 MFA 前，请先重新验证已经绑定的身份；证明仅对当前会话短期有效。">
+          {verifiedProvider ? <InlineAlert tone="success" title="第三方身份验证已完成">现在可以继续设置密码或启用 MFA。已启用 MFA 的高风险变更仍需动态码验证。</InlineAlert> : null}
+          {boundProviders.length ? (
+            <ProviderButtons providers={boundProviders} mode="verify" />
+          ) : (
+            <InlineAlert tone="warning">未找到可重新验证的已绑定提供方。请检查绑定与提供方状态后重试。</InlineAlert>
+          )}
+        </SectionCard>
+      ) : null}
 
       {boundProvider ? (
         <InlineAlert
@@ -452,16 +468,20 @@ export function SecurityPage() {
           }
         >
           <form className="space-y-3" onSubmit={submitPassword}>
-            <Field label="当前密码" htmlFor="current-password" required>
-              <Input
-                id="current-password"
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                required
-              />
-            </Field>
+            {passwordAvailable ? (
+              <Field label="当前密码" htmlFor="current-password" required>
+                <Input
+                  id="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  required
+                />
+              </Field>
+            ) : (
+              <InlineAlert tone="info">请先使用上方已绑定身份完成重新验证，再继续此操作。</InlineAlert>
+            )}
             <Field
               label="新密码"
               htmlFor="new-password"
@@ -529,16 +549,20 @@ export function SecurityPage() {
             }}
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="当前密码" htmlFor="step-password" required>
-                <Input
-                  id="step-password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={stepPassword}
-                  onChange={(event) => setStepPassword(event.target.value)}
-                  required
-                />
-              </Field>
+              {passwordAvailable ? (
+                <Field label="当前密码" htmlFor="step-password" required>
+                  <Input
+                    id="step-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={stepPassword}
+                    onChange={(event) => setStepPassword(event.target.value)}
+                    required
+                  />
+                </Field>
+              ) : (
+                <InlineAlert tone="info">请先使用上方已绑定身份完成重新验证，再继续此操作。</InlineAlert>
+              )}
               <Field label="动态验证码 / 恢复码" htmlFor="step-code" required>
                 <Input
                   id="step-code"
@@ -590,6 +614,7 @@ export function SecurityPage() {
           <Button
             size="sm"
             variant="secondary"
+            disabled={!passwordAvailable}
             onClick={() => {
               setNewEmail('')
               setEmailPassword('')
@@ -695,7 +720,7 @@ export function SecurityPage() {
         description={
           setupData
             ? '使用身份验证器扫描二维码，然后输入当前 6 位动态码完成绑定。'
-            : '先验证当前密码，再生成 TOTP 密钥。'
+            : passwordAvailable ? '先验证当前密码，再生成 TOTP 密钥。' : '先重新验证已绑定的第三方身份，再生成 TOTP 密钥。'
         }
         size="md"
         bodyClassName="space-y-4"
@@ -729,16 +754,20 @@ export function SecurityPage() {
       >
         {!setupData ? (
           <form className="space-y-3" onSubmit={submitSetupPassword}>
-            <Field label="当前密码" htmlFor="setup-password" required>
-              <Input
-                id="setup-password"
-                type="password"
-                autoComplete="current-password"
-                value={setupPassword}
-                onChange={(event) => setSetupPassword(event.target.value)}
-                required
-              />
-            </Field>
+            {passwordAvailable ? (
+              <Field label="当前密码" htmlFor="setup-password" required>
+                <Input
+                  id="setup-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={setupPassword}
+                  onChange={(event) => setSetupPassword(event.target.value)}
+                  required
+                />
+              </Field>
+            ) : (
+              <InlineAlert tone="info">请先使用上方已绑定身份完成重新验证，再继续此操作。</InlineAlert>
+            )}
             <Button
               type="submit"
               size="sm"
@@ -887,23 +916,27 @@ export function SecurityPage() {
               size="sm"
               onClick={() => disableMfa.mutate(undefined)}
               loading={disableMfa.isPending}
-              disabled={!disablePassword || disableCode.trim().length < 6}
+              disabled={(passwordAvailable && !disablePassword) || disableCode.trim().length < 6}
             >
               确认关闭
             </Button>
           </>
         }
       >
-        <Field label="当前密码" htmlFor="disable-password" required>
-          <Input
-            id="disable-password"
-            type="password"
-            autoComplete="current-password"
-            value={disablePassword}
-            onChange={(event) => setDisablePassword(event.target.value)}
-            required
-          />
-        </Field>
+        {passwordAvailable ? (
+          <Field label="当前密码" htmlFor="disable-password" required>
+            <Input
+              id="disable-password"
+              type="password"
+              autoComplete="current-password"
+              value={disablePassword}
+              onChange={(event) => setDisablePassword(event.target.value)}
+              required
+            />
+          </Field>
+        ) : (
+          <InlineAlert tone="info">请先重新验证上方已绑定的第三方身份，然后输入动态验证码继续。</InlineAlert>
+        )}
         <Field label="动态验证码 / 恢复码" htmlFor="disable-code" required>
           <Input
             id="disable-code"
@@ -941,23 +974,27 @@ export function SecurityPage() {
               size="sm"
               onClick={() => rotateCodes.mutate(undefined)}
               loading={rotateCodes.isPending}
-              disabled={!rotatePassword || rotateCode.trim().length < 6}
+              disabled={(passwordAvailable && !rotatePassword) || rotateCode.trim().length < 6}
             >
               轮换恢复码
             </Button>
           </>
         }
       >
-        <Field label="当前密码" htmlFor="rotate-password" required>
-          <Input
-            id="rotate-password"
-            type="password"
-            autoComplete="current-password"
-            value={rotatePassword}
-            onChange={(event) => setRotatePassword(event.target.value)}
-            required
-          />
-        </Field>
+        {passwordAvailable ? (
+          <Field label="当前密码" htmlFor="rotate-password" required>
+            <Input
+              id="rotate-password"
+              type="password"
+              autoComplete="current-password"
+              value={rotatePassword}
+              onChange={(event) => setRotatePassword(event.target.value)}
+              required
+            />
+          </Field>
+        ) : (
+          <InlineAlert tone="info">请先重新验证上方已绑定的第三方身份，然后输入动态验证码继续。</InlineAlert>
+        )}
         <Field label="动态验证码 / 恢复码" htmlFor="rotate-code" required>
           <Input
             id="rotate-code"

@@ -321,19 +321,20 @@ type IntegrationClient struct {
 }
 
 type Delivery struct {
-	EventID       string
-	EventType     string
-	SubscriberID  string
-	Status        string
-	Attempts      int
-	NextRetryAt   time.Time
-	LastError     string
-	Payload       string
-	AggregateType string
-	AggregateID   int64
-	SchemaVersion int
-	OccurredAt    time.Time
-	CallbackURL   string
+	EventID           string
+	EventType         string
+	SubscriberID      string
+	Status            string
+	Attempts          int
+	NextRetryAt       time.Time
+	LastError         string
+	Payload           string
+	AggregateType     string
+	AggregateID       int64
+	AggregateRevision uint64
+	SchemaVersion     int
+	OccurredAt        time.Time
+	CallbackURL       string
 }
 
 type AuthSettings struct {

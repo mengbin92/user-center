@@ -127,7 +127,6 @@ export function AdminUserDetailPage() {
   })
 
   const policyRevision =
-    effectiveQuery.data?.policy_revision ??
     authorization?.policy_revision ??
     ''
 
@@ -146,7 +145,8 @@ export function AdminUserDetailPage() {
         display_name: displayName.trim(),
         update_mask: 'display_name',
         expected_revision: user?.revision ?? '0',
-        reason: editReason.trim() || 'administrator update',
+        expected_policy_revision: authorization?.policy_revision,
+        reason: editReason.trim(),
       }),
     successMessage: '用户资料已更新',
     onSuccess: async () => {
@@ -161,6 +161,7 @@ export function AdminUserDetailPage() {
         id,
         status: input.status,
         expected_revision: user?.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: '账号状态已更新',
@@ -173,6 +174,7 @@ export function AdminUserDetailPage() {
       api.admin.archiveUser(id, {
         id,
         expected_revision: user?.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason,
       }),
     successMessage: '账号已归档',
@@ -181,7 +183,12 @@ export function AdminUserDetailPage() {
   })
 
   const resetMfa = useApiMutation({
-    mutationFn: (reason: string) => api.admin.resetMfa(id, { id, reason }),
+    mutationFn: (reason: string) => api.admin.resetMfa(id, {
+      id,
+      expected_revision: user?.revision,
+      expected_policy_revision: authorization?.policy_revision,
+      reason,
+    }),
     successMessage: 'MFA 已重置',
     invalidate: [['admin', 'user', id], ['admin', 'users']],
     onSuccess: () => setReasonAction(null),
@@ -204,6 +211,8 @@ export function AdminUserDetailPage() {
       api.admin.createEmailChange(id, {
         id,
         new_email: newEmail.trim(),
+        expected_policy_revision: authorization?.policy_revision,
+        expected_revision: user?.revision,
         reason: emailReason.trim(),
       }),
     successMessage: '验证码已发送',
@@ -226,6 +235,8 @@ export function AdminUserDetailPage() {
         id,
         challenge_id: emailChallenge.id,
         code: emailCode.trim(),
+        expected_policy_revision: authorization?.policy_revision,
+        expected_revision: user?.revision,
         reason: emailReason.trim(),
       })
     },
@@ -244,7 +255,12 @@ export function AdminUserDetailPage() {
 
   const requestPasswordReset = useApiMutation({
     mutationFn: (reason: string) =>
-      api.admin.createPasswordResetRequest(id, { id, reason }),
+      api.admin.createPasswordResetRequest(id, {
+        id,
+        expected_revision: user?.revision,
+        expected_policy_revision: authorization?.policy_revision,
+        reason,
+      }),
     successMessage: '密码重置请求已创建',
     successDescription: '重置链接已发送到用户邮箱，30 分钟内有效。',
     invalidate: [['admin', 'user', id]],
@@ -257,6 +273,8 @@ export function AdminUserDetailPage() {
         id,
         session_ids: input.sessionIds,
         revoke_all: input.all,
+        expected_policy_revision: authorization?.policy_revision,
+        expected_revision: user?.revision,
         reason: input.reason,
       }),
     successMessage: '用户会话已撤销',
@@ -265,9 +283,10 @@ export function AdminUserDetailPage() {
   })
 
   const revokeAssignment = useApiMutation({
-    mutationFn: (input: { assignmentId: string; reason: string }) =>
+    mutationFn: (input: { assignmentId: string; revision?: string; reason: string }) =>
       api.iam.revokeAssignment(input.assignmentId, {
         id: input.assignmentId,
+        expected_revision: input.revision,
         reason: input.reason,
         expected_policy_revision: policyRevision,
       }),
@@ -368,7 +387,7 @@ export function AdminUserDetailPage() {
       confirmLabel: '撤销分配',
       tone: 'danger',
       run: (reason) =>
-        revokeAssignment.mutate({ assignmentId: assignment.id ?? '', reason }),
+        revokeAssignment.mutate({ assignmentId: assignment.id ?? '', revision: assignment.revision, reason }),
     })
   }
 
@@ -1031,7 +1050,7 @@ export function AdminUserDetailPage() {
                     size="sm"
                     onClick={() => updateUser.mutate(undefined)}
                     loading={updateUser.isPending}
-                    disabled={!displayName.trim()}
+                    disabled={!editReason.trim() || !displayName.trim()}
                   >
                     保存
                   </Button>
@@ -1051,7 +1070,7 @@ export function AdminUserDetailPage() {
                   id="admin-edit-reason"
                   value={editReason}
                   onChange={(event) => setEditReason(event.target.value)}
-                  placeholder="可选，写入审计日志"
+                  placeholder="请填写本次变更的原因" required
                 />
               </Field>
               <div className="text-[11px] text-slate-500">

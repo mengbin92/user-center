@@ -56,7 +56,7 @@ go run ./cmd/admin-rescue -config configs/config.local.yaml \
 go run ./cmd/user-center -config configs/config.local.yaml
 ```
 
-生产环境可用环境变量覆盖配置：`DB_DSN`、`REDIS_ADDR`、`SESSION_SECRET`、`CSRF_SECRET`、`MFA_ENCRYPTION_KEY`、`COOKIE_SECURE`、`COOKIE_DOMAIN`、`PUBLIC_BASE_URL`、`USER_CENTER_INTEGRATION_TOKEN` 等，详见 `internal/config/config.go`。
+生产环境可用环境变量覆盖配置：`DB_DSN`、`REDIS_ADDR`、`SESSION_SECRET`、`CSRF_SECRET`、`MFA_ENCRYPTION_KEY`、`COOKIE_SECURE`、`COOKIE_DOMAIN`、`PUBLIC_BASE_URL` 等，详见 `internal/config/config.go`。内部 gRPC 使用数据库管理的接入客户端凭据。
 
 ## 架构
 
@@ -116,9 +116,9 @@ scripts/                  开发与检查脚本
 |---|---|
 | 浏览器会话 | 32 字节随机不透明令牌；DB 只存 SHA-256；HttpOnly + SameSite=Lax Cookie；服务端权威校验状态、身份版本、过期与空闲超时 |
 | CSRF | 双提交 Cookie：非 HttpOnly 的 `uc_csrf` + 写请求 `X-CSRF-Token`；中间件对全部 `/api/v1` 非安全方法强制校验 |
-| 密码 | bcrypt；策略最小长度可配置（默认 10）；修改密码后提升 `identity_version` 并撤销其他会话 |
+| 密码 | bcrypt；最小字符数可配置（默认 10），最多 72 字节；修改密码后提升 `identity_version` 并撤销其他会话 |
 | MFA | TOTP（RFC 6238）+ 8 个一次性恢复码；秘钥 AES-GCM 加密；`last_step` 防重放；5 次失败锁定 5 分钟 |
-| Step-up | 高风险操作要求近期密码 + 第二因素验证，证明绑定当前 session、5 分钟过期 |
+| Step-up | 高风险操作要求近期主认证 + 第二因素验证，证明绑定当前 session 与身份版本、5 分钟过期 |
 | 邮箱 | 注册/换绑使用一次性验证码；验证码 HMAC 后存 Redis（无 Redis 时内存），单次消费 + 数据库完成记录幂等 |
 | 审计 | 所有敏感写入在业务事务内写 `iam_audit_events`；登录与安全事件写 `security_events`；CSV 导出重新校验权限与范围 |
 | 授权 | 权限目录 + 角色继承 + 分配边界 + 有效期 + 显式 deny + 职责分离约束；决策由服务端根据 DB 事实实时计算，客户端只消费投影 |
@@ -159,7 +159,6 @@ scripts/                  开发与检查脚本
 - 委派目前约束“分配/撤销角色”的目标角色、用户范围与动作；角色 Grant/继承的变更仍要求直接权限，不允许通过委派修改策略本身；
 - 原 `micro-one-api` 的 BFF 兼容层与适配器不在本仓库内，接入契约见 `docs/migration.md`；
 - OpenAPI 未描述 Cookie/CSRF 安全方案与原始 OAuth/CSV 下载路由；这些在 `docs/api.md` 中约定；
-- 列表 `total_size` 为粗过滤值（deny/self 逐行应用），受限管理员可能看到略大的总数。
 
 这些差异不会把权限退化回 `role >= 10`：未实现的模块不暴露菜单/接口，而不是用空实现伪装完成。
 
@@ -195,6 +194,7 @@ docker compose up -d --build
 - [运维手册](docs/operations.md)
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
+- [代码审查与修复记录（2026-11-03）](docs/code-review-2026-11-03.md)
 
 ## License
 

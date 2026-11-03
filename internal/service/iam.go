@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -66,6 +67,10 @@ func (s *IAMService) GetPermission(ctx context.Context, req *usercv1.GetPermissi
 }
 
 func (s *IAMService) CreatePermission(ctx context.Context, req *usercv1.CreatePermissionRequest) (*usercv1.Permission, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	resourceID, err := parseIDField(req.GetResourceId(), "resource_id")
 	if err != nil {
 		return nil, err
@@ -75,7 +80,7 @@ func (s *IAMService) CreatePermission(ctx context.Context, req *usercv1.CreatePe
 		Category: req.GetCategory(), RiskLevel: req.GetRiskLevel(),
 		SupportedScopes: req.GetSupportedScopes(), ContextTypes: req.GetContextTypes(),
 		Description: req.GetDescription(), Sort: req.GetSort(),
-	}, reasonOr(req.GetReason(), "create permission"))
+	}, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +88,10 @@ func (s *IAMService) CreatePermission(ctx context.Context, req *usercv1.CreatePe
 }
 
 func (s *IAMService) UpdatePermission(ctx context.Context, req *usercv1.UpdatePermissionRequest) (*usercv1.Permission, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	permID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -95,7 +104,7 @@ func (s *IAMService) UpdatePermission(ctx context.Context, req *usercv1.UpdatePe
 		ID: permID, Name: req.GetName(), Category: req.GetCategory(),
 		RiskLevel: req.GetRiskLevel(), SupportedScopes: req.GetSupportedScopes(),
 		Description: req.GetDescription(), Sort: req.GetSort(),
-	}, expected, reasonOr(req.GetReason(), "update permission"))
+	}, expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +112,10 @@ func (s *IAMService) UpdatePermission(ctx context.Context, req *usercv1.UpdatePe
 }
 
 func (s *IAMService) SetPermissionStatus(ctx context.Context, req *usercv1.SetPermissionStatusRequest) (*usercv1.Permission, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	permID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -111,7 +124,7 @@ func (s *IAMService) SetPermissionStatus(ctx context.Context, req *usercv1.SetPe
 	if err != nil {
 		return nil, err
 	}
-	p, err := s.iam.SetPermissionStatus(ctx, requestMeta(ctx), permID, req.GetStatus(), expected, reasonOr(req.GetReason(), "permission status"))
+	p, err := s.iam.SetPermissionStatus(ctx, requestMeta(ctx), permID, req.GetStatus(), expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +132,10 @@ func (s *IAMService) SetPermissionStatus(ctx context.Context, req *usercv1.SetPe
 }
 
 func (s *IAMService) ArchivePermission(ctx context.Context, req *usercv1.ArchivePermissionRequest) (*usercv1.Permission, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	permID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -127,7 +144,7 @@ func (s *IAMService) ArchivePermission(ctx context.Context, req *usercv1.Archive
 	if err != nil {
 		return nil, err
 	}
-	p, err := s.iam.ArchivePermission(ctx, requestMeta(ctx), permID, expected, reasonOr(req.GetReason(), "archive permission"))
+	p, err := s.iam.ArchivePermission(ctx, requestMeta(ctx), permID, expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +192,10 @@ func (s *IAMService) GetRole(ctx context.Context, req *usercv1.GetRoleRequest) (
 }
 
 func (s *IAMService) CreateRole(ctx context.Context, req *usercv1.CreateRoleRequest) (*usercv1.Role, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	grants, err := grantsBiz(req.GetGrants())
 	if err != nil {
 		return nil, err
@@ -192,17 +213,10 @@ func (s *IAMService) CreateRole(ctx context.Context, req *usercv1.CreateRoleRequ
 		v := req.GetMaxMembers()
 		maxMembers = &v
 	}
-	var policy uint64
-	if req.GetExpectedPolicyRevision() != "" {
-		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
-		if err != nil {
-			return nil, err
-		}
-	}
 	r, err := s.iam.CreateRole(ctx, requestMeta(ctx), &biz.Role{
 		Code: req.GetCode(), Name: req.GetName(), Description: req.GetDescription(),
 		Grants: grants, Inherits: inherits, MaxMembers: maxMembers,
-	}, reasonOr(req.GetReason(), "create role"), policy)
+	}, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -210,6 +224,10 @@ func (s *IAMService) CreateRole(ctx context.Context, req *usercv1.CreateRoleRequ
 }
 
 func (s *IAMService) UpdateRole(ctx context.Context, req *usercv1.UpdateRoleRequest) (*usercv1.Role, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	roleID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -218,7 +236,7 @@ func (s *IAMService) UpdateRole(ctx context.Context, req *usercv1.UpdateRoleRequ
 	if err != nil {
 		return nil, err
 	}
-	r, err := s.iam.UpdateRole(ctx, requestMeta(ctx), roleID, req.GetName(), req.GetDescription(), req.GetMaxMembers(), expected, reasonOr(req.GetReason(), "update role"))
+	r, err := s.iam.UpdateRole(ctx, requestMeta(ctx), roleID, req.GetName(), req.GetDescription(), req.GetMaxMembers(), expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -226,11 +244,19 @@ func (s *IAMService) UpdateRole(ctx context.Context, req *usercv1.UpdateRoleRequ
 }
 
 func (s *IAMService) CopyRole(ctx context.Context, req *usercv1.CopyRoleRequest) (*usercv1.Role, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	roleID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	r, err := s.iam.CopyRole(ctx, requestMeta(ctx), roleID, req.GetCode(), req.GetName(), reasonOr(req.GetReason(), "copy role"))
+	expected, err := parseRevisionField(req.GetExpectedRevision(), "expected_revision")
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.iam.CopyRole(ctx, requestMeta(ctx), roleID, req.GetCode(), req.GetName(), reason, expected, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +264,10 @@ func (s *IAMService) CopyRole(ctx context.Context, req *usercv1.CopyRoleRequest)
 }
 
 func (s *IAMService) SetRoleStatus(ctx context.Context, req *usercv1.SetRoleStatusRequest) (*usercv1.Role, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	roleID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -246,7 +276,7 @@ func (s *IAMService) SetRoleStatus(ctx context.Context, req *usercv1.SetRoleStat
 	if err != nil {
 		return nil, err
 	}
-	r, err := s.iam.SetRoleStatus(ctx, requestMeta(ctx), roleID, req.GetStatus(), expected, reasonOr(req.GetReason(), "role status"))
+	r, err := s.iam.SetRoleStatus(ctx, requestMeta(ctx), roleID, req.GetStatus(), expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -254,6 +284,10 @@ func (s *IAMService) SetRoleStatus(ctx context.Context, req *usercv1.SetRoleStat
 }
 
 func (s *IAMService) ArchiveRole(ctx context.Context, req *usercv1.ArchiveRoleRequest) (*usercv1.Role, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	roleID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -262,7 +296,7 @@ func (s *IAMService) ArchiveRole(ctx context.Context, req *usercv1.ArchiveRoleRe
 	if err != nil {
 		return nil, err
 	}
-	r, err := s.iam.ArchiveRole(ctx, requestMeta(ctx), roleID, expected, reasonOr(req.GetReason(), "archive role"))
+	r, err := s.iam.ArchiveRole(ctx, requestMeta(ctx), roleID, expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +340,10 @@ func (s *IAMService) GetRolePermissions(ctx context.Context, req *usercv1.GetRol
 }
 
 func (s *IAMService) PutRolePermissions(ctx context.Context, req *usercv1.PutRolePermissionsRequest) (*usercv1.RolePermissionsReply, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	roleID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -318,14 +356,7 @@ func (s *IAMService) PutRolePermissions(ctx context.Context, req *usercv1.PutRol
 	if err != nil {
 		return nil, err
 	}
-	var policy uint64
-	if req.GetExpectedPolicyRevision() != "" {
-		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
-		if err != nil {
-			return nil, err
-		}
-	}
-	saved, revision, err := s.iam.PutRolePermissions(ctx, requestMeta(ctx), roleID, grants, expected, policy, reasonOr(req.GetReason(), "update role permissions"))
+	saved, revision, err := s.iam.PutRolePermissions(ctx, requestMeta(ctx), roleID, grants, expected, policy, reason)
 	if err != nil {
 		return nil, err
 	}
@@ -353,6 +384,10 @@ func (s *IAMService) GetRoleInheritance(ctx context.Context, req *usercv1.GetRol
 }
 
 func (s *IAMService) PutRoleInheritance(ctx context.Context, req *usercv1.PutRoleInheritanceRequest) (*usercv1.RoleInheritanceReply, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	roleID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -369,14 +404,7 @@ func (s *IAMService) PutRoleInheritance(ctx context.Context, req *usercv1.PutRol
 	if err != nil {
 		return nil, err
 	}
-	var policy uint64
-	if req.GetExpectedPolicyRevision() != "" {
-		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
-		if err != nil {
-			return nil, err
-		}
-	}
-	saved, revision, err := s.iam.PutRoleInheritance(ctx, requestMeta(ctx), roleID, inherits, expected, policy, reasonOr(req.GetReason(), "update role inheritance"))
+	saved, revision, err := s.iam.PutRoleInheritance(ctx, requestMeta(ctx), roleID, inherits, expected, policy, reason)
 	if err != nil {
 		return nil, err
 	}
@@ -480,6 +508,10 @@ func (s *IAMService) ListAssignments(ctx context.Context, req *usercv1.ListAssig
 }
 
 func (s *IAMService) CreateAssignment(ctx context.Context, req *usercv1.CreateAssignmentRequest) (*usercv1.Assignment, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	userID, err := parseIDField(req.GetUserId(), "user_id")
 	if err != nil {
 		return nil, err
@@ -504,16 +536,9 @@ func (s *IAMService) CreateAssignment(ctx context.Context, req *usercv1.CreateAs
 	if !expires.IsZero() {
 		expPtr = &expires
 	}
-	var policy uint64
-	if req.GetExpectedPolicyRevision() != "" {
-		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
-		if err != nil {
-			return nil, err
-		}
-	}
 	a, err := s.iam.CreateAssignment(ctx, requestMeta(ctx), &biz.Assignment{
 		UserID: userID, RoleID: roleID, Boundary: boundary, StartsAt: starts, ExpiresAt: expPtr,
-	}, reasonOr(req.GetReason(), "grant role"), policy)
+	}, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -521,18 +546,19 @@ func (s *IAMService) CreateAssignment(ctx context.Context, req *usercv1.CreateAs
 }
 
 func (s *IAMService) RevokeAssignment(ctx context.Context, req *usercv1.RevokeAssignmentRequest) (*usercv1.Assignment, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	assignmentID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	var policy uint64
-	if req.GetExpectedPolicyRevision() != "" {
-		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
-		if err != nil {
-			return nil, err
-		}
+	expected, err := parseRevisionField(req.GetExpectedRevision(), "expected_revision")
+	if err != nil {
+		return nil, err
 	}
-	a, err := s.iam.RevokeAssignment(ctx, requestMeta(ctx), assignmentID, reasonOr(req.GetReason(), "revoke role"), policy)
+	a, err := s.iam.RevokeAssignment(ctx, requestMeta(ctx), assignmentID, reason, expected, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -575,6 +601,10 @@ func (s *IAMService) PreviewBatchAssign(ctx context.Context, req *usercv1.Previe
 }
 
 func (s *IAMService) BatchAssign(ctx context.Context, req *usercv1.BatchAssignRequest) (*usercv1.BatchAssignReply, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	userIDs, err := parseIDs(req.GetUserIds(), "user_id")
 	if err != nil {
 		return nil, err
@@ -599,14 +629,7 @@ func (s *IAMService) BatchAssign(ctx context.Context, req *usercv1.BatchAssignRe
 	if !expires.IsZero() {
 		expPtr = &expires
 	}
-	var policy uint64
-	if req.GetExpectedPolicyRevision() != "" {
-		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
-		if err != nil {
-			return nil, err
-		}
-	}
-	assignments, err := s.iam.BatchAssign(ctx, requestMeta(ctx), userIDs, roleID, boundary, starts, expPtr, reasonOr(req.GetReason(), "batch grant role"), policy)
+	assignments, err := s.iam.BatchAssign(ctx, requestMeta(ctx), userIDs, roleID, boundary, starts, expPtr, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -641,21 +664,18 @@ func constraintProto(c *biz.Constraint) *usercv1.Constraint {
 }
 
 func (s *IAMService) CreateConstraint(ctx context.Context, req *usercv1.CreateConstraintRequest) (*usercv1.Constraint, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	roleIDs, err := parseIDs(req.GetRoleIds(), "role_id")
 	if err != nil {
 		return nil, err
 	}
-	var policy uint64
-	if req.GetExpectedPolicyRevision() != "" {
-		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
-		if err != nil {
-			return nil, err
-		}
-	}
 	c, err := s.iam.CreateConstraint(ctx, requestMeta(ctx), &biz.Constraint{
 		Kind: req.GetKind(), Name: req.GetName(), RoleIDs: roleIDs,
 		MaxCount: req.GetMaxCount(), Enabled: true,
-	}, reasonOr(req.GetReason(), "create constraint"), policy)
+	}, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -663,6 +683,10 @@ func (s *IAMService) CreateConstraint(ctx context.Context, req *usercv1.CreateCo
 }
 
 func (s *IAMService) UpdateConstraint(ctx context.Context, req *usercv1.UpdateConstraintRequest) (*usercv1.Constraint, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	constraintID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -678,7 +702,7 @@ func (s *IAMService) UpdateConstraint(ctx context.Context, req *usercv1.UpdateCo
 	c, err := s.iam.UpdateConstraint(ctx, requestMeta(ctx), &biz.Constraint{
 		ID: constraintID, Name: req.GetName(), RoleIDs: roleIDs,
 		MaxCount: req.GetMaxCount(), Enabled: req.GetEnabled(),
-	}, expected, reasonOr(req.GetReason(), "update constraint"))
+	}, expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -686,6 +710,10 @@ func (s *IAMService) UpdateConstraint(ctx context.Context, req *usercv1.UpdateCo
 }
 
 func (s *IAMService) DeleteConstraint(ctx context.Context, req *usercv1.DeleteConstraintRequest) (*emptypb.Empty, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	constraintID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -694,7 +722,7 @@ func (s *IAMService) DeleteConstraint(ctx context.Context, req *usercv1.DeleteCo
 	if err != nil {
 		return nil, err
 	}
-	if err := s.iam.DeleteConstraint(ctx, requestMeta(ctx), constraintID, expected, reasonOr(req.GetReason(), "delete constraint")); err != nil {
+	if err := s.iam.DeleteConstraint(ctx, requestMeta(ctx), constraintID, expected, reason, policy); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
@@ -721,8 +749,11 @@ func menuProto(m *biz.MenuItem) *usercv1.MenuItem {
 }
 
 func (s *IAMService) CreateMenuItem(ctx context.Context, req *usercv1.CreateMenuItemRequest) (*usercv1.MenuItem, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	var parentID int64
-	var err error
 	if req.GetParentId() != "" {
 		parentID, err = parseIDField(req.GetParentId(), "parent_id")
 		if err != nil {
@@ -733,7 +764,7 @@ func (s *IAMService) CreateMenuItem(ctx context.Context, req *usercv1.CreateMenu
 		ParentID: parentID, RouteKey: req.GetRouteKey(), Name: req.GetName(),
 		IconKey: req.GetIconKey(), Sort: req.GetSort(),
 		RequiredAll: req.GetRequiredAll(), RequiredAny: req.GetRequiredAny(),
-	}, reasonOr(req.GetReason(), "create menu"))
+	}, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -741,6 +772,10 @@ func (s *IAMService) CreateMenuItem(ctx context.Context, req *usercv1.CreateMenu
 }
 
 func (s *IAMService) UpdateMenuItem(ctx context.Context, req *usercv1.UpdateMenuItemRequest) (*usercv1.MenuItem, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	menuID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -752,7 +787,7 @@ func (s *IAMService) UpdateMenuItem(ctx context.Context, req *usercv1.UpdateMenu
 	m, err := s.iam.UpdateMenu(ctx, requestMeta(ctx), &biz.MenuItem{
 		ID: menuID, Name: req.GetName(), IconKey: req.GetIconKey(), Sort: req.GetSort(),
 		Enabled: req.GetEnabled(), RequiredAll: req.GetRequiredAll(), RequiredAny: req.GetRequiredAny(),
-	}, expected, reasonOr(req.GetReason(), "update menu"))
+	}, expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -760,6 +795,10 @@ func (s *IAMService) UpdateMenuItem(ctx context.Context, req *usercv1.UpdateMenu
 }
 
 func (s *IAMService) ArchiveMenuItem(ctx context.Context, req *usercv1.ArchiveMenuItemRequest) (*usercv1.MenuItem, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	menuID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -768,7 +807,7 @@ func (s *IAMService) ArchiveMenuItem(ctx context.Context, req *usercv1.ArchiveMe
 	if err != nil {
 		return nil, err
 	}
-	m, err := s.iam.ArchiveMenu(ctx, requestMeta(ctx), menuID, expected, reasonOr(req.GetReason(), "archive menu"))
+	m, err := s.iam.ArchiveMenu(ctx, requestMeta(ctx), menuID, expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -790,15 +829,15 @@ func (s *IAMService) ExplainAuthorization(ctx context.Context, req *usercv1.Expl
 		ValidUntil: tptr(result.ValidUntil),
 	}
 	for _, src := range result.Sources {
-		out.Sources = append(out.Sources, grantSourceProto(src))
+		out.Sources = append(out.Sources, grantSourceProto(src, userID))
 	}
 	return out, nil
 }
 
-func grantSourceProto(src authorization.GrantSource) *usercv1.GrantSource {
+func grantSourceProto(src authorization.GrantSource, userID int64) *usercv1.GrantSource {
 	out := &usercv1.GrantSource{
 		RoleId: id(src.RoleID), RoleCode: src.RoleCode, Operation: src.Operation,
-		Effect: string(src.Effect), Scope: scopeProto(IntersectScope(src)),
+		Effect: string(src.Effect), Scope: scopeProto(authorization.IntersectForActor(src.RoleScope, src.Boundary, userID)),
 		AssignmentId: id(src.AssignmentID), Active: src.Active,
 	}
 	for _, p := range src.Inheritance {
@@ -891,6 +930,10 @@ func (s *IAMService) ListDelegations(ctx context.Context, req *usercv1.ListDeleg
 }
 
 func (s *IAMService) CreateDelegation(ctx context.Context, req *usercv1.CreateDelegationRequest) (*usercv1.Delegation, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	managerID, err := parseIDField(req.GetManagerRoleId(), "manager_role_id")
 	if err != nil {
 		return nil, err
@@ -923,18 +966,11 @@ func (s *IAMService) CreateDelegation(ctx context.Context, req *usercv1.CreateDe
 		}
 		ceiling = append(ceiling, biz.DelegationCeiling{Operation: c.GetOperation(), Scope: cs})
 	}
-	var policy uint64
-	if req.GetExpectedPolicyRevision() != "" {
-		policy, err = parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
-		if err != nil {
-			return nil, err
-		}
-	}
 	d, err := s.iam.CreateDelegation(ctx, requestMeta(ctx), &biz.Delegation{
 		ManagerRoleID: managerID, TargetRoleID: targetID, TargetKind: req.GetTargetKind(),
 		Actions: req.GetActions(), TargetUserScope: scope, GrantCeiling: ceiling,
 		CanRedelegate: req.GetCanRedelegate(), StartsAt: starts, ExpiresAt: expPtr,
-	}, reasonOr(req.GetReason(), "create delegation"), policy)
+	}, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -942,6 +978,10 @@ func (s *IAMService) CreateDelegation(ctx context.Context, req *usercv1.CreateDe
 }
 
 func (s *IAMService) UpdateDelegation(ctx context.Context, req *usercv1.UpdateDelegationRequest) (*usercv1.Delegation, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	delegationID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -987,7 +1027,7 @@ func (s *IAMService) UpdateDelegation(ctx context.Context, req *usercv1.UpdateDe
 	}
 	existing.StartsAt = starts
 	existing.ExpiresAt = expPtr
-	d, err := s.iam.UpdateDelegation(ctx, requestMeta(ctx), existing, expected, reasonOr(req.GetReason(), "update delegation"))
+	d, err := s.iam.UpdateDelegation(ctx, requestMeta(ctx), existing, expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -995,6 +1035,10 @@ func (s *IAMService) UpdateDelegation(ctx context.Context, req *usercv1.UpdateDe
 }
 
 func (s *IAMService) RevokeDelegation(ctx context.Context, req *usercv1.RevokeDelegationRequest) (*usercv1.Delegation, error) {
+	policy, reason, err := iamMutation(req)
+	if err != nil {
+		return nil, err
+	}
 	delegationID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -1003,9 +1047,26 @@ func (s *IAMService) RevokeDelegation(ctx context.Context, req *usercv1.RevokeDe
 	if err != nil {
 		return nil, err
 	}
-	d, err := s.iam.RevokeDelegation(ctx, requestMeta(ctx), delegationID, expected, reasonOr(req.GetReason(), "revoke delegation"))
+	d, err := s.iam.RevokeDelegation(ctx, requestMeta(ctx), delegationID, expected, reason, policy)
 	if err != nil {
 		return nil, err
 	}
 	return delegationProto(d), nil
+}
+
+type iamMutationRequest interface {
+	GetExpectedPolicyRevision() string
+	GetReason() string
+}
+
+func iamMutation(req iamMutationRequest) (uint64, string, error) {
+	policy, err := parseRevisionField(req.GetExpectedPolicyRevision(), "expected_policy_revision")
+	if err != nil {
+		return 0, "", err
+	}
+	reason := strings.TrimSpace(req.GetReason())
+	if reason == "" {
+		return 0, "", biz.Validation("reason 不能为空")
+	}
+	return policy, reason, nil
 }

@@ -62,10 +62,8 @@ func (uc *UserUsecase) Me(ctx context.Context, actor ActorContext) (*User, error
 }
 
 func (uc *UserUsecase) UpdateMe(ctx context.Context, actor ActorContext, in UpdateMeInput) (*User, error) {
-	if in.UpdateMask != "" && !strings.Contains(in.UpdateMask, "display_name") {
-		if strings.TrimSpace(in.DisplayName) == "" {
-			return uc.Me(ctx, actor)
-		}
+	if _, err := mutationFields(in.UpdateMask, "display_name"); err != nil {
+		return nil, err
 	}
 	name := strings.TrimSpace(in.DisplayName)
 	if name == "" || len([]rune(name)) > 64 {
@@ -74,13 +72,24 @@ func (uc *UserUsecase) UpdateMe(ctx context.Context, actor ActorContext, in Upda
 	if in.ExpectedRevision != actor.User.Revision {
 		return nil, ConflictRevision(actor.User.Revision)
 	}
-	actor.User.DisplayName = name
-	updated, err := uc.Users.Update(ctx, nil, actor.User, in.ExpectedRevision)
+	var updated *User
+	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		user := *actor.User
+		user.DisplayName = name
+		var err error
+		updated, err = uc.Users.Update(ctx, tx, &user, in.ExpectedRevision)
+		if err != nil {
+			return err
+		}
+		if err := uc.audit(ctx, tx, actor, "identity.user.profile.update", itoa(user.ID), "{}", "{}", "{}", "self-service profile update", "success"); err != nil {
+			return err
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"user_id": itoa(updated.ID), "display_name": name})
+		return uc.emit(ctx, tx, "user", updated.ID, updated.Revision, "user.profile.updated", string(payload))
+	})
 	if err != nil {
 		return nil, err
 	}
-	payload, _ := jsonx.Marshal(map[string]any{"user_id": updated.ID, "display_name": name})
-	_ = uc.emit(ctx, nil, "user", updated.ID, updated.Revision, "user.profile.updated", string(payload))
 	return uc.Me(ctx, ActorContext{User: updated, Session: actor.Session, Actor: actor.Actor})
 }
 
@@ -90,23 +99,58 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, actor ActorContext, c
 		return ErrDependency
 	}
 	cred, err := uc.Credentials.Get(ctx, nil, actor.User.ID)
-	if err != nil || cred.PasswordHash == "" || !VerifyPassword(cred.PasswordHash, current) {
-		return Validation("当前密码不正确")
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
+		return ErrDependency
+	}
+	if err := uc.confirmPrimaryAuthentication(ctx, actor, current); err != nil {
+		return err
+	}
+	if cred == nil || cred.PasswordHash == "" {
+		mfa, err := uc.MFA.Get(ctx, nil, actor.User.ID)
+		if err != nil && !errors.Is(err, ErrResourceNotFound) {
+			return ErrDependency
+		}
+		if mfa != nil && mfa.Enabled() {
+			if err := uc.RequireStepUp(ctx, actor); err != nil {
+				return err
+			}
+		}
 	}
 	if err := ValidatePassword(next, settings.PasswordMinLength); err != nil {
 		return err
 	}
-	if VerifyPassword(cred.PasswordHash, next) {
+	if cred != nil && VerifyPassword(cred.PasswordHash, next) {
 		return Validation("新密码不能与当前密码相同")
 	}
 	hash, err := HashPassword(next)
 	if err != nil {
 		return ErrDependency
 	}
+	if err := uc.clearStepUp(ctx, actor.Session); err != nil {
+		return err
+	}
 	now := uc.Clock.Now().UTC()
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		if _, err := uc.Credentials.UpdatePassword(ctx, tx, actor.User.ID, hash, "bcrypt", cred.Revision, false); err != nil {
-			return err
+		if cred == nil || cred.PasswordHash == "" {
+			user, err := uc.Users.Get(ctx, tx, actor.User.ID)
+			if err != nil {
+				return ErrDependency
+			}
+			if user.IdentityVersion != actor.Session.IdentityVersion {
+				return ErrStepUpRequired
+			}
+			if _, err := uc.Users.Update(ctx, tx, user, user.Revision); err != nil {
+				return err
+			}
+		}
+		if cred == nil {
+			if err := uc.Credentials.Create(ctx, tx, &Credential{UserID: actor.User.ID, PasswordHash: hash, Algorithm: "bcrypt", PasswordVersion: 1, Revision: 1, UpdatedAt: now}); err != nil {
+				return err
+			}
+		} else {
+			if _, err := uc.Credentials.UpdatePassword(ctx, tx, actor.User.ID, hash, "bcrypt", cred.Revision, false); err != nil {
+				return err
+			}
 		}
 		version, err := uc.Users.BumpIdentityVersion(ctx, tx, actor.User.ID)
 		if err != nil {
@@ -166,6 +210,9 @@ func (uc *UserUsecase) CreateEmailChallenge(ctx context.Context, actor ActorCont
 }
 
 func (uc *UserUsecase) ConfirmEmail(ctx context.Context, actor ActorContext, challengeID, code string) (*User, error) {
+	if err := uc.clearStepUp(ctx, actor.Session); err != nil {
+		return nil, err
+	}
 	c, err := uc.Challenges.Verify(ctx, "email_change", challengeID, code)
 	if err != nil {
 		return nil, err
@@ -226,6 +273,9 @@ func (uc *UserUsecase) ConfirmEmail(ctx context.Context, actor ActorContext, cha
 }
 
 func (uc *UserUsecase) CreateAdminEmailChange(ctx context.Context, actor ActorContext, targetID int64, newEmail, reason string) (string, time.Time, error) {
+	if _, err := uc.managementTarget(ctx, nil, actor, targetID, false); err != nil {
+		return "", time.Time{}, err
+	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.email_binding.update", targetID, false); err != nil {
 		return "", time.Time{}, err
 	}
@@ -267,6 +317,9 @@ func (uc *UserUsecase) CreateAdminEmailChange(ctx context.Context, actor ActorCo
 }
 
 func (uc *UserUsecase) ConfirmAdminEmailChange(ctx context.Context, actor ActorContext, targetID int64, challengeID, code, reason string) (*User, error) {
+	if _, err := uc.managementTarget(ctx, nil, actor, targetID, false); err != nil {
+		return nil, err
+	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.email_binding.update", targetID, false); err != nil {
 		return nil, err
 	}
@@ -283,6 +336,9 @@ func (uc *UserUsecase) ConfirmAdminEmailChange(ctx context.Context, actor ActorC
 	email := NormalizeEmail(c.Email)
 	now := uc.Clock.Now().UTC()
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.managementTarget(ctx, tx, actor, targetID, false); err != nil {
+			return err
+		}
 		u, err := uc.Users.Get(ctx, tx, targetID)
 		if err != nil {
 			return ErrUserNotFound
@@ -325,17 +381,45 @@ func (uc *UserUsecase) DeleteExternalIdentity(ctx context.Context, actor ActorCo
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return err
 	}
-	identity, err := uc.Identities.GetByID(ctx, nil, id)
-	if err != nil || identity.UserID != actor.User.ID {
-		return ErrResourceNotFound
+	user, err := uc.Users.Get(ctx, nil, actor.User.ID)
+	if err != nil {
+		return ErrDependency
 	}
-	cred, _ := uc.Credentials.Get(ctx, nil, actor.User.ID)
-	passwordAvailable := cred != nil && cred.PasswordHash != ""
-	count, _ := uc.Identities.CountByUser(ctx, nil, actor.User.ID)
-	if !passwordAvailable && count <= 1 {
-		return ErrLastLoginMethod
-	}
-	return uc.Identities.Delete(ctx, nil, id, actor.User.ID)
+	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// The user CAS serializes removal of different external identities.
+		// Counting before this lock would let both requests remove the last
+		// two login methods after observing the same count.
+		if _, err := uc.Users.Update(ctx, tx, user, user.Revision); err != nil {
+			return err
+		}
+		identity, err := uc.Identities.GetByID(ctx, tx, id)
+		if errors.Is(err, ErrResourceNotFound) || err == nil && identity.UserID != actor.User.ID {
+			return ErrResourceNotFound
+		}
+		if err != nil {
+			return ErrDependency
+		}
+		cred, err := uc.Credentials.Get(ctx, tx, actor.User.ID)
+		if err != nil && !errors.Is(err, ErrResourceNotFound) {
+			return ErrDependency
+		}
+		passwordAvailable := cred != nil && cred.PasswordHash != ""
+		count, err := uc.Identities.CountByUser(ctx, tx, actor.User.ID)
+		if err != nil {
+			return ErrDependency
+		}
+		if !passwordAvailable && count <= 1 {
+			return ErrLastLoginMethod
+		}
+		if err := uc.Identities.Delete(ctx, tx, id, actor.User.ID); err != nil {
+			return err
+		}
+		if err := uc.audit(ctx, tx, actor, "identity.external.unbind", itoa(actor.User.ID), "{}", "{}", "{}", "self-service external identity removal", "success"); err != nil {
+			return err
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"user_id": actor.User.ID, "provider": identity.Provider})
+		return uc.emit(ctx, tx, "user", actor.User.ID, user.Revision, "user.profile.updated", string(payload))
+	})
 }
 
 func (uc *UserUsecase) SecurityEvents(ctx context.Context, actor ActorContext, pageSize int, token string) ([]*SecurityEvent, string, error) {
@@ -360,30 +444,16 @@ func (uc *UserUsecase) SecurityEvents(ctx context.Context, actor ActorContext, p
 // Overview reports scoped counters. Counters never turn an unauthorized read
 // into zero; the caller must hold identity.user.list.
 func (uc *UserUsecase) OverviewView(ctx context.Context, actor ActorContext) (*Overview, error) {
-	scope, err := uc.ListScope(ctx, actor, "identity.user.list")
+	filter, err := uc.listUserFilter(ctx, actor, "identity.user.list", UserFilter{})
 	if err != nil {
 		return nil, err
 	}
-	counts, err := uc.Users.CountByStatus(ctx, nil, scope)
+	now := uc.Clock.Now().UTC()
+	stats, err := uc.Users.Overview(ctx, nil, filter, now.Add(-24*time.Hour), now)
 	if err != nil {
 		return nil, ErrDependency
 	}
-	mfa, err := uc.Users.CountMFA(ctx, nil, scope)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	sessions, err := uc.Sessions.CountActive(ctx, nil)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	since := uc.Clock.Now().Add(-24 * time.Hour)
-	logins, _ := uc.Events.CountRecent(ctx, nil, "login_success", since)
-	failures, _ := uc.Events.CountRecent(ctx, nil, "login_failure", since)
-	return &Overview{
-		Total: counts["total"], Enabled: counts[UserStatusEnabled],
-		Disabled: counts[UserStatusDisabled], Archived: counts[UserStatusArchived],
-		MFA: mfa, ActiveSessions: sessions, Logins24h: logins, Failed24h: failures,
-	}, nil
+	return stats, nil
 }
 
 // ListScope authorizes a tenant-scoped list and returns the coarse SQL filter.
@@ -418,12 +488,10 @@ func (s *Services) ListScope(ctx context.Context, actor ActorContext, operation 
 }
 
 func (uc *UserUsecase) ListUsers(ctx context.Context, actor ActorContext, filter UserFilter) ([]*UserListItem, int64, error) {
-	scope, err := uc.ListScope(ctx, actor, "identity.user.list")
+	filter, err := uc.listUserFilter(ctx, actor, "identity.user.list", filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	filter.Scope = scope
-	filter.ActorID = actor.User.ID
 	if filter.Offset < 0 {
 		filter.Offset = 0
 	}
@@ -437,7 +505,10 @@ func (uc *UserUsecase) ListUsers(ctx context.Context, actor ActorContext, filter
 	out := make([]*UserListItem, 0, len(users))
 	for _, u := range users {
 		d, derr := uc.Decide(ctx, actor, "identity.user.list", u.ID, false)
-		if derr != nil || !d.Allowed {
+		if derr != nil {
+			return nil, 0, ErrAuthorizationDown
+		}
+		if !d.Allowed {
 			continue
 		}
 		roles, _ := uc.Users.RolesForUser(ctx, nil, u.ID)
@@ -488,6 +559,9 @@ func (uc *UserUsecase) loadUserWithRoles(ctx context.Context, actor ActorContext
 }
 
 func (uc *UserUsecase) CreateUser(ctx context.Context, actor ActorContext, in CreateUserInput) (*User, error) {
+	if err := uc.managementPolicy(ctx, nil, actor); err != nil {
+		return nil, err
+	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.create", 0, true); err != nil {
 		return nil, err
 	}
@@ -511,6 +585,12 @@ func (uc *UserUsecase) CreateUser(ctx context.Context, actor ActorContext, in Cr
 	}
 	var hash string
 	if in.InitialPassword != "" {
+		if _, err := uc.Authorize(ctx, actor, "identity.user.credential.update", 0, true); err != nil {
+			return nil, err
+		}
+		if err := uc.RequireStepUp(ctx, actor); err != nil {
+			return nil, err
+		}
 		if err := ValidatePassword(in.InitialPassword, settings.PasswordMinLength); err != nil {
 			return nil, err
 		}
@@ -519,34 +599,21 @@ func (uc *UserUsecase) CreateUser(ctx context.Context, actor ActorContext, in Cr
 			return nil, ErrDependency
 		}
 	}
-	roleIDs := in.RoleIDs
-	if len(roleIDs) == 0 {
-		member, err := uc.IAM.GetRoleByCode(ctx, nil, "member")
-		if err != nil {
-			return nil, ErrDependency
-		}
-		roleIDs = []int64{member.ID}
-	}
-	roles, err := uc.IAM.ListRoles(ctx, nil, RoleFilter{})
+	member, err := uc.IAM.GetRoleByCode(ctx, nil, "member")
 	if err != nil {
 		return nil, ErrDependency
 	}
-	byID := map[int64]*Role{}
-	for _, r := range roles {
-		byID[r.ID] = r
+	if member.Status != RoleStatusActive {
+		return nil, Validation("默认成员角色不可用")
 	}
-	constraints, err := uc.IAM.ListConstraints(ctx, nil)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	for _, id := range roleIDs {
-		r := byID[id]
-		if r == nil || r.Status != RoleStatusActive {
-			return nil, Validation("包含不可分配的角色")
+	for _, roleID := range in.RoleIDs {
+		if roleID != member.ID {
+			return nil, ErrPermissionDenied
 		}
 	}
-	if err := CheckConstraints(roleIDs, constraints); err != nil {
-		return nil, err
+	roleIDs := []int64{member.ID}
+	if hash == "" && in.Email == "" {
+		return nil, Validation("未设置初始密码时必须提供激活邮箱")
 	}
 	now := uc.Clock.Now().UTC()
 	u := &User{
@@ -557,6 +624,9 @@ func (uc *UserUsecase) CreateUser(ctx context.Context, actor ActorContext, in Cr
 	}
 	var created *User
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.managementPolicy(ctx, tx, actor); err != nil {
+			return err
+		}
 		created0, err := uc.Users.Create(ctx, tx, u)
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -625,7 +695,13 @@ func (uc *UserUsecase) createActivation(ctx context.Context, user *User, actor A
 }
 
 func (uc *UserUsecase) UpdateUser(ctx context.Context, actor ActorContext, id int64, in UpdateUserInput) (*User, error) {
+	if err := uc.managementPolicy(ctx, nil, actor); err != nil {
+		return nil, err
+	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.update", id, false); err != nil {
+		return nil, err
+	}
+	if _, err := mutationFields(in.UpdateMask, "display_name"); err != nil {
 		return nil, err
 	}
 	policy, err := uc.Policy.PolicyRevision(ctx, nil)
@@ -652,6 +728,9 @@ func (uc *UserUsecase) UpdateUser(ctx context.Context, actor ActorContext, id in
 	before, _ := jsonx.Marshal(map[string]string{"display_name": u.DisplayName})
 	u.DisplayName = name
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.managementPolicy(ctx, tx, actor); err != nil {
+			return err
+		}
 		updated, err := uc.Users.Update(ctx, tx, u, in.ExpectedRevision)
 		if err != nil {
 			return err
@@ -669,6 +748,9 @@ func (uc *UserUsecase) UpdateUser(ctx context.Context, actor ActorContext, id in
 }
 
 func (uc *UserUsecase) SetStatus(ctx context.Context, actor ActorContext, id int64, status string, expected uint64, reason string) (*User, error) {
+	if err := uc.managementPolicy(ctx, nil, actor); err != nil {
+		return nil, err
+	}
 	if status != UserStatusEnabled && status != UserStatusDisabled {
 		return nil, Validation("状态只能是 enabled 或 disabled")
 	}
@@ -679,11 +761,16 @@ func (uc *UserUsecase) SetStatus(ctx context.Context, actor ActorContext, id int
 	if _, err := uc.Authorize(ctx, actor, op, id, false); err != nil {
 		return nil, err
 	}
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
+		return nil, err
+	}
 	if id == actor.User.ID && status == UserStatusDisabled {
 		return nil, ErrProtectedAccount
 	}
-	if err := uc.ensureNotLastRoot(ctx, id); err != nil {
-		return nil, err
+	if status == UserStatusDisabled {
+		if err := uc.ensureNotLastRoot(ctx, id); err != nil {
+			return nil, err
+		}
 	}
 	u, err := uc.Users.Get(ctx, nil, id)
 	if err != nil {
@@ -699,6 +786,18 @@ func (uc *UserUsecase) SetStatus(ctx context.Context, actor ActorContext, id int
 	before := u.Status
 	u.Status = status
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.managementPolicy(ctx, tx, actor); err != nil {
+			return err
+		}
+		if err := uc.governableTarget(ctx, tx, actor, id); err != nil {
+			return err
+		}
+		if status == UserStatusDisabled {
+			if err := uc.ensureNotLastRootTx(ctx, tx, id); err != nil {
+				return err
+			}
+		}
+
 		updated, err := uc.Users.Update(ctx, tx, u, expected)
 		if err != nil {
 			return err
@@ -733,6 +832,9 @@ func (uc *UserUsecase) SetStatus(ctx context.Context, actor ActorContext, id int
 }
 
 func (uc *UserUsecase) Archive(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string) (*User, error) {
+	if err := uc.managementPolicy(ctx, nil, actor); err != nil {
+		return nil, err
+	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.archive", id, false); err != nil {
 		return nil, err
 	}
@@ -760,6 +862,16 @@ func (uc *UserUsecase) Archive(ctx context.Context, actor ActorContext, id int64
 	u.Status = UserStatusArchived
 	u.ArchivedAt = &now
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.managementPolicy(ctx, tx, actor); err != nil {
+			return err
+		}
+		if err := uc.governableTarget(ctx, tx, actor, id); err != nil {
+			return err
+		}
+		if err := uc.ensureNotLastRootTx(ctx, tx, id); err != nil {
+			return err
+		}
+
 		if _, err := uc.Users.Update(ctx, tx, u, expected); err != nil {
 			return err
 		}
@@ -783,6 +895,9 @@ func (uc *UserUsecase) Archive(ctx context.Context, actor ActorContext, id int64
 }
 
 func (uc *UserUsecase) CreatePasswordResetTask(ctx context.Context, actor ActorContext, id int64, reason string) (time.Time, error) {
+	if _, err := uc.managementTarget(ctx, nil, actor, id, false); err != nil {
+		return time.Time{}, err
+	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.credential.update", id, false); err != nil {
 		return time.Time{}, err
 	}
@@ -819,6 +934,9 @@ func (uc *UserUsecase) CreatePasswordResetTask(ctx context.Context, actor ActorC
 }
 
 func (uc *UserUsecase) ResetMFA(ctx context.Context, actor ActorContext, id int64, reason string) error {
+	if _, err := uc.managementTarget(ctx, nil, actor, id, false); err != nil {
+		return err
+	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.mfa.reset", id, false); err != nil {
 		return err
 	}
@@ -829,7 +947,14 @@ func (uc *UserUsecase) ResetMFA(ctx context.Context, actor ActorContext, id int6
 		return ErrUserNotFound
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.managementTarget(ctx, tx, actor, id, true); err != nil {
+			return err
+		}
 		if err := uc.MFA.Delete(ctx, tx, id); err != nil {
+			return err
+		}
+		now := uc.Clock.Now().UTC()
+		if err := uc.Sessions.RevokeAllForUser(ctx, tx, id, &now); err != nil {
 			return err
 		}
 		version, err := uc.Users.BumpIdentityVersion(ctx, tx, id)
@@ -852,26 +977,41 @@ func (uc *UserUsecase) UserSessions(ctx context.Context, actor ActorContext, id 
 }
 
 func (uc *UserUsecase) RevokeUserSessions(ctx context.Context, actor ActorContext, id int64, ids []string, all bool, reason string) error {
+	if _, err := uc.managementTarget(ctx, nil, actor, id, false); err != nil {
+		return err
+	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.session.revoke", id, false); err != nil {
 		return err
 	}
-	now := uc.Clock.Now().UTC()
-	if all {
-		if err := uc.Sessions.RevokeAllForUser(ctx, nil, id, &now); err != nil {
-			return ErrDependency
-		}
-	} else {
-		for _, sid := range ids {
-			s, err := uc.Sessions.Get(ctx, nil, sid)
-			if err != nil || s.UserID != id {
-				continue
-			}
-			if err := uc.Sessions.Revoke(ctx, nil, sid, &now); err != nil {
-				return ErrDependency
-			}
-		}
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
+		return err
 	}
+	now := uc.Clock.Now().UTC()
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.managementTarget(ctx, tx, actor, id, true); err != nil {
+			return err
+		}
+		if all {
+			if err := uc.Sessions.RevokeAllForUser(ctx, tx, id, &now); err != nil {
+				return err
+			}
+		} else {
+			for _, sid := range ids {
+				s, err := uc.Sessions.Get(ctx, tx, sid)
+				if errors.Is(err, ErrResourceNotFound) {
+					continue
+				}
+				if err != nil {
+					return err
+				}
+				if s.UserID != id {
+					return ErrPermissionDenied
+				}
+				if err := uc.Sessions.Revoke(ctx, tx, sid, &now); err != nil {
+					return err
+				}
+			}
+		}
 		if err := uc.audit(ctx, tx, actor, "identity.user.sessions.revoke", itoa(id), "{}", "{}", "{}", reason, "success"); err != nil {
 			return err
 		}
@@ -888,7 +1028,11 @@ func (uc *UserUsecase) EffectivePermissions(ctx context.Context, actor ActorCont
 }
 
 func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyword, status string, fields []string, roleID int64, mfa *bool, reason string) (*ExportJob, error) {
-	scope, err := uc.ListScope(ctx, actor, "identity.user.export")
+	filter, err := uc.listUserFilter(ctx, actor, "identity.user.export", UserFilter{Keyword: keyword, Status: status, RoleID: roleID, MFA: mfa, Limit: 100000})
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := uc.exportSnapshot(ctx, actor)
 	if err != nil {
 		return nil, err
 	}
@@ -901,23 +1045,23 @@ func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyw
 			return nil, Validation("不支持的导出字段: " + f)
 		}
 	}
-	if slices.Contains(fields, "email") {
-		if _, err := uc.Authorize(ctx, actor, "identity.user.contact.read", 0, true); err != nil {
-			return nil, ErrPermissionDenied
-		}
-	}
-	filter := UserFilter{Keyword: keyword, Status: status, Scope: scope, RoleID: roleID, MFA: mfa, Limit: 100000}
 	users, _, err := uc.Users.List(ctx, nil, filter)
 	if err != nil {
 		return nil, ErrDependency
 	}
 	job := &ExportJob{
 		Kind: "users", ActorUserID: actor.User.ID, ActorSessionID: actor.Session.ID,
-		ScopeSnapshot: scope.String(), RequestedFields: fields, Status: ExportPending,
+		ScopeSnapshot: snapshot, RequestedFields: fields, Status: ExportPending,
 		CreatedAt: uc.Clock.Now().UTC(), ExpiresAt: uc.Clock.Now().Add(24 * time.Hour),
 		ArtifactName: uc.IDs.NewID() + ".csv",
 	}
 	path := filepath.Join(uc.ArtifactDir, job.ArtifactName)
+	keepArtifact := false
+	defer func() {
+		if !keepArtifact {
+			_ = os.Remove(path)
+		}
+	}()
 	if err := os.MkdirAll(uc.ArtifactDir, 0o750); err != nil {
 		return nil, ErrDependency
 	}
@@ -929,8 +1073,18 @@ func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyw
 	_ = w.Write(fields)
 	for _, u := range users {
 		d, derr := uc.Decide(ctx, actor, "identity.user.export", u.ID, false)
-		if derr != nil || !d.Allowed {
+		if derr != nil {
+			_ = f.Close()
+			return nil, ErrAuthorizationDown
+		}
+		if !d.Allowed {
 			continue
+		}
+		if slices.Contains(fields, "email") || slices.Contains(fields, "email_verified") {
+			if _, err := uc.Authorize(ctx, actor, "identity.user.contact.read", u.ID, false); err != nil {
+				_ = f.Close()
+				return nil, err
+			}
 		}
 		roles, _ := uc.Users.RolesForUser(ctx, nil, u.ID)
 		mfa := false
@@ -964,7 +1118,7 @@ func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyw
 				row = append(row, strings.Join(codes, "|"))
 			}
 		}
-		_ = w.Write(row)
+		_ = w.Write(csvSafeRow(row))
 	}
 	w.Flush()
 	if err := w.Error(); err != nil {
@@ -975,11 +1129,19 @@ func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyw
 		return nil, ErrDependency
 	}
 	job.Status = ExportReady
-	saved, err := uc.Exports.Create(ctx, job)
+	var saved *ExportJob
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		var err error
+		saved, err = uc.Exports.Create(ctx, tx, job)
+		if err != nil {
+			return err
+		}
+		return uc.audit(ctx, tx, actor, "identity.user.export", "users", "{}", "{}", string(mustJSON(map[string]any{"fields": fields})), reason, "success")
+	})
 	if err != nil {
-		return nil, ErrDependency
+		return nil, err
 	}
-	_ = uc.audit(ctx, nil, actor, "identity.user.export", "users", "{}", "{}", string(mustJSON(map[string]any{"fields": fields})), reason, "success")
+	keepArtifact = true
 	return saved, nil
 }
 
@@ -988,10 +1150,11 @@ func (uc *UserUsecase) GetExport(ctx context.Context, actor ActorContext, id int
 	if err != nil {
 		return nil, ErrResourceNotFound
 	}
-	if job.ActorUserID != actor.User.ID {
-		if _, err := uc.Authorize(ctx, actor, "identity.user.export", 0, true); err != nil {
-			return nil, ErrResourceNotFound
-		}
+	if job.ActorUserID != actor.User.ID || job.ActorSessionID != actor.Session.ID {
+		return nil, ErrResourceNotFound
+	}
+	if err := uc.authorizeExport(ctx, actor, job); err != nil {
+		return nil, err
 	}
 	return job, nil
 }
@@ -1016,11 +1179,18 @@ func (uc *UserUsecase) ListExports(ctx context.Context, actor ActorContext, page
 }
 
 func (uc *UserUsecase) ensureNotLastRoot(ctx context.Context, targetID int64) error {
-	root, err := uc.IAM.GetRoleByCode(ctx, nil, "root")
+	return uc.ensureNotLastRootTx(ctx, nil, targetID)
+}
+
+func (uc *UserUsecase) ensureNotLastRootTx(ctx context.Context, tx Tx, targetID int64) error {
+	root, err := uc.IAM.GetRoleByCode(ctx, tx, "root")
 	if err != nil {
-		return nil // root role is optional in stripped deployments
+		return ErrDependency
 	}
-	roles, _ := uc.Users.RolesForUser(ctx, nil, targetID)
+	roles, err := uc.Users.RolesForUser(ctx, tx, targetID)
+	if err != nil {
+		return ErrDependency
+	}
 	isRoot := false
 	for _, r := range roles {
 		if r.ID == root.ID {
@@ -1031,7 +1201,7 @@ func (uc *UserUsecase) ensureNotLastRoot(ctx context.Context, targetID int64) er
 	if !isRoot {
 		return nil
 	}
-	count, err := uc.Users.CountsByRole(ctx, nil, root.ID)
+	count, err := uc.Users.CountsByRole(ctx, tx, root.ID)
 	if err != nil {
 		return ErrDependency
 	}

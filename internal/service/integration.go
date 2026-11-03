@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -26,7 +27,10 @@ func (s *IntegrationService) Usecase() *biz.IntegrationUsecase { return s.uc }
 func (s *IntegrationService) ValidateSession(ctx context.Context, req *usercv1.ValidateSessionRequest) (*usercv1.ValidateSessionReply, error) {
 	facts, user, err := s.uc.ValidateSession(ctx, req.GetSessionToken(), req.GetApplicationCode())
 	if err != nil {
-		return &usercv1.ValidateSessionReply{Valid: false, Reason: "SESSION_INVALID"}, nil
+		if errors.Is(err, biz.ErrUnauthenticated) || errors.Is(err, biz.ErrSessionRevoked) {
+			return &usercv1.ValidateSessionReply{Valid: false, Reason: "SESSION_INVALID"}, nil
+		}
+		return nil, err
 	}
 	return &usercv1.ValidateSessionReply{
 		Valid: true,
@@ -115,17 +119,17 @@ func (s *IntegrationService) GetResourceAuthorization(ctx context.Context, req *
 			return nil, err
 		}
 	}
-	allowed, reason, scope, policy, err := s.uc.ResourceAuthorization(ctx, req.GetSessionToken(), req.GetOperation(), ownerID, resourceID)
+	allowed, reason, scope, policy, validUntil, err := s.uc.ResourceAuthorization(ctx, req.GetSessionToken(), req.GetExecutionPoint(), req.GetOperation(), ownerID, resourceID)
 	if err != nil {
 		return nil, err
 	}
 	return &usercv1.ResourceAuthorizationReply{
-		Allowed: allowed, Reason: reason, Scope: scopeProto(scope), PolicyRevision: rev(policy),
+		Allowed: allowed, Reason: reason, Scope: scopeProto(scope), PolicyRevision: rev(policy), ValidUntil: tptr(validUntil),
 	}, nil
 }
 
 func (s *IntegrationService) RevokeSession(ctx context.Context, req *usercv1.IntegrationRevokeSessionRequest) (*emptypb.Empty, error) {
-	if err := s.uc.RevokeSession(ctx, req.GetSessionId(), req.GetReason()); err != nil {
+	if err := s.uc.RevokeSession(ctx, req.GetSessionToken(), req.GetSessionId(), req.GetReason()); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil

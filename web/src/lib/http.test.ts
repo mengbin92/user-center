@@ -62,3 +62,29 @@ describe('CSRF and request id client', () => {
     )
   })
 })
+
+describe('session response isolation', () => {
+  it('ignores unauthorized responses that started before a session change', async () => {
+    const { AxiosError } = await import('axios')
+    const { invalidateHttpSession, setUnauthorizedHandler } = await import('./http')
+    const { vi } = await import('vitest')
+    const unauthorized = vi.fn()
+    let reject!: (error: Error) => void
+    let request!: InternalAxiosRequestConfig
+    const adapter: AxiosAdapter = async (config) => {
+      request = config
+      return await new Promise((_resolve, rejectRequest) => { reject = rejectRequest })
+    }
+    const client = createHttpClient({ adapter })
+    setUnauthorizedHandler(unauthorized)
+    const pending = client.get('/api/v1/me').catch((error: unknown) => error)
+    await vi.waitFor(() => expect(request).toBeDefined())
+    invalidateHttpSession()
+    reject(new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', request, undefined, {
+      data: { reason: 'SESSION_REVOKED' }, status: 401, statusText: 'Unauthorized', headers: {}, config: request,
+    }))
+    await pending
+    expect(unauthorized).not.toHaveBeenCalled()
+    setUnauthorizedHandler(null)
+  })
+})

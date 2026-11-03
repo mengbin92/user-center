@@ -170,7 +170,7 @@ export function AdminRoleDetailPage() {
     if (!role) return
     setRoleName(role.name ?? '')
     setRoleDescription(role.description ?? '')
-    setRoleMaxMembers(role.max_members ?? '')
+    setRoleMaxMembers(role.max_members === '0' ? '' : role.max_members ?? '')
   }, [role])
 
   const policyRevision = authorization?.policy_revision ?? ''
@@ -227,9 +227,11 @@ export function AdminRoleDetailPage() {
         description: roleDescription.trim(),
         max_members: roleMaxMembers.trim() || undefined,
         expected_revision: role?.revision ?? '0',
-        reason: roleEditReason.trim() || 'update role profile',
+        expected_policy_revision: authorization?.policy_revision,
+        reason: roleEditReason.trim(),
       }),
     successMessage: '角色资料已更新',
+    refreshAuth: true,
     onSuccess: async () => {
       setEditOpen(false)
       await invalidateRole()
@@ -242,6 +244,7 @@ export function AdminRoleDetailPage() {
         id,
         status: input.status,
         expected_revision: role?.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: '角色状态已更新',
@@ -257,6 +260,7 @@ export function AdminRoleDetailPage() {
       api.iam.archiveRole(id, {
         id,
         expected_revision: role?.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason,
       }),
     successMessage: '角色已归档',
@@ -271,11 +275,14 @@ export function AdminRoleDetailPage() {
     mutationFn: () =>
       api.iam.copyRole(id, {
         id,
+        expected_revision: role?.revision,
         code: copyCode.trim(),
         name: copyName.trim(),
+        expected_policy_revision: authorization?.policy_revision,
         reason: copyReason.trim(),
       }),
     successMessage: '角色已复制',
+    refreshAuth: true,
     onSuccess: async (created) => {
       setCopyOpen(false)
       await invalidateRole()
@@ -448,7 +455,7 @@ export function AdminRoleDetailPage() {
                       <span className="font-mono">{role.code}</span>
                       <span className="font-mono">id={role.id}</span>
                       <span>revision {role.revision}</span>
-                      <span>成员上限 {role.max_members || '不限'}</span>
+                      <span>成员上限 {role.max_members && role.max_members !== '0' ? role.max_members : '不限'}</span>
                     </div>
                     {role.description ? (
                       <p className="mt-1 max-w-2xl text-[11px] text-slate-500">
@@ -829,7 +836,7 @@ export function AdminRoleDetailPage() {
                         label: '内置',
                         value: role.builtin ? '是（受保护）' : '否',
                       },
-                      { label: '成员上限', value: role.max_members || '不限' },
+                      { label: '成员上限', value: role.max_members && role.max_members !== '0' ? role.max_members : '不限' },
                       { label: 'revision', value: role.revision, mono: true },
                       {
                         label: 'grants revision',
@@ -894,7 +901,7 @@ export function AdminRoleDetailPage() {
                     size="sm"
                     onClick={() => updateRole.mutate(undefined)}
                     loading={updateRole.isPending}
-                    disabled={!roleName.trim()}
+                    disabled={!roleName.trim() || !roleEditReason.trim()}
                   >
                     保存
                   </Button>
@@ -929,7 +936,7 @@ export function AdminRoleDetailPage() {
                   id="role-edit-reason"
                   value={roleEditReason}
                   onChange={(event) => setRoleEditReason(event.target.value)}
-                  placeholder="可选，写入审计"
+                  placeholder="请填写本次变更的原因" required
                 />
               </Field>
             </Dialog>

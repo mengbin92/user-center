@@ -465,11 +465,12 @@ func (x *UpdateIntegrationClientRequest) GetReason() string {
 }
 
 type RotateIntegrationClientCredentialRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reason           string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedRevision string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *RotateIntegrationClientCredentialRequest) Reset() {
@@ -516,12 +517,20 @@ func (x *RotateIntegrationClientCredentialRequest) GetReason() string {
 	return ""
 }
 
+func (x *RotateIntegrationClientCredentialRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return ""
+}
+
 type DisableIntegrationClientRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reason           string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedRevision string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *DisableIntegrationClientRequest) Reset() {
@@ -564,6 +573,13 @@ func (x *DisableIntegrationClientRequest) GetId() string {
 func (x *DisableIntegrationClientRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *DisableIntegrationClientRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
 	}
 	return ""
 }
@@ -876,13 +892,15 @@ const file_api_usercenter_v1_integration_admin_proto_rawDesc = "" +
 	"\x13event_subscriptions\x18\x03 \x03(\tR\x12eventSubscriptions\x12!\n" +
 	"\fcallback_url\x18\x04 \x01(\tR\vcallbackUrl\x12+\n" +
 	"\x11expected_revision\x18\x05 \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\x06 \x01(\tR\x06reason\"R\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\"\x7f\n" +
 	"(RotateIntegrationClientCredentialRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"I\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12+\n" +
+	"\x11expected_revision\x18\x03 \x01(\tR\x10expectedRevision\"v\n" +
 	"\x1fDisableIntegrationClientRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xe5\x01\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12+\n" +
+	"\x11expected_revision\x18\x03 \x01(\tR\x10expectedRevision\"\xe5\x01\n" +
 	"\rEventDelivery\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
 	"\n" +

@@ -99,6 +99,7 @@ message CreateUserRequest {
   bool send_activation = 5;
   string initial_password = 6;
   string reason = 7;
+  string expected_policy_revision = 8;
 }
 
 message GetUserRequest {
@@ -120,17 +121,21 @@ message SetUserStatusRequest {
   string status = 2;
   string expected_revision = 3;
   string reason = 4;
+  string expected_policy_revision = 5;
 }
 
 message ArchiveUserRequest {
   string id = 1;
   string expected_revision = 2;
   string reason = 3;
+  string expected_policy_revision = 4;
 }
 
 message CreatePasswordResetTaskRequest {
   string id = 1;
   string reason = 2;
+  string expected_revision = 3;
+  string expected_policy_revision = 4;
 }
 
 message PasswordResetTaskReply {
@@ -141,12 +146,16 @@ message PasswordResetTaskReply {
 message ResetMFARequest {
   string id = 1;
   string reason = 2;
+  string expected_revision = 3;
+  string expected_policy_revision = 4;
 }
 
 message CreateEmailChangeChallengeRequest {
   string id = 1;
   string new_email = 2;
   string reason = 3;
+  string expected_revision = 4;
+  string expected_policy_revision = 5;
 }
 
 message ConfirmEmailChangeRequest {
@@ -154,6 +163,8 @@ message ConfirmEmailChangeRequest {
   string challenge_id = 2;
   string code = 3;
   string reason = 4;
+  string expected_revision = 5;
+  string expected_policy_revision = 6;
 }
 
 message ListUserSessionsRequest {
@@ -165,6 +176,8 @@ message RevokeUserSessionsRequest {
   repeated string session_ids = 2;
   bool revoke_all = 3;
   string reason = 4;
+  string expected_revision = 5;
+  string expected_policy_revision = 6;
 }
 
 message GetUserEffectivePermissionsRequest {

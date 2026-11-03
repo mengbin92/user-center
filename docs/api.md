@@ -5,14 +5,15 @@
 ## 1. 通用约定
 
 - 前缀：`/api/v1`；公开认证在 `/api/v1/auth/*`。
-- JSON：`snake_case`；枚举使用小写字符串（`enabled`、`disabled`、`archived`、`allow`、`deny`）。
+- JSON：ProtoJSON，`snake_case`；保留空集合与 false，拒绝未知字段；枚举使用小写字符串（`enabled`、`disabled`、`archived`、`allow`、`deny`）。
 - ID、revision、计数：十进制字符串。前端不得先转 `Number` 再转回字符串。
 - 时间：RFC 3339 UTC（例：`2026-11-02T08:00:00Z`）。
 - 成功：资源对象直接返回；列表 `{items, meta:{next_page_token,total_size}}`。
 - 失败：使用 HTTP 状态码，响应体 `{code, reason, message, metadata}`；不再使用 HTTP 200 + `success=false`。
 - 分页：`page_size` 默认 20、上限 100；`page_token` 不透明并绑定筛选条件。
 - 并发：敏感写操作必须携带 `expected_revision`；策略写操作携带 `expected_policy_revision`；冲突返回 409 + `current_revision` / `current_policy_revision`。
-- 审计：管理写操作必须携带 `reason`；高风险操作要求近期 Step-up。
+- 审计：管理写操作必须携带非空 `reason`，不自动填充默认理由；高风险操作要求近期 Step-up。
+- 请求大小：JSON 请求体最多 1 MiB，超限返回 413。更新掩码逐字段匹配，未列入掩码的字段保持不变。
 
 ## 2. Cookie 与 CSRF
 
@@ -34,13 +35,15 @@ POST /auth/mfa/complete                 {challenge_id,code} → authenticated + 
 POST /auth/logout                       撤销当前会话 + 清 Cookie
 POST /auth/password-reset-challenges     {identifier} → 统一响应，不泄露账号是否存在
 POST /auth/password-reset                {challenge_id,code,new_password}
-GET  /auth/providers/{provider}/start    ?mode=login|bind → 302 到提供方
+GET  /auth/providers/{provider}/start    ?mode=login|bind|verify → 302 到提供方
 GET  /auth/providers/{provider}/callback ?state&code → 302 / Set-Cookie
 ```
 
 登录成功后服务端设置 Cookie；响应不返回任何 bearer token。MFA 登录时先返回短期 challenge，不建立完整会话。`LoginReply` 还包含 `password_change_required` 和 `mfa_enrollment_required`：前者要求先改初始密码，后者要求管理员先绑定 TOTP。
 
 OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必须已登录。回调只接受服务端交换，不把 provider access token 返回浏览器。未绑定账号登录返回 `OAUTH_NOT_BOUND`，不回退为按邮箱自动合并。若账号已启用 MFA，OAuth 登录不会直接建立会话，而是重定向到 `/login?mfa_challenge=...` 完成第二因素。
+
+纯 OAuth 账号可用 `mode=verify` 重新认证已经绑定的外部身份。state 绑定当前用户、会话和身份版本，回调 subject 必须仍属于当前用户；成功后服务端保存 5 分钟主认证证明。该证明允许设置首个本地密码或开始 MFA 设置，不替代已经启用的第二因素。已有 MFA 时，先完成 `/me/security:verify`，再设置首个本地密码。证明不返回给浏览器，跨会话、过期、身份变更及 state 重放均被拒绝。
 
 ## 4. 本人接口
 
@@ -74,7 +77,7 @@ OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必
 |---|---|---|
 | GET | `/admin/overview` | 受 `identity.user.list` 范围约束的统计 |
 | GET | `/admin/users` | `keyword/status/role_id/mfa_enabled/page_size/page_token` |
-| POST | `/admin/users` | 创建；默认 `member`；可发激活邮件；禁止客户端指定 balance/group |
+| POST | `/admin/users` | 仅创建默认 `member`；其他角色走独立分配；设置初始密码另需 credential.update + Step-up；禁止 balance/group |
 | GET | `/admin/users/{id}` | 核心资料 + 角色 + MFA 状态 |
 | PATCH | `/admin/users/{id}` | 仅资料字段；CAS + reason |
 | POST | `/admin/users/{id}:set-status` | enabled/disabled；禁用会撤销全部会话 |
@@ -88,9 +91,11 @@ OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必
 | GET | `/admin/users/{id}/effective-permissions` | 角色、继承、Scope、拒绝解释 |
 | POST | `/admin/users:export` | 生成 CSV；字段白名单 |
 | GET | `/admin/exports/{id}` | 只能访问有权限的任务 |
-| GET | `/admin/exports/{id}/download` | 再次验证会话、任务归属与过期 |
+| GET | `/admin/exports/{id}/download` | 再次验证当前会话、任务归属、权限版本与授权有效期 |
 
-邮箱仅在调用者拥有 `identity.user.contact.read` 时返回；否则列表与详情中的邮箱为空字符串。前端遮罩不是安全边界。
+用户管理创建/更新/启停/归档及安全动作必须携带 `expected_policy_revision`；操作已有用户还需 `expected_revision`。非 root 管理员不能变更 root 凭据、邮箱或 MFA。接入客户端轮换和停用也要求目标 revision。
+
+邮箱仅在调用者拥有 `identity.user.contact.read` 时返回；否则列表与详情中的邮箱为空字符串。邮箱关键词检索还要求完整范围的联系方式读取权限，避免通过筛选推断被隐藏的邮箱。前端遮罩不是安全边界。
 
 ## 6. IAM 接口
 
@@ -105,20 +110,20 @@ OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必
 | 菜单 | `GET/POST /admin/iam/menus`；`PATCH /admin/iam/menus/{id}`；`{id}:archive` |
 | 解释/模拟 | `POST /admin/iam/authorization:explain`、`authorization:simulate` |
 
-写操作要求 `reason`；角色/分配/约束变更要求 Step-up（按实现中的 operation 集合）。
+所有 IAM 管理写必须携带 `reason` 与 `expected_policy_revision`，修改/复制/撤销已有资源还需其 `expected_revision`；角色/分配/约束变更要求 Step-up。
 
 ## 7. 内部 gRPC
 
-`IntegrationService` 仅注册在 `:9090`，不注册浏览器 HTTP 方法。若设置 `USER_CENTER_INTEGRATION_TOKEN`，调用方必须携带 `authorization: Bearer <token>`。
+`IntegrationService` 仅注册在 `:9090`，不注册浏览器 HTTP 方法。调用方必须携带数据库接入客户端的 `authorization: Bearer <client_id.secret>`；凭据状态/有效期/方法白名单逐次校验。旧 `USER_CENTER_INTEGRATION_TOKEN` 旁路已移除。
 
 | RPC | 语义 |
 |---|---|
-| `ValidateSession` | 校验原始会话令牌、应用、身份版本、状态、有效期 |
+| `ValidateSession` | 校验原始会话令牌、应用、身份版本、状态、有效期；application_code 必填且等于签发值（V1 为 user-center） |
 | `ValidateSubject` | 只读用户启停与身份版本，供 API Key owner 组合本地状态 |
 | `GetUser` / `BatchGetUsers` | 最小核心资料，批量 ≤100 |
-| `GetSessionAuthorization` | 当前应用可见的权限投影 + 菜单键 |
-| `GetResourceAuthorization` | 给定操作与资源 owner 事实返回 allow/deny |
-| `RevokeSession` | 幂等撤销 |
+| `GetSessionAuthorization` | 校验应用后，仅返回调用方 service_owner 拥有资源的权限投影 + 菜单键 |
+| `GetResourceAuthorization` | execution_point 等于 operation；提供真实 owner_user_id/resource_id；调用方匹配资源 owner；返回该对象最小范围与 valid_until |
+| `RevokeSession` | 携带 session_token 用户证明与 reason，只撤销同用户/同应用会话；审计与撤销同事务 |
 
 ## 8. 错误码
 

@@ -16,7 +16,7 @@ export function isPublicPath(pathname: string): boolean {
 
 export function safeNext(raw: string | null): string | null {
   if (!raw) return null
-  if (!raw.startsWith('/') || raw.startsWith('//')) return null
+  if (!raw.startsWith('/') || raw.startsWith('//') || /[\\\u0000-\u001f\u007f]/.test(raw)) return null
   if (isPublicPath(raw.split('?')[0])) return null
   return raw
 }

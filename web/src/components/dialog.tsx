@@ -43,6 +43,10 @@ export function Dialog({
   const descriptionId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
   const lastFocused = useRef<HTMLElement | null>(null)
+  const closeRef = useRef(onClose)
+  const dismissibleRef = useRef(dismissible)
+  closeRef.current = onClose
+  dismissibleRef.current = dismissible
 
   useEffect(() => {
     if (!open) return
@@ -59,9 +63,31 @@ export function Dialog({
     }, 20)
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && dismissible) {
+      if (event.key === 'Escape' && dismissibleRef.current) {
         event.stopPropagation()
-        onClose()
+        closeRef.current()
+      }
+      if (event.key === 'Tab') {
+        const panel = panelRef.current
+        if (!panel) return
+        const focusable = [...panel.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        )].filter((element) => !element.closest('[hidden], [aria-hidden="true"]'))
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (!first || !last) {
+          event.preventDefault()
+          panel.focus()
+        } else if (!panel.contains(document.activeElement)) {
+          event.preventDefault()
+          ;(event.shiftKey ? last : first).focus()
+        } else if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
       }
     }
     document.addEventListener('keydown', onKeyDown)
@@ -71,7 +97,7 @@ export function Dialog({
       document.body.style.overflow = previousOverflow
       lastFocused.current?.focus?.()
     }
-  }, [open, dismissible, onClose])
+  }, [open])
 
   if (!open) return null
 

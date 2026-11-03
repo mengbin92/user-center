@@ -70,10 +70,9 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	integrationAdminService := service.NewIntegrationAdminService(integrationAdminUsecase)
 	artifactDir := server.NewArtifactDir()
 	httpServer := server.NewHTTPServer(confServer, security, middleware, logger, authService, meService, adminUserService, iamService, auditService, settingsService, integrationAdminService, userUsecase, artifactDir)
-	integrationToken := server.NewIntegrationToken()
 	integrationUsecase := biz.NewIntegrationUsecase(services)
 	integrationService := service.NewIntegrationService(integrationUsecase)
-	grpcServer := server.NewGRPCServer(confServer, integrationToken, logger, integrationService)
+	grpcServer := server.NewGRPCServer(confServer, logger, integrationService)
 	app := wiring.NewApp(httpServer, grpcServer, services, integrationAdminUsecase, logger)
 	return app, func() {
 		cleanup()

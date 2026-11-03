@@ -177,6 +177,7 @@ export function AdminAssignmentsPage() {
     mutationFn: (input: { assignment: AssignmentItem; reason: string }) =>
       api.iam.revokeAssignment(input.assignment.id ?? '', {
         id: input.assignment.id,
+        expected_revision: input.assignment.revision,
         reason: input.reason,
         expected_policy_revision: authorization?.policy_revision ?? undefined,
       }),

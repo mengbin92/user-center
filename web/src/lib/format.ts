@@ -29,6 +29,9 @@ export function formatDate(value?: string | null): string {
 
 export function formatNumber(value?: string | number | null): string {
   if (value === undefined || value === null || value === '') return '0'
+  if (typeof value === 'string' && /^-?\d+$/.test(value)) {
+    return new Intl.NumberFormat('zh-CN').format(BigInt(value))
+  }
   const numeric = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(numeric)) return String(value)
   return new Intl.NumberFormat('zh-CN').format(numeric)

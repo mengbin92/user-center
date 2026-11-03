@@ -64,6 +64,11 @@ type SimulateResult struct {
 }
 
 func (uc *IAMUsecase) guard(ctx context.Context, actor ActorContext, operation string, stepUp bool) error {
+	current, err := uc.currentIAMActor(ctx, actor)
+	if err != nil {
+		return err
+	}
+	actor = current
 	if _, err := uc.Authorize(ctx, actor, operation, 0, true); err != nil {
 		return err
 	}
@@ -78,7 +83,10 @@ func (uc *IAMUsecase) policyGuard(ctx context.Context, tx Tx, expected uint64) (
 	if err != nil {
 		return 0, ErrDependency
 	}
-	if expected != 0 && expected != current {
+	if expected == 0 {
+		return current, Validation("expected_policy_revision 必须为正整数")
+	}
+	if expected != current {
 		return current, ConflictPolicy(current)
 	}
 	return current, nil
@@ -138,8 +146,11 @@ func validatePermission(p *Permission) error {
 	return nil
 }
 
-func (uc *IAMUsecase) CreatePermission(ctx context.Context, actor ActorContext, p *Permission, reason string) (*Permission, error) {
-	if err := uc.guard(ctx, actor, "iam.permission.create", false); err != nil {
+func (uc *IAMUsecase) CreatePermission(ctx context.Context, actor ActorContext, p *Permission, reason string, expectedPolicy uint64) (*Permission, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
+	if err := uc.guard(ctx, actor, "iam.permission.create", true); err != nil {
 		return nil, err
 	}
 	if err := validatePermission(p); err != nil {
@@ -161,12 +172,18 @@ func (uc *IAMUsecase) CreatePermission(ctx context.Context, actor ActorContext, 
 	}
 	var created *Permission
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.permission.create", true); err != nil {
+			return err
+		}
 		c, err := uc.IAM.CreatePermission(ctx, tx, p)
 		if err != nil {
 			return err
 		}
 		created = c
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.permission.create", c.Code, "{}", "{}", "{}", reason, "success")
@@ -177,18 +194,31 @@ func (uc *IAMUsecase) CreatePermission(ctx context.Context, actor ActorContext, 
 	return created, nil
 }
 
-func (uc *IAMUsecase) UpdatePermission(ctx context.Context, actor ActorContext, p *Permission, expected uint64, reason string) (*Permission, error) {
-	if err := uc.guard(ctx, actor, "iam.permission.update", false); err != nil {
-		return nil, err
+func (uc *IAMUsecase) UpdatePermission(ctx context.Context, actor ActorContext, p *Permission, expected uint64, reason string, expectedPolicy uint64) (*Permission, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
 	}
-	if err := validatePermission(p); err != nil {
+	if err := uc.guard(ctx, actor, "iam.permission.update", true); err != nil {
 		return nil, err
 	}
 	var updated *Permission
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.permission.update", true); err != nil {
+			return err
+		}
 		existing, err := uc.IAM.GetPermission(ctx, tx, p.ID)
 		if err != nil {
 			return ErrResourceNotFound
+		}
+		p.Code = existing.Code
+		if existing.Binding == BindingBound && !slices.Equal(existing.SupportedScopes, p.SupportedScopes) {
+			return Validation("已绑定权限的 scope 支持由执行点定义")
+		}
+		if err := validatePermission(p); err != nil {
+			return err
 		}
 		existing.Name = p.Name
 		existing.Category = p.Category
@@ -201,7 +231,7 @@ func (uc *IAMUsecase) UpdatePermission(ctx context.Context, actor ActorContext, 
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.permission.update", existing.Code, "{}", "{}", "{}", reason, "success")
@@ -212,15 +242,24 @@ func (uc *IAMUsecase) UpdatePermission(ctx context.Context, actor ActorContext, 
 	return updated, nil
 }
 
-func (uc *IAMUsecase) SetPermissionStatus(ctx context.Context, actor ActorContext, id int64, status string, expected uint64, reason string) (*Permission, error) {
+func (uc *IAMUsecase) SetPermissionStatus(ctx context.Context, actor ActorContext, id int64, status string, expected uint64, reason string, expectedPolicy uint64) (*Permission, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if status != PermissionStatusActive && status != PermissionStatusDisabled {
 		return nil, Validation("状态只能是 active 或 disabled")
 	}
-	if err := uc.guard(ctx, actor, "iam.permission.update", false); err != nil {
+	if err := uc.guard(ctx, actor, "iam.permission.update", true); err != nil {
 		return nil, err
 	}
 	var updated *Permission
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.permission.update", true); err != nil {
+			return err
+		}
 		p, err := uc.IAM.GetPermission(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -234,7 +273,7 @@ func (uc *IAMUsecase) SetPermissionStatus(ctx context.Context, actor ActorContex
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.permission.status", p.Code, "{}", "{}", "{}", reason, "success")
@@ -245,12 +284,21 @@ func (uc *IAMUsecase) SetPermissionStatus(ctx context.Context, actor ActorContex
 	return updated, nil
 }
 
-func (uc *IAMUsecase) ArchivePermission(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string) (*Permission, error) {
-	if err := uc.guard(ctx, actor, "iam.permission.update", false); err != nil {
+func (uc *IAMUsecase) ArchivePermission(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string, expectedPolicy uint64) (*Permission, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
+	if err := uc.guard(ctx, actor, "iam.permission.update", true); err != nil {
 		return nil, err
 	}
 	var updated *Permission
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.permission.update", true); err != nil {
+			return err
+		}
 		p, err := uc.IAM.GetPermission(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -264,7 +312,7 @@ func (uc *IAMUsecase) ArchivePermission(ctx context.Context, actor ActorContext,
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.permission.archive", p.Code, "{}", "{}", "{}", reason, "success")
@@ -344,6 +392,9 @@ func validateGrants(ctx context.Context, repo IAMRepo, grants []Grant) error {
 }
 
 func (uc *IAMUsecase) CreateRole(ctx context.Context, actor ActorContext, role *Role, reason string, expectedPolicy uint64) (*Role, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.role.create", true); err != nil {
 		return nil, err
 	}
@@ -351,6 +402,9 @@ func (uc *IAMUsecase) CreateRole(ctx context.Context, actor ActorContext, role *
 	role.Name = strings.TrimSpace(role.Name)
 	if role.Code == "" || role.Name == "" {
 		return nil, Validation("角色 code 和名称不能为空")
+	}
+	if role.Code == "root" || role.Builtin {
+		return nil, ErrProtectedAccount
 	}
 	if strings.ContainsAny(role.Code, " \t\n") {
 		return nil, Validation("角色 code 不能包含空白字符")
@@ -361,9 +415,15 @@ func (uc *IAMUsecase) CreateRole(ctx context.Context, actor ActorContext, role *
 	if err := validateGrants(ctx, uc.IAM, role.Grants); err != nil {
 		return nil, err
 	}
+	if err := uc.checkGrantAuthority(ctx, actor, role.Grants); err != nil {
+		return nil, err
+	}
 	existingRoles, err := uc.IAM.ListAllRolesWithGrants(ctx, nil)
 	if err != nil {
 		return nil, ErrDependency
+	}
+	if err := uc.checkInheritanceAuthority(ctx, actor, existingRoles, role.Inherits); err != nil {
+		return nil, err
 	}
 	knownRoles := map[int64]bool{}
 	for _, r := range existingRoles {
@@ -377,6 +437,22 @@ func (uc *IAMUsecase) CreateRole(ctx context.Context, actor ActorContext, role *
 	var created *Role
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.role.create", true); err != nil {
+			return err
+		}
+		if err := validateGrants(ctx, uc.IAM, role.Grants); err != nil {
+			return err
+		}
+		if err := uc.checkGrantAuthority(ctx, actor, role.Grants); err != nil {
+			return err
+		}
+		roles, err := uc.IAM.ListAllRolesWithGrants(ctx, tx)
+		if err != nil {
+			return ErrDependency
+		}
+		if err := uc.checkInheritanceAuthority(ctx, actor, roles, role.Inherits); err != nil {
 			return err
 		}
 		c, err := uc.IAM.CreateRole(ctx, tx, role)
@@ -394,7 +470,7 @@ func (uc *IAMUsecase) CreateRole(ctx context.Context, actor ActorContext, role *
 			}
 		}
 		created = c
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		payload, _ := jsonx.Marshal(map[string]any{"role_id": c.ID, "code": c.Code})
@@ -409,8 +485,11 @@ func (uc *IAMUsecase) CreateRole(ctx context.Context, actor ActorContext, role *
 	return uc.IAM.GetRole(ctx, nil, created.ID)
 }
 
-func (uc *IAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, id int64, name, description string, maxMembers int64, expected uint64, reason string) (*Role, error) {
-	if err := uc.guard(ctx, actor, "iam.role.update", false); err != nil {
+func (uc *IAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, id int64, name, description string, maxMembers int64, expected uint64, reason string, expectedPolicy uint64) (*Role, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
+	if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
 		return nil, err
 	}
 	name = strings.TrimSpace(name)
@@ -419,6 +498,12 @@ func (uc *IAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, id int
 	}
 	var updated *Role
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
+			return err
+		}
 		r, err := uc.IAM.GetRole(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -432,7 +517,7 @@ func (uc *IAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, id int
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.role.update", r.Code, "{}", "{}", "{}", reason, "success")
@@ -443,7 +528,10 @@ func (uc *IAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, id int
 	return updated, nil
 }
 
-func (uc *IAMUsecase) CopyRole(ctx context.Context, actor ActorContext, id int64, code, name, reason string) (*Role, error) {
+func (uc *IAMUsecase) CopyRole(ctx context.Context, actor ActorContext, id int64, code, name, reason string, expected, expectedPolicy uint64) (*Role, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.role.create", true); err != nil {
 		return nil, err
 	}
@@ -451,22 +539,37 @@ func (uc *IAMUsecase) CopyRole(ctx context.Context, actor ActorContext, id int64
 	if err != nil {
 		return nil, ErrResourceNotFound
 	}
+	if expected == 0 || source.Revision != expected {
+		return nil, ConflictRevision(source.Revision)
+	}
+	if protectedRoot(source) {
+		return nil, ErrProtectedAccount
+	}
 	copyRole := &Role{
 		Code: code, Name: name, Description: source.Description,
 		Status: RoleStatusActive, Grants: source.Grants, Inherits: source.Inherits,
 	}
-	return uc.CreateRole(ctx, actor, copyRole, reason, 0)
+	return uc.CreateRole(ctx, actor, copyRole, reason, expectedPolicy)
 }
 
-func (uc *IAMUsecase) SetRoleStatus(ctx context.Context, actor ActorContext, id int64, status string, expected uint64, reason string) (*Role, error) {
+func (uc *IAMUsecase) SetRoleStatus(ctx context.Context, actor ActorContext, id int64, status string, expected uint64, reason string, expectedPolicy uint64) (*Role, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if status != RoleStatusActive && status != RoleStatusDisabled {
 		return nil, Validation("状态只能是 active 或 disabled")
 	}
-	if err := uc.guard(ctx, actor, "iam.role.update", false); err != nil {
+	if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
 		return nil, err
 	}
 	var updated *Role
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
+			return err
+		}
 		r, err := uc.IAM.GetRole(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -480,7 +583,7 @@ func (uc *IAMUsecase) SetRoleStatus(ctx context.Context, actor ActorContext, id 
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.role.status", r.Code, "{}", "{}", "{}", reason, "success")
@@ -491,12 +594,21 @@ func (uc *IAMUsecase) SetRoleStatus(ctx context.Context, actor ActorContext, id 
 	return updated, nil
 }
 
-func (uc *IAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string) (*Role, error) {
+func (uc *IAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string, expectedPolicy uint64) (*Role, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
 		return nil, err
 	}
 	var updated *Role
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
+			return err
+		}
 		r, err := uc.IAM.GetRole(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -510,7 +622,7 @@ func (uc *IAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, id in
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.role.archive", r.Code, "{}", "{}", "{}", reason, "success")
@@ -540,15 +652,30 @@ func (uc *IAMUsecase) RolePermissions(ctx context.Context, actor ActorContext, i
 }
 
 func (uc *IAMUsecase) PutRolePermissions(ctx context.Context, actor ActorContext, id int64, grants []Grant, expected, expectedPolicy uint64, reason string) ([]Grant, uint64, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, 0, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
 		return nil, 0, err
 	}
 	if err := validateGrants(ctx, uc.IAM, grants); err != nil {
 		return nil, 0, err
 	}
+	if err := uc.checkGrantAuthority(ctx, actor, grants); err != nil {
+		return nil, 0, err
+	}
 	var revision uint64
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
+			return err
+		}
+		if err := validateGrants(ctx, uc.IAM, grants); err != nil {
+			return err
+		}
+		if err := uc.checkGrantAuthority(ctx, actor, grants); err != nil {
 			return err
 		}
 		r, err := uc.IAM.GetRole(ctx, tx, id)
@@ -563,7 +690,7 @@ func (uc *IAMUsecase) PutRolePermissions(ctx context.Context, actor ActorContext
 			return err
 		}
 		revision = rev
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		payload, _ := jsonx.Marshal(map[string]any{"role_id": id, "grants": len(grants)})
@@ -590,12 +717,18 @@ func (uc *IAMUsecase) RoleInheritance(ctx context.Context, actor ActorContext, i
 }
 
 func (uc *IAMUsecase) PutRoleInheritance(ctx context.Context, actor ActorContext, id int64, inherits []int64, expected, expectedPolicy uint64, reason string) ([]int64, uint64, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, 0, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
 		return nil, 0, err
 	}
 	roles, err := uc.IAM.ListAllRolesWithGrants(ctx, nil)
 	if err != nil {
 		return nil, 0, ErrDependency
+	}
+	if err := uc.checkInheritanceAuthority(ctx, actor, roles, inherits); err != nil {
+		return nil, 0, err
 	}
 	edges := map[int64][]int64{}
 	for _, r := range roles {
@@ -615,6 +748,24 @@ func (uc *IAMUsecase) PutRoleInheritance(ctx context.Context, actor ActorContext
 		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
 			return err
 		}
+		if err := uc.guard(ctx, actor, "iam.role.update", true); err != nil {
+			return err
+		}
+		roles, err := uc.IAM.ListAllRolesWithGrants(ctx, tx)
+		if err != nil {
+			return ErrDependency
+		}
+		if err := uc.checkInheritanceAuthority(ctx, actor, roles, inherits); err != nil {
+			return err
+		}
+		edges := map[int64][]int64{}
+		for _, r := range roles {
+			edges[r.ID] = r.Inherits
+		}
+		edges[id] = inherits
+		if authorization.ValidateInheritance(edges) != nil {
+			return Validation("角色继承不能形成环")
+		}
 		r, err := uc.IAM.GetRole(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -627,7 +778,7 @@ func (uc *IAMUsecase) PutRoleInheritance(ctx context.Context, actor ActorContext
 			return err
 		}
 		revision = rev
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.role.inheritance.update", r.Code, "{}", "{}", "{}", reason, "success")
@@ -716,62 +867,53 @@ func (uc *IAMUsecase) UserAssignments(ctx context.Context, actor ActorContext, u
 }
 
 func (uc *IAMUsecase) CreateAssignment(ctx context.Context, actor ActorContext, a *Assignment, reason string, expectedPolicy uint64) (*Assignment, error) {
-	if err := uc.guard(ctx, actor, "iam.assignment.create", true); err != nil {
+	currentActor, actorErr := uc.currentIAMActor(ctx, actor)
+	if actorErr != nil {
+		return nil, actorErr
+	}
+	actor = currentActor
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
+	if _, err := uc.Authorize(ctx, actor, "iam.assignment.create", a.UserID, false); err != nil {
+		return nil, err
+	}
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return nil, err
 	}
 	if a.UserID <= 0 || a.RoleID <= 0 {
 		return nil, Validation("用户和角色不能为空")
 	}
-	if a.Boundary.Empty() {
-		a.Boundary = authorization.Scope{All: true}
+	var err error
+	a.Boundary, err = normalizeAssignmentScope(a.Boundary)
+	if err != nil {
+		return nil, err
 	}
-	if err := a.Boundary.Validate([]authorization.ScopeKind{authorization.All, authorization.Self, authorization.Users}); err != nil {
-		return nil, Validation("分配边界不合法")
+	now := uc.Clock.Now().UTC()
+	if a.StartsAt.IsZero() {
+		a.StartsAt = now
 	}
-	if !a.StartsAt.IsZero() && a.ExpiresAt != nil && !a.StartsAt.Before(*a.ExpiresAt) {
+	if a.ExpiresAt != nil && (!a.StartsAt.Before(*a.ExpiresAt) || !now.Before(*a.ExpiresAt)) {
 		return nil, Validation("有效期不合法")
 	}
-	if _, err := uc.Users.Get(ctx, nil, a.UserID); err != nil {
-		return nil, ErrUserNotFound
-	}
-	role, err := uc.IAM.GetRole(ctx, nil, a.RoleID)
-	if err != nil || role.Status != RoleStatusActive {
-		return nil, Validation("角色不可分配")
-	}
-	if err := uc.checkRoleCapacity(ctx, nil, role); err != nil {
-		return nil, err
-	}
-	if err := uc.checkDelegation(ctx, actor, a.UserID, a.RoleID, "assign", a.Boundary); err != nil {
-		return nil, err
-	}
-	constraints, err := uc.IAM.ListConstraints(ctx, nil)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	current, err := uc.IAM.ListAssignmentsForUser(ctx, nil, a.UserID)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	now := uc.Clock.Now()
-	var active []int64
-	for _, x := range current {
-		if x.Active(now) {
-			active = append(active, x.RoleID)
-		}
-	}
-	if a.StartsAt.IsZero() {
-		a.StartsAt = now.UTC()
-	}
-	if CheckConstraints(append(active, a.RoleID), constraints) != nil {
-		return nil, ErrRoleConstraint
-	}
-	a.Origin = OriginExplicit
-	a.AssignedBy = actor.User.ID
-	a.Revision = 1
-	a.CreatedAt = now
+	a.Origin, a.AssignedBy, a.Revision, a.CreatedAt = OriginExplicit, actor.User.ID, 1, now
 	var created *Assignment
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		currentActor, err := uc.currentIAMActor(ctx, actor)
+		if err != nil {
+			return err
+		}
+		actor = currentActor
+		if _, err := uc.Authorize(ctx, actor, "iam.assignment.create", a.UserID, false); err != nil {
+			return err
+		}
+		if err := uc.validateAssignment(ctx, tx, a); err != nil {
+			return err
+		}
+		if err := uc.checkDelegation(ctx, actor, a.UserID, a.RoleID, "assign", a.Boundary, a.StartsAt, a.ExpiresAt); err != nil {
 			return err
 		}
 		c, err := uc.IAM.CreateAssignment(ctx, tx, a)
@@ -779,7 +921,7 @@ func (uc *IAMUsecase) CreateAssignment(ctx context.Context, actor ActorContext, 
 			return err
 		}
 		created = c
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		payload, _ := jsonx.Marshal(map[string]any{"user_id": a.UserID, "role_id": a.RoleID})
@@ -788,10 +930,7 @@ func (uc *IAMUsecase) CreateAssignment(ctx context.Context, actor ActorContext, 
 		}
 		return uc.audit(ctx, tx, actor, "iam.assignment.create", fmt.Sprintf("%d/%d", a.UserID, a.RoleID), "{}", "{}", "{}", reason, "success")
 	})
-	if err != nil {
-		return nil, err
-	}
-	return created, nil
+	return created, err
 }
 
 func (uc *IAMUsecase) checkRoleCapacity(ctx context.Context, tx Tx, role *Role) error {
@@ -808,81 +947,107 @@ func (uc *IAMUsecase) checkRoleCapacity(ctx context.Context, tx Tx, role *Role) 
 	return nil
 }
 
-func (uc *IAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContext, id int64, reason string, expectedPolicy uint64) (*Assignment, error) {
-	if err := uc.guard(ctx, actor, "iam.assignment.revoke", true); err != nil {
+func (uc *IAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContext, id int64, reason string, expected, expectedPolicy uint64) (*Assignment, error) {
+	currentActor, actorErr := uc.currentIAMActor(ctx, actor)
+	if actorErr != nil {
+		return nil, actorErr
+	}
+	actor = currentActor
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
+	a, err := uc.IAM.GetAssignment(ctx, nil, id)
+	if err != nil {
+		return nil, ErrResourceNotFound
+	}
+	if _, err := uc.Authorize(ctx, actor, "iam.assignment.revoke", a.UserID, false); err != nil {
 		return nil, err
 	}
-	if a, err := uc.IAM.GetAssignment(ctx, nil, id); err == nil {
-		if err := uc.checkDelegation(ctx, actor, a.UserID, a.RoleID, "revoke", a.Boundary); err != nil {
-			return nil, err
-		}
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
+		return nil, err
 	}
 	var out *Assignment
-	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
 			return err
 		}
+		currentActor, err := uc.currentIAMActor(ctx, actor)
+		if err != nil {
+			return err
+		}
+		actor = currentActor
 		a, err := uc.IAM.GetAssignment(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
 		}
+		if expected == 0 || a.Revision != expected {
+			return ConflictRevision(a.Revision)
+		}
 		if a.Revoked {
 			return Validation("授权已撤销")
+		}
+		role, err := uc.IAM.GetRole(ctx, tx, a.RoleID)
+		if err != nil {
+			return err
+		}
+		if protectedRoot(role) {
+			return ErrProtectedAccount
+		}
+		if _, err := uc.Authorize(ctx, actor, "iam.assignment.revoke", a.UserID, false); err != nil {
+			return err
+		}
+		if err := uc.checkDelegation(ctx, actor, a.UserID, a.RoleID, "revoke", a.Boundary, a.StartsAt, a.ExpiresAt); err != nil {
+			return err
 		}
 		if err := uc.IAM.RevokeAssignment(ctx, tx, id, a.Revision, actor.User.ID); err != nil {
 			return err
 		}
-		a.Revoked = true
+		a.Revoked, a.Revision = true, a.Revision+1
 		out = a
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
+			return err
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"user_id": a.UserID, "role_id": a.RoleID})
+		if err := uc.emit(ctx, tx, "user", a.UserID, 0, "authorization.changed", string(payload)); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.assignment.revoke", fmt.Sprintf("%d/%d", a.UserID, a.RoleID), "{}", "{}", "{}", reason, "success")
 	})
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
+	return out, err
 }
 
 func (uc *IAMUsecase) PreviewBatch(ctx context.Context, actor ActorContext, userIDs []int64, roleID int64, boundary authorization.Scope, expires *time.Time) (*BatchPreview, error) {
-	if err := uc.guard(ctx, actor, "iam.assignment.create", false); err != nil {
-		return nil, err
+	currentActor, actorErr := uc.currentIAMActor(ctx, actor)
+	if actorErr != nil {
+		return nil, actorErr
 	}
+	actor = currentActor
 	if len(userIDs) == 0 || len(userIDs) > 100 {
 		return nil, Validation("每批必须为 1-100 个用户")
 	}
-	role, err := uc.IAM.GetRole(ctx, nil, roleID)
-	if err != nil || role.Status != RoleStatusActive {
-		return nil, Validation("角色不可分配")
-	}
-	constraints, err := uc.IAM.ListConstraints(ctx, nil)
+	boundary, err := normalizeAssignmentScope(boundary)
 	if err != nil {
-		return nil, ErrDependency
+		return nil, err
+	}
+	now := uc.Clock.Now().UTC()
+	if expires != nil && !now.Before(*expires) {
+		return nil, Validation("有效期不合法")
 	}
 	out := &BatchPreview{}
+	seen := map[int64]bool{}
 	for _, uid := range userIDs {
-		if _, err := uc.Users.Get(ctx, nil, uid); err != nil {
-			out.Failures = append(out.Failures, BatchFailure{UserID: uid, Reason: "用户不存在"})
-			continue
+		if uid <= 0 || seen[uid] {
+			return nil, Validation("批量用户必须有效且不能重复")
 		}
-		current, err := uc.IAM.ListAssignmentsForUser(ctx, nil, uid)
-		if err != nil {
-			out.Failures = append(out.Failures, BatchFailure{UserID: uid, Reason: "读取现有授权失败"})
-			continue
+		seen[uid] = true
+		if _, err := uc.Authorize(ctx, actor, "iam.assignment.create", uid, false); err != nil {
+			return nil, err
 		}
-		var active []int64
-		for _, a := range current {
-			if a.Active(uc.Clock.Now()) && !a.Revoked {
-				active = append(active, a.RoleID)
-			}
+		if err := uc.checkDelegation(ctx, actor, uid, roleID, "assign", boundary, now, expires); err != nil {
+			return nil, err
 		}
-		if slices.Contains(active, roleID) {
-			out.Failures = append(out.Failures, BatchFailure{UserID: uid, Reason: "已拥有该角色"})
-			continue
-		}
-		if CheckConstraints(append(active, roleID), constraints) != nil {
-			out.Failures = append(out.Failures, BatchFailure{UserID: uid, Reason: "角色约束冲突"})
+		if err := uc.validateAssignment(ctx, nil, &Assignment{UserID: uid, RoleID: roleID, Boundary: boundary, StartsAt: now, ExpiresAt: expires}); err != nil {
+			out.Failures = append(out.Failures, BatchFailure{UserID: uid, Reason: err.Error()})
 			continue
 		}
 		out.Eligible = append(out.Eligible, uid)
@@ -891,6 +1056,17 @@ func (uc *IAMUsecase) PreviewBatch(ctx context.Context, actor ActorContext, user
 }
 
 func (uc *IAMUsecase) BatchAssign(ctx context.Context, actor ActorContext, userIDs []int64, roleID int64, boundary authorization.Scope, starts time.Time, expires *time.Time, reason string, expectedPolicy uint64) ([]*Assignment, error) {
+	currentActor, actorErr := uc.currentIAMActor(ctx, actor)
+	if actorErr != nil {
+		return nil, actorErr
+	}
+	actor = currentActor
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
+	if err := uc.RequireStepUp(ctx, actor); err != nil {
+		return nil, err
+	}
 	preview, err := uc.PreviewBatch(ctx, actor, userIDs, roleID, boundary, expires)
 	if err != nil {
 		return nil, err
@@ -898,32 +1074,49 @@ func (uc *IAMUsecase) BatchAssign(ctx context.Context, actor ActorContext, userI
 	if len(preview.Failures) > 0 {
 		return nil, Validation(fmt.Sprintf("批量授权预检失败 %d 项，请先处理", len(preview.Failures)))
 	}
-	for _, uid := range preview.Eligible {
-		if err := uc.checkDelegation(ctx, actor, uid, roleID, "assign", boundary); err != nil {
-			return nil, err
-		}
+	boundary, err = normalizeAssignmentScope(boundary)
+	if err != nil {
+		return nil, err
+	}
+	now := uc.Clock.Now().UTC()
+	if starts.IsZero() {
+		starts = now
+	}
+	if expires != nil && !starts.Before(*expires) {
+		return nil, Validation("有效期不合法")
 	}
 	var created []*Assignment
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
 			return err
 		}
-		now := uc.Clock.Now().UTC()
-		if starts.IsZero() {
-			starts = now
+		currentActor, err := uc.currentIAMActor(ctx, actor)
+		if err != nil {
+			return err
 		}
+		actor = currentActor
 		for _, uid := range preview.Eligible {
-			a, err := uc.IAM.CreateAssignment(ctx, tx, &Assignment{
-				UserID: uid, RoleID: roleID, Boundary: boundary,
-				StartsAt: starts, ExpiresAt: expires, Origin: OriginExplicit,
-				Revision: 1, AssignedBy: actor.User.ID, CreatedAt: now,
-			})
+			if _, err := uc.Authorize(ctx, actor, "iam.assignment.create", uid, false); err != nil {
+				return err
+			}
+			if err := uc.checkDelegation(ctx, actor, uid, roleID, "assign", boundary, starts, expires); err != nil {
+				return err
+			}
+			a := &Assignment{UserID: uid, RoleID: roleID, Boundary: boundary, StartsAt: starts, ExpiresAt: expires, Origin: OriginExplicit, Revision: 1, AssignedBy: actor.User.ID, CreatedAt: now}
+			if err := uc.validateAssignment(ctx, tx, a); err != nil {
+				return err
+			}
+			c, err := uc.IAM.CreateAssignment(ctx, tx, a)
 			if err != nil {
 				return err
 			}
-			created = append(created, a)
+			created = append(created, c)
+			payload, _ := jsonx.Marshal(map[string]any{"user_id": uid, "role_id": roleID})
+			if err := uc.emit(ctx, tx, "user", uid, 0, "authorization.changed", string(payload)); err != nil {
+				return err
+			}
 		}
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.assignment.batch_create", fmt.Sprintf("role:%d", roleID), "{}", "{}", string(mustJSON(map[string]int{"count": len(created)})), reason, "success")
@@ -962,6 +1155,9 @@ func validateConstraint(c *Constraint) error {
 }
 
 func (uc *IAMUsecase) CreateConstraint(ctx context.Context, actor ActorContext, c *Constraint, reason string, expectedPolicy uint64) (*Constraint, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.constraint.update", true); err != nil {
 		return nil, err
 	}
@@ -986,12 +1182,29 @@ func (uc *IAMUsecase) CreateConstraint(ctx context.Context, actor ActorContext, 
 		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
 			return err
 		}
+		if err := uc.guard(ctx, actor, "iam.constraint.update", true); err != nil {
+			return err
+		}
+		seen := map[int64]bool{}
+		for _, id := range c.RoleIDs {
+			if id <= 0 || seen[id] {
+				return Validation("约束角色必须有效且不能重复")
+			}
+			seen[id] = true
+			role, err := uc.IAM.GetRole(ctx, tx, id)
+			if err != nil {
+				return Validation("约束包含未知角色")
+			}
+			if protectedRoot(role) {
+				return ErrProtectedAccount
+			}
+		}
 		created0, err := uc.IAM.CreateConstraint(ctx, tx, c)
 		if err != nil {
 			return err
 		}
 		created = created0
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.constraint.create", c.Name, "{}", "{}", "{}", reason, "success")
@@ -1002,21 +1215,49 @@ func (uc *IAMUsecase) CreateConstraint(ctx context.Context, actor ActorContext, 
 	return created, nil
 }
 
-func (uc *IAMUsecase) UpdateConstraint(ctx context.Context, actor ActorContext, c *Constraint, expected uint64, reason string) (*Constraint, error) {
-	if err := uc.guard(ctx, actor, "iam.constraint.update", false); err != nil {
-		return nil, err
+func (uc *IAMUsecase) UpdateConstraint(ctx context.Context, actor ActorContext, c *Constraint, expected uint64, reason string, expectedPolicy uint64) (*Constraint, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
 	}
-	if err := validateConstraint(c); err != nil {
+	if err := uc.guard(ctx, actor, "iam.constraint.update", true); err != nil {
 		return nil, err
 	}
 	var updated *Constraint
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.constraint.update", true); err != nil {
+			return err
+		}
+		existing, err := uc.IAM.GetConstraint(ctx, tx, c.ID)
+		if err != nil {
+			return ErrResourceNotFound
+		}
+		c.Kind = existing.Kind
+		if err := validateConstraint(c); err != nil {
+			return err
+		}
+		seen := map[int64]bool{}
+		for _, id := range c.RoleIDs {
+			if id <= 0 || seen[id] {
+				return Validation("约束角色必须有效且不能重复")
+			}
+			seen[id] = true
+			role, err := uc.IAM.GetRole(ctx, tx, id)
+			if err != nil {
+				return Validation("约束包含未知角色")
+			}
+			if protectedRoot(role) {
+				return ErrProtectedAccount
+			}
+		}
 		u, err := uc.IAM.UpdateConstraint(ctx, tx, c, expected)
 		if err != nil {
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.constraint.update", c.Name, "{}", "{}", "{}", reason, "success")
@@ -1027,15 +1268,31 @@ func (uc *IAMUsecase) UpdateConstraint(ctx context.Context, actor ActorContext, 
 	return updated, nil
 }
 
-func (uc *IAMUsecase) DeleteConstraint(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string) error {
+func (uc *IAMUsecase) DeleteConstraint(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string, expectedPolicy uint64) error {
+	if strings.TrimSpace(reason) == "" {
+		return Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.constraint.update", true); err != nil {
 		return err
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.constraint.update", true); err != nil {
+			return err
+		}
+		current, err := uc.IAM.GetConstraint(ctx, tx, id)
+		if err != nil {
+			return ErrResourceNotFound
+		}
+		if expected == 0 || current.Revision != expected {
+			return ConflictRevision(current.Revision)
+		}
 		if err := uc.IAM.DeleteConstraint(ctx, tx, id); err != nil {
 			return ErrResourceNotFound
 		}
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.constraint.delete", itoa(id), "{}", "{}", "{}", reason, "success")
@@ -1055,10 +1312,16 @@ func validateMenu(m *MenuItem) error {
 	if m.RouteKey == "" || m.Name == "" {
 		return Validation("菜单路由和名称不能为空")
 	}
+	if !slices.Contains([]string{"account", "account/security", "account/sessions", "account/roles", "account/activity", "admin", "admin/users", "admin/iam/roles", "admin/iam/permissions", "admin/iam/assignments", "admin/iam/delegations", "admin/iam/constraints", "admin/iam/menus", "admin/iam/explain", "admin/audits", "admin/exports", "admin/integrations", "admin/settings/auth", "admin/settings/email"}, m.RouteKey) {
+		return Validation("不支持的菜单路由")
+	}
 	return nil
 }
 
-func (uc *IAMUsecase) CreateMenu(ctx context.Context, actor ActorContext, m *MenuItem, reason string) (*MenuItem, error) {
+func (uc *IAMUsecase) CreateMenu(ctx context.Context, actor ActorContext, m *MenuItem, reason string, expectedPolicy uint64) (*MenuItem, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.menu.update", false); err != nil {
 		return nil, err
 	}
@@ -1067,12 +1330,28 @@ func (uc *IAMUsecase) CreateMenu(ctx context.Context, actor ActorContext, m *Men
 	}
 	var created *MenuItem
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.menu.update", false); err != nil {
+			return err
+		}
+		for _, code := range append(slices.Clone(m.RequiredAll), m.RequiredAny...) {
+			if _, err := uc.IAM.GetPermissionByCode(ctx, tx, code); err != nil {
+				return Validation("菜单包含未知权限")
+			}
+		}
+		if m.ParentID > 0 {
+			if _, err := uc.IAM.GetMenu(ctx, tx, m.ParentID); err != nil {
+				return Validation("父菜单不存在")
+			}
+		}
 		c, err := uc.IAM.CreateMenu(ctx, tx, m)
 		if err != nil {
 			return err
 		}
 		created = c
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.menu.create", m.RouteKey, "{}", "{}", "{}", reason, "success")
@@ -1083,21 +1362,40 @@ func (uc *IAMUsecase) CreateMenu(ctx context.Context, actor ActorContext, m *Men
 	return created, nil
 }
 
-func (uc *IAMUsecase) UpdateMenu(ctx context.Context, actor ActorContext, m *MenuItem, expected uint64, reason string) (*MenuItem, error) {
-	if err := uc.guard(ctx, actor, "iam.menu.update", false); err != nil {
-		return nil, err
+func (uc *IAMUsecase) UpdateMenu(ctx context.Context, actor ActorContext, m *MenuItem, expected uint64, reason string, expectedPolicy uint64) (*MenuItem, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
 	}
-	if err := validateMenu(m); err != nil {
+	if err := uc.guard(ctx, actor, "iam.menu.update", false); err != nil {
 		return nil, err
 	}
 	var updated *MenuItem
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.menu.update", false); err != nil {
+			return err
+		}
+		existing, err := uc.IAM.GetMenu(ctx, tx, m.ID)
+		if err != nil {
+			return ErrResourceNotFound
+		}
+		m.RouteKey = existing.RouteKey
+		if err := validateMenu(m); err != nil {
+			return err
+		}
+		for _, code := range append(slices.Clone(m.RequiredAll), m.RequiredAny...) {
+			if _, err := uc.IAM.GetPermissionByCode(ctx, tx, code); err != nil {
+				return Validation("菜单包含未知权限")
+			}
+		}
 		u, err := uc.IAM.UpdateMenu(ctx, tx, m, expected)
 		if err != nil {
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.menu.update", m.RouteKey, "{}", "{}", "{}", reason, "success")
@@ -1108,12 +1406,21 @@ func (uc *IAMUsecase) UpdateMenu(ctx context.Context, actor ActorContext, m *Men
 	return updated, nil
 }
 
-func (uc *IAMUsecase) ArchiveMenu(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string) (*MenuItem, error) {
+func (uc *IAMUsecase) ArchiveMenu(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string, expectedPolicy uint64) (*MenuItem, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.menu.update", false); err != nil {
 		return nil, err
 	}
 	var updated *MenuItem
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.menu.update", false); err != nil {
+			return err
+		}
 		m, err := uc.IAM.GetMenu(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -1124,7 +1431,7 @@ func (uc *IAMUsecase) ArchiveMenu(ctx context.Context, actor ActorContext, id in
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.menu.archive", m.RouteKey, "{}", "{}", "{}", reason, "success")
@@ -1159,8 +1466,9 @@ func (uc *IAMUsecase) Explain(ctx context.Context, actor ActorContext, userID in
 	}
 	owner := userID
 	if ownerUserID != "" {
-		if id, err := ParseID(ownerUserID, "owner_user_id"); err == nil {
-			owner = id
+		owner, err = ParseID(ownerUserID, "owner_user_id")
+		if err != nil {
+			return nil, err
 		}
 	}
 	_ = resourceID
@@ -1191,78 +1499,90 @@ func (uc *IAMUsecase) Simulate(ctx context.Context, actor ActorContext, userID i
 	if err != nil {
 		return nil, ErrDependency
 	}
-	assignments, _ := uc.IAM.ListAssignmentsForUser(ctx, nil, userID)
 	now := uc.Clock.Now()
-	var current []int64
-	for _, a := range assignments {
-		if a.Active(now) {
-			current = append(current, a.RoleID)
-		}
-	}
-	after := current
-	for _, id := range addRoleIDs {
-		if !slices.Contains(after, id) {
-			after = append(after, id)
-		}
-	}
-	for _, id := range removeRoleIDs {
-		filtered := after[:0]
-		for _, x := range after {
-			if x != id {
-				filtered = append(filtered, x)
-			}
-		}
-		after = filtered
-	}
 	owner := userID
 	if ownerUserID != "" {
-		if id, err := ParseID(ownerUserID, "owner_user_id"); err == nil {
-			owner = id
-		}
-	}
-	evaluate := func(roleIDs []int64) (map[string]bool, error) {
-		facts, err := uc.LoadAuthzFacts(ctx, userID, roleIDs)
+		owner, err = ParseID(ownerUserID, "owner_user_id")
 		if err != nil {
 			return nil, err
 		}
+	}
+	for _, id := range append(slices.Clone(addRoleIDs), removeRoleIDs...) {
+		if base.Roles[id] == nil {
+			return nil, Validation("模拟包含未知角色")
+		}
+	}
+	for _, id := range addRoleIDs {
+		if base.Roles[id].Status != RoleStatusActive {
+			return nil, Validation("模拟不能新增已停用角色")
+		}
+		if slices.Contains(removeRoleIDs, id) {
+			return nil, Validation("不能同时新增和移除同一角色")
+		}
+	}
+	beforeAssignments := slices.Clone(base.Assignments)
+	afterAssignments := []*Assignment{}
+	assigned := map[int64]bool{}
+	for _, assignment := range beforeAssignments {
+		if slices.Contains(removeRoleIDs, assignment.RoleID) {
+			continue
+		}
+		afterAssignments = append(afterAssignments, assignment)
+		if assignment.Active(now) {
+			assigned[assignment.RoleID] = true
+		}
+	}
+	for _, id := range addRoleIDs {
+		if !assigned[id] {
+			afterAssignments = append(afterAssignments, &Assignment{UserID: userID, RoleID: id, Boundary: authorization.Scope{All: true}, StartsAt: now})
+		}
+	}
+	permissions, err := uc.IAM.ListPermissions(ctx, nil, PermissionFilter{Status: PermissionStatusActive})
+	if err != nil {
+		return nil, ErrDependency
+	}
+	evaluate := func(assignments []*Assignment) (map[string]bool, authorization.Decision, error) {
+		facts := *base
+		facts.Assignments, facts.ActiveRoleIDs = assignments, []int64{}
+		for _, assignment := range assignments {
+			if assignment.Active(now) && !slices.Contains(facts.ActiveRoleIDs, assignment.RoleID) {
+				facts.ActiveRoleIDs = append(facts.ActiveRoleIDs, assignment.RoleID)
+			}
+		}
+		if err := facts.resolveSources(now); err != nil {
+			return nil, authorization.Decision{}, err
+		}
 		actorCtx := ActorContext{
-			User: user, Session: &Session{ID: "simulate", UserID: userID, ActiveRoleIDs: roleIDs, ExpiresAt: now.Add(time.Hour), IdleExpiresAt: now.Add(time.Hour)},
+			User: user, Session: &Session{ID: "simulate", UserID: userID, ActiveRoleIDs: facts.ActiveRoleIDs, ExpiresAt: now.Add(time.Hour), IdleExpiresAt: now.Add(time.Hour)},
 			Actor: authorization.Actor{UserID: userID, SessionID: "simulate", ExpiresAt: now.Add(time.Hour)},
 		}
-		permissions, _ := uc.IAM.ListPermissions(ctx, nil, PermissionFilter{Status: PermissionStatusActive})
+		requested, err := uc.decideWithFacts(ctx, &facts, actorCtx, operation, owner, false)
+		if err != nil {
+			return nil, authorization.Decision{}, err
+		}
 		out := map[string]bool{}
-		for _, p := range permissions {
-			if p.Binding != BindingBound {
+		for _, permission := range permissions {
+			if permission.Binding != BindingBound {
 				continue
 			}
-			d, err := uc.decideWithFacts(ctx, facts, actorCtx, p.Code, owner, false)
+			decision, err := uc.decideWithFacts(ctx, &facts, actorCtx, permission.Code, owner, false)
 			if err != nil {
-				return nil, err
+				return nil, authorization.Decision{}, err
 			}
-			out[p.Code] = d.Allowed
+			out[permission.Code] = decision.Allowed
 		}
-		return out, nil
+		return out, requested, nil
 	}
-	before, err := evaluate(current)
+	before, beforeDecision, err := evaluate(beforeAssignments)
 	if err != nil {
 		return nil, ErrDependency
 	}
-	afterPerms, err := evaluate(after)
+	after, afterDecision, err := evaluate(afterAssignments)
 	if err != nil {
 		return nil, ErrDependency
 	}
-	out := &SimulateResult{BeforeAllowed: before[operation], AfterAllowed: afterPerms[operation]}
-	if before[operation] {
-		out.BeforeReason = "ALLOWED"
-	} else {
-		out.BeforeReason = "DENIED"
-	}
-	if afterPerms[operation] {
-		out.AfterReason = "ALLOWED"
-	} else {
-		out.AfterReason = "DENIED"
-	}
-	for op, allowed := range afterPerms {
+	out := &SimulateResult{BeforeAllowed: beforeDecision.Allowed, AfterAllowed: afterDecision.Allowed, BeforeReason: beforeDecision.Reason, AfterReason: afterDecision.Reason}
+	for op, allowed := range after {
 		if allowed && !before[op] {
 			out.Added = append(out.Added, op)
 		}
@@ -1272,7 +1592,6 @@ func (uc *IAMUsecase) Simulate(ctx context.Context, actor ActorContext, userID i
 	}
 	slices.Sort(out.Added)
 	slices.Sort(out.Removed)
-	_ = base
 	return out, nil
 }
 
@@ -1319,6 +1638,9 @@ func validateDelegation(d *Delegation) error {
 	if d.TargetKind != "role" {
 		return Validation("V1 只支持角色委派")
 	}
+	if d.CanRedelegate {
+		return Validation("V1 不支持继续委派")
+	}
 	if len(d.Actions) == 0 {
 		return Validation("委派动作不能为空")
 	}
@@ -1343,6 +1665,9 @@ func validateDelegation(d *Delegation) error {
 }
 
 func (uc *IAMUsecase) CreateDelegation(ctx context.Context, actor ActorContext, d *Delegation, reason string, expectedPolicy uint64) (*Delegation, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
 		return nil, err
 	}
@@ -1372,7 +1697,13 @@ func (uc *IAMUsecase) CreateDelegation(ctx context.Context, actor ActorContext, 
 	if target == nil || target.Status != RoleStatusActive {
 		return nil, Validation("目标角色不可用")
 	}
+	if protectedRoot(target) {
+		return nil, ErrProtectedAccount
+	}
 	for _, c := range d.GrantCeiling {
+		if err := uc.checkGrantAuthority(ctx, actor, []Grant{{Operation: c.Operation, Effect: authorization.Allow, Scope: c.Scope}}); err != nil {
+			return nil, err
+		}
 		p := permByCode[c.Operation]
 		if p == nil {
 			return nil, Validation("委派上限包含未知权限: " + c.Operation)
@@ -1387,12 +1718,15 @@ func (uc *IAMUsecase) CreateDelegation(ctx context.Context, actor ActorContext, 
 		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
 			return err
 		}
+		if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
+			return err
+		}
 		c, err := uc.IAM.CreateDelegation(ctx, tx, d)
 		if err != nil {
 			return err
 		}
 		created = c
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.delegation.create", itoa(c.ID), "{}", "{}", "{}", reason, "success")
@@ -1403,21 +1737,38 @@ func (uc *IAMUsecase) CreateDelegation(ctx context.Context, actor ActorContext, 
 	return created, nil
 }
 
-func (uc *IAMUsecase) UpdateDelegation(ctx context.Context, actor ActorContext, d *Delegation, expected uint64, reason string) (*Delegation, error) {
+func (uc *IAMUsecase) UpdateDelegation(ctx context.Context, actor ActorContext, d *Delegation, expected uint64, reason string, expectedPolicy uint64) (*Delegation, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
 		return nil, err
 	}
 	if err := validateDelegation(d); err != nil {
 		return nil, err
 	}
+	for _, c := range d.GrantCeiling {
+		if err := validateGrants(ctx, uc.IAM, []Grant{{Operation: c.Operation, Effect: authorization.Allow, Scope: c.Scope}}); err != nil {
+			return nil, err
+		}
+		if err := uc.checkGrantAuthority(ctx, actor, []Grant{{Operation: c.Operation, Effect: authorization.Allow, Scope: c.Scope}}); err != nil {
+			return nil, err
+		}
+	}
 	var updated *Delegation
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
+			return err
+		}
 		u, err := uc.IAM.UpdateDelegation(ctx, tx, d, expected)
 		if err != nil {
 			return err
 		}
 		updated = u
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.delegation.update", itoa(d.ID), "{}", "{}", "{}", reason, "success")
@@ -1428,12 +1779,21 @@ func (uc *IAMUsecase) UpdateDelegation(ctx context.Context, actor ActorContext, 
 	return updated, nil
 }
 
-func (uc *IAMUsecase) RevokeDelegation(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string) (*Delegation, error) {
+func (uc *IAMUsecase) RevokeDelegation(ctx context.Context, actor ActorContext, id int64, expected uint64, reason string, expectedPolicy uint64) (*Delegation, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, Validation("reason 不能为空")
+	}
 	if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
 		return nil, err
 	}
 	var out *Delegation
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if _, err := uc.policyGuard(ctx, tx, expectedPolicy); err != nil {
+			return err
+		}
+		if err := uc.guard(ctx, actor, "iam.delegation.update", true); err != nil {
+			return err
+		}
 		d, err := uc.IAM.GetDelegation(ctx, tx, id)
 		if err != nil {
 			return ErrResourceNotFound
@@ -1447,7 +1807,7 @@ func (uc *IAMUsecase) RevokeDelegation(ctx context.Context, actor ActorContext, 
 		d.RevokedAt = ptrTime(uc.Clock.Now().UTC())
 		d.Revision = expected + 1
 		out = d
-		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+		if err := uc.bumpPolicy(ctx, tx); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "iam.delegation.revoke", itoa(id), "{}", "{}", "{}", reason, "success")
