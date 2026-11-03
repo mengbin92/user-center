@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -365,11 +366,12 @@ func (uc *IntegrationAdminUsecase) deliver(ctx context.Context, d *Delivery) err
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-UserCenter-Event", d.EventType)
 	secret := os.Getenv("OUTBOX_SIGNING_SECRET")
-	if secret != "" {
-		mac := hmac.New(sha256.New, []byte(secret))
-		mac.Write(body)
-		req.Header.Set("X-UserCenter-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
+	if secret == "" {
+		return errors.New("outbox signing secret is not configured")
 	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	req.Header.Set("X-UserCenter-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
 	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := client.Do(req)
 	if err != nil {

@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-03
+
+Security-review and verification follow-up to 0.2.0.
+
 ### Security
 
 - Enforce actor-aware scopes, root protection, delegation ceilings, atomic
@@ -16,6 +20,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   remove the static integration-token bypass, and harden mail and startup secrets.
 - Isolate frontend sessions and cached authorization; keep legacy governance
   roles pending until explicitly reassigned with a verified boundary.
+- Refuse unsigned Outbox webhook delivery when `OUTBOX_SIGNING_SECRET` is absent.
 
 ### Changed
 
@@ -23,8 +28,18 @@ adheres to [Semantic Versioning](https://semver.org/).
   types and management preconditions together.
 - Add OAuth-only identity re-verification and explicit offline root MFA rescue.
 - Recover Outbox leases and historical backlog; fix Docker command overrides.
+- Save the first email settings row with a deterministic revision instead of a
+  false `REVISION_CONFLICT`.
 - Record findings, compatibility changes and validation in
   [the review report](docs/code-review-2026-11-03.md).
+
+### Added
+
+- Adapter tests against local fake GitHub/Google OAuth servers and a local fake
+  SMTP server.
+- Docker image build plus container smoke test for native and linux/amd64
+  targets; CI container job.
+- Release notes for v0.2.1.
 
 ## [0.2.0] - 2026-11-02
 
