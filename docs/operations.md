@@ -16,6 +16,9 @@
 | `OUTBOX_SIGNING_SECRET` | Outbox Webhook HMAC-SHA256 签名密钥；启用订阅时必须配置独立的至少 32 字节随机密钥 |
 | `OAUTH_GITHUB_CLIENT_ID/SECRET` | GitHub 登录；两者都设置才启用 |
 | `OAUTH_GOOGLE_CLIENT_ID/SECRET` | Google 登录；两者都设置才启用 |
+
+SMTP 支持 465 implicit TLS 与 587 STARTTLS；真实 QQ 邮箱验收步骤见
+[SMTP 验收记录](acceptance-smtp-2026-11-03.md)。
 | `COOKIE_SECURE` | 生产 `true` |
 | `COOKIE_DOMAIN` | 门户域名；留空表示 host-only |
 | `PUBLIC_BASE_URL` | 邮件链接基址 |

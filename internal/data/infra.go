@@ -333,7 +333,15 @@ func (m *mailSender) Send(ctx context.Context, to, subject, body string) error {
 func sendSMTP(ctx context.Context, addr, host string, auth smtp.Auth, from, to string, msg []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+	var conn net.Conn
+	var err error
+	_, port, _ := net.SplitHostPort(addr)
+	if port == "465" {
+		dialer := &tls.Dialer{NetDialer: &net.Dialer{}, Config: &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}}
+		conn, err = dialer.DialContext(ctx, "tcp", addr)
+	} else {
+		conn, err = (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+	}
 	if err != nil {
 		return err
 	}
@@ -350,9 +358,11 @@ func sendSMTP(ctx context.Context, addr, host string, auth smtp.Auth, from, to s
 		return err
 	}
 	defer client.Close()
-	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
-			return err
+	if port != "465" {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
+				return err
+			}
 		}
 	}
 	if auth != nil {

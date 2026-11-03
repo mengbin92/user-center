@@ -155,7 +155,7 @@ scripts/                  开发与检查脚本
 **仍延后（V2 或需要外部环境）**：
 
 - 组织/多租户、WebAuthn/Passkey、SCIM、标准 OIDC Provider（设计文档中均属 V2）；
-- OAuth 真实提供方沙箱验收、生产 SMTP 送达验收：代码与 mock 测试已就绪，需配置真实凭据后执行；
+- OAuth 真实提供方沙箱验收：代码与本地 fake provider 测试已就绪，需配置真实凭据后执行；QQ 邮箱 SMTP 已完成真实发信与 IMAP 送达验收（[记录](docs/acceptance-smtp-2026-11-03.md)）；
 - 委派目前约束“分配/撤销角色”的目标角色、用户范围与动作；角色 Grant/继承的变更仍要求直接权限，不允许通过委派修改策略本身；
 - 原 `micro-one-api` 的 BFF 兼容层与适配器不在本仓库内，接入契约见 `docs/migration.md`；
 - OpenAPI 未描述 Cookie/CSRF 安全方案与原始 OAuth/CSV 下载路由；这些在 `docs/api.md` 中约定；
@@ -175,6 +175,7 @@ cd web && npm run build # tsc + vite 构建
 - `internal/data`：唯一约束、revision CAS、会话哈希/撤销、目录种子幂等、legacy 导入、GitHub/Google 适配器（本地 fake provider）、SMTP（本地 fake server）。
 - `internal/server`：未登录 401、缺失 CSRF 403、登录、受限管理员越权 403、并发更新 409、导出下载、MFA 完整登录、注册/重置/改密、管理员邮箱变更、OAuth 绑定/登录/OAuth+MFA、委派、接入客户端与 Outbox 投递、MFA 强制与首次改密拦截。
 - `docker build` / `docker buildx --platform linux/amd64`：镜像内迁移、健康检查与 SPA 均已验证。
+- 真实 SMTP：QQ 邮箱 587/STARTTLS 发信并在收件箱确认（opt-in `TestLiveSMTP`）。
 
 ## 部署
 
