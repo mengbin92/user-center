@@ -34,6 +34,7 @@
 | 第三方登录 | 单次 state（Redis + HttpOnly Cookie）、服务端 code 交换、不按邮箱自动合并、已启用 MFA 时仍要求第二因素 |
 | 接入客户端 | 凭据只存 SHA-256、一次性展示、按 gRPC 方法白名单校验、可轮换/停用 |
 | Webhook | HMAC-SHA256 原始 body、至少一次投递、重试退避、消费端按 event_id 去重 |
+| OIDC Provider | 授权码一次性消费、PKCE S256、redirect_uri 精确匹配、RS256、短时 access/refresh token、客户端密钥摘要 |
 | 审计缺失 | 敏感写与业务事务同提交写审计；安全事件独立表 |
 | 密钥泄露 | 环境变量注入；AES-GCM 加密 TOTP；日志不打印凭据 |
 | 开放重定向 | OAuth 回调只重定向到固定的前端路径；state 单次有效并绑定 HttpOnly Cookie |
@@ -62,7 +63,8 @@
 5. **无组织/多租户**：仅 platform 授权域，组织相关输入会被拒绝（V2）。
 6. **同步导出**：单次最多 100000 行，生成期间占用请求；超大导出需异步任务。
 7. **管理员邮箱变更依赖新邮箱可达**：验证码发送到新邮箱，管理员权限 + Step-up 防止误操作，但无法证明旧邮箱归属；需要旧邮箱确认的场景应走用户自助流程。
-8. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。
+8. **OIDC consent/end-session 尚未提供**：V2.1 对管理员注册的客户端自动同意，discovery 不宣告 end_session；交互式 consent 与 RP-initiated logout 计划在 V2.2。
+9. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。
 
 ## 5. 上线检查
 

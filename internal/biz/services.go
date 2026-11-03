@@ -23,6 +23,12 @@ type Services struct {
 	IAM                IAMRepo
 	Outbox             OutboxRepo
 	IntegrationClients IntegrationClientRepo
+	OIDCClients        OIDCClientRepo
+	OIDCCodes          OIDCCodeRepo
+	OIDCSigner         OIDCSigner
+	OIDCIssuer         string
+	OIDCAccessTTL      time.Duration
+	OIDCRefreshTTL     time.Duration
 	Settings           SettingsRepo
 	Exports            ExportRepo
 	Tx                 TxManager
@@ -66,6 +72,9 @@ func NewIntegrationAdminUsecase(s *Services) *IntegrationAdminUsecase {
 }
 
 type RuntimeConfig struct {
+	OIDCIssuer       string
+	OIDCAccessTTL    time.Duration
+	OIDCRefreshTTL   time.Duration
 	SessionTTL       time.Duration
 	IdleTimeout      time.Duration
 	StepUpTTL        time.Duration
@@ -85,15 +94,18 @@ func NewServices(
 	mfa MFARepo, sessions SessionRepo, events SecurityEventRepo, flows FlowCompletionRepo,
 	challenges ChallengeStore, limiter RateLimiter, stepUp StepUpStore, mail MailSender,
 	audit AuditRepo, policy PolicyRepo, iam IAMRepo, outbox OutboxRepo,
-	settings SettingsRepo, exports ExportRepo, integrationClients IntegrationClientRepo, tx TxManager,
-	clock Clock, ids IDGenerator, secrets SecretBox, oauth map[string]OAuthProvider, cfg *RuntimeConfig,
+	settings SettingsRepo, exports ExportRepo, integrationClients IntegrationClientRepo,
+	oidcClients OIDCClientRepo, oidcCodes OIDCCodeRepo, oidcSigner OIDCSigner,
+	tx TxManager, clock Clock, ids IDGenerator, secrets SecretBox,
+	oauth map[string]OAuthProvider, cfg *RuntimeConfig,
 ) *Services {
 	s := &Services{
 		Users: users, Credentials: credentials, Identities: identities, MFA: mfa,
 		Sessions: sessions, Events: events, Flows: flows, Challenges: challenges,
 		Limiter: limiter, StepUp: stepUp, Mail: mail, Audit: audit, Policy: policy,
 		IAM: iam, Outbox: outbox, Settings: settings, Exports: exports,
-		IntegrationClients: integrationClients, Tx: tx,
+		IntegrationClients: integrationClients, OIDCClients: oidcClients,
+		OIDCCodes: oidcCodes, OIDCSigner: oidcSigner, Tx: tx,
 		Clock: clock, IDs: ids, Secrets: secrets, OAuth: oauth,
 		SessionTTL: 12 * time.Hour, IdleTimeout: time.Hour, StepUpTTL: 5 * time.Minute,
 		ChallengeTTL: 10 * time.Minute, ResetTTL: 30 * time.Minute,
@@ -130,6 +142,13 @@ func NewServices(
 		}
 		if cfg.MaxLoginAttempts > 0 {
 			s.MaxLoginAttempts = cfg.MaxLoginAttempts
+		}
+		s.OIDCIssuer = cfg.OIDCIssuer
+		if cfg.OIDCAccessTTL > 0 {
+			s.OIDCAccessTTL = cfg.OIDCAccessTTL
+		}
+		if cfg.OIDCRefreshTTL > 0 {
+			s.OIDCRefreshTTL = cfg.OIDCRefreshTTL
 		}
 	}
 	return s

@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  AppWindow,
   BookOpenCheck,
   ChevronRight,
   ClipboardList,
@@ -135,6 +136,13 @@ const GROUPS: NavGroup[] = [
   {
     label: '系统设置',
     items: [
+      {
+        to: '/admin/applications',
+        label: 'OIDC 应用',
+        icon: AppWindow,
+        menuKey: 'admin/applications',
+        anyOf: ['oidc.client.read'],
+      },
       {
         to: '/admin/integrations',
         label: '接入服务',

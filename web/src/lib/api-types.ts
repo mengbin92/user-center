@@ -644,6 +644,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/oidc-clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OIDCAdminService_ListOIDCClients"];
+        put?: never;
+        post: operations["OIDCAdminService_CreateOIDCClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/oidc-clients/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OIDCAdminService_UpdateOIDCClient"];
+        trace?: never;
+    };
+    "/api/v1/admin/oidc-clients/{id}:disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OIDCAdminService_DisableOIDCClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/oidc-clients/{id}:rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OIDCAdminService_RotateOIDCClientSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/overview": {
         parameters: {
             query?: never;
@@ -1558,6 +1622,19 @@ export interface components {
             reason?: string;
             expected_policy_revision?: string;
         };
+        "api.usercenter.v1.CreateOIDCClientRequest": {
+            name?: string;
+            service_owner?: string;
+            redirect_uris?: string[];
+            scopes?: string[];
+            public?: boolean;
+            require_pkce?: boolean;
+            /** Format: int32 */
+            access_token_ttl_seconds?: number;
+            /** Format: int32 */
+            refresh_token_ttl_seconds?: number;
+            reason?: string;
+        };
         "api.usercenter.v1.CreatePasswordResetChallengeRequest": {
             /** @description Username or email. The response never reveals whether the account exists. */
             identifier?: string;
@@ -1636,6 +1713,10 @@ export interface components {
         "api.usercenter.v1.DisableMFARequest": {
             current_password?: string;
             code?: string;
+        };
+        "api.usercenter.v1.DisableOIDCClientRequest": {
+            id?: string;
+            reason?: string;
         };
         "api.usercenter.v1.EffectivePermission": {
             operation?: string;
@@ -1806,6 +1887,31 @@ export interface components {
         };
         "api.usercenter.v1.MenusReply": {
             items?: components["schemas"]["api.usercenter.v1.MenuItem"][];
+        };
+        "api.usercenter.v1.OIDCClient": {
+            id?: string;
+            client_id?: string;
+            name?: string;
+            service_owner?: string;
+            status?: string;
+            redirect_uris?: string[];
+            scopes?: string[];
+            public?: boolean;
+            require_pkce?: boolean;
+            /** Format: int32 */
+            access_token_ttl_seconds?: number;
+            /** Format: int32 */
+            refresh_token_ttl_seconds?: number;
+            revision?: string;
+            created_at?: string;
+        };
+        "api.usercenter.v1.OIDCClientCredentialReply": {
+            client?: components["schemas"]["api.usercenter.v1.OIDCClient"];
+            /** @description Returned exactly once for confidential clients; empty for public clients. */
+            client_secret?: string;
+        };
+        "api.usercenter.v1.OIDCClientsReply": {
+            items?: components["schemas"]["api.usercenter.v1.OIDCClient"][];
         };
         "api.usercenter.v1.OverviewReply": {
             total_users?: string;
@@ -1998,6 +2104,10 @@ export interface components {
             reason?: string;
             expected_revision?: string;
         };
+        "api.usercenter.v1.RotateOIDCClientSecretRequest": {
+            id?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.RotateRecoveryCodesRequest": {
             current_password?: string;
             code?: string;
@@ -2180,6 +2290,20 @@ export interface components {
             expected_revision?: string;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.UpdateOIDCClientRequest": {
+            id?: string;
+            name?: string;
+            redirect_uris?: string[];
+            scopes?: string[];
+            public?: boolean;
+            require_pkce?: boolean;
+            /** Format: int32 */
+            access_token_ttl_seconds?: number;
+            /** Format: int32 */
+            refresh_token_ttl_seconds?: number;
+            expected_revision?: string;
+            reason?: string;
         };
         "api.usercenter.v1.UpdatePermissionRequest": {
             id?: string;
@@ -3509,6 +3633,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.IntegrationClientCredentialReply"];
+                };
+            };
+        };
+    };
+    OIDCAdminService_ListOIDCClients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OIDCClientsReply"];
+                };
+            };
+        };
+    };
+    OIDCAdminService_CreateOIDCClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateOIDCClientRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OIDCClientCredentialReply"];
+                };
+            };
+        };
+    };
+    OIDCAdminService_UpdateOIDCClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateOIDCClientRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OIDCClient"];
+                };
+            };
+        };
+    };
+    OIDCAdminService_DisableOIDCClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.DisableOIDCClientRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OIDCClient"];
+                };
+            };
+        };
+    };
+    OIDCAdminService_RotateOIDCClientSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.RotateOIDCClientSecretRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OIDCClientCredentialReply"];
                 };
             };
         };

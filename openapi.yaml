@@ -1109,6 +1109,107 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.IntegrationClientCredentialReply'
+    /api/v1/admin/oidc-clients:
+        get:
+            tags:
+                - OIDCAdminService
+            operationId: OIDCAdminService_ListOIDCClients
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OIDCClientsReply'
+        post:
+            tags:
+                - OIDCAdminService
+            operationId: OIDCAdminService_CreateOIDCClient
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateOIDCClientRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OIDCClientCredentialReply'
+    /api/v1/admin/oidc-clients/{id}:
+        patch:
+            tags:
+                - OIDCAdminService
+            operationId: OIDCAdminService_UpdateOIDCClient
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateOIDCClientRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OIDCClient'
+    /api/v1/admin/oidc-clients/{id}:disable:
+        post:
+            tags:
+                - OIDCAdminService
+            operationId: OIDCAdminService_DisableOIDCClient
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.DisableOIDCClientRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OIDCClient'
+    /api/v1/admin/oidc-clients/{id}:rotate-secret:
+        post:
+            tags:
+                - OIDCAdminService
+            operationId: OIDCAdminService_RotateOIDCClientSecret
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RotateOIDCClientSecretRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OIDCClientCredentialReply'
     /api/v1/admin/overview:
         get:
             tags:
@@ -2434,6 +2535,33 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.CreateOIDCClientRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                service_owner:
+                    type: string
+                redirect_uris:
+                    type: array
+                    items:
+                        type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                public:
+                    type: boolean
+                require_pkce:
+                    type: boolean
+                access_token_ttl_seconds:
+                    type: integer
+                    format: int32
+                refresh_token_ttl_seconds:
+                    type: integer
+                    format: int32
+                reason:
+                    type: string
         api.usercenter.v1.CreatePasswordResetChallengeRequest:
             type: object
             properties:
@@ -2594,6 +2722,13 @@ components:
                 current_password:
                     type: string
                 code:
+                    type: string
+        api.usercenter.v1.DisableOIDCClientRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.EffectivePermission:
             type: object
@@ -2932,6 +3067,56 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.MenuItem'
+        api.usercenter.v1.OIDCClient:
+            type: object
+            properties:
+                id:
+                    type: string
+                client_id:
+                    type: string
+                name:
+                    type: string
+                service_owner:
+                    type: string
+                status:
+                    type: string
+                redirect_uris:
+                    type: array
+                    items:
+                        type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                public:
+                    type: boolean
+                require_pkce:
+                    type: boolean
+                access_token_ttl_seconds:
+                    type: integer
+                    format: int32
+                refresh_token_ttl_seconds:
+                    type: integer
+                    format: int32
+                revision:
+                    type: string
+                created_at:
+                    type: string
+        api.usercenter.v1.OIDCClientCredentialReply:
+            type: object
+            properties:
+                client:
+                    $ref: '#/components/schemas/api.usercenter.v1.OIDCClient'
+                client_secret:
+                    type: string
+                    description: Returned exactly once for confidential clients; empty for public clients.
+        api.usercenter.v1.OIDCClientsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.OIDCClient'
         api.usercenter.v1.OverviewReply:
             type: object
             properties:
@@ -3323,6 +3508,13 @@ components:
                     type: string
                 expected_revision:
                     type: string
+        api.usercenter.v1.RotateOIDCClientSecretRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.RotateRecoveryCodesRequest:
             type: object
             properties:
@@ -3694,6 +3886,35 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.UpdateOIDCClientRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                redirect_uris:
+                    type: array
+                    items:
+                        type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                public:
+                    type: boolean
+                require_pkce:
+                    type: boolean
+                access_token_ttl_seconds:
+                    type: integer
+                    format: int32
+                refresh_token_ttl_seconds:
+                    type: integer
+                    format: int32
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.UpdatePermissionRequest:
             type: object
             properties:
@@ -3831,6 +4052,8 @@ tags:
          gRPC API and subscribe to outbox events.
     - name: MeService
       description: MeService owns the authenticated user's self-service surface.
+    - name: OIDCAdminService
+      description: OIDCAdminService manages OAuth2/OIDC clients for the V2 provider.
     - name: SettingsService
       description: |-
         SettingsService owns non-secret authentication policy. Secret material is

@@ -44,6 +44,7 @@ func NewHTTPServer(
 	audit *service.AuditService,
 	settings *service.SettingsService,
 	integrationAdmin *service.IntegrationAdminService,
+	oidcAdmin *service.OIDCAdminService,
 	users *biz.UserUsecase,
 	artifactDir ArtifactDir,
 ) *HTTPServer {
@@ -76,6 +77,7 @@ func NewHTTPServer(
 	usercv1.RegisterAuditServiceHTTPServer(srv, audit)
 	usercv1.RegisterSettingsServiceHTTPServer(srv, settings)
 	usercv1.RegisterIntegrationAdminServiceHTTPServer(srv, integrationAdmin)
+	usercv1.RegisterOIDCAdminServiceHTTPServer(srv, oidcAdmin)
 
 	srv.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -83,6 +85,7 @@ func NewHTTPServer(
 	})
 
 	mountOAuthRoutes(srv, mw, auth, publicBase)
+	mountOIDCRoutes(srv, mw, oidcAdmin.Usecase(), publicBase)
 
 	// CSV artifact download is a raw stream; it re-verifies the actor, job
 	// ownership and expiry on every request.

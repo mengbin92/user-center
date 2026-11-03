@@ -53,3 +53,11 @@ func ConflictPolicy(current uint64) error {
 	err := kerrors.Conflict("POLICY_CONFLICT", "授权策略已被更新，请刷新后重试")
 	return err.WithMetadata(map[string]string{"current_policy_revision": uitoa(current), "conflict_type": "policy"})
 }
+
+var (
+	ErrOIDCInvalidClient  = kerrors.Unauthorized("INVALID_CLIENT", "客户端认证失败")
+	ErrOIDCInvalidGrant   = kerrors.BadRequest("INVALID_GRANT", "授权码、刷新令牌或 PKCE 校验失败")
+	ErrOIDCInvalidRequest = kerrors.BadRequest("INVALID_REQUEST", "OIDC 请求参数不合法")
+	ErrOIDCUnsupported    = kerrors.BadRequest("UNSUPPORTED_GRANT_TYPE", "不支持的 grant_type")
+	ErrOIDCClientNotFound = kerrors.NotFound("OIDC_CLIENT_NOT_FOUND", "OIDC 客户端不存在")
+)

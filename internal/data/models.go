@@ -329,6 +329,56 @@ type integrationClientPO struct {
 
 func (integrationClientPO) TableName() string { return "integration_clients" }
 
+type oidcClientPO struct {
+	ID           int64     `gorm:"column:id;primaryKey;autoIncrement"`
+	ClientID     string    `gorm:"column:client_id;size:64;not null;uniqueIndex"`
+	Name         string    `gorm:"column:name;size:128;not null"`
+	ServiceOwner string    `gorm:"column:service_owner;size:64;not null"`
+	Status       string    `gorm:"column:status;size:16;not null"`
+	SecretHash   string    `gorm:"column:secret_hash;size:64"`
+	RedirectURIs string    `gorm:"column:redirect_uris;type:text;not null"`
+	Scopes       string    `gorm:"column:scopes;type:text;not null"`
+	Public       bool      `gorm:"column:public;not null;default:false"`
+	RequirePKCE  bool      `gorm:"column:require_pkce;not null;default:true"`
+	AccessTTL    int       `gorm:"column:access_token_ttl_seconds;not null;default:900"`
+	RefreshTTL   int       `gorm:"column:refresh_token_ttl_seconds;not null;default:86400"`
+	Revision     uint64    `gorm:"column:revision;not null;default:1"`
+	CreatedAt    time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;not null"`
+}
+
+func (oidcClientPO) TableName() string { return "oidc_clients" }
+
+type oidcCodePO struct {
+	CodeHash            string     `gorm:"column:code_hash;size:64;primaryKey"`
+	ClientID            string     `gorm:"column:client_id;size:64;not null;index"`
+	UserID              int64      `gorm:"column:user_id;not null"`
+	RedirectURI         string     `gorm:"column:redirect_uri;size:512;not null"`
+	Scope               string     `gorm:"column:scope;size:512;not null"`
+	Nonce               string     `gorm:"column:nonce;size:255"`
+	CodeChallenge       string     `gorm:"column:code_challenge;size:128"`
+	CodeChallengeMethod string     `gorm:"column:code_challenge_method;size:8"`
+	AuthTime            time.Time  `gorm:"column:auth_time;not null"`
+	ExpiresAt           time.Time  `gorm:"column:expires_at;not null"`
+	ConsumedAt          *time.Time `gorm:"column:consumed_at"`
+	CreatedAt           time.Time  `gorm:"column:created_at;not null"`
+}
+
+func (oidcCodePO) TableName() string { return "oidc_authorization_codes" }
+
+type oidcRefreshPO struct {
+	TokenHash string     `gorm:"column:token_hash;size:64;primaryKey"`
+	ClientID  string     `gorm:"column:client_id;size:64;not null;index"`
+	UserID    int64      `gorm:"column:user_id;not null"`
+	Scope     string     `gorm:"column:scope;size:512;not null"`
+	AuthTime  time.Time  `gorm:"column:auth_time;not null"`
+	ExpiresAt time.Time  `gorm:"column:expires_at;not null"`
+	RevokedAt *time.Time `gorm:"column:revoked_at"`
+	CreatedAt time.Time  `gorm:"column:created_at;not null"`
+}
+
+func (oidcRefreshPO) TableName() string { return "oidc_refresh_tokens" }
+
 type legacyImportBatchPO struct {
 	BatchID          string     `gorm:"column:batch_id;size:64;primaryKey"`
 	SourceCommit     string     `gorm:"column:source_commit;size:64"`

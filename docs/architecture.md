@@ -24,6 +24,7 @@
 | 邮件适配器 | `console`（开发）或 SMTP；配置可在管理端热更新；不依赖原 `notify-worker` |
 | 第三方身份 | GitHub/Google OAuth2，服务端 code 交换；浏览器不接触 provider token |
 | Outbox worker | 随主进程启动，订阅客户端 Webhook 投递，HMAC 签名 + 指数退避 |
+| OIDC Provider | 标准 discovery/JWKS/authorization code+PKCE/token/userinfo；RSA 签名密钥由部署提供 |
 | SPA | 用户门户 + 管理控制台，仅消费 `/api/v1` |
 
 ## 3. 分层契约

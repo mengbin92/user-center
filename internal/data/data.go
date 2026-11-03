@@ -220,6 +220,6 @@ func models() []any {
 		&policyStatePO{}, &resourcePO{}, &permissionPO{}, &rolePO{},
 		&roleGrantPO{}, &roleInheritancePO{}, &assignmentPO{}, &delegationPO{}, &constraintPO{},
 		&menuPO{}, &auditEventPO{}, &authSettingsPO{}, &emailSettingsPO{},
-		&exportJobPO{}, &outboxEventPO{}, &deliveryPO{}, &integrationClientPO{}, &legacyImportBatchPO{},
+		&exportJobPO{}, &outboxEventPO{}, &deliveryPO{}, &integrationClientPO{}, &legacyImportBatchPO{}, &oidcClientPO{}, &oidcCodePO{}, &oidcRefreshPO{},
 	}
 }

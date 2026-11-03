@@ -34,4 +34,5 @@ var ProviderSet = wire.NewSet(
 	NewSettingsService,
 	NewIntegrationService,
 	NewIntegrationAdminService,
+	NewOIDCAdminService,
 )

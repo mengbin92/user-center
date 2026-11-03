@@ -90,6 +90,9 @@
 | `event_deliveries` | `(event_id, subscriber_id)` 唯一；`attempts`、`next_retry_at`、`status`、`last_error` |
 | `integration_clients` | `client_id`、`code`、`service_owner`、`credential_hash`、`credential_version`、`allowed_methods` JSON、`event_subscriptions` JSON、`callback_url`、`expires_at`、`revision` |
 | `legacy_import_batches` | `batch_id`、`source_commit`、`snapshot_position`、`counts`、`fingerprint`、`state`、`error`、`completed_at` |
+| `oidc_clients` | `client_id` 唯一、`name`、`service_owner`、`status`、`secret_hash`、`redirect_uris` JSON、`scopes` JSON、`public`、`require_pkce`、access/refresh TTL、`revision` |
+| `oidc_authorization_codes` | `code_hash` 主键、`client_id`、`user_id`、`redirect_uri`、`scope`、`nonce`、`code_challenge`/method、`auth_time`、`expires_at`、`consumed_at` |
+| `oidc_refresh_tokens` | `token_hash` 主键、`client_id`、`user_id`、`scope`、`auth_time`、`expires_at`、`revoked_at` |
 | `export_jobs` | 导出任务；`scope_snapshot`、字段、状态、制品名、过期时间；下载时重新鉴权 |
 | `schema_migrations` | `cmd/migrate` 维护的已执行版本 |
 | `legacy_import_batches` | `cmd/import-legacy` 的批次记录；保留源提交、位点、计数、指纹与终态 |

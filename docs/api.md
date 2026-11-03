@@ -112,6 +112,24 @@ OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必
 
 所有 IAM 管理写必须携带 `reason` 与 `expected_policy_revision`，修改/复制/撤销已有资源还需其 `expected_revision`；角色/分配/约束变更要求 Step-up。
 
+## 6.1 OIDC Provider（V2）
+
+标准授权码 + PKCE 流程：
+
+```text
+GET  /.well-known/openid-configuration   issuer、端点、支持的 scope/算法
+GET  /oidc/jwks                          RSA 公钥（kid）
+GET  /oidc/authorize                     需浏览器会话；redirect_uri 必须精确注册
+POST /oidc/token                         authorization_code / refresh_token
+GET  /oidc/userinfo                      Bearer access token
+```
+
+- 支持 `openid profile email offline_access`；`offline_access` 才返回 refresh token。
+- PKCE 仅支持 `S256`；public client 强制 PKCE。
+- ID/access token 使用 RS256；`kid` 对应 JWKS。生产必须通过 `OIDC_SIGNING_KEY_PATH`/`OIDC_SIGNING_KEY_PEM` 提供稳定 RSA 私钥，否则重启后 token 失效。
+- 客户端管理：`GET/POST /admin/oidc-clients`、`PATCH /{id}`、`{id}:rotate-secret`、`{id}:disable`；密钥只返回一次。
+- 当前 V2.1 对管理员预先注册的客户端自动同意授权，未提供交互式 consent 页面；如需用户逐次同意，在 V2.2 增加 consent UI 与 `prompt=consent` 持久化。
+
 ## 7. 内部 gRPC
 
 `IntegrationService` 仅注册在 `:9090`，不注册浏览器 HTTP 方法。调用方必须携带数据库接入客户端的 `authorization: Bearer <client_id.secret>`；凭据状态/有效期/方法白名单逐次校验。旧 `USER_CENTER_INTEGRATION_TOKEN` 旁路已移除。

@@ -14,4 +14,5 @@ var ProviderSet = wire.NewSet(
 	NewSettingsUsecase,
 	NewIntegrationUsecase,
 	NewIntegrationAdminUsecase,
+	NewOIDCUsecase,
 )

@@ -359,3 +359,42 @@ type EmailSettings struct {
 	PasswordSet  bool
 	Revision     uint64
 }
+
+type OIDCClient struct {
+	ID           int64
+	ClientID     string
+	Name         string
+	ServiceOwner string
+	Status       string
+	SecretHash   string
+	RedirectURIs []string
+	Scopes       []string
+	Public       bool
+	RequirePKCE  bool
+	AccessTTL    int
+	RefreshTTL   int
+	Revision     uint64
+	CreatedAt    time.Time
+}
+
+type OIDCCode struct {
+	CodeHash            string
+	ClientID            string
+	UserID              int64
+	RedirectURI         string
+	Scope               string
+	Nonce               string
+	CodeChallenge       string
+	CodeChallengeMethod string
+	AuthTime            time.Time
+	ExpiresAt           time.Time
+}
+
+type OIDCRefreshToken struct {
+	TokenHash string
+	ClientID  string
+	UserID    int64
+	Scope     string
+	AuthTime  time.Time
+	ExpiresAt time.Time
+}

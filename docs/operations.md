@@ -16,6 +16,9 @@
 | `OUTBOX_SIGNING_SECRET` | Outbox Webhook HMAC-SHA256 签名密钥；启用订阅时必须配置独立的至少 32 字节随机密钥 |
 | `OAUTH_GITHUB_CLIENT_ID/SECRET` | GitHub 登录；两者都设置才启用 |
 | `OAUTH_GOOGLE_CLIENT_ID/SECRET` | Google 登录；两者都设置才启用 |
+| `OIDC_ISSUER` | OIDC issuer，默认 `PUBLIC_BASE_URL`；必须与 discovery 地址一致 |
+| `OIDC_SIGNING_KEY_PATH` / `OIDC_SIGNING_KEY_PEM` | RS256 私钥（PEM）；生产必须配置稳定密钥 |
+| `OIDC_ACCESS_TTL_SECONDS` / `OIDC_REFRESH_TTL_SECONDS` | 默认 900 / 86400 秒；客户端可覆盖 |
 
 SMTP 支持 465 implicit TLS 与 587 STARTTLS；真实 QQ 邮箱验收步骤见
 [SMTP 验收记录](acceptance-smtp-2026-11-03.md)。
@@ -65,6 +68,7 @@ docker compose run --rm user-center /app/admin-rescue \
 - 终止 TLS；转发 `Host`、`X-Forwarded-For`、`X-Real-IP`；设置 `TRUST_PROXY_HEADERS=true` 时才会信任这些头。
 - 请求体上限 ≤ 1 MiB；禁用代理层缓存 `/api/`。
 - 透传 `Set-Cookie`（不要重写 `uc_session`/`uc_csrf`）。
+- 将 `/.well-known/openid-configuration`、`/oidc/` 与 `/api/` 一起转发到后端；SPA 由同一后端托管时无需额外配置。
 - 建议安全头：`Strict-Transport-Security`、`Content-Security-Policy`（SPA 资源同源）、`X-Content-Type-Options`（服务已设置后者）。
 
 Nginx 片段：

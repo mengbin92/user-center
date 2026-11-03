@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.2.1 — V1 功能完成。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。剩余差异全部属于 V2 或需要真实第三方环境验收，见[实现范围](#实现范围与已知差异)。
+> **状态：v0.3.0 — V2 已启动：标准 OIDC Provider 可用；组织/多租户、WebAuthn、SCIM、目录同步仍按 V2 里程碑推进。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
 
 ## 目录
 
@@ -143,6 +143,7 @@ scripts/                  开发与检查脚本
 | 用户管理 | `/admin/overview`、`/admin/users`、`/admin/users/{id}`、`{id}:set-status`、`{id}:archive`、`{id}/password-reset-requests`、`{id}/mfa:reset`、`{id}/email-changes*`、`{id}/sessions*`、`{id}/effective-permissions`、`/admin/users:export`、`/admin/exports/{id}`、`/admin/exports/{id}/download` |
 | IAM | `/admin/iam/resources`、`permissions*`、`roles*`、`assignments*`（含列表）、`delegations*`、`constraints*`、`menus*`、`authorization:explain`、`authorization:simulate` |
 | 接入服务 | `/admin/integration-clients*`、`/admin/event-deliveries*` |
+| OIDC Provider | `/.well-known/openid-configuration`、`/oidc/jwks`、`/oidc/authorize`、`/oidc/token`、`/oidc/userinfo`；管理端 `/admin/oidc-clients*` |
 | 审计 / 配置 | `/admin/audits*`、`/admin/settings/auth`、`/admin/settings/email` |
 | 内部 gRPC | `ValidateSession`、`ValidateSubject`、`GetUser`、`BatchGetUsers`、`GetSessionAuthorization`、`GetResourceAuthorization`、`RevokeSession` |
 
@@ -152,9 +153,12 @@ scripts/                  开发与检查脚本
 
 **已实现（V1）**：用户生命周期（创建/资料/启停/归档）、密码与邮箱变更、管理员邮箱变更、强制首次改密、TOTP + 恢复码、管理员强制 MFA、Step-up、会话治理、角色/会话角色、权限目录、角色继承、授权分配（含列表与批量，事务内整批拒绝）、委派、职责分离、菜单投影、授权解释/模拟、审计与导出、认证配置、GitHub/Google 登录与绑定、接入客户端管理、gRPC 客户端鉴权、Outbox Webhook 投递、`cmd/import-legacy` 离线导入。
 
-**仍延后（V2 或需要外部环境）**：
+**V2 已启动（v0.3.0）**：标准 OIDC Provider（discovery/JWKS/authorization code + PKCE/token/userinfo/refresh）、OIDC 客户端管理与 RSA 签名密钥配置。
 
-- 组织/多租户、WebAuthn/Passkey、SCIM、标准 OIDC Provider（设计文档中均属 V2）；
+**仍延后（V2 后续里程碑）**：
+
+- 组织/部门、多租户、WebAuthn/Passkey、SCIM、企业目录同步；
+- OIDC 交互式 consent 页面与 RP-initiated logout（V2.2）；
 - OAuth 真实提供方沙箱验收：代码与本地 fake provider 测试已就绪，需配置真实凭据后执行；QQ 邮箱 SMTP 已完成真实发信与 IMAP 送达验收（[记录](docs/acceptance-smtp-2026-11-03.md)）；
 - 委派目前约束“分配/撤销角色”的目标角色、用户范围与动作；角色 Grant/继承的变更仍要求直接权限，不允许通过委派修改策略本身；
 - 原 `micro-one-api` 的 BFF 兼容层与适配器不在本仓库内，接入契约见 `docs/migration.md`；
@@ -173,7 +177,7 @@ cd web && npm run build # tsc + vite 构建
 关键覆盖：
 - `domain/authorization`：Scope 求交/包含、deny、过期、继承环检测。
 - `internal/data`：唯一约束、revision CAS、会话哈希/撤销、目录种子幂等、legacy 导入、GitHub/Google 适配器（本地 fake provider）、SMTP（本地 fake server）。
-- `internal/server`：未登录 401、缺失 CSRF 403、登录、受限管理员越权 403、并发更新 409、导出下载、MFA 完整登录、注册/重置/改密、管理员邮箱变更、OAuth 绑定/登录/OAuth+MFA、委派、接入客户端与 Outbox 投递、MFA 强制与首次改密拦截。
+- `internal/server`：未登录 401、缺失 CSRF 403、登录、受限管理员越权 403、并发更新 409、导出下载、MFA 完整登录、注册/重置/改密、管理员邮箱变更、OAuth 绑定/登录/OAuth+MFA、委派、接入客户端与 Outbox 投递、MFA 强制与首次改密拦截、OIDC 授权码 + PKCE/refresh/userinfo、OIDC 客户端管理。
 - `docker build` / `docker buildx --platform linux/amd64`：镜像内迁移、健康检查与 SPA 均已验证。
 - 真实 SMTP：QQ 邮箱 587/STARTTLS 发信并在收件箱确认（opt-in `TestLiveSMTP`）。
 
@@ -196,6 +200,7 @@ docker compose up -d --build
 - [运维手册](docs/operations.md)
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
+- [v0.3.0 发布说明](docs/releases/release-v0.3.0.md)
 - [v0.2.1 发布说明](docs/releases/release-v0.2.1.md)
 - [安全审查记录](docs/code-review-2026-11-03.md)
 - [代码审查与修复记录（2026-11-03）](docs/code-review-2026-11-03.md)

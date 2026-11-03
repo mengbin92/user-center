@@ -190,6 +190,28 @@ export type CreateEmailChangeChallengeRequest =
   Schemas['api.usercenter.v1.CreateEmailChangeChallengeRequest']
 export type ConfirmEmailChangeRequest =
   Schemas['api.usercenter.v1.ConfirmEmailChangeRequest']
+export type OIDCClient = Schemas['api.usercenter.v1.OIDCClient']
+export type OIDCClientsReply = Schemas['api.usercenter.v1.OIDCClientsReply']
+export type OIDCClientCredentialReply =
+  Schemas['api.usercenter.v1.OIDCClientCredentialReply']
+export type CreateOIDCClientRequest =
+  Schemas['api.usercenter.v1.CreateOIDCClientRequest']
+export type UpdateOIDCClientRequest =
+  Schemas['api.usercenter.v1.UpdateOIDCClientRequest']
+export type RotateOIDCClientSecretRequest =
+  Schemas['api.usercenter.v1.RotateOIDCClientSecretRequest']
+export type DisableOIDCClientRequest =
+  Schemas['api.usercenter.v1.DisableOIDCClientRequest']
+
+// The discovery document is served by the OIDC transport, not the OpenAPI
+// surface, so it is described here rather than generated from openapi.yaml.
+export type OIDCDiscovery = {
+  issuer: string
+  authorization_endpoint: string
+  token_endpoint: string
+  userinfo_endpoint: string
+  jwks_uri: string
+}
 
 export type ApiList<T> = {
   items: T[]

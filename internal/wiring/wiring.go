@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,6 +80,19 @@ func NewRuntimeConfig(b *conf.Bootstrap) *biz.RuntimeConfig {
 		PublicBaseURL:    srv.Http.PublicBaseUrl,
 		CodeSecret:       sec.SessionSecret,
 		MaxLoginAttempts: 10,
+		OIDCIssuer:       envOr("OIDC_ISSUER", srv.Http.PublicBaseUrl),
+		OIDCAccessTTL:    15 * time.Minute,
+		OIDCRefreshTTL:   24 * time.Hour,
+	}
+	if v := os.Getenv("OIDC_ACCESS_TTL_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.OIDCAccessTTL = time.Duration(n) * time.Second
+		}
+	}
+	if v := os.Getenv("OIDC_REFRESH_TTL_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.OIDCRefreshTTL = time.Duration(n) * time.Second
+		}
 	}
 	if cfg.PublicBaseURL == "" {
 		cfg.PublicBaseURL = "http://localhost:5173"
@@ -116,7 +130,7 @@ func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, svc *biz.Ser
 func (a *App) Run() error {
 	opts := []kratos.Option{
 		kratos.Name("user-center"),
-		kratos.Version("0.2.1"),
+		kratos.Version("0.3.0"),
 		kratos.Logger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))),
 		kratos.Server(a.http.Server, a.grpc.Server),
 		kratos.BeforeStart(a.bootstrap),
@@ -152,13 +166,18 @@ func (a *App) bootstrap(ctx context.Context) error {
 func BuildServices(d *data.Data, b *conf.Bootstrap) *biz.Services {
 	cfg := NewRuntimeConfig(b)
 	sec := ProvideSecurity(b)
+	signer, err := data.NewOIDCSigner(zap.NewNop())
+	if err != nil {
+		return nil
+	}
 	return biz.NewServices(
 		data.NewUserRepo(d), data.NewCredentialRepo(d), data.NewExternalIdentityRepo(d),
 		data.NewMFARepo(d), data.NewSessionRepo(d), data.NewSecurityEventRepo(d),
 		data.NewFlowCompletionRepo(d), data.NewChallengeStore(d), data.NewRateLimiter(d),
 		data.NewStepUpStore(d), data.NewMailSender(d, zap.NewNop(), ProvideMail(b)),
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
-		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d), d,
+		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
+		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), signer, d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
 		map[string]biz.OAuthProvider{}, cfg,
 	)

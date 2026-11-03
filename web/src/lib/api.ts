@@ -100,18 +100,26 @@ import type {
   CreateDelegationRequest,
   CreateEmailChangeChallengeRequest,
   CreateIntegrationClientRequest,
+  CreateOIDCClientRequest,
   Delegation,
   DelegationsReply,
   DisableIntegrationClientRequest,
+  DisableOIDCClientRequest,
   EventDeliveriesReply,
   EventDelivery,
   IntegrationClient,
   IntegrationClientCredentialReply,
   IntegrationClientsReply,
+  OIDCClient,
+  OIDCClientCredentialReply,
+  OIDCClientsReply,
+  OIDCDiscovery,
+  RotateOIDCClientSecretRequest,
   RetryEventDeliveryRequest,
   RevokeDelegationRequest,
   RotateIntegrationClientCredentialRequest,
   UpdateIntegrationClientRequest,
+  UpdateOIDCClientRequest,
 } from './types'
 
 type QueryValue = string | number | boolean | null | undefined
@@ -505,6 +513,25 @@ export const api = {
         `/api/v1/admin/event-deliveries/${enc(eventId)}/subscribers/${enc(subscriberId)}:retry`,
         body,
       ),
+  },
+
+  oidc: {
+    listClients: () =>
+      get<OIDCClientsReply>('/api/v1/admin/oidc-clients'),
+    createClient: (body: CreateOIDCClientRequest) =>
+      post<OIDCClientCredentialReply>('/api/v1/admin/oidc-clients', body),
+    updateClient: (id: string, body: UpdateOIDCClientRequest) =>
+      patch<OIDCClient>(`/api/v1/admin/oidc-clients/${enc(id)}`, body),
+    rotateSecret: (id: string, body: RotateOIDCClientSecretRequest) =>
+      post<OIDCClientCredentialReply>(
+        `/api/v1/admin/oidc-clients/${enc(id)}:rotate-secret`,
+        body,
+      ),
+    disableClient: (id: string, body: DisableOIDCClientRequest) =>
+      post<OIDCClient>(`/api/v1/admin/oidc-clients/${enc(id)}:disable`, body),
+    // Public discovery document. This is a GET so the shared client never
+    // attaches the CSRF header.
+    discovery: () => get<OIDCDiscovery>('/.well-known/openid-configuration'),
   },
 
   settings: {

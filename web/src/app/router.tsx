@@ -20,6 +20,7 @@ import { SessionRolesPage } from '../features/account/roles-page'
 import { SecurityPage } from '../features/account/security-page'
 import { SessionsPage } from '../features/account/sessions-page'
 import { AdminAssignmentsPage } from '../features/admin/assignments-page'
+import { AdminApplicationsPage } from '../features/admin/applications-page'
 import { AdminAuditsPage } from '../features/admin/audits-page'
 import { AdminConstraintsPage } from '../features/admin/constraints-page'
 import { AdminDelegationsPage } from '../features/admin/delegations-page'
@@ -167,6 +168,14 @@ export function AppRoutes() {
             element={
               <RequirePermission anyOf={['identity.user.export', 'audit.export']}>
                 <AdminExportsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="applications"
+            element={
+              <RequirePermission permission="oidc.client.read">
+                <AdminApplicationsPage />
               </RequirePermission>
             }
           />

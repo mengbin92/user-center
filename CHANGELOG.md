@@ -6,6 +6,33 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
+V2 starts with a standards-based OIDC Provider.
+
+### Added
+
+- OIDC discovery (`/.well-known/openid-configuration`), JWKS (`/oidc/jwks`),
+  authorization endpoint (`/oidc/authorize`), token endpoint (`/oidc/token`) and
+  userinfo endpoint (`/oidc/userinfo`).
+- Authorization code flow with S256 PKCE, exact redirect URI matching,
+  RS256 ID/access tokens, refresh tokens for `offline_access`, nonce and
+  auth_time claims.
+- OIDC client administration (`/admin/oidc-clients*`): one-time client secret,
+  redirect URI/scope management, secret rotation, disable and audit.
+- OIDC RSA signing key loading from `OIDC_SIGNING_KEY_PATH`/PEM with an
+  ephemeral development fallback.
+- Admin SPA page for OIDC applications and discovery/JWKS endpoint display.
+- Real QQ SMTP acceptance: implicit TLS/STARTTLS support, end-to-end send and
+  IMAP delivery verification (see `docs/acceptance-smtp-2026-11-03.md`).
+
+### Notes
+
+- V2.1 auto-consents clients pre-registered by an administrator; interactive
+  consent and RP-initiated logout are V2.2.
+- Organization/multi-tenancy, WebAuthn, SCIM and directory sync remain open V2
+  milestones.
+
 ## [0.2.1] - 2026-11-03
 
 Security-review and verification follow-up to 0.2.0.

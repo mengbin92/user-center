@@ -3,11 +3,14 @@ package server_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -94,13 +97,16 @@ func newHarness(t *testing.T) *harness {
 		PublicBaseURL: "http://localhost:5173", CodeSecret: sec.SessionSecret,
 	}
 	mailer := &captureMail{}
+	oidcSigner, err := data.NewOIDCSigner(zap.NewNop())
+	require.NoError(t, err)
 	svc := biz.NewServices(
 		data.NewUserRepo(d), data.NewCredentialRepo(d), data.NewExternalIdentityRepo(d),
 		data.NewMFARepo(d), data.NewSessionRepo(d), data.NewSecurityEventRepo(d),
 		data.NewFlowCompletionRepo(d), data.NewChallengeStore(d), data.NewRateLimiter(d),
 		data.NewStepUpStore(d), mailer,
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
-		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d), d,
+		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
+		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), oidcSigner, d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
 		map[string]biz.OAuthProvider{"mock": &mockOAuthProvider{}},
 		runtime,
@@ -114,6 +120,7 @@ func newHarness(t *testing.T) *harness {
 	settings := biz.NewSettingsUsecase(svc)
 	integration := biz.NewIntegrationUsecase(svc)
 	integrationAdmin := biz.NewIntegrationAdminUsecase(svc)
+	oidcAdmin := service.NewOIDCAdminService(biz.NewOIDCUsecase(svc))
 
 	_, err = svc.BootstrapRoot(context.Background(), "root", "root@example.com", "ChangeMe-12345")
 	require.NoError(t, err)
@@ -130,6 +137,7 @@ func newHarness(t *testing.T) *harness {
 		service.NewAuditService(audit),
 		service.NewSettingsService(settings),
 		service.NewIntegrationAdminService(integrationAdmin),
+		oidcAdmin,
 		users,
 		server.ArtifactDir(runtime.ArtifactDir),
 	)
@@ -170,6 +178,25 @@ func (h *harness) do(method, path string, body any, token string, csrf bool) *ht
 	}
 	if csrf && method != http.MethodGet {
 		req.Header.Set("X-CSRF-Token", h.csrf)
+	}
+	for _, c := range h.jar.Cookies(req.URL) {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	h.srv.ServeHTTP(rec, req)
+	for _, c := range rec.Result().Cookies() {
+		h.jar.SetCookies(req.URL, []*http.Cookie{c})
+	}
+	return rec
+}
+
+func (h *harness) doForm(path string, form url.Values, clientID, secret string) *httptest.ResponseRecorder {
+	h.t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "http://example.com"+path, strings.NewReader(form.Encode()))
+	req.RemoteAddr = "127.0.0.1:54321"
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if clientID != "" || secret != "" {
+		req.SetBasicAuth(clientID, secret)
 	}
 	for _, c := range h.jar.Cookies(req.URL) {
 		req.AddCookie(c)
@@ -689,4 +716,150 @@ func TestOAuthLoginRequiresMFA(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	rec = h.do(http.MethodGet, "/api/v1/me", nil, "", false)
 	require.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestOIDCAuthorizationCodeFlow(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+
+	redirectURI := "http://localhost/callback"
+	verifier := "verifier-0123456789-0123456789-0123456789"
+	sum := sha256.Sum256([]byte(verifier))
+	challenge := base64.RawURLEncoding.EncodeToString(sum[:])
+	_, err := h.svc.OIDCClients.CreateOIDCClient(context.Background(), nil, &biz.OIDCClient{
+		ClientID: "oidc_test", Name: "Test App", ServiceOwner: "test",
+		Status: "active", SecretHash: biz.HashToken("oidc-secret"),
+		RedirectURIs: []string{redirectURI},
+		Scopes:       []string{"openid", "profile", "email", "offline_access"},
+		RequirePKCE:  true, AccessTTL: 900, RefreshTTL: 3600,
+	})
+	require.NoError(t, err)
+
+	query := url.Values{
+		"client_id":             {"oidc_test"},
+		"redirect_uri":          {redirectURI},
+		"response_type":         {"code"},
+		"scope":                 {"openid profile email offline_access"},
+		"state":                 {"state-1"},
+		"nonce":                 {"nonce-1"},
+		"code_challenge":        {challenge},
+		"code_challenge_method": {"S256"},
+	}
+	rec := h.do(http.MethodGet, "/oidc/authorize?"+query.Encode(), nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
+	location, err := url.Parse(rec.Header().Get("Location"))
+	require.NoError(t, err)
+	require.Equal(t, "state-1", location.Query().Get("state"))
+	code := location.Query().Get("code")
+	require.NotEmpty(t, code)
+
+	rec = h.doForm("/oidc/token", url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {redirectURI},
+		"code_verifier": {verifier},
+	}, "oidc_test", "oidc-secret")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	tokens := decode[map[string]any](t, rec)
+	require.NotEmpty(t, tokens["access_token"])
+	require.NotEmpty(t, tokens["id_token"])
+	require.NotEmpty(t, tokens["refresh_token"])
+	require.Equal(t, "Bearer", tokens["token_type"])
+
+	rec = h.do(http.MethodGet, "/oidc/userinfo", nil, "", false)
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/oidc/userinfo", nil)
+	req.Header.Set("Authorization", "Bearer "+tokens["access_token"].(string))
+	ui := httptest.NewRecorder()
+	h.srv.ServeHTTP(ui, req)
+	require.Equal(t, http.StatusOK, ui.Code, ui.Body.String())
+	info := decode[map[string]any](t, ui)
+	require.Equal(t, "1", info["sub"])
+	require.Equal(t, "root", info["preferred_username"])
+
+	rec = h.do(http.MethodGet, "/.well-known/openid-configuration", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+	disco := decode[map[string]any](t, rec)
+	require.Contains(t, disco["authorization_endpoint"], "/oidc/authorize")
+	rec = h.do(http.MethodGet, "/oidc/jwks", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+	jwks := decode[map[string]any](t, rec)
+	require.NotEmpty(t, jwks["keys"])
+
+	rec = h.doForm("/oidc/token", url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {tokens["refresh_token"].(string)},
+	}, "oidc_test", "oidc-secret")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	refreshed := decode[map[string]any](t, rec)
+	require.NotEmpty(t, refreshed["access_token"])
+
+	rec = h.doForm("/oidc/token", url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {redirectURI},
+		"code_verifier": {verifier},
+	}, "oidc_test", "oidc-secret")
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "invalid_grant")
+}
+
+func TestOIDCClientAdmin(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	secret := enrollMFA(t, h, "ChangeMe-12345")
+	stepUp(t, h, "ChangeMe-12345", secret, 1)
+
+	rec := h.do(http.MethodPost, "/api/v1/admin/oidc-clients", map[string]any{
+		"name": "Admin App", "service_owner": "test",
+		"redirect_uris": []string{"https://app.example.com/callback"},
+		"scopes":        []string{"openid", "email"},
+		"require_pkce":  true, "reason": "test",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	created := decode[map[string]any](t, rec)
+	require.NotEmpty(t, created["client_secret"])
+	client := created["client"].(map[string]any)
+	require.NotEmpty(t, client["client_id"])
+	require.Equal(t, true, client["require_pkce"])
+
+	rec = h.do(http.MethodGet, "/api/v1/admin/oidc-clients", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "Admin App")
+}
+
+func TestOIDCPublicClientPKCE(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	redirectURI := "http://localhost/public-callback"
+	_, err := h.svc.OIDCClients.CreateOIDCClient(context.Background(), nil, &biz.OIDCClient{
+		ClientID: "oidc_public", Name: "Public App", ServiceOwner: "test",
+		Status: "active", RedirectURIs: []string{redirectURI},
+		Scopes: []string{"openid", "email"}, Public: true, RequirePKCE: true,
+		AccessTTL: 900, RefreshTTL: 3600,
+	})
+	require.NoError(t, err)
+	base := url.Values{
+		"client_id": {"oidc_public"}, "redirect_uri": {redirectURI},
+		"response_type": {"code"}, "scope": {"openid email"}, "state": {"s1"},
+	}
+	rec := h.do(http.MethodGet, "/oidc/authorize?"+base.Encode(), nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	require.Contains(t, rec.Header().Get("Location"), "error=invalid_request")
+
+	verifier := "public-verifier-0123456789"
+	sum := sha256.Sum256([]byte(verifier))
+	base.Set("code_challenge", base64.RawURLEncoding.EncodeToString(sum[:]))
+	base.Set("code_challenge_method", "S256")
+	rec = h.do(http.MethodGet, "/oidc/authorize?"+base.Encode(), nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	loc, _ := url.Parse(rec.Header().Get("Location"))
+	code := loc.Query().Get("code")
+	require.NotEmpty(t, code)
+
+	rec = h.doForm("/oidc/token", url.Values{
+		"grant_type": {"authorization_code"}, "client_id": {"oidc_public"},
+		"code": {code}, "redirect_uri": {redirectURI}, "code_verifier": {verifier},
+	}, "", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }

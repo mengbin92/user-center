@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// OIDCAdminService manages OAuth2/OIDC clients for the V2 provider.
+service OIDCAdminService {
+  rpc ListOIDCClients(ListOIDCClientsRequest) returns (OIDCClientsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/oidc-clients"};
+  }
+  rpc CreateOIDCClient(CreateOIDCClientRequest) returns (OIDCClientCredentialReply) {
+    option (google.api.http) = {post: "/api/v1/admin/oidc-clients" body: "*"};
+  }
+  rpc UpdateOIDCClient(UpdateOIDCClientRequest) returns (OIDCClient) {
+    option (google.api.http) = {patch: "/api/v1/admin/oidc-clients/{id}" body: "*"};
+  }
+  rpc RotateOIDCClientSecret(RotateOIDCClientSecretRequest) returns (OIDCClientCredentialReply) {
+    option (google.api.http) = {post: "/api/v1/admin/oidc-clients/{id}:rotate-secret" body: "*"};
+  }
+  rpc DisableOIDCClient(DisableOIDCClientRequest) returns (OIDCClient) {
+    option (google.api.http) = {post: "/api/v1/admin/oidc-clients/{id}:disable" body: "*"};
+  }
+}
+
+message OIDCClient {
+  string id = 1;
+  string client_id = 2;
+  string name = 3;
+  string service_owner = 4;
+  string status = 5;
+  repeated string redirect_uris = 6;
+  repeated string scopes = 7;
+  bool public = 8;
+  bool require_pkce = 9;
+  int32 access_token_ttl_seconds = 10;
+  int32 refresh_token_ttl_seconds = 11;
+  string revision = 12;
+  string created_at = 13;
+}
+
+message OIDCClientCredentialReply {
+  OIDCClient client = 1;
+  // Returned exactly once for confidential clients; empty for public clients.
+  string client_secret = 2;
+}
+
+message ListOIDCClientsRequest {}
+
+message OIDCClientsReply {
+  repeated OIDCClient items = 1;
+}
+
+message CreateOIDCClientRequest {
+  string name = 1;
+  string service_owner = 2;
+  repeated string redirect_uris = 3;
+  repeated string scopes = 4;
+  bool public = 5;
+  bool require_pkce = 6;
+  int32 access_token_ttl_seconds = 7;
+  int32 refresh_token_ttl_seconds = 8;
+  string reason = 9;
+}
+
+message UpdateOIDCClientRequest {
+  string id = 1;
+  string name = 2;
+  repeated string redirect_uris = 3;
+  repeated string scopes = 4;
+  bool public = 5;
+  bool require_pkce = 6;
+  int32 access_token_ttl_seconds = 7;
+  int32 refresh_token_ttl_seconds = 8;
+  string expected_revision = 9;
+  string reason = 10;
+}
+
+message RotateOIDCClientSecretRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message DisableOIDCClientRequest {
+  string id = 1;
+  string reason = 2;
+}

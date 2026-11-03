@@ -259,3 +259,28 @@ type SecretBox interface {
 	Encrypt(string) (string, error)
 	Decrypt(string) (string, error)
 }
+
+type OIDCClientRepo interface {
+	ListOIDCClients(context.Context, Tx) ([]*OIDCClient, error)
+	GetOIDCClient(context.Context, Tx, int64) (*OIDCClient, error)
+	GetOIDCClientByClientID(context.Context, Tx, string) (*OIDCClient, error)
+	CreateOIDCClient(context.Context, Tx, *OIDCClient) (*OIDCClient, error)
+	UpdateOIDCClient(context.Context, Tx, *OIDCClient, uint64) (*OIDCClient, error)
+	RotateOIDCClientSecret(context.Context, Tx, int64, string) (*OIDCClient, error)
+	DisableOIDCClient(context.Context, Tx, int64) error
+}
+
+type OIDCCodeRepo interface {
+	CreateOIDCCode(context.Context, Tx, *OIDCCode) error
+	ConsumeOIDCCode(context.Context, Tx, string, string, string, time.Time) (*OIDCCode, error)
+	CreateOIDCRefreshToken(context.Context, Tx, *OIDCRefreshToken) error
+	ConsumeOIDCRefreshToken(context.Context, Tx, string, string, time.Time) (*OIDCRefreshToken, error)
+}
+
+// OIDCSigner owns the RSA key used for ID/access tokens.
+type OIDCSigner interface {
+	KeyID() string
+	Sign(map[string]any) (string, error)
+	Verify(string) (map[string]any, error)
+	PublicJWK() map[string]any
+}

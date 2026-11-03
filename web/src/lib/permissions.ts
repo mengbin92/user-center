@@ -70,6 +70,7 @@ export const ADMIN_PERMISSIONS = [
   'settings.email.read',
   'integration.client.read',
   'integration.delivery.read',
+  'oidc.client.read',
 ]
 
 export function hasAdminAccess(permissions: Set<string>): boolean {
