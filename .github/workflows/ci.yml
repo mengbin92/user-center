@@ -36,3 +36,23 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: user-center:ci
+      - name: Smoke image
+        run: |
+          docker run -d --name uc-ci -e DB_DRIVER=sqlite -e DB_DSN='file:/tmp/uc.db?_fk=1' -e HTTP_ADDR=:8080 -e GRPC_ADDR=:9090 -p 18080:8080 user-center:ci sh -c "/app/migrate -config /app/configs/config.dev.yaml && /app/user-center -config /app/configs/config.dev.yaml"
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18080/healthz && break || sleep 2; done
+          curl -fsS -I http://127.0.0.1:18080/login
+          docker logs uc-ci --tail 20
+          docker rm -f uc-ci

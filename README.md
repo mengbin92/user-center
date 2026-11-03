@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.2.0 — V1 功能完成。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。剩余差异全部属于 V2 或需要真实第三方环境验收，见[实现范围](#实现范围与已知差异)。
+> **状态：v0.2.1 — V1 功能完成。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。剩余差异全部属于 V2 或需要真实第三方环境验收，见[实现范围](#实现范围与已知差异)。
 
 ## 目录
 
@@ -171,9 +171,10 @@ cd web && npm run build # tsc + vite 构建
 ```
 
 关键覆盖：
-- `domain/authorization`：Scope 求交、deny、过期、继承环检测。
-- `internal/data`：唯一约束、revision CAS、会话哈希/撤销、目录种子幂等。
-- `internal/server`：未登录 401、缺失 CSRF 403、登录、受限管理员越权 403、并发更新 409、导出下载、MFA 完整登录、注册/重置/改密、管理员邮箱变更、OAuth 绑定与登录、委派/接入/Outbox 投递、MFA 强制与首次改密拦截。
+- `domain/authorization`：Scope 求交/包含、deny、过期、继承环检测。
+- `internal/data`：唯一约束、revision CAS、会话哈希/撤销、目录种子幂等、legacy 导入、GitHub/Google 适配器（本地 fake provider）、SMTP（本地 fake server）。
+- `internal/server`：未登录 401、缺失 CSRF 403、登录、受限管理员越权 403、并发更新 409、导出下载、MFA 完整登录、注册/重置/改密、管理员邮箱变更、OAuth 绑定/登录/OAuth+MFA、委派、接入客户端与 Outbox 投递、MFA 强制与首次改密拦截。
+- `docker build` / `docker buildx --platform linux/amd64`：镜像内迁移、健康检查与 SPA 均已验证。
 
 ## 部署
 

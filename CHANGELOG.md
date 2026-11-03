@@ -60,8 +60,11 @@ on top of the 0.1.0 extraction.
   admin email change, assignment list filters, delegation and integrations
   pages.
 - Tests for registration/password reset, admin email change, OAuth bind/login,
-  MFA enforcement, forced password change, integration clients + webhook
-  delivery, legacy import, assignments and delegations.
+  OAuth+MFA, MFA enforcement, forced password change, integration clients +
+  webhook delivery, legacy import, assignments and delegations.
+- Adapter tests against a local fake GitHub/Google OAuth server and a local
+  fake SMTP server; Docker image build plus container smoke test for both
+  native and linux/amd64 targets; CI container job.
 
 ### Fixed
 

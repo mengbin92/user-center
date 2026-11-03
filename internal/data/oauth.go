@@ -24,17 +24,25 @@ import (
 func NewOAuthRegistry(log *zap.Logger) map[string]biz.OAuthProvider {
 	out := map[string]biz.OAuthProvider{}
 	if id, secret := os.Getenv("OAUTH_GITHUB_CLIENT_ID"), os.Getenv("OAUTH_GITHUB_CLIENT_SECRET"); id != "" && secret != "" {
-		out["github"] = &githubProvider{conf: &oauth2.Config{ClientID: id, ClientSecret: secret, Endpoint: github.Endpoint, Scopes: []string{"read:user", "user:email"}}, log: log}
+		out["github"] = &githubProvider{
+			conf: &oauth2.Config{ClientID: id, ClientSecret: secret, Endpoint: github.Endpoint, Scopes: []string{"read:user", "user:email"}},
+			log:  log, userInfoURL: "https://api.github.com/user", emailsURL: "https://api.github.com/user/emails",
+		}
 	}
 	if id, secret := os.Getenv("OAUTH_GOOGLE_CLIENT_ID"), os.Getenv("OAUTH_GOOGLE_CLIENT_SECRET"); id != "" && secret != "" {
-		out["google"] = &googleProvider{conf: &oauth2.Config{ClientID: id, ClientSecret: secret, Endpoint: google.Endpoint, Scopes: []string{"openid", "email", "profile"}}, log: log}
+		out["google"] = &googleProvider{
+			conf: &oauth2.Config{ClientID: id, ClientSecret: secret, Endpoint: google.Endpoint, Scopes: []string{"openid", "email", "profile"}},
+			log:  log, userInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
+		}
 	}
 	return out
 }
 
 type githubProvider struct {
-	conf *oauth2.Config
-	log  *zap.Logger
+	conf        *oauth2.Config
+	log         *zap.Logger
+	userInfoURL string
+	emailsURL   string
 }
 
 func (p *githubProvider) Name() string { return "github" }
@@ -58,7 +66,7 @@ func (p *githubProvider) Exchange(ctx context.Context, code, redirectURI string)
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	}
-	if err := getJSON(ctx, client, "https://api.github.com/user", &raw); err != nil {
+	if err := getJSON(ctx, client, p.userInfoURL, &raw); err != nil {
 		return biz.OAuthProfile{}, err
 	}
 	email := raw.Email
@@ -68,7 +76,7 @@ func (p *githubProvider) Exchange(ctx context.Context, code, redirectURI string)
 			Primary  bool   `json:"primary"`
 			Verified bool   `json:"verified"`
 		}
-		if err := getJSON(ctx, client, "https://api.github.com/user/emails", &emails); err == nil {
+		if err := getJSON(ctx, client, p.emailsURL, &emails); err == nil {
 			for _, e := range emails {
 				if e.Primary && e.Verified {
 					email = e.Email
@@ -88,8 +96,9 @@ func (p *githubProvider) Exchange(ctx context.Context, code, redirectURI string)
 }
 
 type googleProvider struct {
-	conf *oauth2.Config
-	log  *zap.Logger
+	conf        *oauth2.Config
+	log         *zap.Logger
+	userInfoURL string
 }
 
 func (p *googleProvider) Name() string { return "google" }
@@ -112,7 +121,7 @@ func (p *googleProvider) Exchange(ctx context.Context, code, redirectURI string)
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	}
-	if err := getJSON(ctx, client, "https://openidconnect.googleapis.com/v1/userinfo", &raw); err != nil {
+	if err := getJSON(ctx, client, p.userInfoURL, &raw); err != nil {
 		return biz.OAuthProfile{}, err
 	}
 	return biz.OAuthProfile{Subject: raw.Sub, Issuer: "google", Display: raw.Name, Email: raw.Email}, nil

@@ -365,6 +365,9 @@ func (r *settingsRepo) SaveEmail(ctx context.Context, tx biz.Tx, s *biz.EmailSet
 	err = db.Where("name = ?", "email").First(&p).Error
 	now := time.Now().UTC()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if expected == 0 {
+			expected = 1
+		}
 		if expected != 1 {
 			return nil, biz.ConflictRevision(1)
 		}
