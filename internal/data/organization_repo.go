@@ -167,15 +167,28 @@ func memberToBiz(p *organizationMemberPO) *biz.OrganizationMember {
 
 func (r *organizationRepo) ListMembers(ctx context.Context, tx biz.Tx, orgID int64) ([]*biz.OrganizationMember, error) {
 	db := r.d.dbOr(tx).WithContext(ctx)
+	// Explicit fields: scanning into an embedded PO silently yields zero values
+	// because the embedded type is unexported, which dropped ids and roles.
 	type row struct {
-		organizationMemberPO
-		Username    string
-		DisplayName string
-		Email       *string
+		ID             int64
+		OrganizationID int64
+		UserID         int64
+		Role           string
+		DepartmentID   *int64
+		Status         string
+		Revision       uint64
+		InvitedBy      int64
+		JoinedAt       time.Time
+		UpdatedAt      time.Time
+		Username       string
+		DisplayName    string
+		Email          *string
 	}
 	var rows []row
 	err := db.Table("organization_members AS m").
-		Select("m.*, u.username, u.display_name, u.email").
+		Select(`m.id, m.organization_id, m.user_id, m.role, m.department_id, m.status,
+			m.revision, m.invited_by, m.joined_at, m.updated_at,
+			u.username, u.display_name, u.email`).
 		Joins("JOIN users AS u ON u.id = m.user_id").
 		Where("m.organization_id = ? AND m.status = ?", orgID, biz.OrgMemberActive).
 		Order("CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, m.id").
@@ -185,8 +198,13 @@ func (r *organizationRepo) ListMembers(ctx context.Context, tx biz.Tx, orgID int
 	}
 	out := make([]*biz.OrganizationMember, 0, len(rows))
 	for i := range rows {
-		m := memberToBiz(&rows[i].organizationMemberPO)
-		m.Username, m.DisplayName = rows[i].Username, rows[i].DisplayName
+		m := &biz.OrganizationMember{
+			ID: rows[i].ID, OrganizationID: rows[i].OrganizationID, UserID: rows[i].UserID,
+			Role: rows[i].Role, DepartmentID: rows[i].DepartmentID, Status: rows[i].Status,
+			Revision: rows[i].Revision, InvitedBy: rows[i].InvitedBy,
+			JoinedAt: rows[i].JoinedAt.UTC(),
+			Username: rows[i].Username, DisplayName: rows[i].DisplayName,
+		}
 		if rows[i].Email != nil {
 			m.Email = *rows[i].Email
 		}
