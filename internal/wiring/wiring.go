@@ -84,6 +84,7 @@ func NewRuntimeConfig(b *conf.Bootstrap) (*biz.RuntimeConfig, error) {
 		OIDCIssuer:       envOr("OIDC_ISSUER", srv.Http.PublicBaseUrl),
 		OIDCAccessTTL:    15 * time.Minute,
 		OIDCRefreshTTL:   24 * time.Hour,
+		OrgInvitationTTL: 72 * time.Hour,
 	}
 	if cfg.PublicBaseURL == "" {
 		cfg.PublicBaseURL = "http://localhost:5173"
@@ -99,6 +100,13 @@ func NewRuntimeConfig(b *conf.Bootstrap) (*biz.RuntimeConfig, error) {
 	if err != nil || u.Host == "" || u.Opaque != "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(cfg.OIDCIssuer, "?#") ||
 		(u.Scheme != "https" && !(development && loopback && u.Scheme == "http")) {
 		return nil, errors.New("OIDC_ISSUER must be an HTTPS URL without user info, query or fragment (HTTP loopback is allowed only in development)")
+	}
+	if raw := os.Getenv("ORG_INVITATION_TTL_HOURS"); raw != "" {
+		hours, err := strconv.Atoi(raw)
+		if err != nil || hours < 1 || hours > 720 {
+			return nil, errors.New("ORG_INVITATION_TTL_HOURS must be an integer from 1 to 720")
+		}
+		cfg.OrgInvitationTTL = time.Duration(hours) * time.Hour
 	}
 	for _, field := range []struct {
 		name     string

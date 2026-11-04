@@ -19,10 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SettingsService_GetAuthSettings_FullMethodName     = "/api.usercenter.v1.SettingsService/GetAuthSettings"
-	SettingsService_UpdateAuthSettings_FullMethodName  = "/api.usercenter.v1.SettingsService/UpdateAuthSettings"
-	SettingsService_GetEmailSettings_FullMethodName    = "/api.usercenter.v1.SettingsService/GetEmailSettings"
-	SettingsService_UpdateEmailSettings_FullMethodName = "/api.usercenter.v1.SettingsService/UpdateEmailSettings"
+	SettingsService_GetAuthSettings_FullMethodName            = "/api.usercenter.v1.SettingsService/GetAuthSettings"
+	SettingsService_UpdateAuthSettings_FullMethodName         = "/api.usercenter.v1.SettingsService/UpdateAuthSettings"
+	SettingsService_GetEmailSettings_FullMethodName           = "/api.usercenter.v1.SettingsService/GetEmailSettings"
+	SettingsService_UpdateEmailSettings_FullMethodName        = "/api.usercenter.v1.SettingsService/UpdateEmailSettings"
+	SettingsService_GetAuthProviders_FullMethodName           = "/api.usercenter.v1.SettingsService/GetAuthProviders"
+	SettingsService_GetOrganizationSettings_FullMethodName    = "/api.usercenter.v1.SettingsService/GetOrganizationSettings"
+	SettingsService_UpdateOrganizationSettings_FullMethodName = "/api.usercenter.v1.SettingsService/UpdateOrganizationSettings"
 )
 
 // SettingsServiceClient is the client API for SettingsService service.
@@ -36,6 +39,9 @@ type SettingsServiceClient interface {
 	UpdateAuthSettings(ctx context.Context, in *UpdateAuthSettingsRequest, opts ...grpc.CallOption) (*AuthSettings, error)
 	GetEmailSettings(ctx context.Context, in *GetEmailSettingsRequest, opts ...grpc.CallOption) (*EmailSettings, error)
 	UpdateEmailSettings(ctx context.Context, in *UpdateEmailSettingsRequest, opts ...grpc.CallOption) (*EmailSettings, error)
+	GetAuthProviders(ctx context.Context, in *GetAuthProvidersRequest, opts ...grpc.CallOption) (*AuthProvidersReply, error)
+	GetOrganizationSettings(ctx context.Context, in *GetOrganizationSettingsRequest, opts ...grpc.CallOption) (*OrganizationSettings, error)
+	UpdateOrganizationSettings(ctx context.Context, in *UpdateOrganizationSettingsRequest, opts ...grpc.CallOption) (*OrganizationSettings, error)
 }
 
 type settingsServiceClient struct {
@@ -86,6 +92,36 @@ func (c *settingsServiceClient) UpdateEmailSettings(ctx context.Context, in *Upd
 	return out, nil
 }
 
+func (c *settingsServiceClient) GetAuthProviders(ctx context.Context, in *GetAuthProvidersRequest, opts ...grpc.CallOption) (*AuthProvidersReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthProvidersReply)
+	err := c.cc.Invoke(ctx, SettingsService_GetAuthProviders_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingsServiceClient) GetOrganizationSettings(ctx context.Context, in *GetOrganizationSettingsRequest, opts ...grpc.CallOption) (*OrganizationSettings, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrganizationSettings)
+	err := c.cc.Invoke(ctx, SettingsService_GetOrganizationSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingsServiceClient) UpdateOrganizationSettings(ctx context.Context, in *UpdateOrganizationSettingsRequest, opts ...grpc.CallOption) (*OrganizationSettings, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrganizationSettings)
+	err := c.cc.Invoke(ctx, SettingsService_UpdateOrganizationSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SettingsServiceServer is the server API for SettingsService service.
 // All implementations must embed UnimplementedSettingsServiceServer
 // for forward compatibility.
@@ -97,6 +133,9 @@ type SettingsServiceServer interface {
 	UpdateAuthSettings(context.Context, *UpdateAuthSettingsRequest) (*AuthSettings, error)
 	GetEmailSettings(context.Context, *GetEmailSettingsRequest) (*EmailSettings, error)
 	UpdateEmailSettings(context.Context, *UpdateEmailSettingsRequest) (*EmailSettings, error)
+	GetAuthProviders(context.Context, *GetAuthProvidersRequest) (*AuthProvidersReply, error)
+	GetOrganizationSettings(context.Context, *GetOrganizationSettingsRequest) (*OrganizationSettings, error)
+	UpdateOrganizationSettings(context.Context, *UpdateOrganizationSettingsRequest) (*OrganizationSettings, error)
 	mustEmbedUnimplementedSettingsServiceServer()
 }
 
@@ -118,6 +157,15 @@ func (UnimplementedSettingsServiceServer) GetEmailSettings(context.Context, *Get
 }
 func (UnimplementedSettingsServiceServer) UpdateEmailSettings(context.Context, *UpdateEmailSettingsRequest) (*EmailSettings, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateEmailSettings not implemented")
+}
+func (UnimplementedSettingsServiceServer) GetAuthProviders(context.Context, *GetAuthProvidersRequest) (*AuthProvidersReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAuthProviders not implemented")
+}
+func (UnimplementedSettingsServiceServer) GetOrganizationSettings(context.Context, *GetOrganizationSettingsRequest) (*OrganizationSettings, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOrganizationSettings not implemented")
+}
+func (UnimplementedSettingsServiceServer) UpdateOrganizationSettings(context.Context, *UpdateOrganizationSettingsRequest) (*OrganizationSettings, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateOrganizationSettings not implemented")
 }
 func (UnimplementedSettingsServiceServer) mustEmbedUnimplementedSettingsServiceServer() {}
 func (UnimplementedSettingsServiceServer) testEmbeddedByValue()                         {}
@@ -212,6 +260,60 @@ func _SettingsService_UpdateEmailSettings_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SettingsService_GetAuthProviders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAuthProvidersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).GetAuthProviders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_GetAuthProviders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).GetAuthProviders(ctx, req.(*GetAuthProvidersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingsService_GetOrganizationSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).GetOrganizationSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_GetOrganizationSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).GetOrganizationSettings(ctx, req.(*GetOrganizationSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingsService_UpdateOrganizationSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateOrganizationSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).UpdateOrganizationSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_UpdateOrganizationSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).UpdateOrganizationSettings(ctx, req.(*UpdateOrganizationSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SettingsService_ServiceDesc is the grpc.ServiceDesc for SettingsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -234,6 +336,18 @@ var SettingsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateEmailSettings",
 			Handler:    _SettingsService_UpdateEmailSettings_Handler,
+		},
+		{
+			MethodName: "GetAuthProviders",
+			Handler:    _SettingsService_GetAuthProviders_Handler,
+		},
+		{
+			MethodName: "GetOrganizationSettings",
+			Handler:    _SettingsService_GetOrganizationSettings_Handler,
+		},
+		{
+			MethodName: "UpdateOrganizationSettings",
+			Handler:    _SettingsService_UpdateOrganizationSettings_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -528,6 +528,391 @@ func (x *UpdateEmailSettingsRequest) GetReason() string {
 	return ""
 }
 
+type GetAuthProvidersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAuthProvidersRequest) Reset() {
+	*x = GetAuthProvidersRequest{}
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAuthProvidersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAuthProvidersRequest) ProtoMessage() {}
+
+func (x *GetAuthProvidersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAuthProvidersRequest.ProtoReflect.Descriptor instead.
+func (*GetAuthProvidersRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_settings_proto_rawDescGZIP(), []int{6}
+}
+
+type AuthProviderView struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Code    string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Name    string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Enabled bool                   `protobuf:"varint,3,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// env | db (currently env only)
+	CredentialSource     string   `protobuf:"bytes,4,opt,name=credential_source,json=credentialSource,proto3" json:"credential_source,omitempty"`
+	CredentialConfigured bool     `protobuf:"varint,5,opt,name=credential_configured,json=credentialConfigured,proto3" json:"credential_configured,omitempty"`
+	CallbackUrl          string   `protobuf:"bytes,6,opt,name=callback_url,json=callbackUrl,proto3" json:"callback_url,omitempty"`
+	RequiredEnv          []string `protobuf:"bytes,7,rep,name=required_env,json=requiredEnv,proto3" json:"required_env,omitempty"`
+	UpdatedAt            string   `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AuthProviderView) Reset() {
+	*x = AuthProviderView{}
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthProviderView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthProviderView) ProtoMessage() {}
+
+func (x *AuthProviderView) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthProviderView.ProtoReflect.Descriptor instead.
+func (*AuthProviderView) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_settings_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *AuthProviderView) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *AuthProviderView) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AuthProviderView) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *AuthProviderView) GetCredentialSource() string {
+	if x != nil {
+		return x.CredentialSource
+	}
+	return ""
+}
+
+func (x *AuthProviderView) GetCredentialConfigured() bool {
+	if x != nil {
+		return x.CredentialConfigured
+	}
+	return false
+}
+
+func (x *AuthProviderView) GetCallbackUrl() string {
+	if x != nil {
+		return x.CallbackUrl
+	}
+	return ""
+}
+
+func (x *AuthProviderView) GetRequiredEnv() []string {
+	if x != nil {
+		return x.RequiredEnv
+	}
+	return nil
+}
+
+func (x *AuthProviderView) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type AuthProvidersReply struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*AuthProviderView    `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	Revision      string                 `protobuf:"bytes,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthProvidersReply) Reset() {
+	*x = AuthProvidersReply{}
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthProvidersReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthProvidersReply) ProtoMessage() {}
+
+func (x *AuthProvidersReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthProvidersReply.ProtoReflect.Descriptor instead.
+func (*AuthProvidersReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_settings_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AuthProvidersReply) GetItems() []*AuthProviderView {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AuthProvidersReply) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+type GetOrganizationSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOrganizationSettingsRequest) Reset() {
+	*x = GetOrganizationSettingsRequest{}
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOrganizationSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOrganizationSettingsRequest) ProtoMessage() {}
+
+func (x *GetOrganizationSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOrganizationSettingsRequest.ProtoReflect.Descriptor instead.
+func (*GetOrganizationSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_settings_proto_rawDescGZIP(), []int{9}
+}
+
+type OrganizationSettings struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	QuotaEnabled    bool                   `protobuf:"varint,1,opt,name=quota_enabled,json=quotaEnabled,proto3" json:"quota_enabled,omitempty"`
+	MaxOwnedPerUser int32                  `protobuf:"varint,2,opt,name=max_owned_per_user,json=maxOwnedPerUser,proto3" json:"max_owned_per_user,omitempty"`
+	CountArchived   bool                   `protobuf:"varint,3,opt,name=count_archived,json=countArchived,proto3" json:"count_archived,omitempty"`
+	Revision        string                 `protobuf:"bytes,4,opt,name=revision,proto3" json:"revision,omitempty"`
+	UpdatedAt       string                 `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *OrganizationSettings) Reset() {
+	*x = OrganizationSettings{}
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OrganizationSettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OrganizationSettings) ProtoMessage() {}
+
+func (x *OrganizationSettings) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OrganizationSettings.ProtoReflect.Descriptor instead.
+func (*OrganizationSettings) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_settings_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *OrganizationSettings) GetQuotaEnabled() bool {
+	if x != nil {
+		return x.QuotaEnabled
+	}
+	return false
+}
+
+func (x *OrganizationSettings) GetMaxOwnedPerUser() int32 {
+	if x != nil {
+		return x.MaxOwnedPerUser
+	}
+	return 0
+}
+
+func (x *OrganizationSettings) GetCountArchived() bool {
+	if x != nil {
+		return x.CountArchived
+	}
+	return false
+}
+
+func (x *OrganizationSettings) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+func (x *OrganizationSettings) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type UpdateOrganizationSettingsRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	QuotaEnabled     bool                   `protobuf:"varint,1,opt,name=quota_enabled,json=quotaEnabled,proto3" json:"quota_enabled,omitempty"`
+	MaxOwnedPerUser  int32                  `protobuf:"varint,2,opt,name=max_owned_per_user,json=maxOwnedPerUser,proto3" json:"max_owned_per_user,omitempty"`
+	CountArchived    bool                   `protobuf:"varint,3,opt,name=count_archived,json=countArchived,proto3" json:"count_archived,omitempty"`
+	UpdateMask       string                 `protobuf:"bytes,4,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
+	ExpectedRevision string                 `protobuf:"bytes,5,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason           string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UpdateOrganizationSettingsRequest) Reset() {
+	*x = UpdateOrganizationSettingsRequest{}
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateOrganizationSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateOrganizationSettingsRequest) ProtoMessage() {}
+
+func (x *UpdateOrganizationSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_settings_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateOrganizationSettingsRequest.ProtoReflect.Descriptor instead.
+func (*UpdateOrganizationSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_settings_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *UpdateOrganizationSettingsRequest) GetQuotaEnabled() bool {
+	if x != nil {
+		return x.QuotaEnabled
+	}
+	return false
+}
+
+func (x *UpdateOrganizationSettingsRequest) GetMaxOwnedPerUser() int32 {
+	if x != nil {
+		return x.MaxOwnedPerUser
+	}
+	return 0
+}
+
+func (x *UpdateOrganizationSettingsRequest) GetCountArchived() bool {
+	if x != nil {
+		return x.CountArchived
+	}
+	return false
+}
+
+func (x *UpdateOrganizationSettingsRequest) GetUpdateMask() string {
+	if x != nil {
+		return x.UpdateMask
+	}
+	return ""
+}
+
+func (x *UpdateOrganizationSettingsRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return ""
+}
+
+func (x *UpdateOrganizationSettingsRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 var File_api_usercenter_v1_settings_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_settings_proto_rawDesc = "" +
@@ -577,12 +962,45 @@ const file_api_usercenter_v1_settings_proto_rawDesc = "" +
 	"\vupdate_mask\x18\a \x01(\tR\n" +
 	"updateMask\x12+\n" +
 	"\x11expected_revision\x18\b \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\t \x01(\tR\x06reason2\xbf\x04\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\"\x19\n" +
+	"\x17GetAuthProvidersRequest\"\x9b\x02\n" +
+	"\x10AuthProviderView\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
+	"\aenabled\x18\x03 \x01(\bR\aenabled\x12+\n" +
+	"\x11credential_source\x18\x04 \x01(\tR\x10credentialSource\x123\n" +
+	"\x15credential_configured\x18\x05 \x01(\bR\x14credentialConfigured\x12!\n" +
+	"\fcallback_url\x18\x06 \x01(\tR\vcallbackUrl\x12!\n" +
+	"\frequired_env\x18\a \x03(\tR\vrequiredEnv\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\b \x01(\tR\tupdatedAt\"k\n" +
+	"\x12AuthProvidersReply\x129\n" +
+	"\x05items\x18\x01 \x03(\v2#.api.usercenter.v1.AuthProviderViewR\x05items\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\tR\brevision\" \n" +
+	"\x1eGetOrganizationSettingsRequest\"\xca\x01\n" +
+	"\x14OrganizationSettings\x12#\n" +
+	"\rquota_enabled\x18\x01 \x01(\bR\fquotaEnabled\x12+\n" +
+	"\x12max_owned_per_user\x18\x02 \x01(\x05R\x0fmaxOwnedPerUser\x12%\n" +
+	"\x0ecount_archived\x18\x03 \x01(\bR\rcountArchived\x12\x1a\n" +
+	"\brevision\x18\x04 \x01(\tR\brevision\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\tR\tupdatedAt\"\x82\x02\n" +
+	"!UpdateOrganizationSettingsRequest\x12#\n" +
+	"\rquota_enabled\x18\x01 \x01(\bR\fquotaEnabled\x12+\n" +
+	"\x12max_owned_per_user\x18\x02 \x01(\x05R\x0fmaxOwnedPerUser\x12%\n" +
+	"\x0ecount_archived\x18\x03 \x01(\bR\rcountArchived\x12\x1f\n" +
+	"\vupdate_mask\x18\x04 \x01(\tR\n" +
+	"updateMask\x12+\n" +
+	"\x11expected_revision\x18\x05 \x01(\tR\x10expectedRevision\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason2\xa4\b\n" +
 	"\x0fSettingsService\x12\x82\x01\n" +
 	"\x0fGetAuthSettings\x12).api.usercenter.v1.GetAuthSettingsRequest\x1a\x1f.api.usercenter.v1.AuthSettings\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/admin/settings/auth\x12\x8b\x01\n" +
 	"\x12UpdateAuthSettings\x12,.api.usercenter.v1.UpdateAuthSettingsRequest\x1a\x1f.api.usercenter.v1.AuthSettings\"&\x82\xd3\xe4\x93\x02 :\x01*2\x1b/api/v1/admin/settings/auth\x12\x86\x01\n" +
 	"\x10GetEmailSettings\x12*.api.usercenter.v1.GetEmailSettingsRequest\x1a .api.usercenter.v1.EmailSettings\"$\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1/admin/settings/email\x12\x8f\x01\n" +
-	"\x13UpdateEmailSettings\x12-.api.usercenter.v1.UpdateEmailSettingsRequest\x1a .api.usercenter.v1.EmailSettings\"'\x82\xd3\xe4\x93\x02!:\x01*2\x1c/api/v1/admin/settings/emailB<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
+	"\x13UpdateEmailSettings\x12-.api.usercenter.v1.UpdateEmailSettingsRequest\x1a .api.usercenter.v1.EmailSettings\"'\x82\xd3\xe4\x93\x02!:\x01*2\x1c/api/v1/admin/settings/email\x12\x8f\x01\n" +
+	"\x10GetAuthProviders\x12*.api.usercenter.v1.GetAuthProvidersRequest\x1a%.api.usercenter.v1.AuthProvidersReply\"(\x82\xd3\xe4\x93\x02\"\x12 /api/v1/admin/settings/providers\x12\xa2\x01\n" +
+	"\x17GetOrganizationSettings\x121.api.usercenter.v1.GetOrganizationSettingsRequest\x1a'.api.usercenter.v1.OrganizationSettings\"+\x82\xd3\xe4\x93\x02%\x12#/api/v1/admin/settings/organization\x12\xab\x01\n" +
+	"\x1aUpdateOrganizationSettings\x124.api.usercenter.v1.UpdateOrganizationSettingsRequest\x1a'.api.usercenter.v1.OrganizationSettings\".\x82\xd3\xe4\x93\x02(:\x01*2#/api/v1/admin/settings/organizationB<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
 
 var (
 	file_api_usercenter_v1_settings_proto_rawDescOnce sync.Once
@@ -596,29 +1014,42 @@ func file_api_usercenter_v1_settings_proto_rawDescGZIP() []byte {
 	return file_api_usercenter_v1_settings_proto_rawDescData
 }
 
-var file_api_usercenter_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_api_usercenter_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_api_usercenter_v1_settings_proto_goTypes = []any{
-	(*GetAuthSettingsRequest)(nil),     // 0: api.usercenter.v1.GetAuthSettingsRequest
-	(*AuthSettings)(nil),               // 1: api.usercenter.v1.AuthSettings
-	(*UpdateAuthSettingsRequest)(nil),  // 2: api.usercenter.v1.UpdateAuthSettingsRequest
-	(*GetEmailSettingsRequest)(nil),    // 3: api.usercenter.v1.GetEmailSettingsRequest
-	(*EmailSettings)(nil),              // 4: api.usercenter.v1.EmailSettings
-	(*UpdateEmailSettingsRequest)(nil), // 5: api.usercenter.v1.UpdateEmailSettingsRequest
+	(*GetAuthSettingsRequest)(nil),            // 0: api.usercenter.v1.GetAuthSettingsRequest
+	(*AuthSettings)(nil),                      // 1: api.usercenter.v1.AuthSettings
+	(*UpdateAuthSettingsRequest)(nil),         // 2: api.usercenter.v1.UpdateAuthSettingsRequest
+	(*GetEmailSettingsRequest)(nil),           // 3: api.usercenter.v1.GetEmailSettingsRequest
+	(*EmailSettings)(nil),                     // 4: api.usercenter.v1.EmailSettings
+	(*UpdateEmailSettingsRequest)(nil),        // 5: api.usercenter.v1.UpdateEmailSettingsRequest
+	(*GetAuthProvidersRequest)(nil),           // 6: api.usercenter.v1.GetAuthProvidersRequest
+	(*AuthProviderView)(nil),                  // 7: api.usercenter.v1.AuthProviderView
+	(*AuthProvidersReply)(nil),                // 8: api.usercenter.v1.AuthProvidersReply
+	(*GetOrganizationSettingsRequest)(nil),    // 9: api.usercenter.v1.GetOrganizationSettingsRequest
+	(*OrganizationSettings)(nil),              // 10: api.usercenter.v1.OrganizationSettings
+	(*UpdateOrganizationSettingsRequest)(nil), // 11: api.usercenter.v1.UpdateOrganizationSettingsRequest
 }
 var file_api_usercenter_v1_settings_proto_depIdxs = []int32{
-	0, // 0: api.usercenter.v1.SettingsService.GetAuthSettings:input_type -> api.usercenter.v1.GetAuthSettingsRequest
-	2, // 1: api.usercenter.v1.SettingsService.UpdateAuthSettings:input_type -> api.usercenter.v1.UpdateAuthSettingsRequest
-	3, // 2: api.usercenter.v1.SettingsService.GetEmailSettings:input_type -> api.usercenter.v1.GetEmailSettingsRequest
-	5, // 3: api.usercenter.v1.SettingsService.UpdateEmailSettings:input_type -> api.usercenter.v1.UpdateEmailSettingsRequest
-	1, // 4: api.usercenter.v1.SettingsService.GetAuthSettings:output_type -> api.usercenter.v1.AuthSettings
-	1, // 5: api.usercenter.v1.SettingsService.UpdateAuthSettings:output_type -> api.usercenter.v1.AuthSettings
-	4, // 6: api.usercenter.v1.SettingsService.GetEmailSettings:output_type -> api.usercenter.v1.EmailSettings
-	4, // 7: api.usercenter.v1.SettingsService.UpdateEmailSettings:output_type -> api.usercenter.v1.EmailSettings
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	7,  // 0: api.usercenter.v1.AuthProvidersReply.items:type_name -> api.usercenter.v1.AuthProviderView
+	0,  // 1: api.usercenter.v1.SettingsService.GetAuthSettings:input_type -> api.usercenter.v1.GetAuthSettingsRequest
+	2,  // 2: api.usercenter.v1.SettingsService.UpdateAuthSettings:input_type -> api.usercenter.v1.UpdateAuthSettingsRequest
+	3,  // 3: api.usercenter.v1.SettingsService.GetEmailSettings:input_type -> api.usercenter.v1.GetEmailSettingsRequest
+	5,  // 4: api.usercenter.v1.SettingsService.UpdateEmailSettings:input_type -> api.usercenter.v1.UpdateEmailSettingsRequest
+	6,  // 5: api.usercenter.v1.SettingsService.GetAuthProviders:input_type -> api.usercenter.v1.GetAuthProvidersRequest
+	9,  // 6: api.usercenter.v1.SettingsService.GetOrganizationSettings:input_type -> api.usercenter.v1.GetOrganizationSettingsRequest
+	11, // 7: api.usercenter.v1.SettingsService.UpdateOrganizationSettings:input_type -> api.usercenter.v1.UpdateOrganizationSettingsRequest
+	1,  // 8: api.usercenter.v1.SettingsService.GetAuthSettings:output_type -> api.usercenter.v1.AuthSettings
+	1,  // 9: api.usercenter.v1.SettingsService.UpdateAuthSettings:output_type -> api.usercenter.v1.AuthSettings
+	4,  // 10: api.usercenter.v1.SettingsService.GetEmailSettings:output_type -> api.usercenter.v1.EmailSettings
+	4,  // 11: api.usercenter.v1.SettingsService.UpdateEmailSettings:output_type -> api.usercenter.v1.EmailSettings
+	8,  // 12: api.usercenter.v1.SettingsService.GetAuthProviders:output_type -> api.usercenter.v1.AuthProvidersReply
+	10, // 13: api.usercenter.v1.SettingsService.GetOrganizationSettings:output_type -> api.usercenter.v1.OrganizationSettings
+	10, // 14: api.usercenter.v1.SettingsService.UpdateOrganizationSettings:output_type -> api.usercenter.v1.OrganizationSettings
+	8,  // [8:15] is the sub-list for method output_type
+	1,  // [1:8] is the sub-list for method input_type
+	1,  // [1:1] is the sub-list for extension type_name
+	1,  // [1:1] is the sub-list for extension extendee
+	0,  // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_api_usercenter_v1_settings_proto_init() }
@@ -632,7 +1063,7 @@ func file_api_usercenter_v1_settings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_usercenter_v1_settings_proto_rawDesc), len(file_api_usercenter_v1_settings_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

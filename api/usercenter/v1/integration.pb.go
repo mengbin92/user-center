@@ -22,6 +22,219 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type AuthenticateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
+	RequestId     string                 `protobuf:"bytes,4,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthenticateRequest) Reset() {
+	*x = AuthenticateRequest{}
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthenticateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthenticateRequest) ProtoMessage() {}
+
+func (x *AuthenticateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthenticateRequest.ProtoReflect.Descriptor instead.
+func (*AuthenticateRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *AuthenticateRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *AuthenticateRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *AuthenticateRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *AuthenticateRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type AuthenticateReply struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// authenticated | mfa_required
+	Status             string `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	ChallengeId        string `protobuf:"bytes,2,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	ChallengeExpiresAt string `protobuf:"bytes,3,opt,name=challenge_expires_at,json=challengeExpiresAt,proto3" json:"challenge_expires_at,omitempty"`
+	SessionToken       string `protobuf:"bytes,4,opt,name=session_token,json=sessionToken,proto3" json:"session_token,omitempty"`
+	SessionId          string `protobuf:"bytes,5,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	UserId             string `protobuf:"bytes,6,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SessionExpiresAt   string `protobuf:"bytes,7,opt,name=session_expires_at,json=sessionExpiresAt,proto3" json:"session_expires_at,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AuthenticateReply) Reset() {
+	*x = AuthenticateReply{}
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthenticateReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthenticateReply) ProtoMessage() {}
+
+func (x *AuthenticateReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthenticateReply.ProtoReflect.Descriptor instead.
+func (*AuthenticateReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AuthenticateReply) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AuthenticateReply) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *AuthenticateReply) GetChallengeExpiresAt() string {
+	if x != nil {
+		return x.ChallengeExpiresAt
+	}
+	return ""
+}
+
+func (x *AuthenticateReply) GetSessionToken() string {
+	if x != nil {
+		return x.SessionToken
+	}
+	return ""
+}
+
+func (x *AuthenticateReply) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AuthenticateReply) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *AuthenticateReply) GetSessionExpiresAt() string {
+	if x != nil {
+		return x.SessionExpiresAt
+	}
+	return ""
+}
+
+type IntegrationCompleteMFARequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChallengeId   string                 `protobuf:"bytes,1,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IntegrationCompleteMFARequest) Reset() {
+	*x = IntegrationCompleteMFARequest{}
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IntegrationCompleteMFARequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IntegrationCompleteMFARequest) ProtoMessage() {}
+
+func (x *IntegrationCompleteMFARequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IntegrationCompleteMFARequest.ProtoReflect.Descriptor instead.
+func (*IntegrationCompleteMFARequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *IntegrationCompleteMFARequest) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *IntegrationCompleteMFARequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
 type SessionFacts struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	SessionId       string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -37,7 +250,7 @@ type SessionFacts struct {
 
 func (x *SessionFacts) Reset() {
 	*x = SessionFacts{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[0]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -49,7 +262,7 @@ func (x *SessionFacts) String() string {
 func (*SessionFacts) ProtoMessage() {}
 
 func (x *SessionFacts) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[0]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -62,7 +275,7 @@ func (x *SessionFacts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionFacts.ProtoReflect.Descriptor instead.
 func (*SessionFacts) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{0}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SessionFacts) GetSessionId() string {
@@ -125,7 +338,7 @@ type ValidateSessionRequest struct {
 
 func (x *ValidateSessionRequest) Reset() {
 	*x = ValidateSessionRequest{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[1]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -137,7 +350,7 @@ func (x *ValidateSessionRequest) String() string {
 func (*ValidateSessionRequest) ProtoMessage() {}
 
 func (x *ValidateSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[1]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -150,7 +363,7 @@ func (x *ValidateSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateSessionRequest.ProtoReflect.Descriptor instead.
 func (*ValidateSessionRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{1}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ValidateSessionRequest) GetSessionToken() string {
@@ -179,7 +392,7 @@ type ValidateSessionReply struct {
 
 func (x *ValidateSessionReply) Reset() {
 	*x = ValidateSessionReply{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[2]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -191,7 +404,7 @@ func (x *ValidateSessionReply) String() string {
 func (*ValidateSessionReply) ProtoMessage() {}
 
 func (x *ValidateSessionReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[2]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -204,7 +417,7 @@ func (x *ValidateSessionReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateSessionReply.ProtoReflect.Descriptor instead.
 func (*ValidateSessionReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{2}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ValidateSessionReply) GetValid() bool {
@@ -244,7 +457,7 @@ type ValidateSubjectRequest struct {
 
 func (x *ValidateSubjectRequest) Reset() {
 	*x = ValidateSubjectRequest{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[3]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -256,7 +469,7 @@ func (x *ValidateSubjectRequest) String() string {
 func (*ValidateSubjectRequest) ProtoMessage() {}
 
 func (x *ValidateSubjectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[3]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -269,7 +482,7 @@ func (x *ValidateSubjectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateSubjectRequest.ProtoReflect.Descriptor instead.
 func (*ValidateSubjectRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{3}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ValidateSubjectRequest) GetUserId() string {
@@ -290,7 +503,7 @@ type ValidateSubjectReply struct {
 
 func (x *ValidateSubjectReply) Reset() {
 	*x = ValidateSubjectReply{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[4]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -302,7 +515,7 @@ func (x *ValidateSubjectReply) String() string {
 func (*ValidateSubjectReply) ProtoMessage() {}
 
 func (x *ValidateSubjectReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[4]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -315,7 +528,7 @@ func (x *ValidateSubjectReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateSubjectReply.ProtoReflect.Descriptor instead.
 func (*ValidateSubjectReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{4}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ValidateSubjectReply) GetEnabled() bool {
@@ -348,7 +561,7 @@ type IntegrationGetUserRequest struct {
 
 func (x *IntegrationGetUserRequest) Reset() {
 	*x = IntegrationGetUserRequest{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[5]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -360,7 +573,7 @@ func (x *IntegrationGetUserRequest) String() string {
 func (*IntegrationGetUserRequest) ProtoMessage() {}
 
 func (x *IntegrationGetUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[5]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -373,7 +586,7 @@ func (x *IntegrationGetUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationGetUserRequest.ProtoReflect.Descriptor instead.
 func (*IntegrationGetUserRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{5}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *IntegrationGetUserRequest) GetUserId() string {
@@ -392,7 +605,7 @@ type IntegrationUserReply struct {
 
 func (x *IntegrationUserReply) Reset() {
 	*x = IntegrationUserReply{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[6]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -404,7 +617,7 @@ func (x *IntegrationUserReply) String() string {
 func (*IntegrationUserReply) ProtoMessage() {}
 
 func (x *IntegrationUserReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[6]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -417,7 +630,7 @@ func (x *IntegrationUserReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationUserReply.ProtoReflect.Descriptor instead.
 func (*IntegrationUserReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{6}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *IntegrationUserReply) GetUser() *User {
@@ -436,7 +649,7 @@ type BatchGetUsersRequest struct {
 
 func (x *BatchGetUsersRequest) Reset() {
 	*x = BatchGetUsersRequest{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[7]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -448,7 +661,7 @@ func (x *BatchGetUsersRequest) String() string {
 func (*BatchGetUsersRequest) ProtoMessage() {}
 
 func (x *BatchGetUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[7]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -461,7 +674,7 @@ func (x *BatchGetUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchGetUsersRequest.ProtoReflect.Descriptor instead.
 func (*BatchGetUsersRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{7}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BatchGetUsersRequest) GetUserIds() []string {
@@ -480,7 +693,7 @@ type IntegrationUsersReply struct {
 
 func (x *IntegrationUsersReply) Reset() {
 	*x = IntegrationUsersReply{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[8]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -492,7 +705,7 @@ func (x *IntegrationUsersReply) String() string {
 func (*IntegrationUsersReply) ProtoMessage() {}
 
 func (x *IntegrationUsersReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[8]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -505,7 +718,7 @@ func (x *IntegrationUsersReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationUsersReply.ProtoReflect.Descriptor instead.
 func (*IntegrationUsersReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{8}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *IntegrationUsersReply) GetItems() []*User {
@@ -525,7 +738,7 @@ type SessionAuthorizationRequest struct {
 
 func (x *SessionAuthorizationRequest) Reset() {
 	*x = SessionAuthorizationRequest{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[9]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -537,7 +750,7 @@ func (x *SessionAuthorizationRequest) String() string {
 func (*SessionAuthorizationRequest) ProtoMessage() {}
 
 func (x *SessionAuthorizationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[9]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -550,7 +763,7 @@ func (x *SessionAuthorizationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionAuthorizationRequest.ProtoReflect.Descriptor instead.
 func (*SessionAuthorizationRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{9}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SessionAuthorizationRequest) GetSessionToken() string {
@@ -579,7 +792,7 @@ type SessionAuthorizationReply struct {
 
 func (x *SessionAuthorizationReply) Reset() {
 	*x = SessionAuthorizationReply{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[10]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +804,7 @@ func (x *SessionAuthorizationReply) String() string {
 func (*SessionAuthorizationReply) ProtoMessage() {}
 
 func (x *SessionAuthorizationReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[10]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +817,7 @@ func (x *SessionAuthorizationReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionAuthorizationReply.ProtoReflect.Descriptor instead.
 func (*SessionAuthorizationReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{10}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SessionAuthorizationReply) GetPermissions() []*PermissionSummary {
@@ -646,7 +859,7 @@ type AuthorizationObjectFacts struct {
 
 func (x *AuthorizationObjectFacts) Reset() {
 	*x = AuthorizationObjectFacts{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[11]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -658,7 +871,7 @@ func (x *AuthorizationObjectFacts) String() string {
 func (*AuthorizationObjectFacts) ProtoMessage() {}
 
 func (x *AuthorizationObjectFacts) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[11]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -671,7 +884,7 @@ func (x *AuthorizationObjectFacts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizationObjectFacts.ProtoReflect.Descriptor instead.
 func (*AuthorizationObjectFacts) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{11}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AuthorizationObjectFacts) GetOwnerUserId() string {
@@ -707,7 +920,7 @@ type ResourceAuthorizationRequest struct {
 
 func (x *ResourceAuthorizationRequest) Reset() {
 	*x = ResourceAuthorizationRequest{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[12]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -719,7 +932,7 @@ func (x *ResourceAuthorizationRequest) String() string {
 func (*ResourceAuthorizationRequest) ProtoMessage() {}
 
 func (x *ResourceAuthorizationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[12]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -732,7 +945,7 @@ func (x *ResourceAuthorizationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceAuthorizationRequest.ProtoReflect.Descriptor instead.
 func (*ResourceAuthorizationRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{12}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ResourceAuthorizationRequest) GetSessionToken() string {
@@ -776,7 +989,7 @@ type ResourceAuthorizationReply struct {
 
 func (x *ResourceAuthorizationReply) Reset() {
 	*x = ResourceAuthorizationReply{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[13]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -788,7 +1001,7 @@ func (x *ResourceAuthorizationReply) String() string {
 func (*ResourceAuthorizationReply) ProtoMessage() {}
 
 func (x *ResourceAuthorizationReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[13]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -801,7 +1014,7 @@ func (x *ResourceAuthorizationReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceAuthorizationReply.ProtoReflect.Descriptor instead.
 func (*ResourceAuthorizationReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{13}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ResourceAuthorizationReply) GetAllowed() bool {
@@ -851,7 +1064,7 @@ type IntegrationRevokeSessionRequest struct {
 
 func (x *IntegrationRevokeSessionRequest) Reset() {
 	*x = IntegrationRevokeSessionRequest{}
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[14]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -863,7 +1076,7 @@ func (x *IntegrationRevokeSessionRequest) String() string {
 func (*IntegrationRevokeSessionRequest) ProtoMessage() {}
 
 func (x *IntegrationRevokeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_integration_proto_msgTypes[14]
+	mi := &file_api_usercenter_v1_integration_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -876,7 +1089,7 @@ func (x *IntegrationRevokeSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationRevokeSessionRequest.ProtoReflect.Descriptor instead.
 func (*IntegrationRevokeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{14}
+	return file_api_usercenter_v1_integration_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *IntegrationRevokeSessionRequest) GetSessionToken() string {
@@ -904,7 +1117,25 @@ var File_api_usercenter_v1_integration_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_integration_proto_rawDesc = "" +
 	"\n" +
-	"#api/usercenter/v1/integration.proto\x12\x11api.usercenter.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1eapi/usercenter/v1/common.proto\"\xf0\x01\n" +
+	"#api/usercenter/v1/integration.proto\x12\x11api.usercenter.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1eapi/usercenter/v1/common.proto\"\x83\x01\n" +
+	"\x13AuthenticateRequest\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x03 \x01(\tR\bpassword\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x04 \x01(\tR\trequestId\"\x8b\x02\n" +
+	"\x11AuthenticateReply\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12!\n" +
+	"\fchallenge_id\x18\x02 \x01(\tR\vchallengeId\x120\n" +
+	"\x14challenge_expires_at\x18\x03 \x01(\tR\x12challengeExpiresAt\x12#\n" +
+	"\rsession_token\x18\x04 \x01(\tR\fsessionToken\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x05 \x01(\tR\tsessionId\x12\x17\n" +
+	"\auser_id\x18\x06 \x01(\tR\x06userId\x12,\n" +
+	"\x12session_expires_at\x18\a \x01(\tR\x10sessionExpiresAt\"V\n" +
+	"\x1dIntegrationCompleteMFARequest\x12!\n" +
+	"\fchallenge_id\x18\x01 \x01(\tR\vchallengeId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\"\xf0\x01\n" +
 	"\fSessionFacts\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x17\n" +
@@ -966,7 +1197,7 @@ const file_api_usercenter_v1_integration_proto_rawDesc = "" +
 	"\rsession_token\x18\x03 \x01(\tR\fsessionToken\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason2\xfa\x05\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason2\xbf\a\n" +
 	"\x12IntegrationService\x12e\n" +
 	"\x0fValidateSession\x12).api.usercenter.v1.ValidateSessionRequest\x1a'.api.usercenter.v1.ValidateSessionReply\x12e\n" +
 	"\x0fValidateSubject\x12).api.usercenter.v1.ValidateSubjectRequest\x1a'.api.usercenter.v1.ValidateSubjectReply\x12`\n" +
@@ -974,7 +1205,9 @@ const file_api_usercenter_v1_integration_proto_rawDesc = "" +
 	"\rBatchGetUsers\x12'.api.usercenter.v1.BatchGetUsersRequest\x1a(.api.usercenter.v1.IntegrationUsersReply\x12w\n" +
 	"\x17GetSessionAuthorization\x12..api.usercenter.v1.SessionAuthorizationRequest\x1a,.api.usercenter.v1.SessionAuthorizationReply\x12z\n" +
 	"\x18GetResourceAuthorization\x12/.api.usercenter.v1.ResourceAuthorizationRequest\x1a-.api.usercenter.v1.ResourceAuthorizationReply\x12[\n" +
-	"\rRevokeSession\x122.api.usercenter.v1.IntegrationRevokeSessionRequest\x1a\x16.google.protobuf.EmptyB<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
+	"\rRevokeSession\x122.api.usercenter.v1.IntegrationRevokeSessionRequest\x1a\x16.google.protobuf.Empty\x12\\\n" +
+	"\fAuthenticate\x12&.api.usercenter.v1.AuthenticateRequest\x1a$.api.usercenter.v1.AuthenticateReply\x12e\n" +
+	"\vCompleteMFA\x120.api.usercenter.v1.IntegrationCompleteMFARequest\x1a$.api.usercenter.v1.AuthenticateReplyB<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
 
 var (
 	file_api_usercenter_v1_integration_proto_rawDescOnce sync.Once
@@ -988,52 +1221,59 @@ func file_api_usercenter_v1_integration_proto_rawDescGZIP() []byte {
 	return file_api_usercenter_v1_integration_proto_rawDescData
 }
 
-var file_api_usercenter_v1_integration_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_api_usercenter_v1_integration_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_api_usercenter_v1_integration_proto_goTypes = []any{
-	(*SessionFacts)(nil),                    // 0: api.usercenter.v1.SessionFacts
-	(*ValidateSessionRequest)(nil),          // 1: api.usercenter.v1.ValidateSessionRequest
-	(*ValidateSessionReply)(nil),            // 2: api.usercenter.v1.ValidateSessionReply
-	(*ValidateSubjectRequest)(nil),          // 3: api.usercenter.v1.ValidateSubjectRequest
-	(*ValidateSubjectReply)(nil),            // 4: api.usercenter.v1.ValidateSubjectReply
-	(*IntegrationGetUserRequest)(nil),       // 5: api.usercenter.v1.IntegrationGetUserRequest
-	(*IntegrationUserReply)(nil),            // 6: api.usercenter.v1.IntegrationUserReply
-	(*BatchGetUsersRequest)(nil),            // 7: api.usercenter.v1.BatchGetUsersRequest
-	(*IntegrationUsersReply)(nil),           // 8: api.usercenter.v1.IntegrationUsersReply
-	(*SessionAuthorizationRequest)(nil),     // 9: api.usercenter.v1.SessionAuthorizationRequest
-	(*SessionAuthorizationReply)(nil),       // 10: api.usercenter.v1.SessionAuthorizationReply
-	(*AuthorizationObjectFacts)(nil),        // 11: api.usercenter.v1.AuthorizationObjectFacts
-	(*ResourceAuthorizationRequest)(nil),    // 12: api.usercenter.v1.ResourceAuthorizationRequest
-	(*ResourceAuthorizationReply)(nil),      // 13: api.usercenter.v1.ResourceAuthorizationReply
-	(*IntegrationRevokeSessionRequest)(nil), // 14: api.usercenter.v1.IntegrationRevokeSessionRequest
-	(*User)(nil),                            // 15: api.usercenter.v1.User
-	(*PermissionSummary)(nil),               // 16: api.usercenter.v1.PermissionSummary
-	(*Scope)(nil),                           // 17: api.usercenter.v1.Scope
-	(*emptypb.Empty)(nil),                   // 18: google.protobuf.Empty
+	(*AuthenticateRequest)(nil),             // 0: api.usercenter.v1.AuthenticateRequest
+	(*AuthenticateReply)(nil),               // 1: api.usercenter.v1.AuthenticateReply
+	(*IntegrationCompleteMFARequest)(nil),   // 2: api.usercenter.v1.IntegrationCompleteMFARequest
+	(*SessionFacts)(nil),                    // 3: api.usercenter.v1.SessionFacts
+	(*ValidateSessionRequest)(nil),          // 4: api.usercenter.v1.ValidateSessionRequest
+	(*ValidateSessionReply)(nil),            // 5: api.usercenter.v1.ValidateSessionReply
+	(*ValidateSubjectRequest)(nil),          // 6: api.usercenter.v1.ValidateSubjectRequest
+	(*ValidateSubjectReply)(nil),            // 7: api.usercenter.v1.ValidateSubjectReply
+	(*IntegrationGetUserRequest)(nil),       // 8: api.usercenter.v1.IntegrationGetUserRequest
+	(*IntegrationUserReply)(nil),            // 9: api.usercenter.v1.IntegrationUserReply
+	(*BatchGetUsersRequest)(nil),            // 10: api.usercenter.v1.BatchGetUsersRequest
+	(*IntegrationUsersReply)(nil),           // 11: api.usercenter.v1.IntegrationUsersReply
+	(*SessionAuthorizationRequest)(nil),     // 12: api.usercenter.v1.SessionAuthorizationRequest
+	(*SessionAuthorizationReply)(nil),       // 13: api.usercenter.v1.SessionAuthorizationReply
+	(*AuthorizationObjectFacts)(nil),        // 14: api.usercenter.v1.AuthorizationObjectFacts
+	(*ResourceAuthorizationRequest)(nil),    // 15: api.usercenter.v1.ResourceAuthorizationRequest
+	(*ResourceAuthorizationReply)(nil),      // 16: api.usercenter.v1.ResourceAuthorizationReply
+	(*IntegrationRevokeSessionRequest)(nil), // 17: api.usercenter.v1.IntegrationRevokeSessionRequest
+	(*User)(nil),                            // 18: api.usercenter.v1.User
+	(*PermissionSummary)(nil),               // 19: api.usercenter.v1.PermissionSummary
+	(*Scope)(nil),                           // 20: api.usercenter.v1.Scope
+	(*emptypb.Empty)(nil),                   // 21: google.protobuf.Empty
 }
 var file_api_usercenter_v1_integration_proto_depIdxs = []int32{
-	0,  // 0: api.usercenter.v1.ValidateSessionReply.session:type_name -> api.usercenter.v1.SessionFacts
-	15, // 1: api.usercenter.v1.ValidateSessionReply.user:type_name -> api.usercenter.v1.User
-	15, // 2: api.usercenter.v1.IntegrationUserReply.user:type_name -> api.usercenter.v1.User
-	15, // 3: api.usercenter.v1.IntegrationUsersReply.items:type_name -> api.usercenter.v1.User
-	16, // 4: api.usercenter.v1.SessionAuthorizationReply.permissions:type_name -> api.usercenter.v1.PermissionSummary
-	11, // 5: api.usercenter.v1.ResourceAuthorizationRequest.object:type_name -> api.usercenter.v1.AuthorizationObjectFacts
-	17, // 6: api.usercenter.v1.ResourceAuthorizationReply.scope:type_name -> api.usercenter.v1.Scope
-	1,  // 7: api.usercenter.v1.IntegrationService.ValidateSession:input_type -> api.usercenter.v1.ValidateSessionRequest
-	3,  // 8: api.usercenter.v1.IntegrationService.ValidateSubject:input_type -> api.usercenter.v1.ValidateSubjectRequest
-	5,  // 9: api.usercenter.v1.IntegrationService.GetUser:input_type -> api.usercenter.v1.IntegrationGetUserRequest
-	7,  // 10: api.usercenter.v1.IntegrationService.BatchGetUsers:input_type -> api.usercenter.v1.BatchGetUsersRequest
-	9,  // 11: api.usercenter.v1.IntegrationService.GetSessionAuthorization:input_type -> api.usercenter.v1.SessionAuthorizationRequest
-	12, // 12: api.usercenter.v1.IntegrationService.GetResourceAuthorization:input_type -> api.usercenter.v1.ResourceAuthorizationRequest
-	14, // 13: api.usercenter.v1.IntegrationService.RevokeSession:input_type -> api.usercenter.v1.IntegrationRevokeSessionRequest
-	2,  // 14: api.usercenter.v1.IntegrationService.ValidateSession:output_type -> api.usercenter.v1.ValidateSessionReply
-	4,  // 15: api.usercenter.v1.IntegrationService.ValidateSubject:output_type -> api.usercenter.v1.ValidateSubjectReply
-	6,  // 16: api.usercenter.v1.IntegrationService.GetUser:output_type -> api.usercenter.v1.IntegrationUserReply
-	8,  // 17: api.usercenter.v1.IntegrationService.BatchGetUsers:output_type -> api.usercenter.v1.IntegrationUsersReply
-	10, // 18: api.usercenter.v1.IntegrationService.GetSessionAuthorization:output_type -> api.usercenter.v1.SessionAuthorizationReply
-	13, // 19: api.usercenter.v1.IntegrationService.GetResourceAuthorization:output_type -> api.usercenter.v1.ResourceAuthorizationReply
-	18, // 20: api.usercenter.v1.IntegrationService.RevokeSession:output_type -> google.protobuf.Empty
-	14, // [14:21] is the sub-list for method output_type
-	7,  // [7:14] is the sub-list for method input_type
+	3,  // 0: api.usercenter.v1.ValidateSessionReply.session:type_name -> api.usercenter.v1.SessionFacts
+	18, // 1: api.usercenter.v1.ValidateSessionReply.user:type_name -> api.usercenter.v1.User
+	18, // 2: api.usercenter.v1.IntegrationUserReply.user:type_name -> api.usercenter.v1.User
+	18, // 3: api.usercenter.v1.IntegrationUsersReply.items:type_name -> api.usercenter.v1.User
+	19, // 4: api.usercenter.v1.SessionAuthorizationReply.permissions:type_name -> api.usercenter.v1.PermissionSummary
+	14, // 5: api.usercenter.v1.ResourceAuthorizationRequest.object:type_name -> api.usercenter.v1.AuthorizationObjectFacts
+	20, // 6: api.usercenter.v1.ResourceAuthorizationReply.scope:type_name -> api.usercenter.v1.Scope
+	4,  // 7: api.usercenter.v1.IntegrationService.ValidateSession:input_type -> api.usercenter.v1.ValidateSessionRequest
+	6,  // 8: api.usercenter.v1.IntegrationService.ValidateSubject:input_type -> api.usercenter.v1.ValidateSubjectRequest
+	8,  // 9: api.usercenter.v1.IntegrationService.GetUser:input_type -> api.usercenter.v1.IntegrationGetUserRequest
+	10, // 10: api.usercenter.v1.IntegrationService.BatchGetUsers:input_type -> api.usercenter.v1.BatchGetUsersRequest
+	12, // 11: api.usercenter.v1.IntegrationService.GetSessionAuthorization:input_type -> api.usercenter.v1.SessionAuthorizationRequest
+	15, // 12: api.usercenter.v1.IntegrationService.GetResourceAuthorization:input_type -> api.usercenter.v1.ResourceAuthorizationRequest
+	17, // 13: api.usercenter.v1.IntegrationService.RevokeSession:input_type -> api.usercenter.v1.IntegrationRevokeSessionRequest
+	0,  // 14: api.usercenter.v1.IntegrationService.Authenticate:input_type -> api.usercenter.v1.AuthenticateRequest
+	2,  // 15: api.usercenter.v1.IntegrationService.CompleteMFA:input_type -> api.usercenter.v1.IntegrationCompleteMFARequest
+	5,  // 16: api.usercenter.v1.IntegrationService.ValidateSession:output_type -> api.usercenter.v1.ValidateSessionReply
+	7,  // 17: api.usercenter.v1.IntegrationService.ValidateSubject:output_type -> api.usercenter.v1.ValidateSubjectReply
+	9,  // 18: api.usercenter.v1.IntegrationService.GetUser:output_type -> api.usercenter.v1.IntegrationUserReply
+	11, // 19: api.usercenter.v1.IntegrationService.BatchGetUsers:output_type -> api.usercenter.v1.IntegrationUsersReply
+	13, // 20: api.usercenter.v1.IntegrationService.GetSessionAuthorization:output_type -> api.usercenter.v1.SessionAuthorizationReply
+	16, // 21: api.usercenter.v1.IntegrationService.GetResourceAuthorization:output_type -> api.usercenter.v1.ResourceAuthorizationReply
+	21, // 22: api.usercenter.v1.IntegrationService.RevokeSession:output_type -> google.protobuf.Empty
+	1,  // 23: api.usercenter.v1.IntegrationService.Authenticate:output_type -> api.usercenter.v1.AuthenticateReply
+	1,  // 24: api.usercenter.v1.IntegrationService.CompleteMFA:output_type -> api.usercenter.v1.AuthenticateReply
+	16, // [16:25] is the sub-list for method output_type
+	7,  // [7:16] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1051,7 +1291,7 @@ func file_api_usercenter_v1_integration_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_usercenter_v1_integration_proto_rawDesc), len(file_api_usercenter_v1_integration_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

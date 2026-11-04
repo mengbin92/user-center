@@ -91,14 +91,14 @@
 
 验收：
 
-- [ ] 同意记录持久化：`client_id` + `user_id` 唯一，保存已授予的 scope 集合与时间；migration 幂等
-- [ ] 无有效同意时，`/oidc/authorize` 重定向到同意页，并使用**一次性服务端 request handle**（不把 `client_id` / `redirect_uri` / `state` 明文摊在 query 里被篡改）
-- [ ] 同意页展示客户端名称、请求的 scopes、发起来源；拒绝时返回 `error=access_denied` 且保留 `state`
-- [ ] 同意只在 scope 未扩展时复用；scope 增加必须重新征询
-- [ ] `prompt=consent` 强制重新征询；`prompt=none` 且无同意时返回 `interaction_required`（不是 500 或静默同意）
-- [ ] `/me/oidc-consents` 可列出与撤销；撤销后下次授权重新征询
-- [ ] 同意页请求本身不能签发授权码；`nonce` / PKCE 校验顺序不变
-- [ ] 测试：首次同意、复用、拒绝、scope 扩展、撤销后重新征询、`prompt` 两种取值
+- [x] 同意记录持久化：`client_id` + `user_id` 唯一，保存已授予的 scope 集合与时间；migration 幂等
+- [x] 无有效同意时，`/oidc/authorize` 重定向到同意页，并使用**一次性服务端 request handle**（不把 `client_id` / `redirect_uri` / `state` 明文摊在 query 里被篡改）
+- [x] 同意页展示客户端名称、请求的 scopes、发起来源；拒绝时返回 `error=access_denied` 且保留 `state`
+- [x] 同意只在 scope 未扩展时复用；scope 增加必须重新征询
+- [x] `prompt=consent` 强制重新征询；`prompt=none` 且无同意时返回 `interaction_required`（不是 500 或静默同意）
+- [x] `/me/oidc-consents` 可列出与撤销；撤销后下次授权重新征询
+- [x] 同意页请求本身不能签发授权码；`nonce` / PKCE 校验顺序不变
+- [x] 测试：首次同意、复用、拒绝、scope 扩展、撤销后重新征询、`prompt` 两种取值
 
 #### R2 RP-initiated logout（`end_session`）
 
@@ -112,13 +112,13 @@
 
 验收：
 
-- [ ] discovery 增加 `end_session_endpoint`
-- [ ] `GET/POST /oidc/logout` 支持 `id_token_hint`、`post_logout_redirect_uri`、`state`
-- [ ] `post_logout_redirect_uri` 必须精确匹配客户端注册的白名单（新增列），否则不回跳并返回错误页
-- [ ] 无 `id_token_hint` 时接受 `client_id`，但仍要求白名单匹配；两者都缺失时只做本地登出
-- [ ] 登出撤销当前会话并清理 Cookie；重复调用幂等
-- [ ] 无效 hint 与过期 hint 的行为一致，不泄露会话或用户是否存在
-- [ ] 测试：有效 hint、无效 hint、未注册 redirect、跨客户端 hint、登出后原会话失效
+- [x] discovery 增加 `end_session_endpoint`
+- [x] `GET/POST /oidc/logout` 支持 `id_token_hint`、`post_logout_redirect_uri`、`state`
+- [x] `post_logout_redirect_uri` 必须精确匹配客户端注册的白名单（新增列），否则不回跳并返回错误页
+- [x] 无 `id_token_hint` 时接受 `client_id`，但仍要求白名单匹配；两者都缺失时只做本地登出
+- [x] 登出撤销当前会话并清理 Cookie；重复调用幂等
+- [x] 无效 hint 与过期 hint 的行为一致，不泄露会话或用户是否存在
+- [x] 测试：有效 hint、无效 hint、未注册 redirect、跨客户端 hint、登出后原会话失效
 
 ---
 
@@ -136,16 +136,16 @@
 
 验收：
 
-- [ ] 邀请表：组织、邮箱（归一化小写）、角色、令牌哈希、过期时间、邀请人、状态、revision
-- [ ] `POST /orgs/{id}/invitations` 要求 `organization.member.manage` + Step-up + `reason`；仅 owner/admin 可邀请 admin（沿用现有归属规则）
-- [ ] 令牌一次性、只在邮件中出现，DB 存哈希；默认 72 小时过期，可配置
-- [ ] 接受接口要求登录态且**邮箱匹配**；不匹配返回统一拒绝，不泄露邀请是否存在
-- [ ] 未注册邮箱不自动建号（避免绕过注册策略）；引导先注册再接受
-- [ ] 接受后成为 active 成员，并同步内置角色分配（复用 `syncOrgMembershipRole`）
-- [ ] 已是成员、邀请过期、已撤销、重复接受都有明确错误码
-- [ ] `GET /orgs/{id}/invitations`、`DELETE /orgs/{id}/invitations/{id}`（撤销）；单组织待接受邀请有上限
-- [ ] 审计事件：`organization.invitation.create` / `.revoke` / `.accept`
-- [ ] 测试：过期、邮箱不匹配、重复接受、撤销后接受失败、跨租户邀请、配额上限
+- [x] 邀请表：组织、邮箱（归一化小写）、角色、令牌哈希、过期时间、邀请人、状态、revision
+- [x] `POST /orgs/{id}/invitations` 要求 `organization.member.manage` + Step-up + `reason`；仅 owner/admin 可邀请 admin（沿用现有归属规则）
+- [x] 令牌一次性、只在邮件中出现，DB 存哈希；默认 72 小时过期，可配置
+- [x] 接受接口要求登录态且**邮箱匹配**；不匹配返回统一拒绝，不泄露邀请是否存在
+- [x] 未注册邮箱不自动建号（避免绕过注册策略）；引导先注册再接受
+- [x] 接受后成为 active 成员，并同步内置角色分配（复用 `syncOrgMembershipRole`）
+- [x] 已是成员、邀请过期、已撤销、重复接受都有明确错误码
+- [x] `GET /orgs/{id}/invitations`、`DELETE /orgs/{id}/invitations/{id}`（撤销）；单组织待接受邀请有上限
+- [x] 审计事件：`organization.invitation.create` / `.revoke` / `.accept`
+- [x] 测试：过期、邮箱不匹配、重复接受、撤销后接受失败、跨租户邀请、配额上限
 
 #### R4 组织域授权解释（explain）
 
@@ -159,12 +159,12 @@
 
 验收：
 
-- [ ] `GET /orgs/{id}/iam/authorization:explain?user_id=&operation=` ，权限为 `organization.iam.assignment.read` 或 `organization.iam.role.read`
-- [ ] 响应包含：决策结果与 reason、命中的角色与分配、deny 来源、scope 边界、有效期、缺失项
-- [ ] 只读取本组织事实，响应中不出现平台角色、其他租户数据与平台策略细节
-- [ ] 与平台 explain 共用同一套领域求值（`authorization.Evaluate` + 相同的 `Input` 构造），不允许另写一份判断
-- [ ] 目标用户必须是本组织成员，否则 `RESOURCE_NOT_FOUND`
-- [ ] 测试：允许、拒绝（无权限）、deny 覆盖、分配过期、非成员
+- [x] `GET /orgs/{id}/iam/authorization:explain?user_id=&operation=` ，权限为 `organization.iam.assignment.read` 或 `organization.iam.role.read`
+- [x] 响应包含：决策结果与 reason、命中的角色与分配、deny 来源、scope 边界、有效期、缺失项
+- [x] 只读取本组织事实，响应中不出现平台角色、其他租户数据与平台策略细节
+- [x] 与平台 explain 共用同一套领域求值（`authorization.Evaluate` + 相同的 `Input` 构造），不允许另写一份判断
+- [x] 目标用户必须是本组织成员，否则 `RESOURCE_NOT_FOUND`
+- [x] 测试：允许、拒绝（无权限）、deny 覆盖、分配过期、非成员
 
 #### R5 租户审计导出
 
@@ -178,12 +178,12 @@
 
 验收：
 
-- [ ] `POST /orgs/{id}/audits:export` 复用现有导出任务与下载签名，不新建一套下载通道
-- [ ] 导出内容严格限定 `organization_id = {id}`，字段与平台导出一致
-- [ ] 权限 `organization.audit.read`；导出任务记录租户归属，跨租户下载返回 `RESOURCE_NOT_FOUND`
-- [ ] CSV 公式前缀转义、文件名 `filepath.Base` 处理沿用现有规则
-- [ ] 权限或 policy revision 变化后必须重新导出（与平台语义一致）
-- [ ] 测试：导出只含本租户、跨租户下载拒绝、权限不足 403、CSV 注入转义
+- [x] `POST /orgs/{id}/audits:export` 复用现有导出任务与下载签名，不新建一套下载通道
+- [x] 导出内容严格限定 `organization_id = {id}`，字段与平台导出一致
+- [x] 权限 `organization.audit.read`；导出任务记录租户归属，跨租户下载返回 `RESOURCE_NOT_FOUND`
+- [x] CSV 公式前缀转义、文件名 `filepath.Base` 处理沿用现有规则
+- [x] 权限或 policy revision 变化后必须重新导出（与平台语义一致）
+- [x] 测试：导出只含本租户、跨租户下载拒绝、权限不足 403、CSV 注入转义
 
 #### R6 组织域事件进 Outbox（C 类扩展）
 
@@ -197,12 +197,12 @@
 
 验收：
 
-- [ ] 事件类型：`organization.member.added/updated/removed`、`organization.department.created/updated/archived`、`organization.role.created/updated/archived`、`organization.assignment.created/revoked`、`organization.archived`
-- [ ] 载荷只含 ID、版本、角色码等最小字段；**不含邮箱、昵称等个人数据**（与设计 6.5 的隐私约束一致）
-- [ ] 与业务事务同提交（Outbox），回滚不产生事件
-- [ ] 订阅方按 `event_type` 过滤；文档新增组织事件表
-- [ ] `event_id` 幂等去重、旧版本不覆盖新状态
-- [ ] 测试：事务回滚无事件、载荷无 PII、event_id 去重、订阅过滤
+- [x] 事件类型：`organization.member.added/updated/removed`、`organization.department.created/updated/archived`、`organization.role.created/updated/archived`、`organization.assignment.created/revoked`、`organization.archived`
+- [x] 载荷只含 ID、版本、角色码等最小字段；**不含邮箱、昵称等个人数据**（与设计 6.5 的隐私约束一致）
+- [x] 与业务事务同提交（Outbox），回滚不产生事件
+- [x] 订阅方按 `event_type` 过滤；文档新增组织事件表
+- [x] `event_id` 幂等去重、旧版本不覆盖新状态
+- [x] 测试：事务回滚无事件、载荷无 PII、event_id 去重、订阅过滤
 
 ---
 
@@ -220,14 +220,14 @@
 
 验收：
 
-- [ ] `Authenticate(app_id, username, password, request_id)` 返回"需要 MFA 的挑战"或"会话令牌"，不返回 Cookie
-- [ ] `CompleteMFA(challenge_id, code)` 完成登录；挑战单次消费、绑定应用与身份版本
-- [ ] 凭据只经服务端 gRPC 传输；调用方必须是通过白名单的接入客户端
-- [ ] 失败计数与 HTTP 登录**共用同一套限流**，不能形成绕过通道
-- [ ] 会话 audience 绑定调用方应用；`ValidateSession` 对该会话的校验语义不变
-- [ ] 审计记录 `actor_service_id`；失败响应不泄露账号是否存在、是否启用 MFA
-- [ ] 停用用户、错误密码、未授权客户端、挑战过期各有稳定错误码
-- [ ] 测试：成功登录、需 MFA、错误密码、停用用户、未授权 client、挑战重放
+- [x] `Authenticate(app_id, username, password, request_id)` 返回"需要 MFA 的挑战"或"会话令牌"，不返回 Cookie
+- [x] `CompleteMFA(challenge_id, code)` 完成登录；挑战单次消费、绑定应用与身份版本
+- [x] 凭据只经服务端 gRPC 传输；调用方必须是通过白名单的接入客户端
+- [x] 失败计数与 HTTP 登录**共用同一套限流**，不能形成绕过通道
+- [x] 会话 audience 绑定调用方应用；`ValidateSession` 对该会话的校验语义不变
+- [x] 审计记录 `actor_service_id`；失败响应不泄露账号是否存在、是否启用 MFA
+- [x] 停用用户、错误密码、未授权客户端、挑战过期各有稳定错误码
+- [x] 测试：成功登录、需 MFA、错误密码、停用用户、未授权 client、挑战重放
 
 #### R8 审计详情页（B 类：后端有、前端无）
 
@@ -241,11 +241,11 @@
 
 验收：
 
-- [ ] `/admin/audits/:id` 路由与详情页：actor、action、target、result、reason、`request_id`、before/after/diff、版本信息
-- [ ] 列表行可进入详情，返回列表时保留原筛选条件
-- [ ] diff 为空时降级提示；长 JSON 可折叠且不破坏布局
-- [ ] 无权限或事件不存在时显示统一空状态，不泄露事件存在性
-- [ ] 测试：渲染、空 diff、返回保留筛选
+- [x] `/admin/audits/:id` 路由与详情页：actor、action、target、result、reason、`request_id`、before/after/diff、版本信息
+- [x] 列表行可进入详情，返回列表时保留原筛选条件
+- [x] diff 为空时降级提示；长 JSON 可折叠且不破坏布局
+- [x] 无权限或事件不存在时显示统一空状态，不泄露事件存在性
+- [x] 测试：渲染、空 diff、返回保留筛选
 
 #### R9 外部身份 provider 配置页
 
@@ -259,12 +259,12 @@
 
 验收：
 
-- [ ] 页面列出 GitHub / Google：启用状态、凭据来源（env / db）、回调地址、最近变更
-- [ ] 未配置凭据时显示引导（含所需环境变量名），不是报错或空白
-- [ ] 启停变更写审计并推进 policy revision；与 `/admin/settings/auth` 的行为一致
-- [ ] 凭据不回显（只显示是否已配置）
-- [ ] 决策记录写进文档：凭据来源单一化，避免 env 与 db 同时生效
-- [ ] 测试：未配置、已配置、启停后登录入口变化
+- [x] 页面列出 GitHub / Google：启用状态、凭据来源（env / db）、回调地址、最近变更
+- [x] 未配置凭据时显示引导（含所需环境变量名），不是报错或空白
+- [x] 启停变更写审计并推进 policy revision；与 `/admin/settings/auth` 的行为一致
+- [x] 凭据不回显（只显示是否已配置）
+- [x] 决策记录写进文档：凭据来源单一化，避免 env 与 db 同时生效
+- [x] 测试：未配置、已配置、启停后登录入口变化
 
 #### R10 用户名修改
 
@@ -278,12 +278,12 @@
 
 验收：
 
-- [ ] 修改接口要求 Step-up + `expected_revision`，并校验当前密码（按设计"重新验证"）
-- [ ] 唯一性按归一化规则检查（大小写、空白），与创建路径共用同一校验函数
-- [ ] 保留字/格式限制与创建一致；冲突返回稳定错误码而不是驱动错误
-- [ ] 变更后旧用户名不能登录；审计记录前后值
-- [ ] 明确管理端是否可改名（建议不允许，避免审计主体歧义），并把结论写进 API 文档
-- [ ] 测试：重复、保留字、Step-up 缺失、并发 409、旧用户名登录失败
+- [x] 修改接口要求 Step-up + `expected_revision`，并校验当前密码（按设计"重新验证"）
+- [x] 唯一性按归一化规则检查（大小写、空白），与创建路径共用同一校验函数
+- [x] 保留字/格式限制与创建一致；冲突返回稳定错误码而不是驱动错误
+- [x] 变更后旧用户名不能登录；审计记录前后值
+- [x] 明确管理端是否可改名（建议不允许，避免审计主体歧义），并把结论写进 API 文档
+- [x] 测试：重复、保留字、Step-up 缺失、并发 409、旧用户名登录失败
 
 #### R11 单条分配预览
 
@@ -297,12 +297,12 @@
 
 验收：
 
-- [ ] `POST /admin/iam/assignments:preview`：入参 user / role / boundary / 有效期，不写库
-- [ ] 返回将获得的权限、命中的 deny、scope 交集、受约束影响的结果
-- [ ] 与批量预览共用同一计算路径，不允许两套逻辑
-- [ ] 角色已归档、超出 `max_members`、边界不合法时给出明确原因
-- [ ] 预览结果与真实创建后的有效权限一致（测试断言）
-- [ ] 测试：普通角色、deny 覆盖、超限、归档角色
+- [x] `POST /admin/iam/assignments:preview`：入参 user / role / boundary / 有效期，不写库
+- [x] 返回将获得的权限、命中的 deny、scope 交集、受约束影响的结果
+- [x] 与批量预览共用同一计算路径，不允许两套逻辑
+- [x] 角色已归档、超出 `max_members`、边界不合法时给出明确原因
+- [x] 预览结果与真实创建后的有效权限一致（测试断言）
+- [x] 测试：普通角色、deny 覆盖、超限、归档角色
 
 #### R12 组织创建配额
 
@@ -316,12 +316,12 @@
 
 验收：
 
-- [ ] 新增组织设置组（沿用 settings 模式），包含开关、每用户上限、是否统计归档组织
-- [ ] 超限返回稳定错误码（`ORGANIZATION_QUOTA_EXCEEDED`），HTTP 状态固定
-- [ ] 平台管理员豁免；豁免行为写入文档
-- [ ] 计数在事务内完成，并发创建不能突破上限
-- [ ] 拒绝也写审计（含原因与当前计数）
-- [ ] 测试：上限、豁免、归档是否释放、并发创建
+- [x] 新增组织设置组（沿用 settings 模式），包含开关、每用户上限、是否统计归档组织
+- [x] 超限返回稳定错误码（`ORGANIZATION_QUOTA_EXCEEDED`），HTTP 状态固定
+- [x] 平台管理员豁免；豁免行为写入文档
+- [x] 计数在事务内完成，并发创建不能突破上限
+- [x] 拒绝也写审计（含原因与当前计数）
+- [x] 测试：上限、豁免、归档是否释放、并发创建
 
 ---
 
@@ -399,11 +399,11 @@
 
 每个工作项合入前必须全部通过：
 
-- [ ] `make api` 后生成物无差异（`git diff --exit-code api openapi.yaml`）
-- [ ] `make wire` 后生成物无差异
-- [ ] `go vet ./...`
-- [ ] `go test ./...`；涉及并发或授权上下文时加 `go test -race ./domain/... ./internal/biz/ ./internal/data/`
-- [ ] `cd web && npm test && npm run build`
+- [x] `make api` 后生成物无差异（`git diff --exit-code api openapi.yaml`）
+- [x] `make wire` 后生成物无差异
+- [x] `go vet ./...`
+- [x] `go test ./...`；涉及并发或授权上下文时加 `go test -race ./domain/... ./internal/biz/ ./internal/data/`
+- [x] `cd web && npm test && npm run build`
 - [ ] 迁移真跑：`USER_CENTER_MYSQL_TEST_DSN=... go test ./cmd/migrate/`
 - [ ] 本地 compose 全流程冒烟（含未登录 401、跨租户拒绝、Step-up、租户审计）
 
@@ -429,28 +429,33 @@
 | 1.2 V2 扩展 | 标准 OIDC 接入应用 | ✅ v0.3.0 | — |
 | 1.2 V2 扩展 | 组织与部门 | ✅ v0.4.0 | — |
 | 1.2 V2 扩展 | 多租户 | ✅ v0.5.0（逻辑隔离） | 物理隔离不纳入 |
-| 1.2 V2 扩展 | WebAuthn / Passkey | ❌ 未实现 | R13 |
+| 1.2 V2 扩展 | WebAuthn / Passkey | ❌ 未实现（按路线图滑动到 V2.5） | R13 |
 | 1.2 V2 扩展 | SCIM | ❌ 未实现 | 不纳入（V2.6） |
 | 1.2 V2 扩展 | 企业目录同步 | ❌ 未实现 | 不纳入（V2.6） |
-| 4.1 个人资料 | 用户名修改需重新验证并检查唯一 | ❌ 只能改昵称 | R10 |
+| 4.1 个人资料 | 用户名修改需重新验证并检查唯一 | ✅ v0.7.0 待发版 | R10 |
 | 6.5 事件机制 | 固定事件清单（不含组织事件） | ✅ 清单内已实现；组织事件属扩展 | R6（扩展） |
-| 7.1 路由 | `/admin/audits/:id` | ⚠️ 后端有、前端无 | R8 |
-| 7.1 路由 | `/admin/settings/providers` | ❌ 无独立页面 | R9 |
+| 7.1 路由 | `/admin/audits/:id` | ✅ 详情页已交付 | R8 |
+| 7.1 路由 | `/admin/settings/providers` | ✅ 只读配置页已交付 | R9 |
 | 7.1 路由 | `/admin/applications` | ✅ 以 `/admin/oidc-clients` 实现（命名差异） | 文档标注 |
-| 7.1 / V2 | 授权同意页 | ❌ 未实现 | R1 |
-| 9.4 IAM | 单条分配 preview | ⚠️ 只有批量 preview | R11 |
-| 9.5 gRPC | `Authenticate` / `CompleteMFA` | ❌ 未实现 | R7 |
+| 7.1 / V2 | 授权同意页 | ✅ 已交付 | R1 |
+| 9.4 IAM | 单条分配 preview | ✅ 已交付 | R11 |
+| 9.5 gRPC | `Authenticate` / `CompleteMFA` | ✅ 已交付 | R7 |
 | 9.5 gRPC | `ExchangeLegacySession` | ❌ 未实现（设计允许默认关闭） | 不纳入 |
-| 4.2 管理端 | 租户审计导出 | ❌ 只有列表 | R5 |
-| — | 组织邀请与接受 | ❌ 未实现 | R3 |
-| — | 组织域 explain | ❌ 未实现 | R4 |
-| — | 组织创建配额 | ❌ 未实现 | R12 |
-| — | 个人信息保留与清理 | ❌ 未实现 | R14 |
+| 4.2 管理端 | 租户审计导出 | ✅ 已交付 | R5 |
+| — | 组织邀请与接受 | ✅ 已交付 | R3 |
+| — | 组织域 explain | ✅ 已交付 | R4 |
+| — | 组织创建配额 | ✅ 已交付 | R12 |
+| — | 个人信息保留与清理 | ❌ 未实现（未排期） | R14 |
 
 ## 9. 变更记录
 
 | 日期 | 变更 | 说明 |
 |---|---|---|
 | 2026-11-04 | 初稿 | 基于 `v0.5.1` 盘点；确定 W1–W5 与 R1–R14，明确不纳入项与理由 |
+| 2026-11-05 | W1/W2 合入 | R1–R6 代码、迁移、前端与测试已合入 `develop`（`72437ce`、`4a55083`）；草稿发布说明 `release-v0.6.0.md` 待打标 |
+| 2026-11-05 | W3 合入 | R7–R12 代码、迁移、前端与测试已合入 `develop`；草稿发布说明 `release-v0.7.0.md` 待打标 |
+| 2026-11-05 | 范围说明 | R13（WebAuthn/Passkey）按 §3.3 整体滑动到 V2.5；R14 未排期。两者本次未实现，保留 `[ ]` |
+
+> 说明：R1–R12 的验收项已在本地 SQLite 集成测试、前端组件测试与构建中验证；§6 中「MySQL 迁移真跑」「本地 compose 全流程冒烟」「E2E 脚本收纳」未在本次执行，保留 `[ ]`。R6 的「旧版本不覆盖新状态」属于订阅方投影语义，已在 `docs/architecture.md` §8.1 约定（`aggregate_revision` 判新旧），本仓库不持有下游投影实现。
 
 维护约定：新差距先补进第 8 节矩阵并标注类型（A/B/C），再决定是否进当前波次；已合并的工作项把 `[ ]` 改成 `[x]` 并在变更记录留一行，不删除历史条目。

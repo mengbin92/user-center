@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	MeService_GetMe_FullMethodName                  = "/api.usercenter.v1.MeService/GetMe"
 	MeService_UpdateMe_FullMethodName               = "/api.usercenter.v1.MeService/UpdateMe"
+	MeService_UpdateUsername_FullMethodName         = "/api.usercenter.v1.MeService/UpdateUsername"
 	MeService_ChangePassword_FullMethodName         = "/api.usercenter.v1.MeService/ChangePassword"
 	MeService_CreateEmailChallenge_FullMethodName   = "/api.usercenter.v1.MeService/CreateEmailChallenge"
 	MeService_ConfirmEmail_FullMethodName           = "/api.usercenter.v1.MeService/ConfirmEmail"
@@ -54,6 +55,7 @@ const (
 type MeServiceClient interface {
 	GetMe(ctx context.Context, in *GetMeRequest, opts ...grpc.CallOption) (*User, error)
 	UpdateMe(ctx context.Context, in *UpdateMeRequest, opts ...grpc.CallOption) (*User, error)
+	UpdateUsername(ctx context.Context, in *UpdateUsernameRequest, opts ...grpc.CallOption) (*User, error)
 	ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CreateEmailChallenge(ctx context.Context, in *CreateEmailChallengeRequest, opts ...grpc.CallOption) (*ChallengeReply, error)
 	ConfirmEmail(ctx context.Context, in *ConfirmEmailRequest, opts ...grpc.CallOption) (*User, error)
@@ -102,6 +104,16 @@ func (c *meServiceClient) UpdateMe(ctx context.Context, in *UpdateMeRequest, opt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(User)
 	err := c.cc.Invoke(ctx, MeService_UpdateMe_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) UpdateUsername(ctx context.Context, in *UpdateUsernameRequest, opts ...grpc.CallOption) (*User, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(User)
+	err := c.cc.Invoke(ctx, MeService_UpdateUsername_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -336,6 +348,7 @@ func (c *meServiceClient) RevokeOIDCConsent(ctx context.Context, in *RevokeOIDCC
 type MeServiceServer interface {
 	GetMe(context.Context, *GetMeRequest) (*User, error)
 	UpdateMe(context.Context, *UpdateMeRequest) (*User, error)
+	UpdateUsername(context.Context, *UpdateUsernameRequest) (*User, error)
 	ChangePassword(context.Context, *ChangePasswordRequest) (*emptypb.Empty, error)
 	CreateEmailChallenge(context.Context, *CreateEmailChallengeRequest) (*ChallengeReply, error)
 	ConfirmEmail(context.Context, *ConfirmEmailRequest) (*User, error)
@@ -375,6 +388,9 @@ func (UnimplementedMeServiceServer) GetMe(context.Context, *GetMeRequest) (*User
 }
 func (UnimplementedMeServiceServer) UpdateMe(context.Context, *UpdateMeRequest) (*User, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateMe not implemented")
+}
+func (UnimplementedMeServiceServer) UpdateUsername(context.Context, *UpdateUsernameRequest) (*User, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateUsername not implemented")
 }
 func (UnimplementedMeServiceServer) ChangePassword(context.Context, *ChangePasswordRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method ChangePassword not implemented")
@@ -495,6 +511,24 @@ func _MeService_UpdateMe_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MeServiceServer).UpdateMe(ctx, req.(*UpdateMeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_UpdateUsername_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUsernameRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).UpdateUsername(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_UpdateUsername_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).UpdateUsername(ctx, req.(*UpdateUsernameRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -909,6 +943,10 @@ var MeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateMe",
 			Handler:    _MeService_UpdateMe_Handler,
+		},
+		{
+			MethodName: "UpdateUsername",
+			Handler:    _MeService_UpdateUsername_Handler,
 		},
 		{
 			MethodName: "ChangePassword",

@@ -228,3 +228,49 @@ GET  /oidc/userinfo                      Bearer access token
   "metadata": {"request_id": "req_example", "current_revision": "9", "conflict_type": "target"}
 }
 ```
+
+## V2.4 新增契约（W1–W3）
+
+### OIDC 同意与登出
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/.well-known/openid-configuration` | 新增 `end_session_endpoint` |
+| GET/POST | `/oidc/logout` | `id_token_hint`、`client_id`、`post_logout_redirect_uri`、`state`；白名单精确匹配，失败返回 OAuth2 错误页（不回跳） |
+| GET | `/api/v1/me/oidc-requests/{handle}` | 同意页展示：客户端名、请求 scopes、已授予 scopes、回调 host、有效期 |
+| POST | `/api/v1/me/oidc-requests/{handle}:decide` | `{approve, remember}`；返回 `redirect_url`。handle 一次性消费、绑定用户 |
+| GET/DELETE | `/api/v1/me/oidc-consents` / `/{client_id}` | 列出/撤销已记住的同意 |
+
+`/oidc/authorize` 现在在无有效同意时 302 到 `/consent?handle=<opaque>`；`prompt=consent` 强制重新征询，`prompt=none` 且缺少同意时返回 `interaction_required`。OIDC 客户端新增 `post_logout_redirect_uris` 字段（创建/更新均可写，最多 10 个，必须为 HTTPS 或 localhost HTTP）。
+
+### 组织与企业化
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST/GET | `/api/v1/orgs/{id}/invitations` | 发起（需 `organization.member.manage` + Step-up + `reason`）与列出邀请 |
+| DELETE | `/api/v1/orgs/{id}/invitations/{invitation_id}` | 撤销；`expected_revision`、`reason` 走 query |
+| POST | `/api/v1/orgs/invitations:accept` | 登录态下凭邮件令牌接受；邮箱不匹配统一 404 |
+| GET | `/api/v1/orgs/{id}/iam/authorization:explain` | `user_id`、`operation`；只用本租户事实，复用 `authorization.Evaluate` |
+| POST | `/api/v1/orgs/{id}/audits:export` | 复用平台导出任务；返回 `ExportJob` |
+| GET | `/api/v1/orgs/{id}/audits/exports/{export_id}/download` | 与平台下载共用同一流式通道，任务行带 `organization_id` |
+
+组织事件类型见 [架构 §8.1](architecture.md)。邀请有效期默认 72 小时，可用 `ORG_INVITATION_TTL_HOURS`（1–720）配置；单组织待接受邀请上限 50。
+
+### 集成面与治理
+
+| 方法 | 路径 / RPC | 说明 |
+|---|---|---|
+| gRPC | `IntegrationService.Authenticate` | `app_id/username/password/request_id` → `authenticated` 或 `mfa_required`；会话 audience 绑定接入客户端 `code` |
+| gRPC | `IntegrationService.CompleteMFA` | 单次消费挑战；挑战绑定应用与身份版本 |
+| GET | `/api/v1/admin/audits/{id}`（前端路由） | 详情页 `/admin/audits/:id`，返回列表保留筛选 |
+| GET | `/api/v1/admin/settings/providers` | 只读：启用状态、凭据来源（env）、是否已配置、回调地址、所需环境变量；不回显凭据 |
+| GET/PATCH | `/api/v1/admin/settings/organization` | 配额开关、每用户上限（1–1000）、是否统计归档组织 |
+| POST | `/api/v1/me/username:update` | `username/current_password/expected_revision/reason`；Step-up 必填 |
+| POST | `/api/v1/admin/iam/assignments:preview` | 单条预览：复用批量预览计算，返回将获得的权限、deny、scope、有效期与拒绝原因 |
+
+### 已明确的决策
+
+- **凭据来源单一化**：外部 provider 凭据只从环境变量读取（`OAUTH_GITHUB_*` / `OAUTH_GOOGLE_*`），不入库、不回显；`/admin/settings/providers` 只做只读可视化与启停，启停仍走 `/admin/settings/auth` 的 `providers` 字段（写审计并推进 policy revision）。若未来入库，需要加密、轮换与审计设计，并先移除环境变量来源，避免两处同时生效。
+- **用户名只能自助修改**：`UpdateUsername` 只暴露在 `/api/v1/me`，管理端没有改名 RPC，避免审计主体歧义。规则（格式、归一化、保留字）与注册路径共用同一函数。
+- **组织配额默认关闭**：开启后每用户默认 5 个（可配 1–1000），平台管理员（root/admin）豁免；归档组织默认不计入。
+- **不纳入**：`ExchangeLegacySession`、SCIM、企业目录同步、租户物理隔离、组织级 SoD（理由见路线图 §3.2）。WebAuthn/Passkey（R13）与个人信息清理（R14）按路线图分别滑动到 V2.5 / 未排期，当前未实现。

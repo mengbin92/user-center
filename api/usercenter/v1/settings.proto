@@ -21,6 +21,15 @@ service SettingsService {
   rpc UpdateEmailSettings(UpdateEmailSettingsRequest) returns (EmailSettings) {
     option (google.api.http) = {patch: "/api/v1/admin/settings/email" body: "*"};
   }
+  rpc GetAuthProviders(GetAuthProvidersRequest) returns (AuthProvidersReply) {
+    option (google.api.http) = {get: "/api/v1/admin/settings/providers"};
+  }
+  rpc GetOrganizationSettings(GetOrganizationSettingsRequest) returns (OrganizationSettings) {
+    option (google.api.http) = {get: "/api/v1/admin/settings/organization"};
+  }
+  rpc UpdateOrganizationSettings(UpdateOrganizationSettingsRequest) returns (OrganizationSettings) {
+    option (google.api.http) = {patch: "/api/v1/admin/settings/organization" body: "*"};
+  }
 }
 
 message GetAuthSettingsRequest {}
@@ -75,4 +84,42 @@ message UpdateEmailSettingsRequest {
   string update_mask = 7;
   string expected_revision = 8;
   string reason = 9;
+}
+
+message GetAuthProvidersRequest {}
+
+message AuthProviderView {
+  string code = 1;
+  string name = 2;
+  bool enabled = 3;
+  // env | db (currently env only)
+  string credential_source = 4;
+  bool credential_configured = 5;
+  string callback_url = 6;
+  repeated string required_env = 7;
+  string updated_at = 8;
+}
+
+message AuthProvidersReply {
+  repeated AuthProviderView items = 1;
+  string revision = 2;
+}
+
+message GetOrganizationSettingsRequest {}
+
+message OrganizationSettings {
+  bool quota_enabled = 1;
+  int32 max_owned_per_user = 2;
+  bool count_archived = 3;
+  string revision = 4;
+  string updated_at = 5;
+}
+
+message UpdateOrganizationSettingsRequest {
+  bool quota_enabled = 1;
+  int32 max_owned_per_user = 2;
+  bool count_archived = 3;
+  string update_mask = 4;
+  string expected_revision = 5;
+  string reason = 6;
 }

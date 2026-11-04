@@ -37,7 +37,7 @@ func consentClient(t *testing.T, h *harness, scopes []string) {
 		ClientID: "consent_client", Name: "Consent App", ServiceOwner: "example",
 		Status: "active", RedirectURIs: []string{consentRedirect},
 		PostLogoutRedirectURIs: []string{"https://app.example.com/logged-out"},
-		Scopes:                 scopes, RequirePKCE: true, AccessTTL: 900, RefreshTTL: 3600,
+		Scopes:                 scopes, Public: true, RequirePKCE: true, AccessTTL: 900, RefreshTTL: 3600,
 	})
 	require.NoError(t, err)
 }
@@ -160,6 +160,28 @@ func TestOIDCEndSession(t *testing.T) {
 		"client_id": {"consent_client"}, "post_logout_redirect_uri": {"https://attacker.example.com/"},
 	}.Encode(), nil, "", false)
 	require.Equal(t, http.StatusBadRequest, bad.Code)
+
+	// A valid ID token hint identifies the client and permits the registered
+	// post-logout target.
+	loc := h.authorize(t, consentQuery("openid", ""))
+	tokenRec := h.doForm("/oidc/token", url.Values{
+		"grant_type": {"authorization_code"}, "code": {loc.Query().Get("code")},
+		"redirect_uri": {consentRedirect}, "code_verifier": {consentVerifier},
+		"client_id": {"consent_client"},
+	}, "", "")
+	require.Equal(t, http.StatusOK, tokenRec.Code, tokenRec.Body.String())
+	validHint := decode[map[string]any](t, tokenRec)["id_token"].(string)
+	withHint := h.do(http.MethodGet, "/oidc/logout?"+url.Values{
+		"id_token_hint": {validHint}, "post_logout_redirect_uri": {"https://app.example.com/logged-out"},
+	}.Encode(), nil, "", false)
+	require.Equal(t, http.StatusFound, withHint.Code, withHint.Body.String())
+
+	// Cross-client hints do not authorize another client's unregistered target.
+	cross := h.do(http.MethodGet, "/oidc/logout?"+url.Values{
+		"id_token_hint": {validHint}, "client_id": {"consent_client"},
+		"post_logout_redirect_uri": {"https://attacker.example.com/"},
+	}.Encode(), nil, "", false)
+	require.Equal(t, http.StatusBadRequest, cross.Code)
 
 	// client_id alone is accepted, but the target is still whitelisted.
 	q := url.Values{"client_id": {"consent_client"},

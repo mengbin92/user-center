@@ -45,6 +45,7 @@ const OperationIAMServiceListResources = "/api.usercenter.v1.IAMService/ListReso
 const OperationIAMServiceListRoleMembers = "/api.usercenter.v1.IAMService/ListRoleMembers"
 const OperationIAMServiceListRoles = "/api.usercenter.v1.IAMService/ListRoles"
 const OperationIAMServiceListUserRoles = "/api.usercenter.v1.IAMService/ListUserRoles"
+const OperationIAMServicePreviewAssignment = "/api.usercenter.v1.IAMService/PreviewAssignment"
 const OperationIAMServicePreviewBatchAssign = "/api.usercenter.v1.IAMService/PreviewBatchAssign"
 const OperationIAMServicePreviewRoleChange = "/api.usercenter.v1.IAMService/PreviewRoleChange"
 const OperationIAMServicePutRoleInheritance = "/api.usercenter.v1.IAMService/PutRoleInheritance"
@@ -88,6 +89,7 @@ type IAMServiceHTTPServer interface {
 	ListRoleMembers(context.Context, *ListRoleMembersRequest) (*RoleMembersReply, error)
 	ListRoles(context.Context, *ListRolesRequest) (*RolesReply, error)
 	ListUserRoles(context.Context, *ListUserRolesRequest) (*AssignmentsReply, error)
+	PreviewAssignment(context.Context, *PreviewAssignmentRequest) (*PreviewAssignmentReply, error)
 	PreviewBatchAssign(context.Context, *PreviewBatchAssignRequest) (*BatchPreviewReply, error)
 	PreviewRoleChange(context.Context, *PreviewRoleChangeRequest) (*PreviewReply, error)
 	PutRoleInheritance(context.Context, *PutRoleInheritanceRequest) (*RoleInheritanceReply, error)
@@ -135,6 +137,7 @@ func RegisterIAMServiceHTTPServer(s *http.Server, srv IAMServiceHTTPServer) {
 	r.Handle("POST", "/api/v1/admin/iam/delegations", _IAMService_CreateDelegation0_HTTP_Handler(srv))
 	r.Handle("PATCH", "/api/v1/admin/iam/delegations/{id}", _IAMService_UpdateDelegation0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/iam/delegations/{id}:revoke", _IAMService_RevokeDelegation0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/admin/iam/assignments:preview", _IAMService_PreviewAssignment0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/iam/assignments:batch-preview", _IAMService_PreviewBatchAssign0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/iam/assignments:batch-assign", _IAMService_BatchAssign0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/admin/iam/constraints", _IAMService_ListConstraints0_HTTP_Handler(srv))
@@ -760,6 +763,25 @@ func _IAMService_RevokeDelegation0_HTTP_Handler(srv IAMServiceHTTPServer) func(c
 	}
 }
 
+func _IAMService_PreviewAssignment0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in PreviewAssignmentRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationIAMServicePreviewAssignment)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.PreviewAssignment(ctx, req.(*PreviewAssignmentRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*PreviewAssignmentReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _IAMService_PreviewBatchAssign0_HTTP_Handler(srv IAMServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in PreviewBatchAssignRequest
@@ -1028,6 +1050,7 @@ type IAMServiceHTTPClient interface {
 	ListRoleMembers(ctx context.Context, req *ListRoleMembersRequest, opts ...http.CallOption) (rsp *RoleMembersReply, err error)
 	ListRoles(ctx context.Context, req *ListRolesRequest, opts ...http.CallOption) (rsp *RolesReply, err error)
 	ListUserRoles(ctx context.Context, req *ListUserRolesRequest, opts ...http.CallOption) (rsp *AssignmentsReply, err error)
+	PreviewAssignment(ctx context.Context, req *PreviewAssignmentRequest, opts ...http.CallOption) (rsp *PreviewAssignmentReply, err error)
 	PreviewBatchAssign(ctx context.Context, req *PreviewBatchAssignRequest, opts ...http.CallOption) (rsp *BatchPreviewReply, err error)
 	PreviewRoleChange(ctx context.Context, req *PreviewRoleChangeRequest, opts ...http.CallOption) (rsp *PreviewReply, err error)
 	PutRoleInheritance(ctx context.Context, req *PutRoleInheritanceRequest, opts ...http.CallOption) (rsp *RoleInheritanceReply, err error)
@@ -1490,6 +1513,23 @@ func (c *IAMServiceHTTPClientImpl) ListUserRoles(ctx context.Context, in *ListUs
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *IAMServiceHTTPClientImpl) PreviewAssignment(ctx context.Context, in *PreviewAssignmentRequest, opts ...http.CallOption) (*PreviewAssignmentReply, error) {
+	var out PreviewAssignmentReply
+	pattern := "/api/v1/admin/iam/assignments:preview"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationIAMServicePreviewAssignment),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

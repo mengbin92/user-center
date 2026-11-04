@@ -19,6 +19,33 @@ service IntegrationService {
   rpc GetSessionAuthorization(SessionAuthorizationRequest) returns (SessionAuthorizationReply);
   rpc GetResourceAuthorization(ResourceAuthorizationRequest) returns (ResourceAuthorizationReply);
   rpc RevokeSession(IntegrationRevokeSessionRequest) returns (google.protobuf.Empty);
+  // Server-side login for approved BFFs. Credentials never leave the gRPC
+  // channel; the issued session is bound to the calling application.
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateReply);
+  rpc CompleteMFA(IntegrationCompleteMFARequest) returns (AuthenticateReply);
+}
+
+message AuthenticateRequest {
+  string app_id = 1;
+  string username = 2;
+  string password = 3;
+  string request_id = 4;
+}
+
+message AuthenticateReply {
+  // authenticated | mfa_required
+  string status = 1;
+  string challenge_id = 2;
+  string challenge_expires_at = 3;
+  string session_token = 4;
+  string session_id = 5;
+  string user_id = 6;
+  string session_expires_at = 7;
+}
+
+message IntegrationCompleteMFARequest {
+  string challenge_id = 1;
+  string code = 2;
 }
 
 message SessionFacts {

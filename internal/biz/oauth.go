@@ -49,6 +49,17 @@ type OAuthResult struct {
 
 func (uc *AuthUsecase) OAuthProviders() []string {
 	var out []string
+	// An explicit enable list in auth settings wins: toggling a provider must
+	// actually change the login entry points. An empty list keeps the legacy
+	// behavior of exposing every configured provider.
+	if settings, err := uc.Settings.GetAuth(context.Background(), nil); err == nil && len(settings.Providers) > 0 {
+		for _, name := range settings.Providers {
+			if p := uc.OAuth[name]; p != nil {
+				out = append(out, name)
+			}
+		}
+		return out
+	}
 	for name, p := range uc.OAuth {
 		if p != nil {
 			out = append(out, name)

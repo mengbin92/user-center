@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"net"
 
+	"google.golang.org/grpc/peer"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	usercv1 "github.com/mengbin92/user-center/api/usercenter/v1"
@@ -133,4 +135,49 @@ func (s *IntegrationService) RevokeSession(ctx context.Context, req *usercv1.Int
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
+}
+
+// --- internal gRPC login (V2.4 R7) ---
+
+func grpcPeerInfo(ctx context.Context) (string, string) {
+	ip := "grpc"
+	if p, ok := peer.FromContext(ctx); ok && p.Addr != nil {
+		if host, _, err := net.SplitHostPort(p.Addr.String()); err == nil {
+			ip = host
+		} else {
+			ip = p.Addr.String()
+		}
+	}
+	return ip, "internal-grpc"
+}
+
+func integrationAuthReply(r *biz.IntegrationAuthResult) *usercv1.AuthenticateReply {
+	out := &usercv1.AuthenticateReply{Status: r.Status, UserId: id(r.UserID)}
+	if r.Status == "mfa_required" {
+		out.ChallengeId = r.ChallengeID
+		out.ChallengeExpiresAt = ts(r.ChallengeExpires)
+		return out
+	}
+	out.SessionToken = r.SessionToken
+	out.SessionId = r.SessionID
+	out.SessionExpiresAt = ts(r.SessionExpires)
+	return out
+}
+
+func (s *IntegrationService) Authenticate(ctx context.Context, req *usercv1.AuthenticateRequest) (*usercv1.AuthenticateReply, error) {
+	ip, ua := grpcPeerInfo(ctx)
+	result, err := s.uc.Authenticate(ctx, req.GetAppId(), req.GetUsername(), req.GetPassword(), ip, ua, req.GetRequestId())
+	if err != nil {
+		return nil, err
+	}
+	return integrationAuthReply(result), nil
+}
+
+func (s *IntegrationService) CompleteMFA(ctx context.Context, req *usercv1.IntegrationCompleteMFARequest) (*usercv1.AuthenticateReply, error) {
+	ip, ua := grpcPeerInfo(ctx)
+	result, err := s.uc.CompleteMFA(ctx, req.GetChallengeId(), req.GetCode(), ip, ua, "")
+	if err != nil {
+		return nil, err
+	}
+	return integrationAuthReply(result), nil
 }

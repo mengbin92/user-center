@@ -41,6 +41,7 @@ const OperationMeServiceRevokeSession = "/api.usercenter.v1.MeService/RevokeSess
 const OperationMeServiceRotateRecoveryCodes = "/api.usercenter.v1.MeService/RotateRecoveryCodes"
 const OperationMeServiceSetupMFA = "/api.usercenter.v1.MeService/SetupMFA"
 const OperationMeServiceUpdateMe = "/api.usercenter.v1.MeService/UpdateMe"
+const OperationMeServiceUpdateUsername = "/api.usercenter.v1.MeService/UpdateUsername"
 const OperationMeServiceVerifySecurity = "/api.usercenter.v1.MeService/VerifySecurity"
 
 type MeServiceHTTPServer interface {
@@ -69,6 +70,7 @@ type MeServiceHTTPServer interface {
 	RotateRecoveryCodes(context.Context, *RotateRecoveryCodesRequest) (*RecoveryCodesReply, error)
 	SetupMFA(context.Context, *SetupMFARequest) (*SetupMFAReply, error)
 	UpdateMe(context.Context, *UpdateMeRequest) (*User, error)
+	UpdateUsername(context.Context, *UpdateUsernameRequest) (*User, error)
 	VerifySecurity(context.Context, *VerifySecurityRequest) (*VerifySecurityReply, error)
 }
 
@@ -76,6 +78,7 @@ func RegisterMeServiceHTTPServer(s *http.Server, srv MeServiceHTTPServer) {
 	r := s.Route("/")
 	r.Handle("GET", "/api/v1/me", _MeService_GetMe0_HTTP_Handler(srv))
 	r.Handle("PATCH", "/api/v1/me", _MeService_UpdateMe0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/me/username:update", _MeService_UpdateUsername0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/me/password:change", _MeService_ChangePassword0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/me/email-challenges", _MeService_CreateEmailChallenge0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/me/email:confirm", _MeService_ConfirmEmail0_HTTP_Handler(srv))
@@ -128,6 +131,25 @@ func _MeService_UpdateMe0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Co
 		http.SetOperation(ctx, OperationMeServiceUpdateMe)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.UpdateMe(ctx, req.(*UpdateMeRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*User)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_UpdateUsername0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateUsernameRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceUpdateUsername)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateUsername(ctx, req.(*UpdateUsernameRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
@@ -597,6 +619,7 @@ type MeServiceHTTPClient interface {
 	RotateRecoveryCodes(ctx context.Context, req *RotateRecoveryCodesRequest, opts ...http.CallOption) (rsp *RecoveryCodesReply, err error)
 	SetupMFA(ctx context.Context, req *SetupMFARequest, opts ...http.CallOption) (rsp *SetupMFAReply, err error)
 	UpdateMe(ctx context.Context, req *UpdateMeRequest, opts ...http.CallOption) (rsp *User, err error)
+	UpdateUsername(ctx context.Context, req *UpdateUsernameRequest, opts ...http.CallOption) (rsp *User, err error)
 	VerifySecurity(ctx context.Context, req *VerifySecurityRequest, opts ...http.CallOption) (rsp *VerifySecurityReply, err error)
 }
 
@@ -983,6 +1006,23 @@ func (c *MeServiceHTTPClientImpl) UpdateMe(ctx context.Context, in *UpdateMeRequ
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "PATCH", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *MeServiceHTTPClientImpl) UpdateUsername(ctx context.Context, in *UpdateUsernameRequest, opts ...http.CallOption) (*User, error) {
+	var out User
+	pattern := "/api/v1/me/username:update"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationMeServiceUpdateUsername),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

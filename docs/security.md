@@ -35,6 +35,14 @@
 | 接入客户端 | 凭据只存 SHA-256、一次性展示、按 gRPC 方法白名单校验、可轮换/停用 |
 | Webhook | HMAC-SHA256 原始 body、至少一次投递、重试退避、消费端按 event_id 去重；公网回调必须 https，拒绝链路本地/未指定地址 |
 | OIDC Provider | 授权码一次性消费、PKCE S256、redirect_uri 精确匹配、RS256、短时 access/refresh token、客户端密钥摘要 |
+| OIDC 同意 | 一次性服务端 request handle（仅存哈希、绑定用户与 10 分钟有效期）；同意页不签发授权码；scope 扩张/`prompt=consent` 重新征询；`prompt=none` 返回 `interaction_required`；用户可在 `/me/oidc-consents` 撤销 |
+| RP-initiated logout | `post_logout_redirect_uri` 精确匹配客户端白名单；无效/过期/跨客户端 hint 与缺失 hint 行为一致；登出清理 Cookie 并撤销会话，重复调用幂等 |
+| 组织邀请 | 令牌只在邮件中出现、DB 存哈希、默认 72 小时（`ORG_INVITATION_TTL_HOURS` 可配）；接受要求登录且账号邮箱归一化后完全相等；不匹配/不存在返回同一 404；不自动建号；单组织待接受邀请有上限 |
+| 租户审计导出 | 复用平台导出任务与下载签名；`organization_id` 固定在过滤条件和任务行上；跨租户/策略版本变化/会话变化均返回 404；CSV 公式前缀转义 |
+| 组织域事件 | 与业务事务同提交；载荷只含 ID/revision/角色码，不含邮箱、昵称；订阅按 `event_type` 过滤，消费端按 `event_id` 去重并按 `aggregate_revision` 判新旧 |
+| 内部 gRPC 登录 | 凭据只在服务端 gRPC 传输；方法白名单 + 接入客户端鉴权；复用 HTTP 登录限流与失败计数；MFA 挑战绑定应用与身份版本且单次消费；会话 audience 绑定调用方应用；审计记录 `actor_service_id` |
+| 用户名修改 | Step-up + 当前密码 + `expected_revision` CAS；归一化唯一性与保留字同注册路径共用；管理端不提供改名接口；审计记录前后值 |
+| 组织创建配额 | 默认关闭；开启后在事务内对该用户的组织行加锁计数；超限返回 `ORGANIZATION_QUOTA_EXCEEDED` 并写拒绝审计；平台管理员豁免 |
 | 组织成员 | 组织角色校验、最后 owner 保护、平台管理员特权、成员邮箱按角色脱敏、变更 revision CAS；归档/成员增改删要求 Step-up |
 | 审计缺失 | 敏感写与业务事务同提交写审计；安全事件独立表 |
 | 密钥泄露 | 环境变量注入；AES-GCM 加密 TOTP；日志不打印凭据 |

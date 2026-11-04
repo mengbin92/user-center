@@ -116,10 +116,10 @@ func (uc *SettingsUsecase) UpdateAuth(ctx context.Context, actor ActorContext, i
 			return err
 		}
 		saved = s
-		if err := uc.audit(ctx, tx, actor, "settings.auth.update", "auth", "{}", "{}", "{}", reason, "success"); err != nil {
-			return err
+		if _, err := uc.Policy.BumpPolicyRevision(ctx, tx); err != nil {
+			return ErrDependency
 		}
-		return nil
+		return uc.audit(ctx, tx, actor, "settings.auth.update", "auth", "{}", "{}", "{}", reason, "success")
 	})
 	if err != nil {
 		return nil, err

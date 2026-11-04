@@ -49,6 +49,7 @@ const (
 	IAMService_CreateDelegation_FullMethodName        = "/api.usercenter.v1.IAMService/CreateDelegation"
 	IAMService_UpdateDelegation_FullMethodName        = "/api.usercenter.v1.IAMService/UpdateDelegation"
 	IAMService_RevokeDelegation_FullMethodName        = "/api.usercenter.v1.IAMService/RevokeDelegation"
+	IAMService_PreviewAssignment_FullMethodName       = "/api.usercenter.v1.IAMService/PreviewAssignment"
 	IAMService_PreviewBatchAssign_FullMethodName      = "/api.usercenter.v1.IAMService/PreviewBatchAssign"
 	IAMService_BatchAssign_FullMethodName             = "/api.usercenter.v1.IAMService/BatchAssign"
 	IAMService_ListConstraints_FullMethodName         = "/api.usercenter.v1.IAMService/ListConstraints"
@@ -100,6 +101,7 @@ type IAMServiceClient interface {
 	CreateDelegation(ctx context.Context, in *CreateDelegationRequest, opts ...grpc.CallOption) (*Delegation, error)
 	UpdateDelegation(ctx context.Context, in *UpdateDelegationRequest, opts ...grpc.CallOption) (*Delegation, error)
 	RevokeDelegation(ctx context.Context, in *RevokeDelegationRequest, opts ...grpc.CallOption) (*Delegation, error)
+	PreviewAssignment(ctx context.Context, in *PreviewAssignmentRequest, opts ...grpc.CallOption) (*PreviewAssignmentReply, error)
 	PreviewBatchAssign(ctx context.Context, in *PreviewBatchAssignRequest, opts ...grpc.CallOption) (*BatchPreviewReply, error)
 	BatchAssign(ctx context.Context, in *BatchAssignRequest, opts ...grpc.CallOption) (*BatchAssignReply, error)
 	ListConstraints(ctx context.Context, in *ListConstraintsRequest, opts ...grpc.CallOption) (*ConstraintsReply, error)
@@ -412,6 +414,16 @@ func (c *iAMServiceClient) RevokeDelegation(ctx context.Context, in *RevokeDeleg
 	return out, nil
 }
 
+func (c *iAMServiceClient) PreviewAssignment(ctx context.Context, in *PreviewAssignmentRequest, opts ...grpc.CallOption) (*PreviewAssignmentReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PreviewAssignmentReply)
+	err := c.cc.Invoke(ctx, IAMService_PreviewAssignment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *iAMServiceClient) PreviewBatchAssign(ctx context.Context, in *PreviewBatchAssignRequest, opts ...grpc.CallOption) (*BatchPreviewReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BatchPreviewReply)
@@ -569,6 +581,7 @@ type IAMServiceServer interface {
 	CreateDelegation(context.Context, *CreateDelegationRequest) (*Delegation, error)
 	UpdateDelegation(context.Context, *UpdateDelegationRequest) (*Delegation, error)
 	RevokeDelegation(context.Context, *RevokeDelegationRequest) (*Delegation, error)
+	PreviewAssignment(context.Context, *PreviewAssignmentRequest) (*PreviewAssignmentReply, error)
 	PreviewBatchAssign(context.Context, *PreviewBatchAssignRequest) (*BatchPreviewReply, error)
 	BatchAssign(context.Context, *BatchAssignRequest) (*BatchAssignReply, error)
 	ListConstraints(context.Context, *ListConstraintsRequest) (*ConstraintsReply, error)
@@ -677,6 +690,9 @@ func (UnimplementedIAMServiceServer) UpdateDelegation(context.Context, *UpdateDe
 }
 func (UnimplementedIAMServiceServer) RevokeDelegation(context.Context, *RevokeDelegationRequest) (*Delegation, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeDelegation not implemented")
+}
+func (UnimplementedIAMServiceServer) PreviewAssignment(context.Context, *PreviewAssignmentRequest) (*PreviewAssignmentReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method PreviewAssignment not implemented")
 }
 func (UnimplementedIAMServiceServer) PreviewBatchAssign(context.Context, *PreviewBatchAssignRequest) (*BatchPreviewReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method PreviewBatchAssign not implemented")
@@ -1257,6 +1273,24 @@ func _IAMService_RevokeDelegation_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IAMService_PreviewAssignment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreviewAssignmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IAMServiceServer).PreviewAssignment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IAMService_PreviewAssignment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IAMServiceServer).PreviewAssignment(ctx, req.(*PreviewAssignmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _IAMService_PreviewBatchAssign_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PreviewBatchAssignRequest)
 	if err := dec(in); err != nil {
@@ -1595,6 +1629,10 @@ var IAMService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeDelegation",
 			Handler:    _IAMService_RevokeDelegation_Handler,
+		},
+		{
+			MethodName: "PreviewAssignment",
+			Handler:    _IAMService_PreviewAssignment_Handler,
 		},
 		{
 			MethodName: "PreviewBatchAssign",

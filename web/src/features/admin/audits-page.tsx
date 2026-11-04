@@ -7,7 +7,7 @@ import {
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 
 import { PageTitle } from '../../app/guards'
 import { Badge, StatusBadge } from '../../components/badge'
@@ -54,13 +54,17 @@ const EXPORT_FIELDS = [
 
 export function AdminAuditsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { can } = useAuth()
-  const [action, setAction] = useState('')
-  const [actorId, setActorId] = useState('')
-  const [target, setTarget] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [tokens, setTokens] = useState<string[]>([''])
+  const saved = (location.state as { auditFilters?: Record<string, unknown> } | null)?.auditFilters
+  const [action, setAction] = useState(String(saved?.action ?? ''))
+  const [actorId, setActorId] = useState(String(saved?.actorId ?? ''))
+  const [target, setTarget] = useState(String(saved?.target ?? ''))
+  const [from, setFrom] = useState(String(saved?.from ?? ''))
+  const [to, setTo] = useState(String(saved?.to ?? ''))
+  const [tokens, setTokens] = useState<string[]>(
+    Array.isArray(saved?.tokens) ? (saved?.tokens as string[]) : [''],
+  )
   const [detailId, setDetailId] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [exportFields, setExportFields] = useState<Set<string>>(
@@ -287,10 +291,14 @@ export function AdminAuditsPage() {
                           variant="ghost"
                           onClick={(clickEvent) => {
                             clickEvent.stopPropagation()
-                            setDetailId(event.id ?? null)
+                            navigate(`/admin/audits/${encodeURIComponent(event.id ?? '')}`, {
+                              state: {
+                                auditFilters: { action, actorId, target, from, to, tokens },
+                              },
+                            })
                           }}
                         >
-                          查看
+                          详情
                         </Button>
                       </TD>
                     </TR>

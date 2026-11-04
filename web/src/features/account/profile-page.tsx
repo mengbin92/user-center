@@ -48,6 +48,11 @@ export function ProfilePage() {
   const { user, refresh } = useAuth()
   const [editing, setEditing] = useState(false)
   const [displayName, setDisplayName] = useState('')
+  const [usernameOpen, setUsernameOpen] = useState(false)
+  const [newUsername, setNewUsername] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [usernameReason, setUsernameReason] = useState('')
+  const [usernameError, setUsernameError] = useState('')
 
   const updateProfile = useApiMutation({
     mutationFn: (name: string) =>
@@ -62,6 +67,26 @@ export function ProfilePage() {
       setEditing(false)
       void refresh(true)
     },
+  })
+
+  const updateUsername = useApiMutation({
+    mutationFn: () =>
+      api.me.updateUsername({
+        username: newUsername.trim(),
+        current_password: currentPassword,
+        expected_revision: user?.revision ?? '0',
+        reason: usernameReason.trim() || '用户自助修改用户名',
+      }),
+    successMessage: '用户名已更新',
+    successDescription: '旧用户名已无法登录，变更已写入审计。',
+    refreshAuth: true,
+    onSuccess: () => {
+      setUsernameOpen(false)
+      setCurrentPassword('')
+      setUsernameError('')
+      void refresh(true)
+    },
+    onError: (cause) => setUsernameError(cause.message),
   })
 
   if (!user) return null
@@ -89,14 +114,27 @@ export function ProfilePage() {
             查看账号身份信息，并维护展示昵称。
           </p>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={openEditor}
-          icon={<Pencil className="h-3.5 w-3.5" />}
-        >
-          编辑昵称
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setNewUsername('')
+              setUsernameError('')
+              setUsernameOpen(true)
+            }}
+          >
+            修改用户名
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={openEditor}
+            icon={<Pencil className="h-3.5 w-3.5" />}
+          >
+            编辑昵称
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -263,6 +301,60 @@ export function ProfilePage() {
             placeholder="输入昵称"
           />
         </Field>
+      </Dialog>
+
+      <Dialog
+        open={usernameOpen}
+        onClose={() => setUsernameOpen(false)}
+        title="修改用户名"
+        description="需要近期安全验证与当前密码；规则与注册一致，管理端不能代改。"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setUsernameOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={updateUsername.isPending}
+              disabled={newUsername.trim().length < 3 || !currentPassword}
+              onClick={() => void updateUsername.mutateAsync()}
+            >
+              确认修改
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="新用户名" htmlFor="profile-new-username">
+            <Input
+              id="profile-new-username"
+              value={newUsername}
+              onChange={(event) => setNewUsername(event.target.value)}
+              placeholder="3-128 位字母、数字、_. -"
+            />
+          </Field>
+          <Field label="当前密码" htmlFor="profile-current-password">
+            <Input
+              id="profile-current-password"
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+            />
+          </Field>
+          <Field label="原因" htmlFor="profile-username-reason">
+            <Input
+              id="profile-username-reason"
+              value={usernameReason}
+              onChange={(event) => setUsernameReason(event.target.value)}
+              placeholder="用于审计留痕"
+            />
+          </Field>
+          {usernameError ? (
+            <p className="text-xs text-rose-600">{usernameError}</p>
+          ) : null}
+        </div>
       </Dialog>
     </div>
   )

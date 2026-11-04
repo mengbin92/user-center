@@ -290,6 +290,24 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.BatchPreviewReply'
+    /api/v1/admin/iam/assignments:preview:
+        post:
+            tags:
+                - IAMService
+            operationId: IAMService_PreviewAssignment
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.PreviewAssignmentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.PreviewAssignmentReply'
     /api/v1/admin/iam/authorization:explain:
         post:
             tags:
@@ -1322,6 +1340,47 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.EmailSettings'
+    /api/v1/admin/settings/organization:
+        get:
+            tags:
+                - SettingsService
+            operationId: SettingsService_GetOrganizationSettings
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrganizationSettings'
+        patch:
+            tags:
+                - SettingsService
+            operationId: SettingsService_UpdateOrganizationSettings
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateOrganizationSettingsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrganizationSettings'
+    /api/v1/admin/settings/providers:
+        get:
+            tags:
+                - SettingsService
+            operationId: SettingsService_GetAuthProviders
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.AuthProvidersReply'
     /api/v1/admin/users:
         get:
             tags:
@@ -2168,6 +2227,24 @@ paths:
                 "200":
                     description: OK
                     content: {}
+    /api/v1/me/username:update:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_UpdateUsername
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateUsernameRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.User'
     /api/v1/orgs:
         get:
             tags:
@@ -3108,6 +3185,37 @@ components:
                     format: int32
                 mfa_required_for_admins:
                     type: boolean
+        api.usercenter.v1.AuthProviderView:
+            type: object
+            properties:
+                code:
+                    type: string
+                name:
+                    type: string
+                enabled:
+                    type: boolean
+                credential_source:
+                    type: string
+                    description: env | db (currently env only)
+                credential_configured:
+                    type: boolean
+                callback_url:
+                    type: string
+                required_env:
+                    type: array
+                    items:
+                        type: string
+                updated_at:
+                    type: string
+        api.usercenter.v1.AuthProvidersReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.AuthProviderView'
+                revision:
+                    type: string
         api.usercenter.v1.AuthSettings:
             type: object
             properties:
@@ -4399,6 +4507,20 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.OrganizationMember'
+        api.usercenter.v1.OrganizationSettings:
+            type: object
+            properties:
+                quota_enabled:
+                    type: boolean
+                max_owned_per_user:
+                    type: integer
+                    format: int32
+                count_archived:
+                    type: boolean
+                revision:
+                    type: string
+                updated_at:
+                    type: string
         api.usercenter.v1.OrganizationsReply:
             type: object
             properties:
@@ -4486,6 +4608,42 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Permission'
+        api.usercenter.v1.PreviewAssignmentReply:
+            type: object
+            properties:
+                eligible:
+                    type: boolean
+                reason:
+                    type: string
+                permissions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.PermissionSummary'
+                deny_sources:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.GrantSource'
+                scope:
+                    type: string
+                valid_until:
+                    type: string
+                policy_revision:
+                    type: string
+                role_status:
+                    type: string
+                max_members:
+                    type: string
+        api.usercenter.v1.PreviewAssignmentRequest:
+            type: object
+            properties:
+                user_id:
+                    type: string
+                role_id:
+                    type: string
+                boundary:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                expires_at:
+                    type: string
         api.usercenter.v1.PreviewBatchAssignRequest:
             type: object
             properties:
@@ -5287,6 +5445,22 @@ components:
                     type: string
                 reason:
                     type: string
+        api.usercenter.v1.UpdateOrganizationSettingsRequest:
+            type: object
+            properties:
+                quota_enabled:
+                    type: boolean
+                max_owned_per_user:
+                    type: integer
+                    format: int32
+                count_archived:
+                    type: boolean
+                update_mask:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.UpdatePermissionRequest:
             type: object
             properties:
@@ -5342,6 +5516,17 @@ components:
                 expected_revision:
                     type: string
                 expected_policy_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateUsernameRequest:
+            type: object
+            properties:
+                username:
+                    type: string
+                current_password:
+                    type: string
+                expected_revision:
                     type: string
                 reason:
                     type: string

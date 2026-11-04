@@ -120,6 +120,9 @@ func (uc *OrganizationUsecase) Create(ctx context.Context, actor ActorContext, i
 	now := uc.Clock.Now().UTC()
 	var created *Organization
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.organizationQuotaGuard(ctx, tx, actor); err != nil {
+			return err
+		}
 		org, err := uc.Organizations.CreateOrganization(ctx, tx, &Organization{Code: in.Code, Name: in.Name, CreatedBy: actor.User.ID})
 		if err != nil {
 			return err

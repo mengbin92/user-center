@@ -115,11 +115,13 @@ func (r *userRepo) Update(ctx context.Context, tx biz.Tx, u *biz.User, expected 
 	}
 	now := time.Now().UTC()
 	updates := map[string]any{
-		"display_name": u.DisplayName,
-		"status":       u.Status,
-		"revision":     expected + 1,
-		"updated_at":   now,
-		"archived_at":  u.ArchivedAt,
+		"username":            u.Username,
+		"username_normalized": u.UsernameNormalized,
+		"display_name":        u.DisplayName,
+		"status":              u.Status,
+		"revision":            expected + 1,
+		"updated_at":          now,
+		"archived_at":         u.ArchivedAt,
 	}
 	if u.Email != "" {
 		updates["email"] = u.Email

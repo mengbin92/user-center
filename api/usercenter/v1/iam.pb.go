@@ -3852,6 +3852,182 @@ func (x *RevokeAssignmentRequest) GetExpectedRevision() string {
 	return ""
 }
 
+type PreviewAssignmentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	RoleId        string                 `protobuf:"bytes,2,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	Boundary      *Scope                 `protobuf:"bytes,3,opt,name=boundary,proto3" json:"boundary,omitempty"`
+	ExpiresAt     string                 `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewAssignmentRequest) Reset() {
+	*x = PreviewAssignmentRequest{}
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewAssignmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewAssignmentRequest) ProtoMessage() {}
+
+func (x *PreviewAssignmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewAssignmentRequest.ProtoReflect.Descriptor instead.
+func (*PreviewAssignmentRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *PreviewAssignmentRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *PreviewAssignmentRequest) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *PreviewAssignmentRequest) GetBoundary() *Scope {
+	if x != nil {
+		return x.Boundary
+	}
+	return nil
+}
+
+func (x *PreviewAssignmentRequest) GetExpiresAt() string {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return ""
+}
+
+type PreviewAssignmentReply struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Eligible       bool                   `protobuf:"varint,1,opt,name=eligible,proto3" json:"eligible,omitempty"`
+	Reason         string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	Permissions    []*PermissionSummary   `protobuf:"bytes,3,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	DenySources    []*GrantSource         `protobuf:"bytes,4,rep,name=deny_sources,json=denySources,proto3" json:"deny_sources,omitempty"`
+	Scope          string                 `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`
+	ValidUntil     string                 `protobuf:"bytes,6,opt,name=valid_until,json=validUntil,proto3" json:"valid_until,omitempty"`
+	PolicyRevision string                 `protobuf:"bytes,7,opt,name=policy_revision,json=policyRevision,proto3" json:"policy_revision,omitempty"`
+	RoleStatus     string                 `protobuf:"bytes,8,opt,name=role_status,json=roleStatus,proto3" json:"role_status,omitempty"`
+	MaxMembers     string                 `protobuf:"bytes,9,opt,name=max_members,json=maxMembers,proto3" json:"max_members,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PreviewAssignmentReply) Reset() {
+	*x = PreviewAssignmentReply{}
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewAssignmentReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewAssignmentReply) ProtoMessage() {}
+
+func (x *PreviewAssignmentReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewAssignmentReply.ProtoReflect.Descriptor instead.
+func (*PreviewAssignmentReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *PreviewAssignmentReply) GetEligible() bool {
+	if x != nil {
+		return x.Eligible
+	}
+	return false
+}
+
+func (x *PreviewAssignmentReply) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *PreviewAssignmentReply) GetPermissions() []*PermissionSummary {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
+func (x *PreviewAssignmentReply) GetDenySources() []*GrantSource {
+	if x != nil {
+		return x.DenySources
+	}
+	return nil
+}
+
+func (x *PreviewAssignmentReply) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *PreviewAssignmentReply) GetValidUntil() string {
+	if x != nil {
+		return x.ValidUntil
+	}
+	return ""
+}
+
+func (x *PreviewAssignmentReply) GetPolicyRevision() string {
+	if x != nil {
+		return x.PolicyRevision
+	}
+	return ""
+}
+
+func (x *PreviewAssignmentReply) GetRoleStatus() string {
+	if x != nil {
+		return x.RoleStatus
+	}
+	return ""
+}
+
+func (x *PreviewAssignmentReply) GetMaxMembers() string {
+	if x != nil {
+		return x.MaxMembers
+	}
+	return ""
+}
+
 type PreviewBatchAssignRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserIds       []string               `protobuf:"bytes,1,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
@@ -3864,7 +4040,7 @@ type PreviewBatchAssignRequest struct {
 
 func (x *PreviewBatchAssignRequest) Reset() {
 	*x = PreviewBatchAssignRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[52]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3876,7 +4052,7 @@ func (x *PreviewBatchAssignRequest) String() string {
 func (*PreviewBatchAssignRequest) ProtoMessage() {}
 
 func (x *PreviewBatchAssignRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[52]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3889,7 +4065,7 @@ func (x *PreviewBatchAssignRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewBatchAssignRequest.ProtoReflect.Descriptor instead.
 func (*PreviewBatchAssignRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{52}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *PreviewBatchAssignRequest) GetUserIds() []string {
@@ -3930,7 +4106,7 @@ type BatchPreviewReply struct {
 
 func (x *BatchPreviewReply) Reset() {
 	*x = BatchPreviewReply{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[53]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3942,7 +4118,7 @@ func (x *BatchPreviewReply) String() string {
 func (*BatchPreviewReply) ProtoMessage() {}
 
 func (x *BatchPreviewReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[53]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3955,7 +4131,7 @@ func (x *BatchPreviewReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchPreviewReply.ProtoReflect.Descriptor instead.
 func (*BatchPreviewReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{53}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *BatchPreviewReply) GetEligibleUserIds() []string {
@@ -3982,7 +4158,7 @@ type BatchFailure struct {
 
 func (x *BatchFailure) Reset() {
 	*x = BatchFailure{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[54]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3994,7 +4170,7 @@ func (x *BatchFailure) String() string {
 func (*BatchFailure) ProtoMessage() {}
 
 func (x *BatchFailure) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[54]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4007,7 +4183,7 @@ func (x *BatchFailure) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchFailure.ProtoReflect.Descriptor instead.
 func (*BatchFailure) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{54}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *BatchFailure) GetUserId() string {
@@ -4039,7 +4215,7 @@ type BatchAssignRequest struct {
 
 func (x *BatchAssignRequest) Reset() {
 	*x = BatchAssignRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[55]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4051,7 +4227,7 @@ func (x *BatchAssignRequest) String() string {
 func (*BatchAssignRequest) ProtoMessage() {}
 
 func (x *BatchAssignRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[55]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4064,7 +4240,7 @@ func (x *BatchAssignRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchAssignRequest.ProtoReflect.Descriptor instead.
 func (*BatchAssignRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{55}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *BatchAssignRequest) GetUserIds() []string {
@@ -4125,7 +4301,7 @@ type BatchAssignReply struct {
 
 func (x *BatchAssignReply) Reset() {
 	*x = BatchAssignReply{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[56]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4137,7 +4313,7 @@ func (x *BatchAssignReply) String() string {
 func (*BatchAssignReply) ProtoMessage() {}
 
 func (x *BatchAssignReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[56]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4150,7 +4326,7 @@ func (x *BatchAssignReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchAssignReply.ProtoReflect.Descriptor instead.
 func (*BatchAssignReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{56}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *BatchAssignReply) GetAssignments() []*Assignment {
@@ -4168,7 +4344,7 @@ type ListConstraintsRequest struct {
 
 func (x *ListConstraintsRequest) Reset() {
 	*x = ListConstraintsRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[57]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4180,7 +4356,7 @@ func (x *ListConstraintsRequest) String() string {
 func (*ListConstraintsRequest) ProtoMessage() {}
 
 func (x *ListConstraintsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[57]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4193,7 +4369,7 @@ func (x *ListConstraintsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConstraintsRequest.ProtoReflect.Descriptor instead.
 func (*ListConstraintsRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{57}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{59}
 }
 
 type ConstraintsReply struct {
@@ -4205,7 +4381,7 @@ type ConstraintsReply struct {
 
 func (x *ConstraintsReply) Reset() {
 	*x = ConstraintsReply{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[58]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4217,7 +4393,7 @@ func (x *ConstraintsReply) String() string {
 func (*ConstraintsReply) ProtoMessage() {}
 
 func (x *ConstraintsReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[58]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4230,7 +4406,7 @@ func (x *ConstraintsReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConstraintsReply.ProtoReflect.Descriptor instead.
 func (*ConstraintsReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{58}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *ConstraintsReply) GetItems() []*Constraint {
@@ -4254,7 +4430,7 @@ type CreateConstraintRequest struct {
 
 func (x *CreateConstraintRequest) Reset() {
 	*x = CreateConstraintRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[59]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4266,7 +4442,7 @@ func (x *CreateConstraintRequest) String() string {
 func (*CreateConstraintRequest) ProtoMessage() {}
 
 func (x *CreateConstraintRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[59]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4279,7 +4455,7 @@ func (x *CreateConstraintRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateConstraintRequest.ProtoReflect.Descriptor instead.
 func (*CreateConstraintRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{59}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *CreateConstraintRequest) GetKind() string {
@@ -4340,7 +4516,7 @@ type UpdateConstraintRequest struct {
 
 func (x *UpdateConstraintRequest) Reset() {
 	*x = UpdateConstraintRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[60]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4352,7 +4528,7 @@ func (x *UpdateConstraintRequest) String() string {
 func (*UpdateConstraintRequest) ProtoMessage() {}
 
 func (x *UpdateConstraintRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[60]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4365,7 +4541,7 @@ func (x *UpdateConstraintRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateConstraintRequest.ProtoReflect.Descriptor instead.
 func (*UpdateConstraintRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{60}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *UpdateConstraintRequest) GetId() string {
@@ -4436,7 +4612,7 @@ type DeleteConstraintRequest struct {
 
 func (x *DeleteConstraintRequest) Reset() {
 	*x = DeleteConstraintRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[61]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4448,7 +4624,7 @@ func (x *DeleteConstraintRequest) String() string {
 func (*DeleteConstraintRequest) ProtoMessage() {}
 
 func (x *DeleteConstraintRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[61]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4461,7 +4637,7 @@ func (x *DeleteConstraintRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConstraintRequest.ProtoReflect.Descriptor instead.
 func (*DeleteConstraintRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{61}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *DeleteConstraintRequest) GetId() string {
@@ -4500,7 +4676,7 @@ type ListMenusRequest struct {
 
 func (x *ListMenusRequest) Reset() {
 	*x = ListMenusRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[62]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4512,7 +4688,7 @@ func (x *ListMenusRequest) String() string {
 func (*ListMenusRequest) ProtoMessage() {}
 
 func (x *ListMenusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[62]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4525,7 +4701,7 @@ func (x *ListMenusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMenusRequest.ProtoReflect.Descriptor instead.
 func (*ListMenusRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{62}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{64}
 }
 
 type MenusReply struct {
@@ -4537,7 +4713,7 @@ type MenusReply struct {
 
 func (x *MenusReply) Reset() {
 	*x = MenusReply{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[63]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4549,7 +4725,7 @@ func (x *MenusReply) String() string {
 func (*MenusReply) ProtoMessage() {}
 
 func (x *MenusReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[63]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4562,7 +4738,7 @@ func (x *MenusReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MenusReply.ProtoReflect.Descriptor instead.
 func (*MenusReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{63}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *MenusReply) GetItems() []*MenuItem {
@@ -4589,7 +4765,7 @@ type CreateMenuItemRequest struct {
 
 func (x *CreateMenuItemRequest) Reset() {
 	*x = CreateMenuItemRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[64]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4601,7 +4777,7 @@ func (x *CreateMenuItemRequest) String() string {
 func (*CreateMenuItemRequest) ProtoMessage() {}
 
 func (x *CreateMenuItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[64]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4614,7 +4790,7 @@ func (x *CreateMenuItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateMenuItemRequest.ProtoReflect.Descriptor instead.
 func (*CreateMenuItemRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{64}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *CreateMenuItemRequest) GetParentId() string {
@@ -4698,7 +4874,7 @@ type UpdateMenuItemRequest struct {
 
 func (x *UpdateMenuItemRequest) Reset() {
 	*x = UpdateMenuItemRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[65]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4710,7 +4886,7 @@ func (x *UpdateMenuItemRequest) String() string {
 func (*UpdateMenuItemRequest) ProtoMessage() {}
 
 func (x *UpdateMenuItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[65]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4723,7 +4899,7 @@ func (x *UpdateMenuItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMenuItemRequest.ProtoReflect.Descriptor instead.
 func (*UpdateMenuItemRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{65}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *UpdateMenuItemRequest) GetId() string {
@@ -4808,7 +4984,7 @@ type ArchiveMenuItemRequest struct {
 
 func (x *ArchiveMenuItemRequest) Reset() {
 	*x = ArchiveMenuItemRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[66]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4820,7 +4996,7 @@ func (x *ArchiveMenuItemRequest) String() string {
 func (*ArchiveMenuItemRequest) ProtoMessage() {}
 
 func (x *ArchiveMenuItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[66]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4833,7 +5009,7 @@ func (x *ArchiveMenuItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveMenuItemRequest.ProtoReflect.Descriptor instead.
 func (*ArchiveMenuItemRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{66}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *ArchiveMenuItemRequest) GetId() string {
@@ -4881,7 +5057,7 @@ type GrantSource struct {
 
 func (x *GrantSource) Reset() {
 	*x = GrantSource{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[67]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4893,7 +5069,7 @@ func (x *GrantSource) String() string {
 func (*GrantSource) ProtoMessage() {}
 
 func (x *GrantSource) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[67]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4906,7 +5082,7 @@ func (x *GrantSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrantSource.ProtoReflect.Descriptor instead.
 func (*GrantSource) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{67}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *GrantSource) GetRoleId() string {
@@ -4984,7 +5160,7 @@ type ExplainAuthorizationRequest struct {
 
 func (x *ExplainAuthorizationRequest) Reset() {
 	*x = ExplainAuthorizationRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[68]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4996,7 +5172,7 @@ func (x *ExplainAuthorizationRequest) String() string {
 func (*ExplainAuthorizationRequest) ProtoMessage() {}
 
 func (x *ExplainAuthorizationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[68]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5009,7 +5185,7 @@ func (x *ExplainAuthorizationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExplainAuthorizationRequest.ProtoReflect.Descriptor instead.
 func (*ExplainAuthorizationRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{68}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *ExplainAuthorizationRequest) GetUserId() string {
@@ -5054,7 +5230,7 @@ type ExplainAuthorizationReply struct {
 
 func (x *ExplainAuthorizationReply) Reset() {
 	*x = ExplainAuthorizationReply{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[69]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5066,7 +5242,7 @@ func (x *ExplainAuthorizationReply) String() string {
 func (*ExplainAuthorizationReply) ProtoMessage() {}
 
 func (x *ExplainAuthorizationReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[69]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5079,7 +5255,7 @@ func (x *ExplainAuthorizationReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExplainAuthorizationReply.ProtoReflect.Descriptor instead.
 func (*ExplainAuthorizationReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{69}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *ExplainAuthorizationReply) GetAllowed() bool {
@@ -5137,7 +5313,7 @@ type SimulateAuthorizationRequest struct {
 
 func (x *SimulateAuthorizationRequest) Reset() {
 	*x = SimulateAuthorizationRequest{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[70]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5149,7 +5325,7 @@ func (x *SimulateAuthorizationRequest) String() string {
 func (*SimulateAuthorizationRequest) ProtoMessage() {}
 
 func (x *SimulateAuthorizationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[70]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5162,7 +5338,7 @@ func (x *SimulateAuthorizationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SimulateAuthorizationRequest.ProtoReflect.Descriptor instead.
 func (*SimulateAuthorizationRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{70}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *SimulateAuthorizationRequest) GetUserId() string {
@@ -5214,7 +5390,7 @@ type SimulateAuthorizationReply struct {
 
 func (x *SimulateAuthorizationReply) Reset() {
 	*x = SimulateAuthorizationReply{}
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[71]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5226,7 +5402,7 @@ func (x *SimulateAuthorizationReply) String() string {
 func (*SimulateAuthorizationReply) ProtoMessage() {}
 
 func (x *SimulateAuthorizationReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_iam_proto_msgTypes[71]
+	mi := &file_api_usercenter_v1_iam_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5239,7 +5415,7 @@ func (x *SimulateAuthorizationReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SimulateAuthorizationReply.ProtoReflect.Descriptor instead.
 func (*SimulateAuthorizationReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{71}
+	return file_api_usercenter_v1_iam_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *SimulateAuthorizationReply) GetBeforeAllowed() bool {
@@ -5622,7 +5798,26 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x128\n" +
 	"\x18expected_policy_revision\x18\x03 \x01(\tR\x16expectedPolicyRevision\x12+\n" +
-	"\x11expected_revision\x18\x04 \x01(\tR\x10expectedRevision\"\xa4\x01\n" +
+	"\x11expected_revision\x18\x04 \x01(\tR\x10expectedRevision\"\xa1\x01\n" +
+	"\x18PreviewAssignmentRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
+	"\arole_id\x18\x02 \x01(\tR\x06roleId\x124\n" +
+	"\bboundary\x18\x03 \x01(\v2\x18.api.usercenter.v1.ScopeR\bboundary\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\tR\texpiresAt\"\xf9\x02\n" +
+	"\x16PreviewAssignmentReply\x12\x1a\n" +
+	"\beligible\x18\x01 \x01(\bR\beligible\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12F\n" +
+	"\vpermissions\x18\x03 \x03(\v2$.api.usercenter.v1.PermissionSummaryR\vpermissions\x12A\n" +
+	"\fdeny_sources\x18\x04 \x03(\v2\x1e.api.usercenter.v1.GrantSourceR\vdenySources\x12\x14\n" +
+	"\x05scope\x18\x05 \x01(\tR\x05scope\x12\x1f\n" +
+	"\vvalid_until\x18\x06 \x01(\tR\n" +
+	"validUntil\x12'\n" +
+	"\x0fpolicy_revision\x18\a \x01(\tR\x0epolicyRevision\x12\x1f\n" +
+	"\vrole_status\x18\b \x01(\tR\n" +
+	"roleStatus\x12\x1f\n" +
+	"\vmax_members\x18\t \x01(\tR\n" +
+	"maxMembers\"\xa4\x01\n" +
 	"\x19PreviewBatchAssignRequest\x12\x19\n" +
 	"\buser_ids\x18\x01 \x03(\tR\auserIds\x12\x17\n" +
 	"\arole_id\x18\x02 \x01(\tR\x06roleId\x124\n" +
@@ -5739,7 +5934,7 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\rbefore_reason\x18\x03 \x01(\tR\fbeforeReason\x12!\n" +
 	"\fafter_reason\x18\x04 \x01(\tR\vafterReason\x12+\n" +
 	"\x11added_permissions\x18\x05 \x03(\tR\x10addedPermissions\x12/\n" +
-	"\x13removed_permissions\x18\x06 \x03(\tR\x12removedPermissions2\xb6-\n" +
+	"\x13removed_permissions\x18\x06 \x03(\tR\x12removedPermissions2\xd6.\n" +
 	"\n" +
 	"IAMService\x12\x80\x01\n" +
 	"\rListResources\x12'.api.usercenter.v1.ListResourcesRequest\x1a!.api.usercenter.v1.ResourcesReply\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/admin/iam/resources\x12\x88\x01\n" +
@@ -5772,7 +5967,8 @@ const file_api_usercenter_v1_iam_proto_rawDesc = "" +
 	"\x0fListDelegations\x12).api.usercenter.v1.ListDelegationsRequest\x1a#.api.usercenter.v1.DelegationsReply\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/admin/iam/delegations\x12\x87\x01\n" +
 	"\x10CreateDelegation\x12*.api.usercenter.v1.CreateDelegationRequest\x1a\x1d.api.usercenter.v1.Delegation\"(\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/api/v1/admin/iam/delegations\x12\x8c\x01\n" +
 	"\x10UpdateDelegation\x12*.api.usercenter.v1.UpdateDelegationRequest\x1a\x1d.api.usercenter.v1.Delegation\"-\x82\xd3\xe4\x93\x02':\x01*2\"/api/v1/admin/iam/delegations/{id}\x12\x93\x01\n" +
-	"\x10RevokeDelegation\x12*.api.usercenter.v1.RevokeDelegationRequest\x1a\x1d.api.usercenter.v1.Delegation\"4\x82\xd3\xe4\x93\x02.:\x01*\")/api/v1/admin/iam/delegations/{id}:revoke\x12\xa0\x01\n" +
+	"\x10RevokeDelegation\x12*.api.usercenter.v1.RevokeDelegationRequest\x1a\x1d.api.usercenter.v1.Delegation\"4\x82\xd3\xe4\x93\x02.:\x01*\")/api/v1/admin/iam/delegations/{id}:revoke\x12\x9d\x01\n" +
+	"\x11PreviewAssignment\x12+.api.usercenter.v1.PreviewAssignmentRequest\x1a).api.usercenter.v1.PreviewAssignmentReply\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/admin/iam/assignments:preview\x12\xa0\x01\n" +
 	"\x12PreviewBatchAssign\x12,.api.usercenter.v1.PreviewBatchAssignRequest\x1a$.api.usercenter.v1.BatchPreviewReply\"6\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1/admin/iam/assignments:batch-preview\x12\x90\x01\n" +
 	"\vBatchAssign\x12%.api.usercenter.v1.BatchAssignRequest\x1a#.api.usercenter.v1.BatchAssignReply\"5\x82\xd3\xe4\x93\x02/:\x01*\"*/api/v1/admin/iam/assignments:batch-assign\x12\x88\x01\n" +
 	"\x0fListConstraints\x12).api.usercenter.v1.ListConstraintsRequest\x1a#.api.usercenter.v1.ConstraintsReply\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/admin/iam/constraints\x12\x87\x01\n" +
@@ -5798,7 +5994,7 @@ func file_api_usercenter_v1_iam_proto_rawDescGZIP() []byte {
 	return file_api_usercenter_v1_iam_proto_rawDescData
 }
 
-var file_api_usercenter_v1_iam_proto_msgTypes = make([]protoimpl.MessageInfo, 72)
+var file_api_usercenter_v1_iam_proto_msgTypes = make([]protoimpl.MessageInfo, 74)
 var file_api_usercenter_v1_iam_proto_goTypes = []any{
 	(*Grant)(nil),                          // 0: api.usercenter.v1.Grant
 	(*Resource)(nil),                       // 1: api.usercenter.v1.Resource
@@ -5852,34 +6048,37 @@ var file_api_usercenter_v1_iam_proto_goTypes = []any{
 	(*RevokeDelegationRequest)(nil),        // 49: api.usercenter.v1.RevokeDelegationRequest
 	(*CreateAssignmentRequest)(nil),        // 50: api.usercenter.v1.CreateAssignmentRequest
 	(*RevokeAssignmentRequest)(nil),        // 51: api.usercenter.v1.RevokeAssignmentRequest
-	(*PreviewBatchAssignRequest)(nil),      // 52: api.usercenter.v1.PreviewBatchAssignRequest
-	(*BatchPreviewReply)(nil),              // 53: api.usercenter.v1.BatchPreviewReply
-	(*BatchFailure)(nil),                   // 54: api.usercenter.v1.BatchFailure
-	(*BatchAssignRequest)(nil),             // 55: api.usercenter.v1.BatchAssignRequest
-	(*BatchAssignReply)(nil),               // 56: api.usercenter.v1.BatchAssignReply
-	(*ListConstraintsRequest)(nil),         // 57: api.usercenter.v1.ListConstraintsRequest
-	(*ConstraintsReply)(nil),               // 58: api.usercenter.v1.ConstraintsReply
-	(*CreateConstraintRequest)(nil),        // 59: api.usercenter.v1.CreateConstraintRequest
-	(*UpdateConstraintRequest)(nil),        // 60: api.usercenter.v1.UpdateConstraintRequest
-	(*DeleteConstraintRequest)(nil),        // 61: api.usercenter.v1.DeleteConstraintRequest
-	(*ListMenusRequest)(nil),               // 62: api.usercenter.v1.ListMenusRequest
-	(*MenusReply)(nil),                     // 63: api.usercenter.v1.MenusReply
-	(*CreateMenuItemRequest)(nil),          // 64: api.usercenter.v1.CreateMenuItemRequest
-	(*UpdateMenuItemRequest)(nil),          // 65: api.usercenter.v1.UpdateMenuItemRequest
-	(*ArchiveMenuItemRequest)(nil),         // 66: api.usercenter.v1.ArchiveMenuItemRequest
-	(*GrantSource)(nil),                    // 67: api.usercenter.v1.GrantSource
-	(*ExplainAuthorizationRequest)(nil),    // 68: api.usercenter.v1.ExplainAuthorizationRequest
-	(*ExplainAuthorizationReply)(nil),      // 69: api.usercenter.v1.ExplainAuthorizationReply
-	(*SimulateAuthorizationRequest)(nil),   // 70: api.usercenter.v1.SimulateAuthorizationRequest
-	(*SimulateAuthorizationReply)(nil),     // 71: api.usercenter.v1.SimulateAuthorizationReply
-	(*Scope)(nil),                          // 72: api.usercenter.v1.Scope
-	(*ListMeta)(nil),                       // 73: api.usercenter.v1.ListMeta
-	(*emptypb.Empty)(nil),                  // 74: google.protobuf.Empty
+	(*PreviewAssignmentRequest)(nil),       // 52: api.usercenter.v1.PreviewAssignmentRequest
+	(*PreviewAssignmentReply)(nil),         // 53: api.usercenter.v1.PreviewAssignmentReply
+	(*PreviewBatchAssignRequest)(nil),      // 54: api.usercenter.v1.PreviewBatchAssignRequest
+	(*BatchPreviewReply)(nil),              // 55: api.usercenter.v1.BatchPreviewReply
+	(*BatchFailure)(nil),                   // 56: api.usercenter.v1.BatchFailure
+	(*BatchAssignRequest)(nil),             // 57: api.usercenter.v1.BatchAssignRequest
+	(*BatchAssignReply)(nil),               // 58: api.usercenter.v1.BatchAssignReply
+	(*ListConstraintsRequest)(nil),         // 59: api.usercenter.v1.ListConstraintsRequest
+	(*ConstraintsReply)(nil),               // 60: api.usercenter.v1.ConstraintsReply
+	(*CreateConstraintRequest)(nil),        // 61: api.usercenter.v1.CreateConstraintRequest
+	(*UpdateConstraintRequest)(nil),        // 62: api.usercenter.v1.UpdateConstraintRequest
+	(*DeleteConstraintRequest)(nil),        // 63: api.usercenter.v1.DeleteConstraintRequest
+	(*ListMenusRequest)(nil),               // 64: api.usercenter.v1.ListMenusRequest
+	(*MenusReply)(nil),                     // 65: api.usercenter.v1.MenusReply
+	(*CreateMenuItemRequest)(nil),          // 66: api.usercenter.v1.CreateMenuItemRequest
+	(*UpdateMenuItemRequest)(nil),          // 67: api.usercenter.v1.UpdateMenuItemRequest
+	(*ArchiveMenuItemRequest)(nil),         // 68: api.usercenter.v1.ArchiveMenuItemRequest
+	(*GrantSource)(nil),                    // 69: api.usercenter.v1.GrantSource
+	(*ExplainAuthorizationRequest)(nil),    // 70: api.usercenter.v1.ExplainAuthorizationRequest
+	(*ExplainAuthorizationReply)(nil),      // 71: api.usercenter.v1.ExplainAuthorizationReply
+	(*SimulateAuthorizationRequest)(nil),   // 72: api.usercenter.v1.SimulateAuthorizationRequest
+	(*SimulateAuthorizationReply)(nil),     // 73: api.usercenter.v1.SimulateAuthorizationReply
+	(*Scope)(nil),                          // 74: api.usercenter.v1.Scope
+	(*ListMeta)(nil),                       // 75: api.usercenter.v1.ListMeta
+	(*PermissionSummary)(nil),              // 76: api.usercenter.v1.PermissionSummary
+	(*emptypb.Empty)(nil),                  // 77: google.protobuf.Empty
 }
 var file_api_usercenter_v1_iam_proto_depIdxs = []int32{
-	72, // 0: api.usercenter.v1.Grant.scope:type_name -> api.usercenter.v1.Scope
+	74, // 0: api.usercenter.v1.Grant.scope:type_name -> api.usercenter.v1.Scope
 	0,  // 1: api.usercenter.v1.Role.grants:type_name -> api.usercenter.v1.Grant
-	72, // 2: api.usercenter.v1.Assignment.boundary:type_name -> api.usercenter.v1.Scope
+	74, // 2: api.usercenter.v1.Assignment.boundary:type_name -> api.usercenter.v1.Scope
 	1,  // 3: api.usercenter.v1.ResourcesReply.items:type_name -> api.usercenter.v1.Resource
 	2,  // 4: api.usercenter.v1.PermissionsReply.items:type_name -> api.usercenter.v1.Permission
 	18, // 5: api.usercenter.v1.ReferencesReply.items:type_name -> api.usercenter.v1.Reference
@@ -5890,113 +6089,118 @@ var file_api_usercenter_v1_iam_proto_depIdxs = []int32{
 	0,  // 10: api.usercenter.v1.PutRolePermissionsRequest.grants:type_name -> api.usercenter.v1.Grant
 	0,  // 11: api.usercenter.v1.PreviewRoleChangeRequest.grants:type_name -> api.usercenter.v1.Grant
 	4,  // 12: api.usercenter.v1.AssignmentsReply.items:type_name -> api.usercenter.v1.Assignment
-	72, // 13: api.usercenter.v1.AssignmentItem.boundary:type_name -> api.usercenter.v1.Scope
+	74, // 13: api.usercenter.v1.AssignmentItem.boundary:type_name -> api.usercenter.v1.Scope
 	40, // 14: api.usercenter.v1.AssignmentListReply.items:type_name -> api.usercenter.v1.AssignmentItem
-	73, // 15: api.usercenter.v1.AssignmentListReply.meta:type_name -> api.usercenter.v1.ListMeta
-	72, // 16: api.usercenter.v1.DelegationCeiling.scope:type_name -> api.usercenter.v1.Scope
-	72, // 17: api.usercenter.v1.Delegation.target_user_scope:type_name -> api.usercenter.v1.Scope
+	75, // 15: api.usercenter.v1.AssignmentListReply.meta:type_name -> api.usercenter.v1.ListMeta
+	74, // 16: api.usercenter.v1.DelegationCeiling.scope:type_name -> api.usercenter.v1.Scope
+	74, // 17: api.usercenter.v1.Delegation.target_user_scope:type_name -> api.usercenter.v1.Scope
 	43, // 18: api.usercenter.v1.Delegation.grant_ceiling:type_name -> api.usercenter.v1.DelegationCeiling
 	44, // 19: api.usercenter.v1.DelegationsReply.items:type_name -> api.usercenter.v1.Delegation
-	72, // 20: api.usercenter.v1.CreateDelegationRequest.target_user_scope:type_name -> api.usercenter.v1.Scope
+	74, // 20: api.usercenter.v1.CreateDelegationRequest.target_user_scope:type_name -> api.usercenter.v1.Scope
 	43, // 21: api.usercenter.v1.CreateDelegationRequest.grant_ceiling:type_name -> api.usercenter.v1.DelegationCeiling
-	72, // 22: api.usercenter.v1.UpdateDelegationRequest.target_user_scope:type_name -> api.usercenter.v1.Scope
+	74, // 22: api.usercenter.v1.UpdateDelegationRequest.target_user_scope:type_name -> api.usercenter.v1.Scope
 	43, // 23: api.usercenter.v1.UpdateDelegationRequest.grant_ceiling:type_name -> api.usercenter.v1.DelegationCeiling
-	72, // 24: api.usercenter.v1.CreateAssignmentRequest.boundary:type_name -> api.usercenter.v1.Scope
-	72, // 25: api.usercenter.v1.PreviewBatchAssignRequest.boundary:type_name -> api.usercenter.v1.Scope
-	54, // 26: api.usercenter.v1.BatchPreviewReply.failures:type_name -> api.usercenter.v1.BatchFailure
-	72, // 27: api.usercenter.v1.BatchAssignRequest.boundary:type_name -> api.usercenter.v1.Scope
-	4,  // 28: api.usercenter.v1.BatchAssignReply.assignments:type_name -> api.usercenter.v1.Assignment
-	6,  // 29: api.usercenter.v1.ConstraintsReply.items:type_name -> api.usercenter.v1.Constraint
-	7,  // 30: api.usercenter.v1.MenusReply.items:type_name -> api.usercenter.v1.MenuItem
-	72, // 31: api.usercenter.v1.GrantSource.scope:type_name -> api.usercenter.v1.Scope
-	67, // 32: api.usercenter.v1.ExplainAuthorizationReply.sources:type_name -> api.usercenter.v1.GrantSource
-	8,  // 33: api.usercenter.v1.IAMService.ListResources:input_type -> api.usercenter.v1.ListResourcesRequest
-	10, // 34: api.usercenter.v1.IAMService.ListPermissions:input_type -> api.usercenter.v1.ListPermissionsRequest
-	12, // 35: api.usercenter.v1.IAMService.GetPermission:input_type -> api.usercenter.v1.GetPermissionRequest
-	13, // 36: api.usercenter.v1.IAMService.CreatePermission:input_type -> api.usercenter.v1.CreatePermissionRequest
-	14, // 37: api.usercenter.v1.IAMService.UpdatePermission:input_type -> api.usercenter.v1.UpdatePermissionRequest
-	15, // 38: api.usercenter.v1.IAMService.SetPermissionStatus:input_type -> api.usercenter.v1.SetPermissionStatusRequest
-	16, // 39: api.usercenter.v1.IAMService.ArchivePermission:input_type -> api.usercenter.v1.ArchivePermissionRequest
-	17, // 40: api.usercenter.v1.IAMService.GetPermissionReferences:input_type -> api.usercenter.v1.GetPermissionReferencesRequest
-	20, // 41: api.usercenter.v1.IAMService.ListRoles:input_type -> api.usercenter.v1.ListRolesRequest
-	22, // 42: api.usercenter.v1.IAMService.GetRole:input_type -> api.usercenter.v1.GetRoleRequest
-	23, // 43: api.usercenter.v1.IAMService.CreateRole:input_type -> api.usercenter.v1.CreateRoleRequest
-	24, // 44: api.usercenter.v1.IAMService.UpdateRole:input_type -> api.usercenter.v1.UpdateRoleRequest
-	25, // 45: api.usercenter.v1.IAMService.CopyRole:input_type -> api.usercenter.v1.CopyRoleRequest
-	26, // 46: api.usercenter.v1.IAMService.SetRoleStatus:input_type -> api.usercenter.v1.SetRoleStatusRequest
-	27, // 47: api.usercenter.v1.IAMService.ArchiveRole:input_type -> api.usercenter.v1.ArchiveRoleRequest
-	28, // 48: api.usercenter.v1.IAMService.ListRoleMembers:input_type -> api.usercenter.v1.ListRoleMembersRequest
-	30, // 49: api.usercenter.v1.IAMService.GetRolePermissions:input_type -> api.usercenter.v1.GetRolePermissionsRequest
-	32, // 50: api.usercenter.v1.IAMService.PutRolePermissions:input_type -> api.usercenter.v1.PutRolePermissionsRequest
-	33, // 51: api.usercenter.v1.IAMService.GetRoleInheritance:input_type -> api.usercenter.v1.GetRoleInheritanceRequest
-	35, // 52: api.usercenter.v1.IAMService.PutRoleInheritance:input_type -> api.usercenter.v1.PutRoleInheritanceRequest
-	36, // 53: api.usercenter.v1.IAMService.PreviewRoleChange:input_type -> api.usercenter.v1.PreviewRoleChangeRequest
-	38, // 54: api.usercenter.v1.IAMService.ListUserRoles:input_type -> api.usercenter.v1.ListUserRolesRequest
-	42, // 55: api.usercenter.v1.IAMService.ListAssignments:input_type -> api.usercenter.v1.ListAssignmentsRequest
-	50, // 56: api.usercenter.v1.IAMService.CreateAssignment:input_type -> api.usercenter.v1.CreateAssignmentRequest
-	51, // 57: api.usercenter.v1.IAMService.RevokeAssignment:input_type -> api.usercenter.v1.RevokeAssignmentRequest
-	45, // 58: api.usercenter.v1.IAMService.ListDelegations:input_type -> api.usercenter.v1.ListDelegationsRequest
-	47, // 59: api.usercenter.v1.IAMService.CreateDelegation:input_type -> api.usercenter.v1.CreateDelegationRequest
-	48, // 60: api.usercenter.v1.IAMService.UpdateDelegation:input_type -> api.usercenter.v1.UpdateDelegationRequest
-	49, // 61: api.usercenter.v1.IAMService.RevokeDelegation:input_type -> api.usercenter.v1.RevokeDelegationRequest
-	52, // 62: api.usercenter.v1.IAMService.PreviewBatchAssign:input_type -> api.usercenter.v1.PreviewBatchAssignRequest
-	55, // 63: api.usercenter.v1.IAMService.BatchAssign:input_type -> api.usercenter.v1.BatchAssignRequest
-	57, // 64: api.usercenter.v1.IAMService.ListConstraints:input_type -> api.usercenter.v1.ListConstraintsRequest
-	59, // 65: api.usercenter.v1.IAMService.CreateConstraint:input_type -> api.usercenter.v1.CreateConstraintRequest
-	60, // 66: api.usercenter.v1.IAMService.UpdateConstraint:input_type -> api.usercenter.v1.UpdateConstraintRequest
-	61, // 67: api.usercenter.v1.IAMService.DeleteConstraint:input_type -> api.usercenter.v1.DeleteConstraintRequest
-	62, // 68: api.usercenter.v1.IAMService.ListMenus:input_type -> api.usercenter.v1.ListMenusRequest
-	64, // 69: api.usercenter.v1.IAMService.CreateMenuItem:input_type -> api.usercenter.v1.CreateMenuItemRequest
-	65, // 70: api.usercenter.v1.IAMService.UpdateMenuItem:input_type -> api.usercenter.v1.UpdateMenuItemRequest
-	66, // 71: api.usercenter.v1.IAMService.ArchiveMenuItem:input_type -> api.usercenter.v1.ArchiveMenuItemRequest
-	68, // 72: api.usercenter.v1.IAMService.ExplainAuthorization:input_type -> api.usercenter.v1.ExplainAuthorizationRequest
-	70, // 73: api.usercenter.v1.IAMService.SimulateAuthorization:input_type -> api.usercenter.v1.SimulateAuthorizationRequest
-	9,  // 74: api.usercenter.v1.IAMService.ListResources:output_type -> api.usercenter.v1.ResourcesReply
-	11, // 75: api.usercenter.v1.IAMService.ListPermissions:output_type -> api.usercenter.v1.PermissionsReply
-	2,  // 76: api.usercenter.v1.IAMService.GetPermission:output_type -> api.usercenter.v1.Permission
-	2,  // 77: api.usercenter.v1.IAMService.CreatePermission:output_type -> api.usercenter.v1.Permission
-	2,  // 78: api.usercenter.v1.IAMService.UpdatePermission:output_type -> api.usercenter.v1.Permission
-	2,  // 79: api.usercenter.v1.IAMService.SetPermissionStatus:output_type -> api.usercenter.v1.Permission
-	2,  // 80: api.usercenter.v1.IAMService.ArchivePermission:output_type -> api.usercenter.v1.Permission
-	19, // 81: api.usercenter.v1.IAMService.GetPermissionReferences:output_type -> api.usercenter.v1.ReferencesReply
-	21, // 82: api.usercenter.v1.IAMService.ListRoles:output_type -> api.usercenter.v1.RolesReply
-	3,  // 83: api.usercenter.v1.IAMService.GetRole:output_type -> api.usercenter.v1.Role
-	3,  // 84: api.usercenter.v1.IAMService.CreateRole:output_type -> api.usercenter.v1.Role
-	3,  // 85: api.usercenter.v1.IAMService.UpdateRole:output_type -> api.usercenter.v1.Role
-	3,  // 86: api.usercenter.v1.IAMService.CopyRole:output_type -> api.usercenter.v1.Role
-	3,  // 87: api.usercenter.v1.IAMService.SetRoleStatus:output_type -> api.usercenter.v1.Role
-	3,  // 88: api.usercenter.v1.IAMService.ArchiveRole:output_type -> api.usercenter.v1.Role
-	29, // 89: api.usercenter.v1.IAMService.ListRoleMembers:output_type -> api.usercenter.v1.RoleMembersReply
-	31, // 90: api.usercenter.v1.IAMService.GetRolePermissions:output_type -> api.usercenter.v1.RolePermissionsReply
-	31, // 91: api.usercenter.v1.IAMService.PutRolePermissions:output_type -> api.usercenter.v1.RolePermissionsReply
-	34, // 92: api.usercenter.v1.IAMService.GetRoleInheritance:output_type -> api.usercenter.v1.RoleInheritanceReply
-	34, // 93: api.usercenter.v1.IAMService.PutRoleInheritance:output_type -> api.usercenter.v1.RoleInheritanceReply
-	37, // 94: api.usercenter.v1.IAMService.PreviewRoleChange:output_type -> api.usercenter.v1.PreviewReply
-	39, // 95: api.usercenter.v1.IAMService.ListUserRoles:output_type -> api.usercenter.v1.AssignmentsReply
-	41, // 96: api.usercenter.v1.IAMService.ListAssignments:output_type -> api.usercenter.v1.AssignmentListReply
-	4,  // 97: api.usercenter.v1.IAMService.CreateAssignment:output_type -> api.usercenter.v1.Assignment
-	4,  // 98: api.usercenter.v1.IAMService.RevokeAssignment:output_type -> api.usercenter.v1.Assignment
-	46, // 99: api.usercenter.v1.IAMService.ListDelegations:output_type -> api.usercenter.v1.DelegationsReply
-	44, // 100: api.usercenter.v1.IAMService.CreateDelegation:output_type -> api.usercenter.v1.Delegation
-	44, // 101: api.usercenter.v1.IAMService.UpdateDelegation:output_type -> api.usercenter.v1.Delegation
-	44, // 102: api.usercenter.v1.IAMService.RevokeDelegation:output_type -> api.usercenter.v1.Delegation
-	53, // 103: api.usercenter.v1.IAMService.PreviewBatchAssign:output_type -> api.usercenter.v1.BatchPreviewReply
-	56, // 104: api.usercenter.v1.IAMService.BatchAssign:output_type -> api.usercenter.v1.BatchAssignReply
-	58, // 105: api.usercenter.v1.IAMService.ListConstraints:output_type -> api.usercenter.v1.ConstraintsReply
-	6,  // 106: api.usercenter.v1.IAMService.CreateConstraint:output_type -> api.usercenter.v1.Constraint
-	6,  // 107: api.usercenter.v1.IAMService.UpdateConstraint:output_type -> api.usercenter.v1.Constraint
-	74, // 108: api.usercenter.v1.IAMService.DeleteConstraint:output_type -> google.protobuf.Empty
-	63, // 109: api.usercenter.v1.IAMService.ListMenus:output_type -> api.usercenter.v1.MenusReply
-	7,  // 110: api.usercenter.v1.IAMService.CreateMenuItem:output_type -> api.usercenter.v1.MenuItem
-	7,  // 111: api.usercenter.v1.IAMService.UpdateMenuItem:output_type -> api.usercenter.v1.MenuItem
-	7,  // 112: api.usercenter.v1.IAMService.ArchiveMenuItem:output_type -> api.usercenter.v1.MenuItem
-	69, // 113: api.usercenter.v1.IAMService.ExplainAuthorization:output_type -> api.usercenter.v1.ExplainAuthorizationReply
-	71, // 114: api.usercenter.v1.IAMService.SimulateAuthorization:output_type -> api.usercenter.v1.SimulateAuthorizationReply
-	74, // [74:115] is the sub-list for method output_type
-	33, // [33:74] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	74, // 24: api.usercenter.v1.CreateAssignmentRequest.boundary:type_name -> api.usercenter.v1.Scope
+	74, // 25: api.usercenter.v1.PreviewAssignmentRequest.boundary:type_name -> api.usercenter.v1.Scope
+	76, // 26: api.usercenter.v1.PreviewAssignmentReply.permissions:type_name -> api.usercenter.v1.PermissionSummary
+	69, // 27: api.usercenter.v1.PreviewAssignmentReply.deny_sources:type_name -> api.usercenter.v1.GrantSource
+	74, // 28: api.usercenter.v1.PreviewBatchAssignRequest.boundary:type_name -> api.usercenter.v1.Scope
+	56, // 29: api.usercenter.v1.BatchPreviewReply.failures:type_name -> api.usercenter.v1.BatchFailure
+	74, // 30: api.usercenter.v1.BatchAssignRequest.boundary:type_name -> api.usercenter.v1.Scope
+	4,  // 31: api.usercenter.v1.BatchAssignReply.assignments:type_name -> api.usercenter.v1.Assignment
+	6,  // 32: api.usercenter.v1.ConstraintsReply.items:type_name -> api.usercenter.v1.Constraint
+	7,  // 33: api.usercenter.v1.MenusReply.items:type_name -> api.usercenter.v1.MenuItem
+	74, // 34: api.usercenter.v1.GrantSource.scope:type_name -> api.usercenter.v1.Scope
+	69, // 35: api.usercenter.v1.ExplainAuthorizationReply.sources:type_name -> api.usercenter.v1.GrantSource
+	8,  // 36: api.usercenter.v1.IAMService.ListResources:input_type -> api.usercenter.v1.ListResourcesRequest
+	10, // 37: api.usercenter.v1.IAMService.ListPermissions:input_type -> api.usercenter.v1.ListPermissionsRequest
+	12, // 38: api.usercenter.v1.IAMService.GetPermission:input_type -> api.usercenter.v1.GetPermissionRequest
+	13, // 39: api.usercenter.v1.IAMService.CreatePermission:input_type -> api.usercenter.v1.CreatePermissionRequest
+	14, // 40: api.usercenter.v1.IAMService.UpdatePermission:input_type -> api.usercenter.v1.UpdatePermissionRequest
+	15, // 41: api.usercenter.v1.IAMService.SetPermissionStatus:input_type -> api.usercenter.v1.SetPermissionStatusRequest
+	16, // 42: api.usercenter.v1.IAMService.ArchivePermission:input_type -> api.usercenter.v1.ArchivePermissionRequest
+	17, // 43: api.usercenter.v1.IAMService.GetPermissionReferences:input_type -> api.usercenter.v1.GetPermissionReferencesRequest
+	20, // 44: api.usercenter.v1.IAMService.ListRoles:input_type -> api.usercenter.v1.ListRolesRequest
+	22, // 45: api.usercenter.v1.IAMService.GetRole:input_type -> api.usercenter.v1.GetRoleRequest
+	23, // 46: api.usercenter.v1.IAMService.CreateRole:input_type -> api.usercenter.v1.CreateRoleRequest
+	24, // 47: api.usercenter.v1.IAMService.UpdateRole:input_type -> api.usercenter.v1.UpdateRoleRequest
+	25, // 48: api.usercenter.v1.IAMService.CopyRole:input_type -> api.usercenter.v1.CopyRoleRequest
+	26, // 49: api.usercenter.v1.IAMService.SetRoleStatus:input_type -> api.usercenter.v1.SetRoleStatusRequest
+	27, // 50: api.usercenter.v1.IAMService.ArchiveRole:input_type -> api.usercenter.v1.ArchiveRoleRequest
+	28, // 51: api.usercenter.v1.IAMService.ListRoleMembers:input_type -> api.usercenter.v1.ListRoleMembersRequest
+	30, // 52: api.usercenter.v1.IAMService.GetRolePermissions:input_type -> api.usercenter.v1.GetRolePermissionsRequest
+	32, // 53: api.usercenter.v1.IAMService.PutRolePermissions:input_type -> api.usercenter.v1.PutRolePermissionsRequest
+	33, // 54: api.usercenter.v1.IAMService.GetRoleInheritance:input_type -> api.usercenter.v1.GetRoleInheritanceRequest
+	35, // 55: api.usercenter.v1.IAMService.PutRoleInheritance:input_type -> api.usercenter.v1.PutRoleInheritanceRequest
+	36, // 56: api.usercenter.v1.IAMService.PreviewRoleChange:input_type -> api.usercenter.v1.PreviewRoleChangeRequest
+	38, // 57: api.usercenter.v1.IAMService.ListUserRoles:input_type -> api.usercenter.v1.ListUserRolesRequest
+	42, // 58: api.usercenter.v1.IAMService.ListAssignments:input_type -> api.usercenter.v1.ListAssignmentsRequest
+	50, // 59: api.usercenter.v1.IAMService.CreateAssignment:input_type -> api.usercenter.v1.CreateAssignmentRequest
+	51, // 60: api.usercenter.v1.IAMService.RevokeAssignment:input_type -> api.usercenter.v1.RevokeAssignmentRequest
+	45, // 61: api.usercenter.v1.IAMService.ListDelegations:input_type -> api.usercenter.v1.ListDelegationsRequest
+	47, // 62: api.usercenter.v1.IAMService.CreateDelegation:input_type -> api.usercenter.v1.CreateDelegationRequest
+	48, // 63: api.usercenter.v1.IAMService.UpdateDelegation:input_type -> api.usercenter.v1.UpdateDelegationRequest
+	49, // 64: api.usercenter.v1.IAMService.RevokeDelegation:input_type -> api.usercenter.v1.RevokeDelegationRequest
+	52, // 65: api.usercenter.v1.IAMService.PreviewAssignment:input_type -> api.usercenter.v1.PreviewAssignmentRequest
+	54, // 66: api.usercenter.v1.IAMService.PreviewBatchAssign:input_type -> api.usercenter.v1.PreviewBatchAssignRequest
+	57, // 67: api.usercenter.v1.IAMService.BatchAssign:input_type -> api.usercenter.v1.BatchAssignRequest
+	59, // 68: api.usercenter.v1.IAMService.ListConstraints:input_type -> api.usercenter.v1.ListConstraintsRequest
+	61, // 69: api.usercenter.v1.IAMService.CreateConstraint:input_type -> api.usercenter.v1.CreateConstraintRequest
+	62, // 70: api.usercenter.v1.IAMService.UpdateConstraint:input_type -> api.usercenter.v1.UpdateConstraintRequest
+	63, // 71: api.usercenter.v1.IAMService.DeleteConstraint:input_type -> api.usercenter.v1.DeleteConstraintRequest
+	64, // 72: api.usercenter.v1.IAMService.ListMenus:input_type -> api.usercenter.v1.ListMenusRequest
+	66, // 73: api.usercenter.v1.IAMService.CreateMenuItem:input_type -> api.usercenter.v1.CreateMenuItemRequest
+	67, // 74: api.usercenter.v1.IAMService.UpdateMenuItem:input_type -> api.usercenter.v1.UpdateMenuItemRequest
+	68, // 75: api.usercenter.v1.IAMService.ArchiveMenuItem:input_type -> api.usercenter.v1.ArchiveMenuItemRequest
+	70, // 76: api.usercenter.v1.IAMService.ExplainAuthorization:input_type -> api.usercenter.v1.ExplainAuthorizationRequest
+	72, // 77: api.usercenter.v1.IAMService.SimulateAuthorization:input_type -> api.usercenter.v1.SimulateAuthorizationRequest
+	9,  // 78: api.usercenter.v1.IAMService.ListResources:output_type -> api.usercenter.v1.ResourcesReply
+	11, // 79: api.usercenter.v1.IAMService.ListPermissions:output_type -> api.usercenter.v1.PermissionsReply
+	2,  // 80: api.usercenter.v1.IAMService.GetPermission:output_type -> api.usercenter.v1.Permission
+	2,  // 81: api.usercenter.v1.IAMService.CreatePermission:output_type -> api.usercenter.v1.Permission
+	2,  // 82: api.usercenter.v1.IAMService.UpdatePermission:output_type -> api.usercenter.v1.Permission
+	2,  // 83: api.usercenter.v1.IAMService.SetPermissionStatus:output_type -> api.usercenter.v1.Permission
+	2,  // 84: api.usercenter.v1.IAMService.ArchivePermission:output_type -> api.usercenter.v1.Permission
+	19, // 85: api.usercenter.v1.IAMService.GetPermissionReferences:output_type -> api.usercenter.v1.ReferencesReply
+	21, // 86: api.usercenter.v1.IAMService.ListRoles:output_type -> api.usercenter.v1.RolesReply
+	3,  // 87: api.usercenter.v1.IAMService.GetRole:output_type -> api.usercenter.v1.Role
+	3,  // 88: api.usercenter.v1.IAMService.CreateRole:output_type -> api.usercenter.v1.Role
+	3,  // 89: api.usercenter.v1.IAMService.UpdateRole:output_type -> api.usercenter.v1.Role
+	3,  // 90: api.usercenter.v1.IAMService.CopyRole:output_type -> api.usercenter.v1.Role
+	3,  // 91: api.usercenter.v1.IAMService.SetRoleStatus:output_type -> api.usercenter.v1.Role
+	3,  // 92: api.usercenter.v1.IAMService.ArchiveRole:output_type -> api.usercenter.v1.Role
+	29, // 93: api.usercenter.v1.IAMService.ListRoleMembers:output_type -> api.usercenter.v1.RoleMembersReply
+	31, // 94: api.usercenter.v1.IAMService.GetRolePermissions:output_type -> api.usercenter.v1.RolePermissionsReply
+	31, // 95: api.usercenter.v1.IAMService.PutRolePermissions:output_type -> api.usercenter.v1.RolePermissionsReply
+	34, // 96: api.usercenter.v1.IAMService.GetRoleInheritance:output_type -> api.usercenter.v1.RoleInheritanceReply
+	34, // 97: api.usercenter.v1.IAMService.PutRoleInheritance:output_type -> api.usercenter.v1.RoleInheritanceReply
+	37, // 98: api.usercenter.v1.IAMService.PreviewRoleChange:output_type -> api.usercenter.v1.PreviewReply
+	39, // 99: api.usercenter.v1.IAMService.ListUserRoles:output_type -> api.usercenter.v1.AssignmentsReply
+	41, // 100: api.usercenter.v1.IAMService.ListAssignments:output_type -> api.usercenter.v1.AssignmentListReply
+	4,  // 101: api.usercenter.v1.IAMService.CreateAssignment:output_type -> api.usercenter.v1.Assignment
+	4,  // 102: api.usercenter.v1.IAMService.RevokeAssignment:output_type -> api.usercenter.v1.Assignment
+	46, // 103: api.usercenter.v1.IAMService.ListDelegations:output_type -> api.usercenter.v1.DelegationsReply
+	44, // 104: api.usercenter.v1.IAMService.CreateDelegation:output_type -> api.usercenter.v1.Delegation
+	44, // 105: api.usercenter.v1.IAMService.UpdateDelegation:output_type -> api.usercenter.v1.Delegation
+	44, // 106: api.usercenter.v1.IAMService.RevokeDelegation:output_type -> api.usercenter.v1.Delegation
+	53, // 107: api.usercenter.v1.IAMService.PreviewAssignment:output_type -> api.usercenter.v1.PreviewAssignmentReply
+	55, // 108: api.usercenter.v1.IAMService.PreviewBatchAssign:output_type -> api.usercenter.v1.BatchPreviewReply
+	58, // 109: api.usercenter.v1.IAMService.BatchAssign:output_type -> api.usercenter.v1.BatchAssignReply
+	60, // 110: api.usercenter.v1.IAMService.ListConstraints:output_type -> api.usercenter.v1.ConstraintsReply
+	6,  // 111: api.usercenter.v1.IAMService.CreateConstraint:output_type -> api.usercenter.v1.Constraint
+	6,  // 112: api.usercenter.v1.IAMService.UpdateConstraint:output_type -> api.usercenter.v1.Constraint
+	77, // 113: api.usercenter.v1.IAMService.DeleteConstraint:output_type -> google.protobuf.Empty
+	65, // 114: api.usercenter.v1.IAMService.ListMenus:output_type -> api.usercenter.v1.MenusReply
+	7,  // 115: api.usercenter.v1.IAMService.CreateMenuItem:output_type -> api.usercenter.v1.MenuItem
+	7,  // 116: api.usercenter.v1.IAMService.UpdateMenuItem:output_type -> api.usercenter.v1.MenuItem
+	7,  // 117: api.usercenter.v1.IAMService.ArchiveMenuItem:output_type -> api.usercenter.v1.MenuItem
+	71, // 118: api.usercenter.v1.IAMService.ExplainAuthorization:output_type -> api.usercenter.v1.ExplainAuthorizationReply
+	73, // 119: api.usercenter.v1.IAMService.SimulateAuthorization:output_type -> api.usercenter.v1.SimulateAuthorizationReply
+	78, // [78:120] is the sub-list for method output_type
+	36, // [36:78] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_api_usercenter_v1_iam_proto_init() }
@@ -6011,7 +6215,7 @@ func file_api_usercenter_v1_iam_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_usercenter_v1_iam_proto_rawDesc), len(file_api_usercenter_v1_iam_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   72,
+			NumMessages:   74,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

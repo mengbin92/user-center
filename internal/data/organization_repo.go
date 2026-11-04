@@ -386,9 +386,24 @@ func (r *organizationRepo) ArchiveDepartment(ctx context.Context, tx biz.Tx, org
 }
 
 func (r *organizationRepo) CountOwnedOrganizations(ctx context.Context, tx biz.Tx, userID int64, includeArchived bool) (int64, error) {
-	q := r.d.dbOr(tx).WithContext(ctx).Model(&organizationPO{}).Where("created_by = ?", userID)
+	db := r.d.dbOr(tx).WithContext(ctx)
+	q := db.Model(&organizationPO{}).Where("created_by = ?", userID)
 	if !includeArchived {
 		q = q.Where("status = ?", biz.OrgStatusActive)
+	}
+	// MySQL: lock the owner's organization rows so two concurrent creates
+	// cannot both pass the quota check. SQLite (tests/dev) has no row locks and
+	// uses a plain count instead.
+	if db.Dialector.Name() == "mysql" {
+		var rows []organizationPO
+		lock := db.Clauses(clause.Locking{Strength: "UPDATE"}).Where("created_by = ?", userID)
+		if !includeArchived {
+			lock = lock.Where("status = ?", biz.OrgStatusActive)
+		}
+		if err := lock.Find(&rows).Error; err != nil {
+			return 0, err
+		}
+		return int64(len(rows)), nil
 	}
 	var n int64
 	return n, q.Count(&n).Error

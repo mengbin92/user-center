@@ -6,6 +6,32 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+V2.4 W1–W3 已合入 `develop`；按路线图建议分别发 `v0.6.0`（W1/W2）与 `v0.7.0`（W3），tag 尚未创建。
+
+### Added (W1/W2, 建议 v0.6.0)
+
+- OIDC 交互式授权同意页：一次性服务端 handle、按 client+user 持久化已授予 scope、scope 扩张与 `prompt=consent` 重新征询、`prompt=none` 返回 `interaction_required`、`/me/oidc-consents` 列出与撤销。
+- RP-initiated logout：discovery `end_session_endpoint`、`/oidc/logout`、客户端 `post_logout_redirect_uris` 精确白名单、会话撤销与 Cookie 清理、幂等重复调用。
+- 组织邀请与接受：令牌哈希存储、邮件投递、邮箱匹配、过期/撤销/重复接受/上限/跨租户拒绝、接受后同步内置角色授权、审计事件。
+- 组织域授权解释 `GET /orgs/{id}/iam/authorization:explain`，复用同一 `authorization.Evaluate` 路径。
+- 租户审计导出 `POST /orgs/{id}/audits:export` + 租户下载通道，复用平台 CSV/签名与版本校验。
+- 组织域事件进 Outbox（成员/部门/角色/分配/归档，最小无 PII 载荷），文档新增事件表。
+
+### Added (W3, 建议 v0.7.0)
+
+- 内部 gRPC `Authenticate` / `CompleteMFA`，复用 HTTP 登录限流与失败计数、会话绑定应用、审计 `actor_service_id`。
+- 审计详情页 `/admin/audits/:id`（before/after/diff 折叠、返回保留筛选）、身份提供方配置页 `/admin/settings/providers`、组织策略页 `/admin/settings/organization`。
+- 用户名自助修改（Step-up + 当前密码 + revision CAS，管理端不可改）、单条分配预览、组织创建配额。
+
+### Changed
+
+- 认证配置变更（`settings.auth.update`）现在推进 policy revision。
+- 迁移新增 `007_oidc_consent.sql`、`008_org_invitations.sql`、`009_org_quota.sql`；权限目录新增 `settings.organization.read/update`，菜单新增应用授权、身份提供方、组织策略。
+
+### Notes
+
+- R13 WebAuthn/Passkey（可整体滑动到 V2.5）与 R14 个人信息保留清理（未排期）按路线图未纳入本次交付。
+
 ## [0.5.2] - 2026-11-04
 
 Full-project review follow-up. No schema change.

@@ -17,16 +17,22 @@ var _ = new(context.Context)
 
 const _ = http.SupportPackageIsVersion3
 
+const OperationSettingsServiceGetAuthProviders = "/api.usercenter.v1.SettingsService/GetAuthProviders"
 const OperationSettingsServiceGetAuthSettings = "/api.usercenter.v1.SettingsService/GetAuthSettings"
 const OperationSettingsServiceGetEmailSettings = "/api.usercenter.v1.SettingsService/GetEmailSettings"
+const OperationSettingsServiceGetOrganizationSettings = "/api.usercenter.v1.SettingsService/GetOrganizationSettings"
 const OperationSettingsServiceUpdateAuthSettings = "/api.usercenter.v1.SettingsService/UpdateAuthSettings"
 const OperationSettingsServiceUpdateEmailSettings = "/api.usercenter.v1.SettingsService/UpdateEmailSettings"
+const OperationSettingsServiceUpdateOrganizationSettings = "/api.usercenter.v1.SettingsService/UpdateOrganizationSettings"
 
 type SettingsServiceHTTPServer interface {
+	GetAuthProviders(context.Context, *GetAuthProvidersRequest) (*AuthProvidersReply, error)
 	GetAuthSettings(context.Context, *GetAuthSettingsRequest) (*AuthSettings, error)
 	GetEmailSettings(context.Context, *GetEmailSettingsRequest) (*EmailSettings, error)
+	GetOrganizationSettings(context.Context, *GetOrganizationSettingsRequest) (*OrganizationSettings, error)
 	UpdateAuthSettings(context.Context, *UpdateAuthSettingsRequest) (*AuthSettings, error)
 	UpdateEmailSettings(context.Context, *UpdateEmailSettingsRequest) (*EmailSettings, error)
+	UpdateOrganizationSettings(context.Context, *UpdateOrganizationSettingsRequest) (*OrganizationSettings, error)
 }
 
 func RegisterSettingsServiceHTTPServer(s *http.Server, srv SettingsServiceHTTPServer) {
@@ -35,6 +41,9 @@ func RegisterSettingsServiceHTTPServer(s *http.Server, srv SettingsServiceHTTPSe
 	r.Handle("PATCH", "/api/v1/admin/settings/auth", _SettingsService_UpdateAuthSettings0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/admin/settings/email", _SettingsService_GetEmailSettings0_HTTP_Handler(srv))
 	r.Handle("PATCH", "/api/v1/admin/settings/email", _SettingsService_UpdateEmailSettings0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/admin/settings/providers", _SettingsService_GetAuthProviders0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/admin/settings/organization", _SettingsService_GetOrganizationSettings0_HTTP_Handler(srv))
+	r.Handle("PATCH", "/api/v1/admin/settings/organization", _SettingsService_UpdateOrganizationSettings0_HTTP_Handler(srv))
 }
 
 func _SettingsService_GetAuthSettings0_HTTP_Handler(srv SettingsServiceHTTPServer) func(ctx http.Context) error {
@@ -113,11 +122,71 @@ func _SettingsService_UpdateEmailSettings0_HTTP_Handler(srv SettingsServiceHTTPS
 	}
 }
 
+func _SettingsService_GetAuthProviders0_HTTP_Handler(srv SettingsServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetAuthProvidersRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationSettingsServiceGetAuthProviders)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetAuthProviders(ctx, req.(*GetAuthProvidersRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*AuthProvidersReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _SettingsService_GetOrganizationSettings0_HTTP_Handler(srv SettingsServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetOrganizationSettingsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationSettingsServiceGetOrganizationSettings)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetOrganizationSettings(ctx, req.(*GetOrganizationSettingsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrganizationSettings)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _SettingsService_UpdateOrganizationSettings0_HTTP_Handler(srv SettingsServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateOrganizationSettingsRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationSettingsServiceUpdateOrganizationSettings)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateOrganizationSettings(ctx, req.(*UpdateOrganizationSettingsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrganizationSettings)
+		return ctx.Result(200, reply)
+	}
+}
+
 type SettingsServiceHTTPClient interface {
+	GetAuthProviders(ctx context.Context, req *GetAuthProvidersRequest, opts ...http.CallOption) (rsp *AuthProvidersReply, err error)
 	GetAuthSettings(ctx context.Context, req *GetAuthSettingsRequest, opts ...http.CallOption) (rsp *AuthSettings, err error)
 	GetEmailSettings(ctx context.Context, req *GetEmailSettingsRequest, opts ...http.CallOption) (rsp *EmailSettings, err error)
+	GetOrganizationSettings(ctx context.Context, req *GetOrganizationSettingsRequest, opts ...http.CallOption) (rsp *OrganizationSettings, err error)
 	UpdateAuthSettings(ctx context.Context, req *UpdateAuthSettingsRequest, opts ...http.CallOption) (rsp *AuthSettings, err error)
 	UpdateEmailSettings(ctx context.Context, req *UpdateEmailSettingsRequest, opts ...http.CallOption) (rsp *EmailSettings, err error)
+	UpdateOrganizationSettings(ctx context.Context, req *UpdateOrganizationSettingsRequest, opts ...http.CallOption) (rsp *OrganizationSettings, err error)
 }
 
 type SettingsServiceHTTPClientImpl struct {
@@ -126,6 +195,22 @@ type SettingsServiceHTTPClientImpl struct {
 
 func NewSettingsServiceHTTPClient(client *http.Client) SettingsServiceHTTPClient {
 	return &SettingsServiceHTTPClientImpl{client}
+}
+
+func (c *SettingsServiceHTTPClientImpl) GetAuthProviders(ctx context.Context, in *GetAuthProvidersRequest, opts ...http.CallOption) (*AuthProvidersReply, error) {
+	var out AuthProvidersReply
+	pattern := "/api/v1/admin/settings/providers"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationSettingsServiceGetAuthProviders),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 func (c *SettingsServiceHTTPClientImpl) GetAuthSettings(ctx context.Context, in *GetAuthSettingsRequest, opts ...http.CallOption) (*AuthSettings, error) {
@@ -160,6 +245,22 @@ func (c *SettingsServiceHTTPClientImpl) GetEmailSettings(ctx context.Context, in
 	return &out, nil
 }
 
+func (c *SettingsServiceHTTPClientImpl) GetOrganizationSettings(ctx context.Context, in *GetOrganizationSettingsRequest, opts ...http.CallOption) (*OrganizationSettings, error) {
+	var out OrganizationSettings
+	pattern := "/api/v1/admin/settings/organization"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationSettingsServiceGetOrganizationSettings),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *SettingsServiceHTTPClientImpl) UpdateAuthSettings(ctx context.Context, in *UpdateAuthSettingsRequest, opts ...http.CallOption) (*AuthSettings, error) {
 	var out AuthSettings
 	pattern := "/api/v1/admin/settings/auth"
@@ -185,6 +286,23 @@ func (c *SettingsServiceHTTPClientImpl) UpdateEmailSettings(ctx context.Context,
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationSettingsServiceUpdateEmailSettings),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "PATCH", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *SettingsServiceHTTPClientImpl) UpdateOrganizationSettings(ctx context.Context, in *UpdateOrganizationSettingsRequest, opts ...http.CallOption) (*OrganizationSettings, error) {
+	var out OrganizationSettings
+	pattern := "/api/v1/admin/settings/organization"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationSettingsServiceUpdateOrganizationSettings),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "PATCH", path, in, &out, opts...)

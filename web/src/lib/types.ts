@@ -289,3 +289,17 @@ export type ExplainOrgAuthorizationReply =
   Schemas['api.usercenter.v1.ExplainOrgAuthorizationReply']
 export type ExportOrgAuditsRequest =
   Schemas['api.usercenter.v1.ExportOrgAuditsRequest']
+
+// V2.4 W3 governance surfaces
+export type AuthProvidersReply =
+  Schemas['api.usercenter.v1.AuthProvidersReply']
+export type OrganizationSettings =
+  Schemas['api.usercenter.v1.OrganizationSettings']
+export type UpdateOrganizationSettingsRequest =
+  Schemas['api.usercenter.v1.UpdateOrganizationSettingsRequest']
+export type UpdateUsernameRequest =
+  Schemas['api.usercenter.v1.UpdateUsernameRequest']
+export type PreviewAssignmentRequest =
+  Schemas['api.usercenter.v1.PreviewAssignmentRequest']
+export type PreviewAssignmentReply =
+  Schemas['api.usercenter.v1.PreviewAssignmentReply']

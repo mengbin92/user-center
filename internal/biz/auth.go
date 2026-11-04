@@ -100,6 +100,9 @@ func (uc *AuthUsecase) Register(ctx context.Context, in RegisterInput) (*User, e
 	if err := ValidateUsername(in.Username); err != nil {
 		return nil, err
 	}
+	if UsernameReserved(in.Username) {
+		return nil, Validation("该用户名为系统保留字")
+	}
 	if err := ValidateEmail(in.Email); err != nil {
 		return nil, err
 	}
@@ -220,6 +223,17 @@ func (uc *AuthUsecase) Register(ctx context.Context, in RegisterInput) (*User, e
 }
 
 func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, error) {
+	return uc.login(ctx, in, ApplicationCode)
+}
+
+// LoginForApplication issues a session bound to the calling integration
+// application. It shares the HTTP login path (rate limits, failure counters,
+// MFA challenge semantics) so gRPC cannot be used to bypass them.
+func (uc *AuthUsecase) LoginForApplication(ctx context.Context, in LoginInput, appID string) (*LoginResult, error) {
+	return uc.login(ctx, in, appID)
+}
+
+func (uc *AuthUsecase) login(ctx context.Context, in LoginInput, appID string) (*LoginResult, error) {
 	if ok, err := uc.Limiter.Allow(ctx, "login:"+in.IP, 30, 5*time.Minute); err != nil {
 		return nil, ErrDependency
 	} else if !ok {
@@ -264,14 +278,14 @@ func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, 
 	if mfa != nil && mfa.Enabled() {
 		challengeID := uc.IDs.NewID()
 		expires := uc.Clock.Now().Add(5 * time.Minute)
-		payload, _ := jsonx.Marshal(map[string]any{"identity_version": user.IdentityVersion, "ip": in.IP, "ua": SummizeAgent(in.UserAgent), "remember": in.Remember})
+		payload, _ := jsonx.Marshal(map[string]any{"identity_version": user.IdentityVersion, "ip": in.IP, "ua": SummizeAgent(in.UserAgent), "remember": in.Remember, "app_id": appID})
 		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
 			return nil, ErrDependency
 		}
 		return &LoginResult{Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires, User: uc.publicUser(ctx, user)}, nil
 	}
 
-	session, raw, err := uc.issueSession(ctx, user, in.UserAgent, in.IP)
+	session, raw, err := uc.issueSessionFor(ctx, user, in.UserAgent, in.IP, appID)
 	if err != nil {
 		return nil, err
 	}
@@ -282,6 +296,17 @@ func (uc *AuthUsecase) Login(ctx context.Context, in LoginInput) (*LoginResult, 
 }
 
 func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, ua string) (*LoginResult, error) {
+	return uc.completeMFA(ctx, challengeID, code, ip, ua, ApplicationCode, false)
+}
+
+// CompleteMFAForApplication consumes a gRPC-issued MFA challenge. The challenge
+// must have been created for the same application; an HTTP challenge (app_id
+// empty) is rejected so the two surfaces cannot be mixed.
+func (uc *AuthUsecase) CompleteMFAForApplication(ctx context.Context, challengeID, code, ip, ua, appID string) (*LoginResult, error) {
+	return uc.completeMFA(ctx, challengeID, code, ip, ua, appID, true)
+}
+
+func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, ua, appID string, requireApp bool) (*LoginResult, error) {
 	if ok, err := uc.Limiter.Allow(ctx, "mfa:"+ip, 20, 5*time.Minute); err != nil {
 		return nil, ErrDependency
 	} else if !ok {
@@ -303,9 +328,18 @@ func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, u
 		IP              string `json:"ip"`
 		UA              string `json:"ua"`
 		Remember        bool   `json:"remember"`
+		AppID           string `json:"app_id"`
 	}
 	if err := jsonx.Unmarshal([]byte(c.Payload), &payload); err != nil || payload.IdentityVersion != user.IdentityVersion {
 		return nil, ErrChallengeInvalid
+	}
+	if requireApp && (payload.AppID == "" || payload.AppID != appID) {
+		return nil, ErrChallengeInvalid
+	}
+	if !requireApp {
+		appID = ApplicationCode
+	} else {
+		appID = payload.AppID
 	}
 	if err := uc.verifyMFA(ctx, user.ID, code); err != nil {
 		uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
@@ -328,7 +362,7 @@ func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, u
 			return err
 		}
 		var err error
-		session, raw, err = uc.issueSessionTx(ctx, tx, user, payload.UA, payload.IP)
+		session, raw, err = uc.issueSessionTxFor(ctx, tx, user, payload.UA, payload.IP, appID)
 		return err
 	})
 	if err != nil {
@@ -347,7 +381,15 @@ func (uc *AuthUsecase) issueSession(ctx context.Context, user *User, ua, ip stri
 	return uc.issueSessionTx(ctx, nil, user, ua, ip)
 }
 
+func (uc *AuthUsecase) issueSessionFor(ctx context.Context, user *User, ua, ip, appID string) (*Session, string, error) {
+	return uc.issueSessionTxFor(ctx, nil, user, ua, ip, appID)
+}
+
 func (uc *AuthUsecase) issueSessionTx(ctx context.Context, tx Tx, user *User, ua, ip string) (*Session, string, error) {
+	return uc.issueSessionTxFor(ctx, tx, user, ua, ip, ApplicationCode)
+}
+
+func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User, ua, ip, appID string) (*Session, string, error) {
 	settings, err := uc.Settings.GetAuth(ctx, nil)
 	if err != nil {
 		return nil, "", ErrDependency
@@ -372,7 +414,7 @@ func (uc *AuthUsecase) issueSessionTx(ctx context.Context, tx Tx, user *User, ua
 	s := &Session{
 		ID:              uc.IDs.NewID(),
 		UserID:          user.ID,
-		ApplicationCode: ApplicationCode,
+		ApplicationCode: appID,
 		TokenHash:       hash,
 		UserAgent:       SummizeAgent(ua),
 		IPMasked:        MaskIP(ip),

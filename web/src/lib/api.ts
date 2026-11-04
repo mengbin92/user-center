@@ -10,6 +10,7 @@ import type {
   AuditEvent,
   AuditsReply,
   AuthContext,
+  AuthProvidersReply,
   AuthSettings,
   AuthorizationReply,
   BatchAssignReply,
@@ -51,10 +52,13 @@ import type {
   MenusReply,
   OIDCConsentRequestView,
   OIDCConsentsReply,
+  OrganizationSettings,
   OverviewReply,
   PasswordResetTaskReply,
   Permission,
   PermissionsReply,
+  PreviewAssignmentReply,
+  PreviewAssignmentRequest,
   PreviewBatchAssignRequest,
   PreviewReply,
   PreviewRoleChangeRequest,
@@ -91,6 +95,8 @@ import type {
   UpdateConstraintRequest,
   UpdateEmailSettingsRequest,
   UpdateMeRequest,
+  UpdateOrganizationSettingsRequest,
+  UpdateUsernameRequest,
   UpdateMenuItemRequest,
   UpdatePermissionRequest,
   UpdateRoleRequest,
@@ -334,6 +340,8 @@ export const api = {
         `/api/v1/me/oidc-requests/${enc(handle)}:decide`,
         body,
       ),
+    updateUsername: (body: UpdateUsernameRequest) =>
+      post<User>('/api/v1/me/username:update', body),
     oidcConsents: () => get<OIDCConsentsReply>('/api/v1/me/oidc-consents'),
     revokeOIDCConsent: (clientId: string) =>
       del(`/api/v1/me/oidc-consents/${enc(clientId)}`),
@@ -637,6 +645,8 @@ export const api = {
         `/api/v1/admin/iam/assignments/${enc(id)}:revoke`,
         body,
       ),
+    previewAssignment: (body: PreviewAssignmentRequest) =>
+      post<PreviewAssignmentReply>('/api/v1/admin/iam/assignments:preview', body),
     previewBatchAssign: (body: PreviewBatchAssignRequest) =>
       post<BatchPreviewReply>(
         '/api/v1/admin/iam/assignments:batch-preview',
@@ -732,6 +742,15 @@ export const api = {
     email: () => get<EmailSettings>('/api/v1/admin/settings/email'),
     updateEmail: (body: UpdateEmailSettingsRequest) =>
       patch<EmailSettings>('/api/v1/admin/settings/email', body),
+    providers: () =>
+      get<AuthProvidersReply>('/api/v1/admin/settings/providers'),
+    organization: () =>
+      get<OrganizationSettings>('/api/v1/admin/settings/organization'),
+    updateOrganization: (body: UpdateOrganizationSettingsRequest) =>
+      patch<OrganizationSettings>(
+        '/api/v1/admin/settings/organization',
+        body,
+      ),
   },
 }
 

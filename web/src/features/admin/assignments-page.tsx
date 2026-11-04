@@ -41,6 +41,7 @@ import { useApiMutation } from '../../lib/mutations'
 import type {
   AssignmentItem,
   BatchPreviewReply,
+  PreviewAssignmentReply,
   Scope,
 } from '../../lib/types'
 import { ScopeBadge, roleById, useAllRoles } from './common'
@@ -62,6 +63,7 @@ export function AdminAssignmentsPage() {
   const [assignOpen, setAssignOpen] = useState(false)
   const [singleAssignOpen, setSingleAssignOpen] = useState(false)
   const [assignResultCount, setAssignResultCount] = useState<number | null>(null)
+  const [singlePreview, setSinglePreview] = useState<PreviewAssignmentReply | null>(null)
   const [revokeTarget, setRevokeTarget] = useState<AssignmentItem | null>(null)
   const [filterUserIdInput, setFilterUserIdInput] = useState('')
   const [filterUserId, setFilterUserId] = useState('')
@@ -119,6 +121,17 @@ export function AdminAssignmentsPage() {
       boundary: buildBoundary(),
       expires_at: toRfc3339(expiresAt),
     })
+
+  const singlePreviewMutation = useApiMutation({
+    mutationFn: () =>
+      api.iam.previewAssignment({
+        user_id: selected.size === 1 ? [...selected][0] : '',
+        role_id: roleId,
+        boundary: buildBoundary(),
+        expires_at: toRfc3339(expiresAt),
+      }),
+    onSuccess: (data) => setSinglePreview(data),
+  })
 
   const previewMutation = useApiMutation({
     mutationFn: buildPreview,
@@ -773,10 +786,45 @@ export function AdminAssignmentsPage() {
             : null
         }
       >
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
-          <div>用户：{selectedUserId ?? '未选择'}</div>
-          <div>数据边界：{boundaryType}</div>
-          <div>过期时间：{expiresAt ? formatDateTime(toRfc3339(expiresAt)) : '永久'}</div>
+        <div className="space-y-2">
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+            <div>用户：{selectedUserId ?? '未选择'}</div>
+            <div>数据边界：{boundaryType}</div>
+            <div>过期时间：{expiresAt ? formatDateTime(toRfc3339(expiresAt)) : '永久'}</div>
+          </div>
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={!selectedUserId || !roleId || singlePreviewMutation.isPending}
+            onClick={() => void singlePreviewMutation.mutateAsync()}
+          >
+            预览将获得的权限
+          </Button>
+          {singlePreview ? (
+            <div className="rounded-md border border-slate-200 p-3 text-[11px] text-slate-600">
+              <div>
+                结论：
+                <span className={singlePreview.eligible ? 'text-emerald-700' : 'text-rose-700'}>
+                  {singlePreview.eligible ? '可分配' : '不可分配'}
+                </span>
+                {singlePreview.reason ? ` · ${singlePreview.reason}` : ''}
+              </div>
+              <div>范围：{singlePreview.scope || '—'} · 角色状态：{singlePreview.role_status || '—'}</div>
+              {singlePreview.max_members ? <div>角色上限：{singlePreview.max_members}</div> : null}
+              <div className="mt-1 space-y-0.5">
+                {(singlePreview.permissions ?? []).slice(0, 12).map((item) => (
+                  <div key={`${item.operation}-${item.effect}`} className="font-mono text-[10px]">
+                    {item.effect} · {item.operation} · {item.scope}
+                  </div>
+                ))}
+              </div>
+              {(singlePreview.deny_sources ?? []).length ? (
+                <div className="mt-1 text-rose-700">
+                  命中 deny：{singlePreview.deny_sources?.map((item) => item.operation).join('、')}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </ReasonDialog>
 

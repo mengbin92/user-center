@@ -27,6 +27,8 @@ const (
 	IntegrationService_GetSessionAuthorization_FullMethodName  = "/api.usercenter.v1.IntegrationService/GetSessionAuthorization"
 	IntegrationService_GetResourceAuthorization_FullMethodName = "/api.usercenter.v1.IntegrationService/GetResourceAuthorization"
 	IntegrationService_RevokeSession_FullMethodName            = "/api.usercenter.v1.IntegrationService/RevokeSession"
+	IntegrationService_Authenticate_FullMethodName             = "/api.usercenter.v1.IntegrationService/Authenticate"
+	IntegrationService_CompleteMFA_FullMethodName              = "/api.usercenter.v1.IntegrationService/CompleteMFA"
 )
 
 // IntegrationServiceClient is the client API for IntegrationService service.
@@ -45,6 +47,10 @@ type IntegrationServiceClient interface {
 	GetSessionAuthorization(ctx context.Context, in *SessionAuthorizationRequest, opts ...grpc.CallOption) (*SessionAuthorizationReply, error)
 	GetResourceAuthorization(ctx context.Context, in *ResourceAuthorizationRequest, opts ...grpc.CallOption) (*ResourceAuthorizationReply, error)
 	RevokeSession(ctx context.Context, in *IntegrationRevokeSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Server-side login for approved BFFs. Credentials never leave the gRPC
+	// channel; the issued session is bound to the calling application.
+	Authenticate(ctx context.Context, in *AuthenticateRequest, opts ...grpc.CallOption) (*AuthenticateReply, error)
+	CompleteMFA(ctx context.Context, in *IntegrationCompleteMFARequest, opts ...grpc.CallOption) (*AuthenticateReply, error)
 }
 
 type integrationServiceClient struct {
@@ -125,6 +131,26 @@ func (c *integrationServiceClient) RevokeSession(ctx context.Context, in *Integr
 	return out, nil
 }
 
+func (c *integrationServiceClient) Authenticate(ctx context.Context, in *AuthenticateRequest, opts ...grpc.CallOption) (*AuthenticateReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthenticateReply)
+	err := c.cc.Invoke(ctx, IntegrationService_Authenticate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *integrationServiceClient) CompleteMFA(ctx context.Context, in *IntegrationCompleteMFARequest, opts ...grpc.CallOption) (*AuthenticateReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthenticateReply)
+	err := c.cc.Invoke(ctx, IntegrationService_CompleteMFA_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IntegrationServiceServer is the server API for IntegrationService service.
 // All implementations must embed UnimplementedIntegrationServiceServer
 // for forward compatibility.
@@ -141,6 +167,10 @@ type IntegrationServiceServer interface {
 	GetSessionAuthorization(context.Context, *SessionAuthorizationRequest) (*SessionAuthorizationReply, error)
 	GetResourceAuthorization(context.Context, *ResourceAuthorizationRequest) (*ResourceAuthorizationReply, error)
 	RevokeSession(context.Context, *IntegrationRevokeSessionRequest) (*emptypb.Empty, error)
+	// Server-side login for approved BFFs. Credentials never leave the gRPC
+	// channel; the issued session is bound to the calling application.
+	Authenticate(context.Context, *AuthenticateRequest) (*AuthenticateReply, error)
+	CompleteMFA(context.Context, *IntegrationCompleteMFARequest) (*AuthenticateReply, error)
 	mustEmbedUnimplementedIntegrationServiceServer()
 }
 
@@ -171,6 +201,12 @@ func (UnimplementedIntegrationServiceServer) GetResourceAuthorization(context.Co
 }
 func (UnimplementedIntegrationServiceServer) RevokeSession(context.Context, *IntegrationRevokeSessionRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeSession not implemented")
+}
+func (UnimplementedIntegrationServiceServer) Authenticate(context.Context, *AuthenticateRequest) (*AuthenticateReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method Authenticate not implemented")
+}
+func (UnimplementedIntegrationServiceServer) CompleteMFA(context.Context, *IntegrationCompleteMFARequest) (*AuthenticateReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteMFA not implemented")
 }
 func (UnimplementedIntegrationServiceServer) mustEmbedUnimplementedIntegrationServiceServer() {}
 func (UnimplementedIntegrationServiceServer) testEmbeddedByValue()                            {}
@@ -319,6 +355,42 @@ func _IntegrationService_RevokeSession_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IntegrationService_Authenticate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AuthenticateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IntegrationServiceServer).Authenticate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IntegrationService_Authenticate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IntegrationServiceServer).Authenticate(ctx, req.(*AuthenticateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IntegrationService_CompleteMFA_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IntegrationCompleteMFARequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IntegrationServiceServer).CompleteMFA(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IntegrationService_CompleteMFA_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IntegrationServiceServer).CompleteMFA(ctx, req.(*IntegrationCompleteMFARequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IntegrationService_ServiceDesc is the grpc.ServiceDesc for IntegrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -353,6 +425,14 @@ var IntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeSession",
 			Handler:    _IntegrationService_RevokeSession_Handler,
+		},
+		{
+			MethodName: "Authenticate",
+			Handler:    _IntegrationService_Authenticate_Handler,
+		},
+		{
+			MethodName: "CompleteMFA",
+			Handler:    _IntegrationService_CompleteMFA_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

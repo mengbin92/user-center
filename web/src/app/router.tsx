@@ -39,6 +39,7 @@ const SessionsPage = lazyPage(() => import('../features/account/sessions-page'),
 const AdminAssignmentsPage = lazyPage(() => import('../features/admin/assignments-page'), 'AdminAssignmentsPage')
 const AdminApplicationsPage = lazyPage(() => import('../features/admin/applications-page'), 'AdminApplicationsPage')
 const AdminAuditsPage = lazyPage(() => import('../features/admin/audits-page'), 'AdminAuditsPage')
+const AdminAuditDetailPage = lazyPage(() => import('../features/admin/audit-detail-page'), 'AdminAuditDetailPage')
 const AdminConstraintsPage = lazyPage(() => import('../features/admin/constraints-page'), 'AdminConstraintsPage')
 const AdminDelegationsPage = lazyPage(() => import('../features/admin/delegations-page'), 'AdminDelegationsPage')
 const AdminExplainPage = lazyPage(() => import('../features/admin/explain-page'), 'AdminExplainPage')
@@ -52,6 +53,8 @@ const AdminRoleDetailPage = lazyPage(() => import('../features/admin/role-detail
 const AdminRolesPage = lazyPage(() => import('../features/admin/roles-page'), 'AdminRolesPage')
 const AdminAuthSettingsPage = lazyPage(() => import('../features/admin/settings-auth-page'), 'AdminAuthSettingsPage')
 const AdminEmailSettingsPage = lazyPage(() => import('../features/admin/settings-email-page'), 'AdminEmailSettingsPage')
+const AdminProvidersPage = lazyPage(() => import('../features/admin/settings-providers-page'), 'AdminProvidersPage')
+const AdminOrganizationSettingsPage = lazyPage(() => import('../features/admin/settings-organization-page'), 'AdminOrganizationSettingsPage')
 const AdminUserDetailPage = lazyPage(() => import('../features/admin/user-detail-page'), 'AdminUserDetailPage')
 const AdminUsersPage = lazyPage(() => import('../features/admin/users-page'), 'AdminUsersPage')
 const OrganizationDetailPage = lazyPage(() => import('../features/orgs/org-detail-page'), 'OrganizationDetailPage')
@@ -206,6 +209,30 @@ export function AppRoutes() {
               element={
                 <RequirePermission permission="audit.read">
                   <AdminAuditsPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="settings/providers"
+              element={
+                <RequirePermission permission="settings.auth.read">
+                  <AdminProvidersPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="settings/organization"
+              element={
+                <RequirePermission permission="settings.organization.read">
+                  <AdminOrganizationSettingsPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="audits/:id"
+              element={
+                <RequirePermission permission="audit.read">
+                  <AdminAuditDetailPage />
                 </RequirePermission>
               }
             />

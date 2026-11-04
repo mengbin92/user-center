@@ -180,6 +180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/iam/assignments:preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["IAMService_PreviewAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/iam/authorization:explain": {
         parameters: {
             query?: never;
@@ -787,6 +803,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["SettingsService_UpdateEmailSettings"];
+        trace?: never;
+    };
+    "/api/v1/admin/settings/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SettingsService_GetOrganizationSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["SettingsService_UpdateOrganizationSettings"];
+        trace?: never;
+    };
+    "/api/v1/admin/settings/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SettingsService_GetAuthProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/users": {
@@ -1481,6 +1529,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/username:update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeService_UpdateUsername"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs": {
         parameters: {
             query?: never;
@@ -1962,6 +2026,21 @@ export interface components {
             /** Format: int32 */
             password_min_length?: number;
             mfa_required_for_admins?: boolean;
+        };
+        "api.usercenter.v1.AuthProviderView": {
+            code?: string;
+            name?: string;
+            enabled?: boolean;
+            /** @description env | db (currently env only) */
+            credential_source?: string;
+            credential_configured?: boolean;
+            callback_url?: string;
+            required_env?: string[];
+            updated_at?: string;
+        };
+        "api.usercenter.v1.AuthProvidersReply": {
+            items?: components["schemas"]["api.usercenter.v1.AuthProviderView"][];
+            revision?: string;
         };
         "api.usercenter.v1.AuthSettings": {
             registration_enabled?: boolean;
@@ -2607,6 +2686,14 @@ export interface components {
         "api.usercenter.v1.OrganizationMembersReply": {
             items?: components["schemas"]["api.usercenter.v1.OrganizationMember"][];
         };
+        "api.usercenter.v1.OrganizationSettings": {
+            quota_enabled?: boolean;
+            /** Format: int32 */
+            max_owned_per_user?: number;
+            count_archived?: boolean;
+            revision?: string;
+            updated_at?: string;
+        };
         "api.usercenter.v1.OrganizationsReply": {
             items?: components["schemas"]["api.usercenter.v1.Organization"][];
         };
@@ -2650,6 +2737,23 @@ export interface components {
         };
         "api.usercenter.v1.PermissionsReply": {
             items?: components["schemas"]["api.usercenter.v1.Permission"][];
+        };
+        "api.usercenter.v1.PreviewAssignmentReply": {
+            eligible?: boolean;
+            reason?: string;
+            permissions?: components["schemas"]["api.usercenter.v1.PermissionSummary"][];
+            deny_sources?: components["schemas"]["api.usercenter.v1.GrantSource"][];
+            scope?: string;
+            valid_until?: string;
+            policy_revision?: string;
+            role_status?: string;
+            max_members?: string;
+        };
+        "api.usercenter.v1.PreviewAssignmentRequest": {
+            user_id?: string;
+            role_id?: string;
+            boundary?: components["schemas"]["api.usercenter.v1.Scope"];
+            expires_at?: string;
         };
         "api.usercenter.v1.PreviewBatchAssignRequest": {
             user_ids?: string[];
@@ -3044,6 +3148,15 @@ export interface components {
             expected_revision?: string;
             reason?: string;
         };
+        "api.usercenter.v1.UpdateOrganizationSettingsRequest": {
+            quota_enabled?: boolean;
+            /** Format: int32 */
+            max_owned_per_user?: number;
+            count_archived?: boolean;
+            update_mask?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.UpdatePermissionRequest": {
             id?: string;
             name?: string;
@@ -3072,6 +3185,12 @@ export interface components {
             update_mask?: string;
             expected_revision?: string;
             expected_policy_revision?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.UpdateUsernameRequest": {
+            username?: string;
+            current_password?: string;
+            expected_revision?: string;
             reason?: string;
         };
         /**
@@ -3405,6 +3524,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.BatchPreviewReply"];
+                };
+            };
+        };
+    };
+    IAMService_PreviewAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.PreviewAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.PreviewAssignmentReply"];
                 };
             };
         };
@@ -4654,6 +4797,70 @@ export interface operations {
             };
         };
     };
+    SettingsService_GetOrganizationSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationSettings"];
+                };
+            };
+        };
+    };
+    SettingsService_UpdateOrganizationSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateOrganizationSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationSettings"];
+                };
+            };
+        };
+    };
+    SettingsService_GetAuthProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.AuthProvidersReply"];
+                };
+            };
+        };
+    };
     AdminUserService_ListUsers: {
         parameters: {
             query?: {
@@ -5732,6 +5939,30 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    MeService_UpdateUsername: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateUsernameRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.User"];
+                };
             };
         };
     };
