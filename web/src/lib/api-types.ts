@@ -1634,6 +1634,7 @@ export interface components {
             /** Format: int32 */
             refresh_token_ttl_seconds?: number;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.CreatePasswordResetChallengeRequest": {
             /** @description Username or email. The response never reveals whether the account exists. */
@@ -1717,6 +1718,8 @@ export interface components {
         "api.usercenter.v1.DisableOIDCClientRequest": {
             id?: string;
             reason?: string;
+            expected_revision?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.EffectivePermission": {
             operation?: string;
@@ -2107,6 +2110,8 @@ export interface components {
         "api.usercenter.v1.RotateOIDCClientSecretRequest": {
             id?: string;
             reason?: string;
+            expected_revision?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.RotateRecoveryCodesRequest": {
             current_password?: string;
@@ -2304,6 +2309,7 @@ export interface components {
             refresh_token_ttl_seconds?: number;
             expected_revision?: string;
             reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.UpdatePermissionRequest": {
             id?: string;

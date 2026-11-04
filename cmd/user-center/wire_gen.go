@@ -47,7 +47,7 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	integrationClientRepo := data.NewIntegrationClientRepo(dataData)
 	oidcClientRepo := data.NewOIDCClientRepo(dataData)
 	oidcCodeRepo := data.NewOIDCCodeRepo(dataData)
-	oidcSigner, err := data.NewOIDCSigner(logger)
+	oidcSigner, err := data.NewOIDCSigner(dataData, logger)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
@@ -56,7 +56,11 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	iDs := &data.IDs{}
 	secretBox := data.NewSecretBox(security)
 	v := data.NewOAuthRegistry(logger)
-	runtimeConfig := wiring.NewRuntimeConfig(b)
+	runtimeConfig, err := wiring.NewRuntimeConfig(b)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
 	services := biz.NewServices(userRepo, credentialRepo, externalIdentityRepo, mfaRepo, sessionRepo, securityEventRepo, flowCompletionRepo, challengeStore, rateLimiter, stepUpStore, mailSender, auditRepo, policyRepo, iamRepo, outboxRepo, settingsRepo, exportRepo, integrationClientRepo, oidcClientRepo, oidcCodeRepo, oidcSigner, dataData, clock, iDs, secretBox, v, runtimeConfig)
 	sessionUsecase := biz.NewSessionUsecase(services)
 	middleware := server.NewMiddleware(sessionUsecase, security, logger)

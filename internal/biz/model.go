@@ -381,6 +381,7 @@ type OIDCCode struct {
 	CodeHash            string
 	ClientID            string
 	UserID              int64
+	IdentityVersion     uint64
 	RedirectURI         string
 	Scope               string
 	Nonce               string
@@ -391,10 +392,12 @@ type OIDCCode struct {
 }
 
 type OIDCRefreshToken struct {
-	TokenHash string
-	ClientID  string
-	UserID    int64
-	Scope     string
-	AuthTime  time.Time
-	ExpiresAt time.Time
+	TokenHash       string
+	FamilyID        string
+	ClientID        string
+	UserID          int64
+	IdentityVersion uint64
+	Scope           string
+	AuthTime        time.Time
+	ExpiresAt       time.Time
 }

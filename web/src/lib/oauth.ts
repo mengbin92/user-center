@@ -1,3 +1,5 @@
+import { oidcAuthorizationPath } from './paths'
+
 const PROVIDER_LABELS: Record<string, string> = {
   github: 'GitHub',
   google: 'Google',
@@ -30,9 +32,12 @@ export function providerLabel(provider: string): string {
 export function providerStartPath(
   provider: string,
   mode: OAuthMode = 'login',
+  next?: string | null,
 ): string {
   const path = `/api/v1/auth/providers/${encodeURIComponent(provider)}/start`
-  return mode === 'login' ? path : `${path}?mode=${mode}`
+  if (mode !== 'login') return `${path}?mode=${mode}`
+  const continuation = oidcAuthorizationPath(next ?? null)
+  return continuation ? `${path}?next=${encodeURIComponent(continuation)}` : path
 }
 
 export function oauthErrorMessage(raw?: string | null): string {

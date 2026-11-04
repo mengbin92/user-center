@@ -266,8 +266,8 @@ type OIDCClientRepo interface {
 	GetOIDCClientByClientID(context.Context, Tx, string) (*OIDCClient, error)
 	CreateOIDCClient(context.Context, Tx, *OIDCClient) (*OIDCClient, error)
 	UpdateOIDCClient(context.Context, Tx, *OIDCClient, uint64) (*OIDCClient, error)
-	RotateOIDCClientSecret(context.Context, Tx, int64, string) (*OIDCClient, error)
-	DisableOIDCClient(context.Context, Tx, int64) error
+	RotateOIDCClientSecret(context.Context, Tx, int64, string, uint64) (*OIDCClient, error)
+	DisableOIDCClient(context.Context, Tx, int64, uint64) error
 }
 
 type OIDCCodeRepo interface {

@@ -110,7 +110,7 @@ func TestIntegrationClientRejectsUnknownMethodUnderValidPrefix(t *testing.T) {
 }
 
 func TestOutboxRetainsBacklogBeyondNewestPage(t *testing.T) {
-	t.Setenv("OUTBOX_SIGNING_SECRET", "review-signing-secret")
+	t.Setenv("OUTBOX_SIGNING_SECRET", "review-signing-secret-at-least-32-bytes")
 	h := newHarness(t)
 	var received []string
 	webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

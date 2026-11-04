@@ -21,6 +21,11 @@ export function safeNext(raw: string | null): string | null {
   return raw
 }
 
+export function oidcAuthorizationPath(raw: string | null): string | null {
+  const next = safeNext(raw)
+  return next?.split(/[?#]/)[0] === '/oidc/authorize' ? next : null
+}
+
 export function loginPath(next?: string): string {
   if (!next) return '/login'
   return `/login?next=${encodeURIComponent(next)}`

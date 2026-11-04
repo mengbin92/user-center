@@ -63,6 +63,8 @@ export function Dialog({
     }, 20)
 
     const onKeyDown = (event: KeyboardEvent) => {
+      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]')
+      if (dialogs[dialogs.length - 1] !== panelRef.current) return
       if (event.key === 'Escape' && dismissibleRef.current) {
         event.stopPropagation()
         closeRef.current()

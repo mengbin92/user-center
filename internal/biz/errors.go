@@ -55,9 +55,6 @@ func ConflictPolicy(current uint64) error {
 }
 
 var (
-	ErrOIDCInvalidClient  = kerrors.Unauthorized("INVALID_CLIENT", "客户端认证失败")
 	ErrOIDCInvalidGrant   = kerrors.BadRequest("INVALID_GRANT", "授权码、刷新令牌或 PKCE 校验失败")
-	ErrOIDCInvalidRequest = kerrors.BadRequest("INVALID_REQUEST", "OIDC 请求参数不合法")
-	ErrOIDCUnsupported    = kerrors.BadRequest("UNSUPPORTED_GRANT_TYPE", "不支持的 grant_type")
 	ErrOIDCClientNotFound = kerrors.NotFound("OIDC_CLIENT_NOT_FOUND", "OIDC 客户端不存在")
 )

@@ -38,6 +38,18 @@ describe('provider buttons', () => {
       '绑定 Google',
     )
   })
+
+  it('carries only a safe OIDC continuation into provider login', () => {
+    const next = '/oidc/authorize?client_id=example&state=opaque'
+    const { rerender } = render(<ProviderButtons providers={['github']} next={next} />)
+    expect(screen.getByTestId('provider-github')).toHaveAttribute('href', `/api/v1/auth/providers/github/start?next=${encodeURIComponent(next)}`)
+    for (const unsafe of ['//evil.example.com', '/\\evil.example.com', 'https://evil.example.com', '/account', '/oidc/authorize-other']) {
+      rerender(<ProviderButtons providers={['github']} next={unsafe} />)
+      expect(screen.getByTestId('provider-github')).toHaveAttribute('href', '/api/v1/auth/providers/github/start')
+    }
+    rerender(<ProviderButtons providers={['github']} mode="bind" next={next} />)
+    expect(screen.getByTestId('provider-github')).toHaveAttribute('href', '/api/v1/auth/providers/github/start?mode=bind')
+  })
 })
 
 it('uses the dedicated bound-identity verification flow', () => {
