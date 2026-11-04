@@ -80,6 +80,10 @@ func (s *AuditService) GetAuditEvent(ctx context.Context, req *usercv1.GetAuditE
 }
 
 func (s *AuditService) ExportAuditEvents(ctx context.Context, req *usercv1.ExportAuditEventsRequest) (*usercv1.ExportJob, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -107,7 +111,7 @@ func (s *AuditService) ExportAuditEvents(ctx context.Context, req *usercv1.Expor
 	if !to.IsZero() {
 		filter.To = &to
 	}
-	job, err := s.uc.Export(ctx, actor, filter, req.GetFields(), reasonOr(req.GetReason(), "export audit events"))
+	job, err := s.uc.Export(ctx, actor, filter, req.GetFields(), auditReason)
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +143,10 @@ func (s *SettingsService) GetAuthSettings(ctx context.Context, _ *usercv1.GetAut
 }
 
 func (s *SettingsService) UpdateAuthSettings(ctx context.Context, req *usercv1.UpdateAuthSettingsRequest) (*usercv1.AuthSettings, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -152,7 +160,7 @@ func (s *SettingsService) UpdateAuthSettings(ctx context.Context, req *usercv1.U
 		PasswordMinLength: int(req.GetPasswordMinLength()), SessionTTLMinutes: int(req.GetSessionTtlMinutes()),
 		IdleTimeoutMinutes: int(req.GetIdleTimeoutMinutes()), MFARequiredForAdmins: req.GetMfaRequiredForAdmins(),
 		AllowedEmailDomains: req.GetAllowedEmailDomains(), Providers: req.GetProviders(),
-	}, req.GetUpdateMask(), expected, reasonOr(req.GetReason(), "update auth settings"))
+	}, req.GetUpdateMask(), expected, auditReason)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +183,10 @@ func (s *SettingsService) GetEmailSettings(ctx context.Context, _ *usercv1.GetEm
 }
 
 func (s *SettingsService) UpdateEmailSettings(ctx context.Context, req *usercv1.UpdateEmailSettingsRequest) (*usercv1.EmailSettings, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -186,7 +198,7 @@ func (s *SettingsService) UpdateEmailSettings(ctx context.Context, req *usercv1.
 	settings, err := s.uc.UpdateEmail(ctx, actor, &biz.EmailSettings{
 		Driver: req.GetDriver(), From: req.GetFrom(), SMTPHost: req.GetSmtpHost(),
 		SMTPPort: int(req.GetSmtpPort()), SMTPUsername: req.GetSmtpUsername(),
-	}, req.GetSmtpPassword(), req.GetUpdateMask(), expected, reasonOr(req.GetReason(), "update email settings"))
+	}, req.GetSmtpPassword(), req.GetUpdateMask(), expected, auditReason)
 	if err != nil {
 		return nil, err
 	}

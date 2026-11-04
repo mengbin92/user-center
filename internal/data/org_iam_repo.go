@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/internal/biz"
@@ -113,16 +114,56 @@ func (r *orgIAMRepo) ListRoles(ctx context.Context, tx biz.Tx, c authorization.C
 }
 
 func (r *orgIAMRepo) GetRole(ctx context.Context, tx biz.Tx, c authorization.Context, id int64) (*biz.Role, error) {
-	rows, err := r.ListRoles(ctx, tx, c)
+	return r.getRole(ctx, tx, c, id, false)
+}
+
+// GetRoleForUpdate takes a row lock so concurrent assignments of the same role
+// serialize their max_members and duplicate checks.
+func (r *orgIAMRepo) GetRoleForUpdate(ctx context.Context, tx biz.Tx, c authorization.Context, id int64) (*biz.Role, error) {
+	return r.getRole(ctx, tx, c, id, true)
+}
+
+func (r *orgIAMRepo) getRole(ctx context.Context, tx biz.Tx, c authorization.Context, id int64, lock bool) (*biz.Role, error) {
+	typ, ctxID, err := contextScope(c)
 	if err != nil {
+		return nil, biz.ErrAuthorizationDown
+	}
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if lock && (db.Dialector == nil || db.Dialector.Name() != "sqlite") {
+		db = db.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
+	}
+	var p rolePO
+	if err := db.Where("id = ? AND context_type = ? AND context_id = ?", id, typ, ctxID).First(&p).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, biz.ErrResourceNotFound
+		}
 		return nil, err
 	}
-	for _, role := range rows {
-		if role.ID == id {
-			return role, nil
-		}
+	var grants []roleGrantPO
+	if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id = ?", p.ID).Find(&grants).Error; err != nil {
+		return nil, err
 	}
-	return nil, biz.ErrResourceNotFound
+	var edges []roleInheritancePO
+	if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id = ?", p.ID).Find(&edges).Error; err != nil {
+		return nil, err
+	}
+	out := &biz.Role{
+		ID: p.ID, Code: p.Code, Name: p.Name, Description: p.Description,
+		Builtin: p.Builtin, Status: p.Status, MaxMembers: p.MaxMembers,
+		Revision: p.Revision, CreationDelegationID: p.CreationDelegationID,
+		Context: c.Normalize(),
+	}
+	for _, g := range grants {
+		var scope authorization.Scope
+		if err := jsonx.Unmarshal([]byte(g.Scope), &scope); err != nil {
+			return nil, fmt.Errorf("decode role grant scope: %w", err)
+		}
+		out.Grants = append(out.Grants, biz.Grant{Operation: g.Operation, Effect: authorization.Effect(g.Effect), Scope: scope})
+	}
+	for _, e := range edges {
+		out.Inherits = append(out.Inherits, e.InheritsID)
+	}
+	return out, nil
 }
 
 func (r *orgIAMRepo) GetRoleByCode(ctx context.Context, tx biz.Tx, c authorization.Context, code string) (*biz.Role, error) {
@@ -358,7 +399,7 @@ func (r *orgIAMRepo) CountActiveAssignments(ctx context.Context, tx biz.Tx, c au
 	}
 	var n int64
 	err = r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).
-		Where("role_id = ? AND context_type = ? AND context_id = ? AND status = ?", roleID, typ, ctxID, "active").
+		Where("role_id = ? AND context_type = ? AND context_id = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?)", roleID, typ, ctxID, "active", time.Now().UTC()).
 		Count(&n).Error
 	return n, err
 }

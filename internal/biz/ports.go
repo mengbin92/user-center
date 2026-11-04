@@ -27,6 +27,7 @@ type UserRepo interface {
 	CountMFA(context.Context, Tx, authorization.Scope) (int64, error)
 	Overview(context.Context, Tx, UserFilter, time.Time, time.Time) (*Overview, error)
 	RolesForUser(context.Context, Tx, int64) ([]RoleRef, error)
+	RolesForUsers(context.Context, Tx, []int64) (map[int64][]RoleRef, error)
 	CountsByRole(context.Context, Tx, int64) (int64, error)
 }
 
@@ -62,6 +63,7 @@ type ExternalIdentityRepo interface {
 
 type MFARepo interface {
 	Get(context.Context, Tx, int64) (*MFAState, error)
+	ListByUsers(context.Context, Tx, []int64) (map[int64]*MFAState, error)
 	Save(context.Context, Tx, *MFAState) error
 	Delete(context.Context, Tx, int64) error
 }
@@ -194,6 +196,7 @@ type IAMRepo interface {
 type OrgIAMRepo interface {
 	ListRoles(context.Context, Tx, authorization.Context) ([]*Role, error)
 	GetRole(context.Context, Tx, authorization.Context, int64) (*Role, error)
+	GetRoleForUpdate(context.Context, Tx, authorization.Context, int64) (*Role, error)
 	GetRoleByCode(context.Context, Tx, authorization.Context, string) (*Role, error)
 	CreateRole(context.Context, Tx, authorization.Context, *Role) (*Role, error)
 	UpdateRole(context.Context, Tx, authorization.Context, *Role, uint64) (*Role, error)
@@ -322,6 +325,7 @@ type OrganizationRepo interface {
 	UpdateMember(context.Context, Tx, *OrganizationMember, uint64) (*OrganizationMember, error)
 	RemoveMember(context.Context, Tx, int64, int64, uint64) error
 	CountActiveOwners(context.Context, Tx, int64) (int64, error)
+	CountActiveOwnersForUpdate(context.Context, Tx, int64) (int64, error)
 	CountActiveMembers(context.Context, Tx, int64) (int64, error)
 
 	ListDepartments(context.Context, Tx, int64) ([]*Department, error)

@@ -149,7 +149,7 @@ func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, svc *biz.Ser
 func (a *App) Run() error {
 	opts := []kratos.Option{
 		kratos.Name("user-center"),
-		kratos.Version("0.5.1"),
+		kratos.Version("0.5.2"),
 		kratos.Logger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))),
 		kratos.Server(a.http.Server, a.grpc.Server),
 		kratos.BeforeStart(a.bootstrap),
@@ -212,5 +212,3 @@ var ProviderSet = wire.NewSet(
 	NewLogger,
 	NewApp,
 )
-
-var _ = errors.New

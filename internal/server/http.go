@@ -63,7 +63,6 @@ func NewHTTPServer(
 			publicBase = cfg.Http.PublicBaseUrl
 		}
 	}
-	_ = publicBase
 
 	srv := khttp.NewServer(
 		khttp.Address(addr),
@@ -226,7 +225,7 @@ func spaHandler(dir string, log *zap.Logger) http.Handler {
 			return
 		}
 		clean := filepath.Clean(strings.TrimPrefix(r.URL.Path, "/"))
-		if clean != "." {
+		if clean != "." && filepath.IsLocal(clean) {
 			if info, err := os.Stat(filepath.Join(dir, clean)); err == nil && !info.IsDir() {
 				fs.ServeHTTP(w, r)
 				return

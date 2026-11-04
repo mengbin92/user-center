@@ -182,6 +182,26 @@ func (r *mfaRepo) Get(ctx context.Context, tx biz.Tx, userID int64) (*biz.MFASta
 	if err != nil {
 		return nil, err
 	}
+	return mfaStateFromPO(&p), nil
+}
+
+// ListByUsers resolves MFA state for a page of users in one query.
+func (r *mfaRepo) ListByUsers(ctx context.Context, tx biz.Tx, userIDs []int64) (map[int64]*biz.MFAState, error) {
+	out := make(map[int64]*biz.MFAState, len(userIDs))
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	var rows []mfaPO
+	if err := r.d.dbOr(tx).WithContext(ctx).Where("user_id IN ?", userIDs).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		out[rows[i].UserID] = mfaStateFromPO(&rows[i])
+	}
+	return out, nil
+}
+
+func mfaStateFromPO(p *mfaPO) *biz.MFAState {
 	hashes := []string{}
 	if p.RecoveryHashes != "" {
 		for _, h := range strings.Split(p.RecoveryHashes, ",") {
@@ -202,7 +222,7 @@ func (r *mfaRepo) Get(ctx context.Context, tx biz.Tx, userID int64) (*biz.MFASta
 	if p.LockedUntil != nil {
 		state.LockedUntil = p.LockedUntil.UTC()
 	}
-	return state, nil
+	return state
 }
 
 func (r *mfaRepo) Save(ctx context.Context, tx biz.Tx, s *biz.MFAState) error {

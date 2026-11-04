@@ -71,7 +71,7 @@ export async function ensureCsrfToken(): Promise<string | null> {
   const baseURL = import.meta.env.VITE_API_BASE ?? ''
   csrfBootstrap = fetch(`${baseURL}/api/v1/auth/context`, {
     method: 'GET',
-    credentials: 'same-origin',
+    credentials: 'include',
     headers: { [REQUEST_ID_HEADER]: newRequestId() },
   })
     .then(() => readCookie(CSRF_COOKIE))

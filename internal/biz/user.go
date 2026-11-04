@@ -502,21 +502,38 @@ func (uc *UserUsecase) ListUsers(ctx context.Context, actor ActorContext, filter
 	if err != nil {
 		return nil, 0, ErrDependency
 	}
+	// One policy snapshot and two batch lookups for the whole page. Deciding per
+	// row used to reload every role, grant, assignment and constraint each time.
+	facts, err := uc.LoadAuthzFacts(ctx, actor.User.ID, actor.Session.ActiveRoleIDs)
+	if err != nil {
+		return nil, 0, ErrAuthorizationDown
+	}
+	ids := make([]int64, 0, len(users))
+	for _, u := range users {
+		ids = append(ids, u.ID)
+	}
+	roleMap, err := uc.Users.RolesForUsers(ctx, nil, ids)
+	if err != nil {
+		return nil, 0, ErrDependency
+	}
+	mfaMap, err := uc.MFA.ListByUsers(ctx, nil, ids)
+	if err != nil {
+		return nil, 0, ErrDependency
+	}
 	out := make([]*UserListItem, 0, len(users))
 	for _, u := range users {
-		d, derr := uc.Decide(ctx, actor, "identity.user.list", u.ID, false)
+		d, derr := uc.decideWithFacts(ctx, facts, actor, "identity.user.list", u.ID, false)
 		if derr != nil {
 			return nil, 0, ErrAuthorizationDown
 		}
 		if !d.Allowed {
 			continue
 		}
-		roles, _ := uc.Users.RolesForUser(ctx, nil, u.ID)
-		u.Roles = roles
-		if state, merr := uc.MFA.Get(ctx, nil, u.ID); merr == nil {
+		u.Roles = roleMap[u.ID]
+		if state := mfaMap[u.ID]; state != nil {
 			u.MFAEnabled = state.Enabled()
 		}
-		if d, derr := uc.Decide(ctx, actor, "identity.user.contact.read", u.ID, false); derr != nil || !d.Allowed {
+		if contact, cerr := uc.decideWithFacts(ctx, facts, actor, "identity.user.contact.read", u.ID, false); cerr != nil || !contact.Allowed {
 			u.Email = ""
 			u.EmailNormalized = ""
 		}

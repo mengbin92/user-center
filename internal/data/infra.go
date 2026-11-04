@@ -402,8 +402,9 @@ type memoryEntry struct {
 }
 
 type memoryKV struct {
-	mu   sync.Mutex
-	data map[string]memoryEntry
+	mu     sync.Mutex
+	data   map[string]memoryEntry
+	writes int
 }
 
 func newMemoryKV() *memoryKV { return &memoryKV{data: map[string]memoryEntry{}} }
@@ -415,6 +416,18 @@ func (m *memoryKV) set(key string, value []byte, expires time.Time) {
 		m.data = map[string]memoryEntry{}
 	}
 	m.data[key] = memoryEntry{value: append([]byte(nil), value...), expires: expires}
+	// Rate-limit keys embed a time bucket, so an old bucket is never read again
+	// and would otherwise stay in the map forever. Sweep periodically to keep a
+	// Redis-less deployment bounded.
+	m.writes++
+	if m.writes%256 == 0 {
+		now := time.Now()
+		for k, e := range m.data {
+			if !e.expires.IsZero() && now.After(e.expires) {
+				delete(m.data, k)
+			}
+		}
+	}
 }
 
 func (m *memoryKV) get(key string) ([]byte, error) {

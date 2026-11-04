@@ -87,11 +87,11 @@ func requireOrgOwner(role string) error {
 // context. Platform administrators keep an explicit override; everyone else
 // must hold the permission through an assignment in this organization.
 func (uc *OrganizationUsecase) orgPermission(ctx context.Context, actor ActorContext, orgID int64, operation string, targetUserID int64, wholeObject bool) error {
-	if isPlatformAdmin(actor) {
-		return nil
-	}
 	if err := uc.ensureOrganizationIAM(ctx, orgID); err != nil {
 		return err
+	}
+	if isPlatformAdmin(actor) {
+		return nil
 	}
 	if _, err := uc.AuthorizeIn(ctx, actor, authorization.Organization(orgID), operation, targetUserID, wholeObject); err != nil {
 		return err
@@ -286,10 +286,12 @@ func (uc *OrganizationUsecase) AddMember(ctx context.Context, actor ActorContext
 		user, err = uc.Users.GetByUsername(ctx, nil, NormalizeUsername(identifier))
 	}
 	if err != nil {
-		return nil, ErrUserNotFound
+		// Do not distinguish "unknown account" from "disabled account": a tenant
+		// administrator must not be able to enumerate the platform directory.
+		return nil, Validation("无法添加该账号")
 	}
 	if user.Status != UserStatusEnabled {
-		return nil, Validation("目标账号不可用")
+		return nil, Validation("无法添加该账号")
 	}
 	if in.DepartmentID != nil {
 		if _, err := uc.Organizations.GetDepartment(ctx, nil, orgID, *in.DepartmentID); err != nil {
@@ -366,19 +368,20 @@ func (uc *OrganizationUsecase) UpdateMember(ctx context.Context, actor ActorCont
 			return nil, ErrPermissionDenied
 		}
 	}
-	if member.Role == OrgRoleOwner && role != OrgRoleOwner {
-		if err := uc.ensureAnotherOwner(ctx, orgID); err != nil {
-			return nil, err
-		}
-	}
 	if departmentID != nil {
 		if _, err := uc.Organizations.GetDepartment(ctx, nil, orgID, *departmentID); err != nil {
 			return nil, Validation("部门不存在")
 		}
 	}
+	wasOwner := member.Role == OrgRoleOwner
 	member.Role, member.DepartmentID = role, departmentID
 	var updated *OrganizationMember
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if wasOwner && role != OrgRoleOwner {
+			if err := uc.ensureAnotherOwner(ctx, tx, orgID); err != nil {
+				return err
+			}
+		}
 		row, err := uc.Organizations.UpdateMember(ctx, tx, member, expected)
 		if err != nil {
 			return err
@@ -395,8 +398,8 @@ func (uc *OrganizationUsecase) UpdateMember(ctx context.Context, actor ActorCont
 	return updated, nil
 }
 
-func (uc *OrganizationUsecase) ensureAnotherOwner(ctx context.Context, orgID int64) error {
-	count, err := uc.Organizations.CountActiveOwners(ctx, nil, orgID)
+func (uc *OrganizationUsecase) ensureAnotherOwner(ctx context.Context, tx Tx, orgID int64) error {
+	count, err := uc.Organizations.CountActiveOwnersForUpdate(ctx, tx, orgID)
 	if err != nil {
 		return ErrDependency
 	}
@@ -426,12 +429,12 @@ func (uc *OrganizationUsecase) RemoveMember(ctx context.Context, actor ActorCont
 			return ErrPermissionDenied
 		}
 	}
-	if member.Role == OrgRoleOwner {
-		if err := uc.ensureAnotherOwner(ctx, orgID); err != nil {
-			return err
-		}
-	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if member.Role == OrgRoleOwner {
+			if err := uc.ensureAnotherOwner(ctx, tx, orgID); err != nil {
+				return err
+			}
+		}
 		if err := uc.Organizations.RemoveMember(ctx, tx, orgID, userID, expected); err != nil {
 			return err
 		}
@@ -447,12 +450,12 @@ func (uc *OrganizationUsecase) Leave(ctx context.Context, actor ActorContext, or
 	if err != nil || member.Status != OrgMemberActive {
 		return ErrResourceNotFound
 	}
-	if member.Role == OrgRoleOwner {
-		if err := uc.ensureAnotherOwner(ctx, orgID); err != nil {
-			return err
-		}
-	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if member.Role == OrgRoleOwner {
+			if err := uc.ensureAnotherOwner(ctx, tx, orgID); err != nil {
+				return err
+			}
+		}
 		if err := uc.Organizations.RemoveMember(ctx, tx, orgID, actor.User.ID, member.Revision); err != nil {
 			return err
 		}

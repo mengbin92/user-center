@@ -81,6 +81,10 @@ func bizFingerprint(parts ...any) string {
 }
 
 func (s *AdminUserService) CreateUser(ctx context.Context, req *usercv1.CreateUserRequest) (*usercv1.User, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -97,7 +101,7 @@ func (s *AdminUserService) CreateUser(ctx context.Context, req *usercv1.CreateUs
 	u, err := s.users.CreateUser(ctx, actor, biz.CreateUserInput{
 		Username: req.GetUsername(), Email: req.GetEmail(), DisplayName: req.GetDisplayName(),
 		RoleIDs: roleIDs, SendActivation: req.GetSendActivation(),
-		InitialPassword: req.GetInitialPassword(), Reason: reasonOr(req.GetReason(), "administrator create"),
+		InitialPassword: req.GetInitialPassword(), Reason: auditReason,
 	})
 	if err != nil {
 		return nil, err
@@ -119,6 +123,10 @@ func (s *AdminUserService) GetUser(ctx context.Context, req *usercv1.GetUserRequ
 }
 
 func (s *AdminUserService) UpdateUser(ctx context.Context, req *usercv1.UpdateUserRequest) (*usercv1.User, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -142,7 +150,7 @@ func (s *AdminUserService) UpdateUser(ctx context.Context, req *usercv1.UpdateUs
 	u, err := s.users.UpdateUser(ctx, actor, userID, biz.UpdateUserInput{
 		DisplayName: req.GetDisplayName(), UpdateMask: req.GetUpdateMask(),
 		ExpectedRevision: expected, ExpectedPolicy: policy,
-		Reason: reasonOr(req.GetReason(), "administrator update"),
+		Reason: auditReason,
 	})
 	if err != nil {
 		return nil, err
@@ -151,6 +159,10 @@ func (s *AdminUserService) UpdateUser(ctx context.Context, req *usercv1.UpdateUs
 }
 
 func (s *AdminUserService) SetUserStatus(ctx context.Context, req *usercv1.SetUserStatusRequest) (*usercv1.User, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -164,7 +176,7 @@ func (s *AdminUserService) SetUserStatus(ctx context.Context, req *usercv1.SetUs
 	if err != nil {
 		return nil, err
 	}
-	u, err := s.users.SetStatus(ctx, actor, userID, req.GetStatus(), expected, reasonOr(req.GetReason(), "administrator status change"))
+	u, err := s.users.SetStatus(ctx, actor, userID, req.GetStatus(), expected, auditReason)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +184,10 @@ func (s *AdminUserService) SetUserStatus(ctx context.Context, req *usercv1.SetUs
 }
 
 func (s *AdminUserService) ArchiveUser(ctx context.Context, req *usercv1.ArchiveUserRequest) (*usercv1.User, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -185,7 +201,7 @@ func (s *AdminUserService) ArchiveUser(ctx context.Context, req *usercv1.Archive
 	if err != nil {
 		return nil, err
 	}
-	u, err := s.users.Archive(ctx, actor, userID, expected, reasonOr(req.GetReason(), "administrator archive"))
+	u, err := s.users.Archive(ctx, actor, userID, expected, auditReason)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +209,10 @@ func (s *AdminUserService) ArchiveUser(ctx context.Context, req *usercv1.Archive
 }
 
 func (s *AdminUserService) CreatePasswordResetRequest(ctx context.Context, req *usercv1.CreatePasswordResetTaskRequest) (*usercv1.PasswordResetTaskReply, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -202,7 +222,7 @@ func (s *AdminUserService) CreatePasswordResetRequest(ctx context.Context, req *
 	if err != nil {
 		return nil, err
 	}
-	expires, err := s.users.CreatePasswordResetTask(ctx, actor, userID, reasonOr(req.GetReason(), "administrator password reset"))
+	expires, err := s.users.CreatePasswordResetTask(ctx, actor, userID, auditReason)
 	if err != nil {
 		return nil, err
 	}
@@ -210,6 +230,10 @@ func (s *AdminUserService) CreatePasswordResetRequest(ctx context.Context, req *
 }
 
 func (s *AdminUserService) ResetMFA(ctx context.Context, req *usercv1.ResetMFARequest) (*emptypb.Empty, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -219,13 +243,17 @@ func (s *AdminUserService) ResetMFA(ctx context.Context, req *usercv1.ResetMFARe
 	if err != nil {
 		return nil, err
 	}
-	if err := s.users.ResetMFA(ctx, actor, userID, reasonOr(req.GetReason(), "administrator MFA reset")); err != nil {
+	if err := s.users.ResetMFA(ctx, actor, userID, auditReason); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
 }
 
 func (s *AdminUserService) CreateEmailChangeChallenge(ctx context.Context, req *usercv1.CreateEmailChangeChallengeRequest) (*usercv1.ChallengeReply, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -235,7 +263,7 @@ func (s *AdminUserService) CreateEmailChangeChallenge(ctx context.Context, req *
 	if err != nil {
 		return nil, err
 	}
-	challengeID, expires, err := s.users.CreateAdminEmailChange(ctx, actor, userID, req.GetNewEmail(), reasonOr(req.GetReason(), "administrator email change"))
+	challengeID, expires, err := s.users.CreateAdminEmailChange(ctx, actor, userID, req.GetNewEmail(), auditReason)
 	if err != nil {
 		return nil, err
 	}
@@ -243,6 +271,10 @@ func (s *AdminUserService) CreateEmailChangeChallenge(ctx context.Context, req *
 }
 
 func (s *AdminUserService) ConfirmEmailChange(ctx context.Context, req *usercv1.ConfirmEmailChangeRequest) (*usercv1.User, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -252,7 +284,7 @@ func (s *AdminUserService) ConfirmEmailChange(ctx context.Context, req *usercv1.
 	if err != nil {
 		return nil, err
 	}
-	u, err := s.users.ConfirmAdminEmailChange(ctx, actor, userID, req.GetChallengeId(), req.GetCode(), reasonOr(req.GetReason(), "administrator email change"))
+	u, err := s.users.ConfirmAdminEmailChange(ctx, actor, userID, req.GetChallengeId(), req.GetCode(), auditReason)
 	if err != nil {
 		return nil, err
 	}
@@ -277,6 +309,10 @@ func (s *AdminUserService) ListUserSessions(ctx context.Context, req *usercv1.Li
 }
 
 func (s *AdminUserService) RevokeUserSessions(ctx context.Context, req *usercv1.RevokeUserSessionsRequest) (*emptypb.Empty, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -286,7 +322,7 @@ func (s *AdminUserService) RevokeUserSessions(ctx context.Context, req *usercv1.
 	if err != nil {
 		return nil, err
 	}
-	if err := s.users.RevokeUserSessions(ctx, actor, userID, req.GetSessionIds(), req.GetRevokeAll(), reasonOr(req.GetReason(), "administrator revoke sessions")); err != nil {
+	if err := s.users.RevokeUserSessions(ctx, actor, userID, req.GetSessionIds(), req.GetRevokeAll(), auditReason); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
@@ -317,6 +353,10 @@ func (s *AdminUserService) GetUserEffectivePermissions(ctx context.Context, req 
 }
 
 func (s *AdminUserService) ExportUsers(ctx context.Context, req *usercv1.ExportUsersRequest) (*usercv1.ExportJob, error) {
+	auditReason, reasonErr := requireReason(req.GetReason())
+	if reasonErr != nil {
+		return nil, reasonErr
+	}
 	actor, metaErr := managementMeta(ctx, req)
 	if metaErr != nil {
 		return nil, metaErr
@@ -342,7 +382,7 @@ func (s *AdminUserService) ExportUsers(ctx context.Context, req *usercv1.ExportU
 	default:
 		return nil, biz.Validation("mfa_enabled 只能是 any/true/false")
 	}
-	job, err := s.users.ExportUsers(ctx, actor, req.GetKeyword(), req.GetStatus(), req.GetFields(), roleID, mfa, reasonOr(req.GetReason(), "administrator export users"))
+	job, err := s.users.ExportUsers(ctx, actor, req.GetKeyword(), req.GetStatus(), req.GetFields(), roleID, mfa, auditReason)
 	if err != nil {
 		return nil, err
 	}

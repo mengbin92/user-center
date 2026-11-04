@@ -83,11 +83,11 @@ func runSQLMigrations(db *gorm.DB, dir string, log *zap.Logger) error {
 	sort.Strings(files)
 	for _, name := range files {
 		version := strings.TrimSuffix(name, filepath.Ext(name))
-		var count int64
-		if err := db.Table("schema_migrations").Where("version = ?", version).Count(&count).Error; err != nil {
+		applied, err := migrationApplied(db, version)
+		if err != nil {
 			return err
 		}
-		if count > 0 {
+		if applied {
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join(dir, name))
@@ -95,23 +95,43 @@ func runSQLMigrations(db *gorm.DB, dir string, log *zap.Logger) error {
 			return err
 		}
 		statements := splitStatements(string(raw))
-		err = db.Transaction(func(tx *gorm.DB) error {
-			for _, stmt := range statements {
-				if strings.TrimSpace(stmt) == "" {
-					continue
-				}
-				if err := tx.Exec(stmt).Error; err != nil {
-					return fmt.Errorf("%s: %w", name, err)
-				}
+		for i, stmt := range statements {
+			if strings.TrimSpace(stmt) == "" {
+				continue
 			}
-			return tx.Exec("INSERT INTO schema_migrations (version, applied_at) VALUES (?, UTC_TIMESTAMP(3))", version).Error
-		})
-		if err != nil {
+			// MySQL commits DDL implicitly, so a file-level transaction cannot
+			// roll back a partially applied migration. Record every statement
+			// instead, which lets a rerun resume after the last successful one.
+			key := fmt.Sprintf("%s#%02d", version, i+1)
+			done, err := migrationApplied(db, key)
+			if err != nil {
+				return err
+			}
+			if done {
+				continue
+			}
+			if err := db.Exec(stmt).Error; err != nil {
+				return fmt.Errorf("%s: %w", key, err)
+			}
+			if err := db.Exec("INSERT INTO schema_migrations (version, applied_at) VALUES (?, UTC_TIMESTAMP(3))", key).Error; err != nil {
+				return err
+			}
+			log.Info("migration statement applied", zap.String("version", key))
+		}
+		if err := db.Exec("INSERT INTO schema_migrations (version, applied_at) VALUES (?, UTC_TIMESTAMP(3))", version).Error; err != nil {
 			return err
 		}
 		log.Info("migration applied", zap.String("version", version))
 	}
 	return nil
+}
+
+func migrationApplied(db *gorm.DB, version string) (bool, error) {
+	var count int64
+	if err := db.Table("schema_migrations").Where("version = ?", version).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func splitStatements(raw string) []string {

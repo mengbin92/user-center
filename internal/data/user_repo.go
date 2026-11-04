@@ -276,6 +276,35 @@ func (r *userRepo) RolesForUser(ctx context.Context, tx biz.Tx, userID int64) ([
 	return out, nil
 }
 
+// RolesForUsers resolves platform roles for a page of users in one query. The
+// list screens must not issue one role lookup per row.
+func (r *userRepo) RolesForUsers(ctx context.Context, tx biz.Tx, userIDs []int64) (map[int64][]biz.RoleRef, error) {
+	out := make(map[int64][]biz.RoleRef, len(userIDs))
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	now := time.Now().UTC()
+	type row struct {
+		UserID     int64
+		ID         int64
+		Code, Name string
+	}
+	var rows []row
+	err := r.d.dbOr(tx).WithContext(ctx).Table("iam_user_roles AS ur").
+		Select("ur.user_id, r.id, r.code, r.name").
+		Joins("JOIN iam_roles AS r ON r.id = ur.role_id").
+		Where("ur.user_id IN ? AND ur.status = ? AND r.status = ? AND ur.starts_at <= ? AND (ur.expires_at IS NULL OR ur.expires_at > ?)", userIDs, "active", "active", now, now).
+		Where("ur.context_type = ? AND ur.context_id = 0 AND r.context_type = ? AND r.context_id = 0", authorization.ContextTypePlatform, authorization.ContextTypePlatform).
+		Order("ur.user_id, r.id").Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, x := range rows {
+		out[x.UserID] = append(out[x.UserID], biz.RoleRef{ID: x.ID, Code: x.Code, Name: x.Name})
+	}
+	return out, nil
+}
+
 func (r *userRepo) CountsByRole(ctx context.Context, tx biz.Tx, roleID int64) (int64, error) {
 	var n int64
 	now := time.Now().UTC()

@@ -225,15 +225,17 @@ func (uc *OrgIAMUsecase) orgGuard(ctx context.Context, actor ActorContext, orgID
 	if err != nil || org.Status != OrgStatusActive {
 		return authCtx, ErrResourceNotFound
 	}
+	// Materialize built-in roles even for platform administrators: otherwise a
+	// legacy organization that skipped backfill shows an empty role list.
+	if err := uc.ensureOrganizationIAM(ctx, orgID); err != nil {
+		return authCtx, err
+	}
 	if isPlatformAdmin(actor) {
 		return authCtx, nil
 	}
 	member, err := uc.Organizations.GetMember(ctx, nil, orgID, actor.User.ID)
 	if err != nil || member.Status != OrgMemberActive {
 		return authCtx, ErrPermissionDenied
-	}
-	if err := uc.ensureOrganizationIAM(ctx, orgID); err != nil {
-		return authCtx, err
 	}
 	if _, err := uc.AuthorizeIn(ctx, actor, authCtx, operation, targetUserID, wholeObject); err != nil {
 		return authCtx, err
@@ -272,7 +274,12 @@ func (uc *OrgIAMUsecase) Permissions(ctx context.Context, actor ActorContext, or
 }
 
 func (uc *OrgIAMUsecase) validateGrants(ctx context.Context, grants []Grant) error {
+	seen := make(map[string]bool, len(grants))
 	for _, g := range grants {
+		if seen[g.Operation] {
+			return Validation("同一权限不能重复授予：" + g.Operation)
+		}
+		seen[g.Operation] = true
 		if g.Effect != authorization.Allow {
 			return Validation("组织角色只支持授予权限，不支持拒绝策略")
 		}
@@ -395,6 +402,9 @@ func (uc *OrgIAMUsecase) PutRoleGrants(ctx context.Context, actor ActorContext, 
 	if role.Builtin {
 		return nil, Validation("内置组织角色不可修改")
 	}
+	if role.Status == RoleStatusArchived {
+		return nil, Validation("已归档角色不可修改")
+	}
 	if err := uc.validateGrants(ctx, grants); err != nil {
 		return nil, err
 	}
@@ -481,30 +491,38 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 	if role.Status != RoleStatusActive {
 		return nil, Validation("角色已停用")
 	}
-	// The same custom role cannot be granted twice to one member.
-	existing, err := uc.OrgIAM.ListAssignments(ctx, nil, authCtx, in.UserID)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	for _, item := range existing {
-		if item.Assignment != nil && item.Assignment.RoleID == role.ID && !item.Assignment.Revoked {
-			return nil, ConflictCode("ORGANIZATION_ASSIGNMENT_EXISTS", "该成员已拥有此角色")
-		}
-	}
-	if role.MaxMembers != nil && *role.MaxMembers > 0 {
-		n, err := uc.OrgIAM.CountActiveAssignments(ctx, nil, authCtx, role.ID)
-		if err != nil {
-			return nil, ErrDependency
-		}
-		if n >= *role.MaxMembers {
-			return nil, ConflictCode("ORGANIZATION_ROLE_FULL", "角色成员数已达上限")
-		}
-	}
 	if in.ExpiresAt != nil && !uc.Clock.Now().Before(*in.ExpiresAt) {
 		return nil, Validation("授权过期时间必须晚于当前时间")
 	}
 	var created *Assignment
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// Lock the role row: the duplicate and max_members checks below must not
+		// run on a stale snapshot when two admins grant the same role at once.
+		locked, err := uc.OrgIAM.GetRoleForUpdate(ctx, tx, authCtx, role.ID)
+		if err != nil {
+			return ErrResourceNotFound
+		}
+		if locked.Status != RoleStatusActive {
+			return Validation("角色已停用")
+		}
+		existing, err := uc.OrgIAM.ListAssignments(ctx, tx, authCtx, in.UserID)
+		if err != nil {
+			return ErrDependency
+		}
+		for _, item := range existing {
+			if item.Assignment != nil && item.Assignment.RoleID == locked.ID && !item.Assignment.Revoked {
+				return ConflictCode("ORGANIZATION_ASSIGNMENT_EXISTS", "该成员已拥有此角色")
+			}
+		}
+		if locked.MaxMembers != nil && *locked.MaxMembers > 0 {
+			n, err := uc.OrgIAM.CountActiveAssignments(ctx, tx, authCtx, locked.ID)
+			if err != nil {
+				return ErrDependency
+			}
+			if n >= *locked.MaxMembers {
+				return ConflictCode("ORGANIZATION_ROLE_FULL", "角色成员数已达上限")
+			}
+		}
 		row, err := uc.OrgIAM.CreateAssignment(ctx, tx, authCtx, &Assignment{
 			UserID: in.UserID, RoleID: role.ID, Boundary: authorization.Scope{All: true},
 			ExpiresAt: in.ExpiresAt, Origin: OriginExplicit, AssignedBy: actor.User.ID,

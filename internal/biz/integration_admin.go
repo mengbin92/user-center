@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -48,6 +50,17 @@ func validateClient(c *IntegrationClient) error {
 		u, err := url.Parse(c.CallbackURL)
 		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil || u.Fragment != "" {
 			return Validation("callback_url 不合法")
+		}
+		host := u.Hostname()
+		ip := net.ParseIP(host)
+		loopback := host == "localhost" || ip != nil && ip.IsLoopback()
+		// Plaintext callbacks are only acceptable for local development; real
+		// receivers must use TLS.
+		if u.Scheme == "http" && !loopback {
+			return Validation("callback_url 必须使用 https")
+		}
+		if ip != nil && (ip.IsLinkLocalUnicast() || ip.IsUnspecified()) {
+			return Validation("callback_url 不允许指向链路本地或未指定地址")
 		}
 	}
 	return nil
@@ -394,9 +407,13 @@ func (uc *IntegrationAdminUsecase) StartWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			_ = uc.Dispatch(ctx)
+			if err := uc.Dispatch(ctx); err != nil {
+				slog.Error("outbox dispatch failed", "error", err)
+			}
 		case <-ticker.C:
-			_ = uc.Dispatch(ctx)
+			if err := uc.Dispatch(ctx); err != nil {
+				slog.Error("outbox dispatch failed", "error", err)
+			}
 		}
 	}
 }

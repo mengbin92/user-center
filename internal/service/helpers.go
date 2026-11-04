@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -212,16 +211,21 @@ func pageSize(v int32) int {
 	return int(v)
 }
 
-func reasonOr(v, def string) string {
-	if strings.TrimSpace(v) == "" {
-		return def
+// requireReason enforces the audit contract: management writes must carry a
+// non-empty reason. Silently substituting a default removes the operator's
+// intent from the audit trail.
+func requireReason(v string) (string, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "", biz.Validation("管理写操作必须提供 reason")
 	}
-	return strings.TrimSpace(v)
+	if len([]rune(v)) > 512 {
+		return "", biz.Validation("reason 不能超过 512 个字符")
+	}
+	return v, nil
 }
 
 func authzError(err error) error { return err }
-
-var _ = fmt.Sprintf
 
 func fingerprintOf(parts ...any) string {
 	raw, _ := jsonx.Marshal(parts)

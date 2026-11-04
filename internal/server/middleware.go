@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -153,7 +152,7 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "登录状态无效或已过期")
 			return ctx, false
 		}
-		if actor.PasswordChangeRequired && (strings.HasPrefix(r.URL.Path, "/api/v1/admin") || strings.HasPrefix(r.URL.Path, "/api/v1/orgs")) {
+		if actor.PasswordChangeRequired && requiresPasswordChange(r.URL.Path) {
 			writeError(w, http.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "首次登录必须先修改初始密码")
 			return ctx, false
 		}
@@ -170,9 +169,28 @@ func isUnsafe(method string) bool {
 	}
 }
 
+// authenticatedPrefixes lists the path families that require a session. Keep it
+// in sync with the gateway route table: a missing prefix silently disables both
+// the 401 gate and the password-change gate below.
+var authenticatedPrefixes = []string{"/api/v1/me", "/api/v1/admin", "/api/v1/orgs"}
+
+// managementPrefixes are the paths blocked until an initial password is
+// changed. /api/v1/me stays reachable so the user can complete the change.
+var managementPrefixes = []string{"/api/v1/admin", "/api/v1/orgs"}
+
 func requiresAuth(path string) bool {
-	if strings.HasPrefix(path, "/api/v1/me") || strings.HasPrefix(path, "/api/v1/admin") {
-		return true
+	return hasAnyPrefix(path, authenticatedPrefixes)
+}
+
+func requiresPasswordChange(path string) bool {
+	return hasAnyPrefix(path, managementPrefixes)
+}
+
+func hasAnyPrefix(path string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
 	}
 	return false
 }
@@ -213,5 +231,3 @@ func writeError(w http.ResponseWriter, status int, reason, message string) {
 	})
 	_, _ = w.Write(body)
 }
-
-var _ = time.Now

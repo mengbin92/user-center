@@ -42,8 +42,11 @@ func NewGRPCServer(cfg *conf.Server, log *zap.Logger, integration *service.Integ
 
 func integrationAuth(uc *biz.IntegrationUsecase) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		// Default deny: only the integration service is exposed here, and a
+		// future registration must opt in explicitly instead of inheriting
+		// anonymous access.
 		if !strings.HasPrefix(info.FullMethod, "/api.usercenter.v1.IntegrationService/") {
-			return handler(ctx, req)
+			return nil, biz.ErrUnauthenticated
 		}
 		md, _ := metadata.FromIncomingContext(ctx)
 		values := md.Get("authorization")

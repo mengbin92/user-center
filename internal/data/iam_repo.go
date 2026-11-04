@@ -188,8 +188,6 @@ func (r *iamRepo) UpdatePermission(ctx context.Context, tx biz.Tx, p *biz.Permis
 	return r.GetPermission(ctx, tx, p.ID)
 }
 
-var _ = fmt.Sprintf
-
 func (r *iamRepo) loadRoles(ctx context.Context, tx biz.Tx, filter biz.RoleFilter) ([]*biz.Role, error) {
 	// Platform policy only: organization-scoped roles live in another context
 	// and must never participate in a platform decision.
@@ -265,16 +263,31 @@ func (r *iamRepo) GetRole(ctx context.Context, tx biz.Tx, id int64) (*biz.Role, 
 	if err != nil {
 		return nil, err
 	}
-	roles, err := r.loadRoles(ctx, tx, biz.RoleFilter{})
-	if err != nil {
+	var grants []roleGrantPO
+	if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id = ?", p.ID).Find(&grants).Error; err != nil {
 		return nil, err
 	}
-	for _, role := range roles {
-		if role.ID == id {
-			return role, nil
-		}
+	var edges []roleInheritancePO
+	if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id = ?", p.ID).Find(&edges).Error; err != nil {
+		return nil, err
 	}
-	return nil, biz.ErrResourceNotFound
+	out := &biz.Role{
+		ID: p.ID, Code: p.Code, Name: p.Name, Description: p.Description,
+		Builtin: p.Builtin, Status: p.Status, MaxMembers: p.MaxMembers,
+		Revision: p.Revision, CreationDelegationID: p.CreationDelegationID,
+		Context: authorization.Platform(),
+	}
+	for _, g := range grants {
+		var scope authorization.Scope
+		if err := jsonx.Unmarshal([]byte(g.Scope), &scope); err != nil {
+			return nil, fmt.Errorf("decode role grant scope: %w", err)
+		}
+		out.Grants = append(out.Grants, biz.Grant{Operation: g.Operation, Effect: authorization.Effect(g.Effect), Scope: scope})
+	}
+	for _, e := range edges {
+		out.Inherits = append(out.Inherits, e.InheritsID)
+	}
+	return out, nil
 }
 
 func (r *iamRepo) GetRoleByCode(ctx context.Context, tx biz.Tx, code string) (*biz.Role, error) {

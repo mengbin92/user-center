@@ -1471,7 +1471,11 @@ func (uc *IAMUsecase) Explain(ctx context.Context, actor ActorContext, userID in
 			return nil, err
 		}
 	}
-	_ = resourceID
+	if strings.TrimSpace(resourceID) != "" {
+		// Resource-level facts live in the owner service; ignoring the parameter
+		// would return an explanation that looks authoritative but is not.
+		return nil, Validation("资源级解释需要在资源 owner 执行，本接口只解释平台策略")
+	}
 	now := uc.Clock.Now()
 	actorCtx := ActorContext{
 		User: user, Session: &Session{ID: "explain", UserID: userID, ActiveRoleIDs: active, ExpiresAt: now.Add(time.Hour), IdleExpiresAt: now.Add(time.Hour)},

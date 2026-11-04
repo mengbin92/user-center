@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/internal/biz"
 )
@@ -278,6 +279,24 @@ func (r *organizationRepo) CountActiveOwners(ctx context.Context, tx biz.Tx, org
 	err := r.d.dbOr(tx).WithContext(ctx).Model(&organizationMemberPO{}).
 		Where("organization_id = ? AND role = ? AND status = ?", orgID, biz.OrgRoleOwner, biz.OrgMemberActive).Count(&n).Error
 	return n, err
+}
+
+// CountActiveOwnersForUpdate serializes concurrent owner removals. Without the
+// row lock two transactions could each see two owners and both commit, leaving
+// the organization without an owner. SQLite has no row locks (tests only).
+func (r *organizationRepo) CountActiveOwnersForUpdate(ctx context.Context, tx biz.Tx, orgID int64) (int64, error) {
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if db.Dialector == nil || db.Dialector.Name() != "sqlite" {
+		db = db.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
+	}
+	var ids []int64
+	err := db.Model(&organizationMemberPO{}).
+		Where("organization_id = ? AND role = ? AND status = ?", orgID, biz.OrgRoleOwner, biz.OrgMemberActive).
+		Pluck("user_id", &ids).Error
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(ids)), nil
 }
 
 func (r *organizationRepo) CountActiveMembers(ctx context.Context, tx biz.Tx, orgID int64) (int64, error) {

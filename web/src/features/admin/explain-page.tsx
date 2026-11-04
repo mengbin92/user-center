@@ -48,7 +48,6 @@ export function AdminExplainPage() {
 
   const [userId, setUserId] = useState('')
   const [operation, setOperation] = useState('')
-  const [resourceId, setResourceId] = useState('')
   const [ownerUserId, setOwnerUserId] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [explainResult, setExplainResult] =
@@ -68,7 +67,6 @@ export function AdminExplainPage() {
       api.iam.explain({
         user_id: userId.trim(),
         operation: operation.trim(),
-        resource_id: resourceId.trim() || undefined,
         owner_user_id: ownerUserId.trim() || undefined,
       }),
     onSuccess: (data) => {
@@ -185,14 +183,6 @@ export function AdminExplainPage() {
                   <option value="">选择操作权限</option>
                   <PermissionSelectOptions permissions={catalogQuery.data?.items} />
                 </Select>
-              </Field>
-              <Field label="资源 ID" htmlFor="explain-resource" hint="可选">
-                <Input
-                  id="explain-resource"
-                  value={resourceId}
-                  onChange={(event) => setResourceId(event.target.value)}
-                  className="font-mono"
-                />
               </Field>
               <Field label="所有者用户 ID" htmlFor="explain-owner" hint="可选">
                 <Input
