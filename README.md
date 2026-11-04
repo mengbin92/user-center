@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.5.0 — V2.3 交付组织域 IAM 与多租户隔离：`organization:{id}` 授权上下文、组织自定义角色/授权、租户审计与上下文隔离查询；WebAuthn、SCIM、目录同步继续按 V2 里程碑推进。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
+> **状态：v0.5.1 — V2.3 交付组织域 IAM 与多租户隔离：`organization:{id}` 授权上下文、组织自定义角色/授权、租户审计与上下文隔离查询；WebAuthn、SCIM、目录同步继续按 V2 里程碑推进。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
 
 ## 目录
 
@@ -204,6 +204,7 @@ docker compose up -d --build
 - [运维手册](docs/operations.md)
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
+- [v0.5.1 发布说明](docs/releases/release-v0.5.1.md)
 - [v0.5.0 发布说明](docs/releases/release-v0.5.0.md)
 - [v0.4.0 发布说明](docs/releases/release-v0.4.0.md)
 - [v0.3.0 发布说明](docs/releases/release-v0.3.0.md)

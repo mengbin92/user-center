@@ -6,11 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-04
+
 ### Fixed
 
 - Unauthenticated requests to `/api/v1/orgs*` dereferenced a zero actor and
   panicked (the connection was dropped instead of returning 401). Every
-  organization RPC now requires an authenticated actor.
+  organization RPC now requires an authenticated actor and keeps the request
+  metadata used by tenant audit.
 
 ## [0.5.0] - 2026-11-04
 
