@@ -49,6 +49,9 @@ Full-project review follow-up. No schema change.
 
 ### Changed
 
+- SPA routes are code-split: account, organization and admin screens load on
+  demand. The initial JS bundle drops from 779 kB to 303 kB (gzip 214 to 92 kB)
+  and the build no longer emits the 500 kB chunk warning.
 - `authorization:explain` returns `VALIDATION_FAILED` for resource-scoped
   requests instead of a partial explanation.
 - Swagger/HTTP clients that omitted `reason` on management writes now receive
