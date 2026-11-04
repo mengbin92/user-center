@@ -62,4 +62,5 @@ var (
 	ErrOIDCInvalidGrant      = kerrors.BadRequest("INVALID_GRANT", "授权码、刷新令牌或 PKCE 校验失败")
 	ErrOIDCClientNotFound    = kerrors.NotFound("OIDC_CLIENT_NOT_FOUND", "OIDC 客户端不存在")
 	ErrOrganisationLastOwner = kerrors.Conflict("ORGANIZATION_LAST_OWNER", "组织必须至少保留一名 owner")
+	ErrOrgRoleExists         = kerrors.Conflict("ORGANIZATION_ROLE_EXISTS", "组织内已存在同名角色")
 )

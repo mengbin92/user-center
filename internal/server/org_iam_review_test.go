@@ -72,6 +72,15 @@ func TestOrganizationIAMTenantIsolation(t *testing.T) {
 	}, "", true)
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 
+	// Creating the same role code twice inside one tenant is a conflict.
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgA+"/iam/roles", map[string]any{
+		"code": "auditor", "name": "重复", "grants": []map[string]any{{
+			"operation": "organization.audit.read", "effect": "allow", "scope": map[string]any{"all": true},
+		}}, "reason": "duplicate",
+	}, "", true)
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "ORGANIZATION_ROLE_EXISTS")
+
 	// A role from another tenant is not visible or assignable.
 	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgB+"/iam/roles", map[string]any{
 		"code": "auditor", "name": "审计员",
@@ -130,10 +139,27 @@ func TestOrganizationIAMTenantIsolation(t *testing.T) {
 	}, "", true)
 	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
 
+	// Platform role views stay platform-only: organization roles never appear
+	// in the platform role directory, in /me, or in user role listings.
+	rec = h.do(http.MethodGet, "/api/v1/admin/iam/roles", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NotContains(t, rec.Body.String(), "org_owner")
+	require.NotContains(t, rec.Body.String(), "auditor")
+
 	// ---------------------------------------------------------------------
 	// Switch to the plain member: membership is the tenant boundary.
 	// ---------------------------------------------------------------------
 	require.Equal(t, http.StatusOK, h.login("tenant_member", "FixturePass-123").Code)
+
+	// The member holds organization roles now, but /me stays platform-only.
+	rec = h.do(http.MethodGet, "/api/v1/me", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NotContains(t, rec.Body.String(), "org_owner")
+	require.NotContains(t, rec.Body.String(), "auditor")
+
+	// And a plain member cannot read the platform role directory at all.
+	rec = h.do(http.MethodGet, "/api/v1/admin/iam/roles", nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 
 	// The custom role grants tenant audit visibility.
 	rec = h.do(http.MethodGet, "/api/v1/orgs/"+orgA+"/audits", nil, "", false)

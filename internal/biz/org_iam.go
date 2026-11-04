@@ -65,17 +65,30 @@ var orgBuiltinRoleSpecs = []orgRoleSpec{
 func provisionOrgIAM(ctx context.Context, s *Services, tx Tx, orgID int64) error {
 	authCtx := authorization.Organization(orgID)
 	for _, spec := range orgBuiltinRoleSpecs {
-		if _, err := s.OrgIAM.GetRoleByCode(ctx, tx, authCtx, spec.Code); err == nil {
-			continue
-		} else if !errors.Is(err, ErrResourceNotFound) {
+		existing, err := s.OrgIAM.GetRoleByCode(ctx, tx, authCtx, spec.Code)
+		if err != nil && !errors.Is(err, ErrResourceNotFound) {
 			return err
 		}
-		role, err := s.OrgIAM.CreateRole(ctx, tx, authCtx, &Role{
-			Code: spec.Code, Name: spec.Name, Description: spec.Description,
-			Builtin: true, Status: RoleStatusActive,
-		})
-		if err != nil {
-			return err
+		var role *Role
+		if existing != nil {
+			role = existing
+			// A concurrent or interrupted provisioning may have left the role
+			// without grants; only an empty grant set is re-applied so manual
+			// fixes are never overwritten.
+			if len(existing.Grants) > 0 {
+				continue
+			}
+		} else {
+			role, err = s.OrgIAM.CreateRole(ctx, tx, authCtx, &Role{
+				Code: spec.Code, Name: spec.Name, Description: spec.Description,
+				Builtin: true, Status: RoleStatusActive,
+			})
+			if err != nil {
+				if errors.Is(err, ErrOrgRoleExists) {
+					continue
+				}
+				return err
+			}
 		}
 		if _, err := s.OrgIAM.PutRoleGrants(ctx, tx, authCtx, role.ID, spec.Grants, role.Revision); err != nil {
 			return err
@@ -106,8 +119,30 @@ func syncOrgMembershipRole(ctx context.Context, s *Services, tx Tx, orgID, userI
 	if target == nil {
 		return ErrDependency
 	}
-	if _, err := s.OrgIAM.RevokeMemberAssignments(ctx, tx, authCtx, userID, builtinIDs, by); err != nil {
+	items, err := s.OrgIAM.ListAssignments(ctx, tx, authCtx, userID)
+	if err != nil {
 		return err
+	}
+	hasTarget := false
+	for _, item := range items {
+		if item.Assignment == nil {
+			continue
+		}
+		a := item.Assignment
+		// Idempotent sync: an active assignment of the target role is kept, so
+		// a repeated membership update does not churn the assignment history.
+		if a.RoleID == target.ID && !a.Revoked {
+			hasTarget = true
+			continue
+		}
+		if slices.Contains(builtinIDs, a.RoleID) {
+			if _, err := s.OrgIAM.RevokeMemberAssignments(ctx, tx, authCtx, userID, []int64{a.RoleID}, by); err != nil {
+				return err
+			}
+		}
+	}
+	if hasTarget {
+		return nil
 	}
 	_, err = s.OrgIAM.CreateAssignment(ctx, tx, authCtx, &Assignment{
 		UserID: userID, RoleID: target.ID, Boundary: authorization.Scope{All: true},
@@ -280,7 +315,7 @@ func (uc *OrgIAMUsecase) CreateRole(ctx context.Context, actor ActorContext, org
 		return nil, err
 	}
 	if _, err := uc.OrgIAM.GetRoleByCode(ctx, nil, authCtx, in.Code); err == nil {
-		return nil, ConflictCode("ORGANIZATION_ROLE_EXISTS", "组织内已存在同名角色")
+		return nil, ErrOrgRoleExists
 	} else if !errors.Is(err, ErrResourceNotFound) {
 		return nil, ErrDependency
 	}
@@ -321,6 +356,9 @@ func (uc *OrgIAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, org
 	}
 	if role.Builtin {
 		return nil, Validation("内置组织角色不可修改")
+	}
+	if role.Status == RoleStatusArchived {
+		return nil, Validation("已归档角色不可修改")
 	}
 	name, description = strings.TrimSpace(name), strings.TrimSpace(description)
 	if name == "" || len([]rune(name)) > 128 {

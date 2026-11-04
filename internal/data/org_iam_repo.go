@@ -153,6 +153,11 @@ func (r *orgIAMRepo) CreateRole(ctx context.Context, tx biz.Tx, c authorization.
 		Revision: 1, ContextType: typ, ContextID: ctxID,
 	}
 	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+		// A concurrent first-write may have created the same (context, code).
+		// Map it to the domain conflict so callers never see driver errors.
+		if isDuplicateKeyError(err) {
+			return nil, biz.ErrOrgRoleExists
+		}
 		return nil, err
 	}
 	role.ID, role.Revision, role.Context = p.ID, p.Revision, c.Normalize()

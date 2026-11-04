@@ -17,7 +17,8 @@ V2.3 delivers organization-scoped IAM and tenant isolation.
   `context_types` lacks the request context is refused.
 - Organization-scoped IAM API: list roles/permissions, create/update/archive
   custom roles, replace role grants, list/assign/revoke member assignments and
-  read tenant audit at `/api/v1/orgs/{id}/iam/*` and `/organizations/{id}/audits`.
+  read tenant audit at `/api/v1/orgs/{id}/iam/*` and
+  `/api/v1/orgs/{id}/audits`.
 - Built-in organization roles `org_owner/org_admin/org_member` materialized per
   organization; membership roles are projected onto them and stay in sync.
 - Tenant-scoped audit: `iam_audit_events.organization_id`, filtered on read.
@@ -41,6 +42,12 @@ V2.3 delivers organization-scoped IAM and tenant isolation.
   scanned into an embedded unexported PO, which GORM could not populate. The
   scan now uses explicit fields, so member lists and member-based UIs are
   correct again.
+- Organization roles leaked into platform views: `/me`, user details and the
+  platform role directory no longer list organization-scoped assignments
+  (`context_type='platform'` filter on role lookups).
+- Concurrent creation of the same organization role returned a raw driver error;
+  it now answers 409 `ORGANIZATION_ROLE_EXISTS`, and first-access backfill
+  tolerates concurrent or interrupted provisioning.
 
 ### Security
 

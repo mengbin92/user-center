@@ -261,7 +261,10 @@ func (r *userRepo) RolesForUser(ctx context.Context, tx biz.Tx, userID int64) ([
 	err := db.Table("iam_user_roles AS ur").
 		Select("r.id, r.code, r.name").
 		Joins("JOIN iam_roles AS r ON r.id = ur.role_id").
+		// Platform view only: organization-scoped assignments must never
+		// surface as platform roles (tenant isolation).
 		Where("ur.user_id = ? AND ur.status = ? AND r.status = ? AND ur.starts_at <= ? AND (ur.expires_at IS NULL OR ur.expires_at > ?)", userID, "active", "active", now, now).
+		Where("ur.context_type = ? AND ur.context_id = 0 AND r.context_type = ? AND r.context_id = 0", authorization.ContextTypePlatform, authorization.ContextTypePlatform).
 		Order("r.id").Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -278,6 +281,7 @@ func (r *userRepo) CountsByRole(ctx context.Context, tx biz.Tx, roleID int64) (i
 	now := time.Now().UTC()
 	err := r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).
 		Where("role_id = ? AND status = ? AND starts_at <= ? AND (expires_at IS NULL OR expires_at > ?)", roleID, "active", now, now).
+		Where("context_type = ? AND context_id = 0", authorization.ContextTypePlatform).
 		Where("user_id IN (?)", r.d.dbOr(tx).Model(&userPO{}).Select("id").Where("status = ?", biz.UserStatusEnabled)).
 		Distinct("user_id").Count(&n).Error
 	return n, err
