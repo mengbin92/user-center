@@ -464,3 +464,70 @@ func (r *exportRepo) ListByActor(ctx context.Context, actorID int64, limit int, 
 	}
 	return out, next, nil
 }
+
+func defaultOrganizationSettings() *biz.OrganizationSettings {
+	return &biz.OrganizationSettings{
+		QuotaEnabled: false, MaxOwnedPerUser: 5, CountArchived: false,
+		Revision: 1, UpdatedAt: time.Now().UTC(),
+	}
+}
+
+func (r *settingsRepo) GetOrganization(ctx context.Context, tx biz.Tx) (*biz.OrganizationSettings, error) {
+	var p authSettingsPO
+	err := r.d.dbOr(tx).WithContext(ctx).Where("name = ?", "organization").First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return defaultOrganizationSettings(), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := defaultOrganizationSettings()
+	if err := jsonx.Unmarshal([]byte(p.Value), out); err != nil {
+		return nil, err
+	}
+	out.Revision = p.Revision
+	out.UpdatedAt = p.UpdatedAt.UTC()
+	return out, nil
+}
+
+func (r *settingsRepo) SaveOrganization(ctx context.Context, tx biz.Tx, s *biz.OrganizationSettings, expected uint64) (*biz.OrganizationSettings, error) {
+	db := r.d.dbOr(tx).WithContext(ctx)
+	payload, err := jsonx.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	var p authSettingsPO
+	err = db.Where("name = ?", "organization").First(&p).Error
+	now := time.Now().UTC()
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if expected != 1 {
+			return nil, biz.ConflictRevision(1)
+		}
+		p = authSettingsPO{Key: "organization", Value: string(payload), Revision: expected + 1, UpdatedAt: now}
+		if err := db.Create(&p).Error; err != nil {
+			return nil, err
+		}
+		s.Revision, s.UpdatedAt = expected+1, now
+		return s, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if expected == 0 {
+		expected = p.Revision
+	}
+	if p.Revision != expected {
+		return nil, biz.ConflictRevision(p.Revision)
+	}
+	res := db.Model(&authSettingsPO{}).Where("name = ? AND revision = ?", "organization", expected).Updates(map[string]any{
+		"value": string(payload), "revision": expected + 1, "updated_at": now,
+	})
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, biz.ConflictRevision(expected)
+	}
+	s.Revision, s.UpdatedAt = expected+1, now
+	return s, nil
+}

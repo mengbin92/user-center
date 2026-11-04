@@ -53,6 +53,12 @@ const NAV_ITEMS: NavItem[] = [
     menuKey: 'account/activity',
     icon: Activity,
   },
+  {
+    to: '/account/consents',
+    label: '应用授权',
+    menuKey: 'account/consents',
+    icon: ShieldCheck,
+  },
 ]
 
 export function AccountLayout() {

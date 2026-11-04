@@ -22,16 +22,20 @@ const OperationMeServiceChangePassword = "/api.usercenter.v1.MeService/ChangePas
 const OperationMeServiceConfirmEmail = "/api.usercenter.v1.MeService/ConfirmEmail"
 const OperationMeServiceConfirmMFA = "/api.usercenter.v1.MeService/ConfirmMFA"
 const OperationMeServiceCreateEmailChallenge = "/api.usercenter.v1.MeService/CreateEmailChallenge"
+const OperationMeServiceDecideOIDCConsent = "/api.usercenter.v1.MeService/DecideOIDCConsent"
 const OperationMeServiceDeleteExternalIdentity = "/api.usercenter.v1.MeService/DeleteExternalIdentity"
 const OperationMeServiceDisableMFA = "/api.usercenter.v1.MeService/DisableMFA"
 const OperationMeServiceGetAuthorization = "/api.usercenter.v1.MeService/GetAuthorization"
 const OperationMeServiceGetMe = "/api.usercenter.v1.MeService/GetMe"
+const OperationMeServiceGetOIDCConsentRequest = "/api.usercenter.v1.MeService/GetOIDCConsentRequest"
 const OperationMeServiceGetSecurity = "/api.usercenter.v1.MeService/GetSecurity"
 const OperationMeServiceGetSessionRoles = "/api.usercenter.v1.MeService/GetSessionRoles"
 const OperationMeServiceListExternalIdentities = "/api.usercenter.v1.MeService/ListExternalIdentities"
+const OperationMeServiceListOIDCConsents = "/api.usercenter.v1.MeService/ListOIDCConsents"
 const OperationMeServiceListSecurityEvents = "/api.usercenter.v1.MeService/ListSecurityEvents"
 const OperationMeServiceListSessions = "/api.usercenter.v1.MeService/ListSessions"
 const OperationMeServicePutSessionRoles = "/api.usercenter.v1.MeService/PutSessionRoles"
+const OperationMeServiceRevokeOIDCConsent = "/api.usercenter.v1.MeService/RevokeOIDCConsent"
 const OperationMeServiceRevokeOtherSessions = "/api.usercenter.v1.MeService/RevokeOtherSessions"
 const OperationMeServiceRevokeSession = "/api.usercenter.v1.MeService/RevokeSession"
 const OperationMeServiceRotateRecoveryCodes = "/api.usercenter.v1.MeService/RotateRecoveryCodes"
@@ -44,16 +48,22 @@ type MeServiceHTTPServer interface {
 	ConfirmEmail(context.Context, *ConfirmEmailRequest) (*User, error)
 	ConfirmMFA(context.Context, *ConfirmMFARequest) (*RecoveryCodesReply, error)
 	CreateEmailChallenge(context.Context, *CreateEmailChallengeRequest) (*ChallengeReply, error)
+	DecideOIDCConsent(context.Context, *DecideOIDCConsentRequest) (*DecideOIDCConsentReply, error)
 	DeleteExternalIdentity(context.Context, *DeleteExternalIdentityRequest) (*emptypb.Empty, error)
 	DisableMFA(context.Context, *DisableMFARequest) (*emptypb.Empty, error)
 	GetAuthorization(context.Context, *GetAuthorizationRequest) (*AuthorizationReply, error)
 	GetMe(context.Context, *GetMeRequest) (*User, error)
+	// GetOIDCConsentRequest OIDC consent (V2.4). The authorize endpoint redirects the browser here with
+	// an opaque one-time handle; the client never sees the handle contents.
+	GetOIDCConsentRequest(context.Context, *GetOIDCConsentRequestRequest) (*OIDCConsentRequestView, error)
 	GetSecurity(context.Context, *GetSecurityRequest) (*SecurityStatus, error)
 	GetSessionRoles(context.Context, *GetSessionRolesRequest) (*SessionRolesReply, error)
 	ListExternalIdentities(context.Context, *ListExternalIdentitiesRequest) (*ExternalIdentitiesReply, error)
+	ListOIDCConsents(context.Context, *ListOIDCConsentsRequest) (*OIDCConsentsReply, error)
 	ListSecurityEvents(context.Context, *ListSecurityEventsRequest) (*SecurityEventsReply, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*SessionsReply, error)
 	PutSessionRoles(context.Context, *PutSessionRolesRequest) (*SessionRolesReply, error)
+	RevokeOIDCConsent(context.Context, *RevokeOIDCConsentRequest) (*emptypb.Empty, error)
 	RevokeOtherSessions(context.Context, *RevokeOtherSessionsRequest) (*emptypb.Empty, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*emptypb.Empty, error)
 	RotateRecoveryCodes(context.Context, *RotateRecoveryCodesRequest) (*RecoveryCodesReply, error)
@@ -84,6 +94,10 @@ func RegisterMeServiceHTTPServer(s *http.Server, srv MeServiceHTTPServer) {
 	r.Handle("PUT", "/api/v1/me/session-roles", _MeService_PutSessionRoles0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/me/authorization", _MeService_GetAuthorization0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/me/security-events", _MeService_ListSecurityEvents0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/me/oidc-requests/{handle}", _MeService_GetOIDCConsentRequest0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/me/oidc-requests/{handle}:decide", _MeService_DecideOIDCConsent0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/me/oidc-consents", _MeService_ListOIDCConsents0_HTTP_Handler(srv))
+	r.Handle("DELETE", "/api/v1/me/oidc-consents/{client_id}", _MeService_RevokeOIDCConsent0_HTTP_Handler(srv))
 }
 
 func _MeService_GetMe0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
@@ -472,21 +486,112 @@ func _MeService_ListSecurityEvents0_HTTP_Handler(srv MeServiceHTTPServer) func(c
 	}
 }
 
+func _MeService_GetOIDCConsentRequest0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetOIDCConsentRequestRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceGetOIDCConsentRequest)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetOIDCConsentRequest(ctx, req.(*GetOIDCConsentRequestRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OIDCConsentRequestView)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_DecideOIDCConsent0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in DecideOIDCConsentRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceDecideOIDCConsent)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.DecideOIDCConsent(ctx, req.(*DecideOIDCConsentRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*DecideOIDCConsentReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_ListOIDCConsents0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ListOIDCConsentsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceListOIDCConsents)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListOIDCConsents(ctx, req.(*ListOIDCConsentsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OIDCConsentsReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_RevokeOIDCConsent0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in RevokeOIDCConsentRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceRevokeOIDCConsent)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.RevokeOIDCConsent(ctx, req.(*RevokeOIDCConsentRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*emptypb.Empty)
+		return ctx.Result(200, reply)
+	}
+}
+
 type MeServiceHTTPClient interface {
 	ChangePassword(ctx context.Context, req *ChangePasswordRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	ConfirmEmail(ctx context.Context, req *ConfirmEmailRequest, opts ...http.CallOption) (rsp *User, err error)
 	ConfirmMFA(ctx context.Context, req *ConfirmMFARequest, opts ...http.CallOption) (rsp *RecoveryCodesReply, err error)
 	CreateEmailChallenge(ctx context.Context, req *CreateEmailChallengeRequest, opts ...http.CallOption) (rsp *ChallengeReply, err error)
+	DecideOIDCConsent(ctx context.Context, req *DecideOIDCConsentRequest, opts ...http.CallOption) (rsp *DecideOIDCConsentReply, err error)
 	DeleteExternalIdentity(ctx context.Context, req *DeleteExternalIdentityRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	DisableMFA(ctx context.Context, req *DisableMFARequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	GetAuthorization(ctx context.Context, req *GetAuthorizationRequest, opts ...http.CallOption) (rsp *AuthorizationReply, err error)
 	GetMe(ctx context.Context, req *GetMeRequest, opts ...http.CallOption) (rsp *User, err error)
+	// GetOIDCConsentRequest OIDC consent (V2.4). The authorize endpoint redirects the browser here with
+	// an opaque one-time handle; the client never sees the handle contents.
+	GetOIDCConsentRequest(ctx context.Context, req *GetOIDCConsentRequestRequest, opts ...http.CallOption) (rsp *OIDCConsentRequestView, err error)
 	GetSecurity(ctx context.Context, req *GetSecurityRequest, opts ...http.CallOption) (rsp *SecurityStatus, err error)
 	GetSessionRoles(ctx context.Context, req *GetSessionRolesRequest, opts ...http.CallOption) (rsp *SessionRolesReply, err error)
 	ListExternalIdentities(ctx context.Context, req *ListExternalIdentitiesRequest, opts ...http.CallOption) (rsp *ExternalIdentitiesReply, err error)
+	ListOIDCConsents(ctx context.Context, req *ListOIDCConsentsRequest, opts ...http.CallOption) (rsp *OIDCConsentsReply, err error)
 	ListSecurityEvents(ctx context.Context, req *ListSecurityEventsRequest, opts ...http.CallOption) (rsp *SecurityEventsReply, err error)
 	ListSessions(ctx context.Context, req *ListSessionsRequest, opts ...http.CallOption) (rsp *SessionsReply, err error)
 	PutSessionRoles(ctx context.Context, req *PutSessionRolesRequest, opts ...http.CallOption) (rsp *SessionRolesReply, err error)
+	RevokeOIDCConsent(ctx context.Context, req *RevokeOIDCConsentRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	RevokeOtherSessions(ctx context.Context, req *RevokeOtherSessionsRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	RevokeSession(ctx context.Context, req *RevokeSessionRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	RotateRecoveryCodes(ctx context.Context, req *RotateRecoveryCodesRequest, opts ...http.CallOption) (rsp *RecoveryCodesReply, err error)
@@ -571,6 +676,23 @@ func (c *MeServiceHTTPClientImpl) CreateEmailChallenge(ctx context.Context, in *
 	return &out, nil
 }
 
+func (c *MeServiceHTTPClientImpl) DecideOIDCConsent(ctx context.Context, in *DecideOIDCConsentRequest, opts ...http.CallOption) (*DecideOIDCConsentReply, error) {
+	var out DecideOIDCConsentReply
+	pattern := "/api/v1/me/oidc-requests/{handle}:decide"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationMeServiceDecideOIDCConsent),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *MeServiceHTTPClientImpl) DeleteExternalIdentity(ctx context.Context, in *DeleteExternalIdentityRequest, opts ...http.CallOption) (*emptypb.Empty, error) {
 	var out emptypb.Empty
 	pattern := "/api/v1/me/external-identities/{id}"
@@ -636,6 +758,24 @@ func (c *MeServiceHTTPClientImpl) GetMe(ctx context.Context, in *GetMeRequest, o
 	return &out, nil
 }
 
+// GetOIDCConsentRequest OIDC consent (V2.4). The authorize endpoint redirects the browser here with
+// an opaque one-time handle; the client never sees the handle contents.
+func (c *MeServiceHTTPClientImpl) GetOIDCConsentRequest(ctx context.Context, in *GetOIDCConsentRequestRequest, opts ...http.CallOption) (*OIDCConsentRequestView, error) {
+	var out OIDCConsentRequestView
+	pattern := "/api/v1/me/oidc-requests/{handle}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationMeServiceGetOIDCConsentRequest),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *MeServiceHTTPClientImpl) GetSecurity(ctx context.Context, in *GetSecurityRequest, opts ...http.CallOption) (*SecurityStatus, error) {
 	var out SecurityStatus
 	pattern := "/api/v1/me/security"
@@ -675,6 +815,22 @@ func (c *MeServiceHTTPClientImpl) ListExternalIdentities(ctx context.Context, in
 	opts = append([]http.CallOption{
 		http.Accept("application/protojson"),
 		http.Operation(OperationMeServiceListExternalIdentities),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *MeServiceHTTPClientImpl) ListOIDCConsents(ctx context.Context, in *ListOIDCConsentsRequest, opts ...http.CallOption) (*OIDCConsentsReply, error) {
+	var out OIDCConsentsReply
+	pattern := "/api/v1/me/oidc-consents"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationMeServiceListOIDCConsents),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
@@ -727,6 +883,22 @@ func (c *MeServiceHTTPClientImpl) PutSessionRoles(ctx context.Context, in *PutSe
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *MeServiceHTTPClientImpl) RevokeOIDCConsent(ctx context.Context, in *RevokeOIDCConsentRequest, opts ...http.CallOption) (*emptypb.Empty, error) {
+	var out emptypb.Empty
+	pattern := "/api/v1/me/oidc-consents/{client_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationMeServiceRevokeOIDCConsent),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

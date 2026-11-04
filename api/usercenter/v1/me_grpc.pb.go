@@ -40,6 +40,10 @@ const (
 	MeService_PutSessionRoles_FullMethodName        = "/api.usercenter.v1.MeService/PutSessionRoles"
 	MeService_GetAuthorization_FullMethodName       = "/api.usercenter.v1.MeService/GetAuthorization"
 	MeService_ListSecurityEvents_FullMethodName     = "/api.usercenter.v1.MeService/ListSecurityEvents"
+	MeService_GetOIDCConsentRequest_FullMethodName  = "/api.usercenter.v1.MeService/GetOIDCConsentRequest"
+	MeService_DecideOIDCConsent_FullMethodName      = "/api.usercenter.v1.MeService/DecideOIDCConsent"
+	MeService_ListOIDCConsents_FullMethodName       = "/api.usercenter.v1.MeService/ListOIDCConsents"
+	MeService_RevokeOIDCConsent_FullMethodName      = "/api.usercenter.v1.MeService/RevokeOIDCConsent"
 )
 
 // MeServiceClient is the client API for MeService service.
@@ -68,6 +72,12 @@ type MeServiceClient interface {
 	PutSessionRoles(ctx context.Context, in *PutSessionRolesRequest, opts ...grpc.CallOption) (*SessionRolesReply, error)
 	GetAuthorization(ctx context.Context, in *GetAuthorizationRequest, opts ...grpc.CallOption) (*AuthorizationReply, error)
 	ListSecurityEvents(ctx context.Context, in *ListSecurityEventsRequest, opts ...grpc.CallOption) (*SecurityEventsReply, error)
+	// OIDC consent (V2.4). The authorize endpoint redirects the browser here with
+	// an opaque one-time handle; the client never sees the handle contents.
+	GetOIDCConsentRequest(ctx context.Context, in *GetOIDCConsentRequestRequest, opts ...grpc.CallOption) (*OIDCConsentRequestView, error)
+	DecideOIDCConsent(ctx context.Context, in *DecideOIDCConsentRequest, opts ...grpc.CallOption) (*DecideOIDCConsentReply, error)
+	ListOIDCConsents(ctx context.Context, in *ListOIDCConsentsRequest, opts ...grpc.CallOption) (*OIDCConsentsReply, error)
+	RevokeOIDCConsent(ctx context.Context, in *RevokeOIDCConsentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type meServiceClient struct {
@@ -278,6 +288,46 @@ func (c *meServiceClient) ListSecurityEvents(ctx context.Context, in *ListSecuri
 	return out, nil
 }
 
+func (c *meServiceClient) GetOIDCConsentRequest(ctx context.Context, in *GetOIDCConsentRequestRequest, opts ...grpc.CallOption) (*OIDCConsentRequestView, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OIDCConsentRequestView)
+	err := c.cc.Invoke(ctx, MeService_GetOIDCConsentRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) DecideOIDCConsent(ctx context.Context, in *DecideOIDCConsentRequest, opts ...grpc.CallOption) (*DecideOIDCConsentReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DecideOIDCConsentReply)
+	err := c.cc.Invoke(ctx, MeService_DecideOIDCConsent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) ListOIDCConsents(ctx context.Context, in *ListOIDCConsentsRequest, opts ...grpc.CallOption) (*OIDCConsentsReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OIDCConsentsReply)
+	err := c.cc.Invoke(ctx, MeService_ListOIDCConsents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) RevokeOIDCConsent(ctx context.Context, in *RevokeOIDCConsentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, MeService_RevokeOIDCConsent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MeServiceServer is the server API for MeService service.
 // All implementations must embed UnimplementedMeServiceServer
 // for forward compatibility.
@@ -304,6 +354,12 @@ type MeServiceServer interface {
 	PutSessionRoles(context.Context, *PutSessionRolesRequest) (*SessionRolesReply, error)
 	GetAuthorization(context.Context, *GetAuthorizationRequest) (*AuthorizationReply, error)
 	ListSecurityEvents(context.Context, *ListSecurityEventsRequest) (*SecurityEventsReply, error)
+	// OIDC consent (V2.4). The authorize endpoint redirects the browser here with
+	// an opaque one-time handle; the client never sees the handle contents.
+	GetOIDCConsentRequest(context.Context, *GetOIDCConsentRequestRequest) (*OIDCConsentRequestView, error)
+	DecideOIDCConsent(context.Context, *DecideOIDCConsentRequest) (*DecideOIDCConsentReply, error)
+	ListOIDCConsents(context.Context, *ListOIDCConsentsRequest) (*OIDCConsentsReply, error)
+	RevokeOIDCConsent(context.Context, *RevokeOIDCConsentRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedMeServiceServer()
 }
 
@@ -373,6 +429,18 @@ func (UnimplementedMeServiceServer) GetAuthorization(context.Context, *GetAuthor
 }
 func (UnimplementedMeServiceServer) ListSecurityEvents(context.Context, *ListSecurityEventsRequest) (*SecurityEventsReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSecurityEvents not implemented")
+}
+func (UnimplementedMeServiceServer) GetOIDCConsentRequest(context.Context, *GetOIDCConsentRequestRequest) (*OIDCConsentRequestView, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOIDCConsentRequest not implemented")
+}
+func (UnimplementedMeServiceServer) DecideOIDCConsent(context.Context, *DecideOIDCConsentRequest) (*DecideOIDCConsentReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method DecideOIDCConsent not implemented")
+}
+func (UnimplementedMeServiceServer) ListOIDCConsents(context.Context, *ListOIDCConsentsRequest) (*OIDCConsentsReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOIDCConsents not implemented")
+}
+func (UnimplementedMeServiceServer) RevokeOIDCConsent(context.Context, *RevokeOIDCConsentRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeOIDCConsent not implemented")
 }
 func (UnimplementedMeServiceServer) mustEmbedUnimplementedMeServiceServer() {}
 func (UnimplementedMeServiceServer) testEmbeddedByValue()                   {}
@@ -755,6 +823,78 @@ func _MeService_ListSecurityEvents_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MeService_GetOIDCConsentRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOIDCConsentRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).GetOIDCConsentRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_GetOIDCConsentRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).GetOIDCConsentRequest(ctx, req.(*GetOIDCConsentRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_DecideOIDCConsent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DecideOIDCConsentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).DecideOIDCConsent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_DecideOIDCConsent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).DecideOIDCConsent(ctx, req.(*DecideOIDCConsentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_ListOIDCConsents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOIDCConsentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).ListOIDCConsents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_ListOIDCConsents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).ListOIDCConsents(ctx, req.(*ListOIDCConsentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_RevokeOIDCConsent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeOIDCConsentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).RevokeOIDCConsent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_RevokeOIDCConsent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).RevokeOIDCConsent(ctx, req.(*RevokeOIDCConsentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MeService_ServiceDesc is the grpc.ServiceDesc for MeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -841,6 +981,22 @@ var MeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListSecurityEvents",
 			Handler:    _MeService_ListSecurityEvents_Handler,
+		},
+		{
+			MethodName: "GetOIDCConsentRequest",
+			Handler:    _MeService_GetOIDCConsentRequest_Handler,
+		},
+		{
+			MethodName: "DecideOIDCConsent",
+			Handler:    _MeService_DecideOIDCConsent_Handler,
+		},
+		{
+			MethodName: "ListOIDCConsents",
+			Handler:    _MeService_ListOIDCConsents_Handler,
+		},
+		{
+			MethodName: "RevokeOIDCConsent",
+			Handler:    _MeService_RevokeOIDCConsent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -70,6 +70,68 @@ service MeService {
   rpc ListSecurityEvents(ListSecurityEventsRequest) returns (SecurityEventsReply) {
     option (google.api.http) = {get: "/api/v1/me/security-events"};
   }
+
+  // OIDC consent (V2.4). The authorize endpoint redirects the browser here with
+  // an opaque one-time handle; the client never sees the handle contents.
+  rpc GetOIDCConsentRequest(GetOIDCConsentRequestRequest) returns (OIDCConsentRequestView) {
+    option (google.api.http) = {get: "/api/v1/me/oidc-requests/{handle}"};
+  }
+  rpc DecideOIDCConsent(DecideOIDCConsentRequest) returns (DecideOIDCConsentReply) {
+    option (google.api.http) = {post: "/api/v1/me/oidc-requests/{handle}:decide" body: "*"};
+  }
+  rpc ListOIDCConsents(ListOIDCConsentsRequest) returns (OIDCConsentsReply) {
+    option (google.api.http) = {get: "/api/v1/me/oidc-consents"};
+  }
+  rpc RevokeOIDCConsent(RevokeOIDCConsentRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/me/oidc-consents/{client_id}"};
+  }
+}
+
+message OIDCConsentRequestView {
+  string client_id = 1;
+  string client_name = 2;
+  string service_owner = 3;
+  repeated string scopes = 4;
+  // Scopes the user already granted to this client in an earlier consent.
+  repeated string previously_granted_scopes = 5;
+  // Host of the redirect target; the full URI stays server-side.
+  string redirect_host = 6;
+  string requested_at = 7;
+  string expires_at = 8;
+}
+
+message GetOIDCConsentRequestRequest {
+  string handle = 1;
+}
+
+message DecideOIDCConsentRequest {
+  string handle = 1;
+  bool approve = 2;
+  // Remember the granted scopes so later authorizations skip this page.
+  bool remember = 3;
+}
+
+message DecideOIDCConsentReply {
+  // Absolute or path-relative redirect the browser must follow.
+  string redirect_url = 1;
+}
+
+message OIDCConsent {
+  string client_id = 1;
+  string client_name = 2;
+  repeated string scopes = 3;
+  string granted_at = 4;
+  string updated_at = 5;
+}
+
+message OIDCConsentsReply {
+  repeated OIDCConsent items = 1;
+}
+
+message ListOIDCConsentsRequest {}
+
+message RevokeOIDCConsentRequest {
+  string client_id = 1;
 }
 
 message GetMeRequest {}

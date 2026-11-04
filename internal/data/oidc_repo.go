@@ -14,17 +14,22 @@ import (
 
 type oidcRepo struct{ d *Data }
 
-func NewOIDCClientRepo(d *Data) biz.OIDCClientRepo { return &oidcRepo{d: d} }
-func NewOIDCCodeRepo(d *Data) biz.OIDCCodeRepo     { return &oidcRepo{d: d} }
+func NewOIDCClientRepo(d *Data) biz.OIDCClientRepo   { return &oidcRepo{d: d} }
+func NewOIDCCodeRepo(d *Data) biz.OIDCCodeRepo       { return &oidcRepo{d: d} }
+func NewOIDCConsentRepo(d *Data) biz.OIDCConsentRepo { return &oidcRepo{d: d} }
 
 func oidcClientToBiz(p *oidcClientPO) *biz.OIDCClient {
-	var redirects, scopes []string
+	var redirects, scopes, postLogout []string
 	_ = jsonx.Unmarshal([]byte(p.RedirectURIs), &redirects)
 	_ = jsonx.Unmarshal([]byte(p.Scopes), &scopes)
+	if p.PostLogoutRedirectURIs != "" {
+		_ = jsonx.Unmarshal([]byte(p.PostLogoutRedirectURIs), &postLogout)
+	}
 	return &biz.OIDCClient{
 		ID: p.ID, ClientID: p.ClientID, Name: p.Name, ServiceOwner: p.ServiceOwner,
 		Status: p.Status, SecretHash: p.SecretHash, RedirectURIs: redirects, Scopes: scopes,
-		Public: p.Public, RequirePKCE: p.RequirePKCE, AccessTTL: p.AccessTTL,
+		PostLogoutRedirectURIs: postLogout,
+		Public:                 p.Public, RequirePKCE: p.RequirePKCE, AccessTTL: p.AccessTTL,
 		RefreshTTL: p.RefreshTTL, Revision: p.Revision, CreatedAt: p.CreatedAt.UTC(),
 	}
 }
@@ -79,11 +84,13 @@ func (r *oidcRepo) GetOIDCClientByClientID(ctx context.Context, tx biz.Tx, clien
 func (r *oidcRepo) CreateOIDCClient(ctx context.Context, tx biz.Tx, c *biz.OIDCClient) (*biz.OIDCClient, error) {
 	redirects, _ := jsonx.Marshal(c.RedirectURIs)
 	scopes, _ := jsonx.Marshal(c.Scopes)
+	postLogout, _ := jsonx.Marshal(c.PostLogoutRedirectURIs)
 	now := time.Now().UTC()
 	p := &oidcClientPO{
 		ClientID: c.ClientID, Name: c.Name, ServiceOwner: c.ServiceOwner, Status: "active",
 		SecretHash: c.SecretHash, RedirectURIs: string(redirects), Scopes: string(scopes),
-		Public: c.Public, RequirePKCE: c.RequirePKCE, AccessTTL: c.AccessTTL,
+		PostLogoutRedirectURIs: string(postLogout),
+		Public:                 c.Public, RequirePKCE: c.RequirePKCE, AccessTTL: c.AccessTTL,
 		RefreshTTL: c.RefreshTTL, Revision: 1, CreatedAt: now, UpdatedAt: now,
 	}
 	if p.AccessTTL <= 0 {
@@ -101,9 +108,11 @@ func (r *oidcRepo) CreateOIDCClient(ctx context.Context, tx biz.Tx, c *biz.OIDCC
 func (r *oidcRepo) UpdateOIDCClient(ctx context.Context, tx biz.Tx, c *biz.OIDCClient, expected uint64) (*biz.OIDCClient, error) {
 	redirects, _ := jsonx.Marshal(c.RedirectURIs)
 	scopes, _ := jsonx.Marshal(c.Scopes)
+	postLogout, _ := jsonx.Marshal(c.PostLogoutRedirectURIs)
 	res := r.d.dbOr(tx).WithContext(ctx).Model(&oidcClientPO{}).Where("id = ? AND revision = ?", c.ID, expected).Updates(map[string]any{
 		"name": c.Name, "redirect_uris": string(redirects), "scopes": string(scopes),
-		"public": c.Public, "require_pkce": c.RequirePKCE,
+		"post_logout_redirect_uris": string(postLogout),
+		"public":                    c.Public, "require_pkce": c.RequirePKCE,
 		"access_token_ttl_seconds": c.AccessTTL, "refresh_token_ttl_seconds": c.RefreshTTL,
 		"revision": expected + 1, "updated_at": time.Now().UTC(),
 	})
@@ -227,4 +236,118 @@ func (r *oidcRepo) ConsumeOIDCRefreshToken(ctx context.Context, tx biz.Tx, hash,
 		return nil, biz.ErrOIDCInvalidGrant
 	}
 	return refresh, nil
+}
+
+// --- consent ---
+
+func oidcConsentToBiz(p *oidcConsentPO) *biz.OIDCConsent {
+	var scopes []string
+	_ = jsonx.Unmarshal([]byte(p.Scopes), &scopes)
+	return &biz.OIDCConsent{
+		ClientID: p.ClientID, UserID: p.UserID, Scopes: scopes,
+		GrantedAt: p.GrantedAt.UTC(), UpdatedAt: p.UpdatedAt.UTC(), Revision: p.Revision,
+	}
+}
+
+func (r *oidcRepo) GetConsent(ctx context.Context, tx biz.Tx, clientID string, userID int64) (*biz.OIDCConsent, error) {
+	var p oidcConsentPO
+	err := r.d.dbOr(tx).WithContext(ctx).Where("client_id = ? AND user_id = ?", clientID, userID).First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, biz.ErrResourceNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return oidcConsentToBiz(&p), nil
+}
+
+func (r *oidcRepo) ListConsentsByUser(ctx context.Context, tx biz.Tx, userID int64) ([]*biz.OIDCConsent, error) {
+	var rows []oidcConsentPO
+	if err := r.d.dbOr(tx).WithContext(ctx).Where("user_id = ?", userID).Order("updated_at DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*biz.OIDCConsent, 0, len(rows))
+	for i := range rows {
+		out = append(out, oidcConsentToBiz(&rows[i]))
+	}
+	return out, nil
+}
+
+func (r *oidcRepo) UpsertConsent(ctx context.Context, tx biz.Tx, c *biz.OIDCConsent) error {
+	scopes, _ := jsonx.Marshal(c.Scopes)
+	now := time.Now().UTC()
+	granted := c.GrantedAt
+	if granted.IsZero() {
+		granted = now
+	}
+	row := &oidcConsentPO{
+		ClientID: c.ClientID, UserID: c.UserID, Scopes: string(scopes),
+		GrantedAt: granted, UpdatedAt: now, Revision: 1,
+	}
+	return r.d.dbOr(tx).WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "client_id"}, {Name: "user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"scopes", "updated_at", "revision"}),
+	}).Create(row).Error
+}
+
+func (r *oidcRepo) DeleteConsent(ctx context.Context, tx biz.Tx, clientID string, userID int64) error {
+	return r.d.dbOr(tx).WithContext(ctx).Where("client_id = ? AND user_id = ?", clientID, userID).Delete(&oidcConsentPO{}).Error
+}
+
+func (r *oidcRepo) CreateConsentRequest(ctx context.Context, tx biz.Tx, q *biz.OIDCConsentRequest) error {
+	p := &oidcConsentRequestPO{
+		HandleHash: q.HandleHash, ClientID: q.ClientID, UserID: q.UserID,
+		RedirectURI: q.RedirectURI, Scope: q.Scope, State: q.State, Nonce: q.Nonce,
+		CodeChallenge: q.CodeChallenge, CodeChallengeMethod: q.CodeChallengeMethod,
+		AuthTime: q.AuthTime, IdentityVersion: q.IdentityVersion,
+		ExpiresAt: q.ExpiresAt, CreatedAt: time.Now().UTC(),
+	}
+	return r.d.dbOr(tx).WithContext(ctx).Create(p).Error
+}
+
+func (r *oidcRepo) GetConsentRequest(ctx context.Context, tx biz.Tx, hash string, userID int64) (*biz.OIDCConsentRequest, error) {
+	var p oidcConsentRequestPO
+	err := r.d.dbOr(tx).WithContext(ctx).
+		Where("handle_hash = ? AND user_id = ? AND consumed_at IS NULL AND expires_at > ?", hash, userID, time.Now().UTC()).
+		First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, biz.ErrResourceNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return oidcConsentRequestToBiz(&p), nil
+}
+
+func (r *oidcRepo) ConsumeConsentRequest(ctx context.Context, tx biz.Tx, hash string, userID int64, now time.Time) (*biz.OIDCConsentRequest, error) {
+	db := r.d.dbOr(tx).WithContext(ctx)
+	var p oidcConsentRequestPO
+	err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("handle_hash = ? AND user_id = ? AND consumed_at IS NULL AND expires_at > ?", hash, userID, now).
+		First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, biz.ErrResourceNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	res := db.Model(&oidcConsentRequestPO{}).
+		Where("handle_hash = ? AND consumed_at IS NULL", hash).Update("consumed_at", now)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, biz.ErrResourceNotFound
+	}
+	return oidcConsentRequestToBiz(&p), nil
+}
+
+func oidcConsentRequestToBiz(p *oidcConsentRequestPO) *biz.OIDCConsentRequest {
+	return &biz.OIDCConsentRequest{
+		HandleHash: p.HandleHash, ClientID: p.ClientID, UserID: p.UserID,
+		RedirectURI: p.RedirectURI, Scope: p.Scope, State: p.State, Nonce: p.Nonce,
+		CodeChallenge: p.CodeChallenge, CodeChallengeMethod: p.CodeChallengeMethod,
+		AuthTime: p.AuthTime.UTC(), IdentityVersion: p.IdentityVersion,
+		ExpiresAt: p.ExpiresAt.UTC(),
+	}
 }

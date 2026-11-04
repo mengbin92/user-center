@@ -55,10 +55,7 @@ func TestOIDCTransportLimitsUnknownLengthAndDecodesBasicAuth(t *testing.T) {
 	})
 	require.NoError(t, err)
 	q := url.Values{"client_id": {clientID}, "redirect_uri": {redirect}, "response_type": {"code"}, "scope": {"openid"}}
-	rec = h.do(http.MethodGet, "/oidc/authorize?"+q.Encode(), nil, "", false)
-	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
-	location, err := url.Parse(rec.Header().Get("Location"))
-	require.NoError(t, err)
+	location := h.authorize(t, q)
 	code := location.Query().Get("code")
 	require.NotEmpty(t, code)
 	form := url.Values{"client_id": {clientID}, "grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirect}}

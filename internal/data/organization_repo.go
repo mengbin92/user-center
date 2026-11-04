@@ -384,3 +384,116 @@ func (r *organizationRepo) ArchiveDepartment(ctx context.Context, tx biz.Tx, org
 	}
 	return nil
 }
+
+func (r *organizationRepo) CountOwnedOrganizations(ctx context.Context, tx biz.Tx, userID int64, includeArchived bool) (int64, error) {
+	q := r.d.dbOr(tx).WithContext(ctx).Model(&organizationPO{}).Where("created_by = ?", userID)
+	if !includeArchived {
+		q = q.Where("status = ?", biz.OrgStatusActive)
+	}
+	var n int64
+	return n, q.Count(&n).Error
+}
+
+// --- invitations ---
+
+func invitationToBiz(p *organizationInvitationPO) *biz.OrganizationInvitation {
+	return &biz.OrganizationInvitation{
+		ID: p.ID, OrganizationID: p.OrganizationID, Email: p.Email,
+		EmailNormalized: p.EmailNormalized, Role: p.Role, DepartmentID: p.DepartmentID,
+		TokenHash: p.TokenHash, Status: p.Status, InvitedBy: p.InvitedBy,
+		AcceptedBy: p.AcceptedBy, ExpiresAt: p.ExpiresAt.UTC(), AcceptedAt: p.AcceptedAt,
+		Revision: p.Revision, CreatedAt: p.CreatedAt.UTC(), UpdatedAt: p.UpdatedAt.UTC(),
+	}
+}
+
+func (r *organizationRepo) CreateInvitation(ctx context.Context, tx biz.Tx, inv *biz.OrganizationInvitation) (*biz.OrganizationInvitation, error) {
+	now := time.Now().UTC()
+	p := &organizationInvitationPO{
+		OrganizationID: inv.OrganizationID, Email: inv.Email, EmailNormalized: inv.EmailNormalized,
+		Role: inv.Role, DepartmentID: inv.DepartmentID, TokenHash: inv.TokenHash,
+		Status: biz.OrgInvitationPending, InvitedBy: inv.InvitedBy, ExpiresAt: inv.ExpiresAt,
+		Revision: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+		return nil, err
+	}
+	return invitationToBiz(p), nil
+}
+
+func (r *organizationRepo) GetInvitation(ctx context.Context, tx biz.Tx, id int64) (*biz.OrganizationInvitation, error) {
+	var p organizationInvitationPO
+	err := r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, biz.ErrResourceNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return invitationToBiz(&p), nil
+}
+
+func (r *organizationRepo) GetInvitationByTokenHash(ctx context.Context, tx biz.Tx, hash string) (*biz.OrganizationInvitation, error) {
+	var p organizationInvitationPO
+	err := r.d.dbOr(tx).WithContext(ctx).Where("token_hash = ?", hash).First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, biz.ErrResourceNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return invitationToBiz(&p), nil
+}
+
+func (r *organizationRepo) GetInvitationByEmail(ctx context.Context, tx biz.Tx, orgID int64, email string) (*biz.OrganizationInvitation, error) {
+	var p organizationInvitationPO
+	err := r.d.dbOr(tx).WithContext(ctx).
+		Where("organization_id = ? AND email_normalized = ? AND status = ?", orgID, email, biz.OrgInvitationPending).
+		Order("id DESC").First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, biz.ErrResourceNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return invitationToBiz(&p), nil
+}
+
+func (r *organizationRepo) ListInvitations(ctx context.Context, tx biz.Tx, orgID int64, status string) ([]*biz.OrganizationInvitation, error) {
+	var rows []organizationInvitationPO
+	q := r.d.dbOr(tx).WithContext(ctx).Where("organization_id = ?", orgID)
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	if err := q.Order("id DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*biz.OrganizationInvitation, 0, len(rows))
+	for i := range rows {
+		out = append(out, invitationToBiz(&rows[i]))
+	}
+	return out, nil
+}
+
+func (r *organizationRepo) UpdateInvitation(ctx context.Context, tx biz.Tx, inv *biz.OrganizationInvitation, expected uint64) (*biz.OrganizationInvitation, error) {
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationInvitationPO{}).
+		Where("id = ? AND revision = ?", inv.ID, expected).
+		Updates(map[string]any{
+			"status": inv.Status, "accepted_by": inv.AcceptedBy, "accepted_at": inv.AcceptedAt,
+			"revision": expected + 1, "updated_at": time.Now().UTC(),
+		})
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, biz.ConflictRevision(expected)
+	}
+	return r.GetInvitation(ctx, tx, inv.ID)
+}
+
+func (r *organizationRepo) CountPendingInvitations(ctx context.Context, tx biz.Tx, orgID int64, now time.Time) (int64, error) {
+	var n int64
+	err := r.d.dbOr(tx).WithContext(ctx).Model(&organizationInvitationPO{}).
+		Where("organization_id = ? AND status = ? AND expires_at > ?", orgID, biz.OrgInvitationPending, now).
+		Count(&n).Error
+	return n, err
+}

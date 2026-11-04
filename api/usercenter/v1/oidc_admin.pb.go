@@ -23,20 +23,22 @@ const (
 )
 
 type OIDCClient struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ClientId               string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	Name                   string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	ServiceOwner           string                 `protobuf:"bytes,4,opt,name=service_owner,json=serviceOwner,proto3" json:"service_owner,omitempty"`
-	Status                 string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
-	RedirectUris           []string               `protobuf:"bytes,6,rep,name=redirect_uris,json=redirectUris,proto3" json:"redirect_uris,omitempty"`
-	Scopes                 []string               `protobuf:"bytes,7,rep,name=scopes,proto3" json:"scopes,omitempty"`
-	Public                 bool                   `protobuf:"varint,8,opt,name=public,proto3" json:"public,omitempty"`
-	RequirePkce            bool                   `protobuf:"varint,9,opt,name=require_pkce,json=requirePkce,proto3" json:"require_pkce,omitempty"`
-	AccessTokenTtlSeconds  int32                  `protobuf:"varint,10,opt,name=access_token_ttl_seconds,json=accessTokenTtlSeconds,proto3" json:"access_token_ttl_seconds,omitempty"`
-	RefreshTokenTtlSeconds int32                  `protobuf:"varint,11,opt,name=refresh_token_ttl_seconds,json=refreshTokenTtlSeconds,proto3" json:"refresh_token_ttl_seconds,omitempty"`
-	Revision               string                 `protobuf:"bytes,12,opt,name=revision,proto3" json:"revision,omitempty"`
-	CreatedAt              string                 `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ClientId     string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	Name         string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	ServiceOwner string                 `protobuf:"bytes,4,opt,name=service_owner,json=serviceOwner,proto3" json:"service_owner,omitempty"`
+	Status       string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	RedirectUris []string               `protobuf:"bytes,6,rep,name=redirect_uris,json=redirectUris,proto3" json:"redirect_uris,omitempty"`
+	Scopes       []string               `protobuf:"bytes,7,rep,name=scopes,proto3" json:"scopes,omitempty"`
+	// RP-initiated logout targets; matched exactly, never by prefix.
+	PostLogoutRedirectUris []string `protobuf:"bytes,14,rep,name=post_logout_redirect_uris,json=postLogoutRedirectUris,proto3" json:"post_logout_redirect_uris,omitempty"`
+	Public                 bool     `protobuf:"varint,8,opt,name=public,proto3" json:"public,omitempty"`
+	RequirePkce            bool     `protobuf:"varint,9,opt,name=require_pkce,json=requirePkce,proto3" json:"require_pkce,omitempty"`
+	AccessTokenTtlSeconds  int32    `protobuf:"varint,10,opt,name=access_token_ttl_seconds,json=accessTokenTtlSeconds,proto3" json:"access_token_ttl_seconds,omitempty"`
+	RefreshTokenTtlSeconds int32    `protobuf:"varint,11,opt,name=refresh_token_ttl_seconds,json=refreshTokenTtlSeconds,proto3" json:"refresh_token_ttl_seconds,omitempty"`
+	Revision               string   `protobuf:"bytes,12,opt,name=revision,proto3" json:"revision,omitempty"`
+	CreatedAt              string   `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -116,6 +118,13 @@ func (x *OIDCClient) GetRedirectUris() []string {
 func (x *OIDCClient) GetScopes() []string {
 	if x != nil {
 		return x.Scopes
+	}
+	return nil
+}
+
+func (x *OIDCClient) GetPostLogoutRedirectUris() []string {
+	if x != nil {
+		return x.PostLogoutRedirectUris
 	}
 	return nil
 }
@@ -307,6 +316,7 @@ type CreateOIDCClientRequest struct {
 	RefreshTokenTtlSeconds int32                  `protobuf:"varint,8,opt,name=refresh_token_ttl_seconds,json=refreshTokenTtlSeconds,proto3" json:"refresh_token_ttl_seconds,omitempty"`
 	Reason                 string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
 	ExpectedPolicyRevision string                 `protobuf:"bytes,10,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	PostLogoutRedirectUris []string               `protobuf:"bytes,11,rep,name=post_logout_redirect_uris,json=postLogoutRedirectUris,proto3" json:"post_logout_redirect_uris,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -411,6 +421,13 @@ func (x *CreateOIDCClientRequest) GetExpectedPolicyRevision() string {
 	return ""
 }
 
+func (x *CreateOIDCClientRequest) GetPostLogoutRedirectUris() []string {
+	if x != nil {
+		return x.PostLogoutRedirectUris
+	}
+	return nil
+}
+
 type UpdateOIDCClientRequest struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -424,6 +441,7 @@ type UpdateOIDCClientRequest struct {
 	ExpectedRevision       string                 `protobuf:"bytes,9,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
 	Reason                 string                 `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`
 	ExpectedPolicyRevision string                 `protobuf:"bytes,11,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	PostLogoutRedirectUris []string               `protobuf:"bytes,12,rep,name=post_logout_redirect_uris,json=postLogoutRedirectUris,proto3" json:"post_logout_redirect_uris,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -533,6 +551,13 @@ func (x *UpdateOIDCClientRequest) GetExpectedPolicyRevision() string {
 		return x.ExpectedPolicyRevision
 	}
 	return ""
+}
+
+func (x *UpdateOIDCClientRequest) GetPostLogoutRedirectUris() []string {
+	if x != nil {
+		return x.PostLogoutRedirectUris
+	}
+	return nil
 }
 
 type RotateOIDCClientSecretRequest struct {
@@ -675,7 +700,7 @@ var File_api_usercenter_v1_oidc_admin_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
 	"\n" +
-	"\"api/usercenter/v1/oidc_admin.proto\x12\x11api.usercenter.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1eapi/usercenter/v1/common.proto\"\xb1\x03\n" +
+	"\"api/usercenter/v1/oidc_admin.proto\x12\x11api.usercenter.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1eapi/usercenter/v1/common.proto\"\xec\x03\n" +
 	"\n" +
 	"OIDCClient\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -684,7 +709,8 @@ const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
 	"\rservice_owner\x18\x04 \x01(\tR\fserviceOwner\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12#\n" +
 	"\rredirect_uris\x18\x06 \x03(\tR\fredirectUris\x12\x16\n" +
-	"\x06scopes\x18\a \x03(\tR\x06scopes\x12\x16\n" +
+	"\x06scopes\x18\a \x03(\tR\x06scopes\x129\n" +
+	"\x19post_logout_redirect_uris\x18\x0e \x03(\tR\x16postLogoutRedirectUris\x12\x16\n" +
 	"\x06public\x18\b \x01(\bR\x06public\x12!\n" +
 	"\frequire_pkce\x18\t \x01(\bR\vrequirePkce\x127\n" +
 	"\x18access_token_ttl_seconds\x18\n" +
@@ -698,7 +724,7 @@ const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
 	"\rclient_secret\x18\x02 \x01(\tR\fclientSecret\"\x18\n" +
 	"\x16ListOIDCClientsRequest\"G\n" +
 	"\x10OIDCClientsReply\x123\n" +
-	"\x05items\x18\x01 \x03(\v2\x1d.api.usercenter.v1.OIDCClientR\x05items\"\x90\x03\n" +
+	"\x05items\x18\x01 \x03(\v2\x1d.api.usercenter.v1.OIDCClientR\x05items\"\xcb\x03\n" +
 	"\x17CreateOIDCClientRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12#\n" +
 	"\rservice_owner\x18\x02 \x01(\tR\fserviceOwner\x12#\n" +
@@ -710,7 +736,8 @@ const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
 	"\x19refresh_token_ttl_seconds\x18\b \x01(\x05R\x16refreshTokenTtlSeconds\x12\x16\n" +
 	"\x06reason\x18\t \x01(\tR\x06reason\x128\n" +
 	"\x18expected_policy_revision\x18\n" +
-	" \x01(\tR\x16expectedPolicyRevision\"\xa8\x03\n" +
+	" \x01(\tR\x16expectedPolicyRevision\x129\n" +
+	"\x19post_logout_redirect_uris\x18\v \x03(\tR\x16postLogoutRedirectUris\"\xe3\x03\n" +
 	"\x17UpdateOIDCClientRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12#\n" +
@@ -723,7 +750,8 @@ const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
 	"\x11expected_revision\x18\t \x01(\tR\x10expectedRevision\x12\x16\n" +
 	"\x06reason\x18\n" +
 	" \x01(\tR\x06reason\x128\n" +
-	"\x18expected_policy_revision\x18\v \x01(\tR\x16expectedPolicyRevision\"\xae\x01\n" +
+	"\x18expected_policy_revision\x18\v \x01(\tR\x16expectedPolicyRevision\x129\n" +
+	"\x19post_logout_redirect_uris\x18\f \x03(\tR\x16postLogoutRedirectUris\"\xae\x01\n" +
 	"\x1dRotateOIDCClientSecretRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12+\n" +

@@ -23,6 +23,458 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type OIDCConsentRequestView struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	ClientId     string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	ClientName   string                 `protobuf:"bytes,2,opt,name=client_name,json=clientName,proto3" json:"client_name,omitempty"`
+	ServiceOwner string                 `protobuf:"bytes,3,opt,name=service_owner,json=serviceOwner,proto3" json:"service_owner,omitempty"`
+	Scopes       []string               `protobuf:"bytes,4,rep,name=scopes,proto3" json:"scopes,omitempty"`
+	// Scopes the user already granted to this client in an earlier consent.
+	PreviouslyGrantedScopes []string `protobuf:"bytes,5,rep,name=previously_granted_scopes,json=previouslyGrantedScopes,proto3" json:"previously_granted_scopes,omitempty"`
+	// Host of the redirect target; the full URI stays server-side.
+	RedirectHost  string `protobuf:"bytes,6,opt,name=redirect_host,json=redirectHost,proto3" json:"redirect_host,omitempty"`
+	RequestedAt   string `protobuf:"bytes,7,opt,name=requested_at,json=requestedAt,proto3" json:"requested_at,omitempty"`
+	ExpiresAt     string `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OIDCConsentRequestView) Reset() {
+	*x = OIDCConsentRequestView{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OIDCConsentRequestView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OIDCConsentRequestView) ProtoMessage() {}
+
+func (x *OIDCConsentRequestView) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OIDCConsentRequestView.ProtoReflect.Descriptor instead.
+func (*OIDCConsentRequestView) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *OIDCConsentRequestView) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *OIDCConsentRequestView) GetClientName() string {
+	if x != nil {
+		return x.ClientName
+	}
+	return ""
+}
+
+func (x *OIDCConsentRequestView) GetServiceOwner() string {
+	if x != nil {
+		return x.ServiceOwner
+	}
+	return ""
+}
+
+func (x *OIDCConsentRequestView) GetScopes() []string {
+	if x != nil {
+		return x.Scopes
+	}
+	return nil
+}
+
+func (x *OIDCConsentRequestView) GetPreviouslyGrantedScopes() []string {
+	if x != nil {
+		return x.PreviouslyGrantedScopes
+	}
+	return nil
+}
+
+func (x *OIDCConsentRequestView) GetRedirectHost() string {
+	if x != nil {
+		return x.RedirectHost
+	}
+	return ""
+}
+
+func (x *OIDCConsentRequestView) GetRequestedAt() string {
+	if x != nil {
+		return x.RequestedAt
+	}
+	return ""
+}
+
+func (x *OIDCConsentRequestView) GetExpiresAt() string {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return ""
+}
+
+type GetOIDCConsentRequestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Handle        string                 `protobuf:"bytes,1,opt,name=handle,proto3" json:"handle,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOIDCConsentRequestRequest) Reset() {
+	*x = GetOIDCConsentRequestRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOIDCConsentRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOIDCConsentRequestRequest) ProtoMessage() {}
+
+func (x *GetOIDCConsentRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOIDCConsentRequestRequest.ProtoReflect.Descriptor instead.
+func (*GetOIDCConsentRequestRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetOIDCConsentRequestRequest) GetHandle() string {
+	if x != nil {
+		return x.Handle
+	}
+	return ""
+}
+
+type DecideOIDCConsentRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Handle  string                 `protobuf:"bytes,1,opt,name=handle,proto3" json:"handle,omitempty"`
+	Approve bool                   `protobuf:"varint,2,opt,name=approve,proto3" json:"approve,omitempty"`
+	// Remember the granted scopes so later authorizations skip this page.
+	Remember      bool `protobuf:"varint,3,opt,name=remember,proto3" json:"remember,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecideOIDCConsentRequest) Reset() {
+	*x = DecideOIDCConsentRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecideOIDCConsentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecideOIDCConsentRequest) ProtoMessage() {}
+
+func (x *DecideOIDCConsentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecideOIDCConsentRequest.ProtoReflect.Descriptor instead.
+func (*DecideOIDCConsentRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *DecideOIDCConsentRequest) GetHandle() string {
+	if x != nil {
+		return x.Handle
+	}
+	return ""
+}
+
+func (x *DecideOIDCConsentRequest) GetApprove() bool {
+	if x != nil {
+		return x.Approve
+	}
+	return false
+}
+
+func (x *DecideOIDCConsentRequest) GetRemember() bool {
+	if x != nil {
+		return x.Remember
+	}
+	return false
+}
+
+type DecideOIDCConsentReply struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absolute or path-relative redirect the browser must follow.
+	RedirectUrl   string `protobuf:"bytes,1,opt,name=redirect_url,json=redirectUrl,proto3" json:"redirect_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecideOIDCConsentReply) Reset() {
+	*x = DecideOIDCConsentReply{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecideOIDCConsentReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecideOIDCConsentReply) ProtoMessage() {}
+
+func (x *DecideOIDCConsentReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecideOIDCConsentReply.ProtoReflect.Descriptor instead.
+func (*DecideOIDCConsentReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DecideOIDCConsentReply) GetRedirectUrl() string {
+	if x != nil {
+		return x.RedirectUrl
+	}
+	return ""
+}
+
+type OIDCConsent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	ClientName    string                 `protobuf:"bytes,2,opt,name=client_name,json=clientName,proto3" json:"client_name,omitempty"`
+	Scopes        []string               `protobuf:"bytes,3,rep,name=scopes,proto3" json:"scopes,omitempty"`
+	GrantedAt     string                 `protobuf:"bytes,4,opt,name=granted_at,json=grantedAt,proto3" json:"granted_at,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OIDCConsent) Reset() {
+	*x = OIDCConsent{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OIDCConsent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OIDCConsent) ProtoMessage() {}
+
+func (x *OIDCConsent) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OIDCConsent.ProtoReflect.Descriptor instead.
+func (*OIDCConsent) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *OIDCConsent) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *OIDCConsent) GetClientName() string {
+	if x != nil {
+		return x.ClientName
+	}
+	return ""
+}
+
+func (x *OIDCConsent) GetScopes() []string {
+	if x != nil {
+		return x.Scopes
+	}
+	return nil
+}
+
+func (x *OIDCConsent) GetGrantedAt() string {
+	if x != nil {
+		return x.GrantedAt
+	}
+	return ""
+}
+
+func (x *OIDCConsent) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type OIDCConsentsReply struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*OIDCConsent         `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OIDCConsentsReply) Reset() {
+	*x = OIDCConsentsReply{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OIDCConsentsReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OIDCConsentsReply) ProtoMessage() {}
+
+func (x *OIDCConsentsReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OIDCConsentsReply.ProtoReflect.Descriptor instead.
+func (*OIDCConsentsReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *OIDCConsentsReply) GetItems() []*OIDCConsent {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type ListOIDCConsentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOIDCConsentsRequest) Reset() {
+	*x = ListOIDCConsentsRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOIDCConsentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOIDCConsentsRequest) ProtoMessage() {}
+
+func (x *ListOIDCConsentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOIDCConsentsRequest.ProtoReflect.Descriptor instead.
+func (*ListOIDCConsentsRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{6}
+}
+
+type RevokeOIDCConsentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeOIDCConsentRequest) Reset() {
+	*x = RevokeOIDCConsentRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeOIDCConsentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeOIDCConsentRequest) ProtoMessage() {}
+
+func (x *RevokeOIDCConsentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeOIDCConsentRequest.ProtoReflect.Descriptor instead.
+func (*RevokeOIDCConsentRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RevokeOIDCConsentRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
 type GetMeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -31,7 +483,7 @@ type GetMeRequest struct {
 
 func (x *GetMeRequest) Reset() {
 	*x = GetMeRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[0]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +495,7 @@ func (x *GetMeRequest) String() string {
 func (*GetMeRequest) ProtoMessage() {}
 
 func (x *GetMeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[0]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +508,7 @@ func (x *GetMeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMeRequest.ProtoReflect.Descriptor instead.
 func (*GetMeRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{0}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{8}
 }
 
 type UpdateMeRequest struct {
@@ -70,7 +522,7 @@ type UpdateMeRequest struct {
 
 func (x *UpdateMeRequest) Reset() {
 	*x = UpdateMeRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[1]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -82,7 +534,7 @@ func (x *UpdateMeRequest) String() string {
 func (*UpdateMeRequest) ProtoMessage() {}
 
 func (x *UpdateMeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[1]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -95,7 +547,7 @@ func (x *UpdateMeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMeRequest.ProtoReflect.Descriptor instead.
 func (*UpdateMeRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{1}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateMeRequest) GetDisplayName() string {
@@ -129,7 +581,7 @@ type ChangePasswordRequest struct {
 
 func (x *ChangePasswordRequest) Reset() {
 	*x = ChangePasswordRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[2]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -141,7 +593,7 @@ func (x *ChangePasswordRequest) String() string {
 func (*ChangePasswordRequest) ProtoMessage() {}
 
 func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[2]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -154,7 +606,7 @@ func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangePasswordRequest.ProtoReflect.Descriptor instead.
 func (*ChangePasswordRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{2}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ChangePasswordRequest) GetCurrentPassword() string {
@@ -182,7 +634,7 @@ type CreateEmailChallengeRequest struct {
 
 func (x *CreateEmailChallengeRequest) Reset() {
 	*x = CreateEmailChallengeRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[3]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -194,7 +646,7 @@ func (x *CreateEmailChallengeRequest) String() string {
 func (*CreateEmailChallengeRequest) ProtoMessage() {}
 
 func (x *CreateEmailChallengeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[3]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -207,7 +659,7 @@ func (x *CreateEmailChallengeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEmailChallengeRequest.ProtoReflect.Descriptor instead.
 func (*CreateEmailChallengeRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{3}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CreateEmailChallengeRequest) GetNewEmail() string {
@@ -241,7 +693,7 @@ type ConfirmEmailRequest struct {
 
 func (x *ConfirmEmailRequest) Reset() {
 	*x = ConfirmEmailRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[4]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -253,7 +705,7 @@ func (x *ConfirmEmailRequest) String() string {
 func (*ConfirmEmailRequest) ProtoMessage() {}
 
 func (x *ConfirmEmailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[4]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -266,7 +718,7 @@ func (x *ConfirmEmailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmEmailRequest.ProtoReflect.Descriptor instead.
 func (*ConfirmEmailRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{4}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ConfirmEmailRequest) GetChallengeId() string {
@@ -295,7 +747,7 @@ type ExternalIdentity struct {
 
 func (x *ExternalIdentity) Reset() {
 	*x = ExternalIdentity{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[5]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -307,7 +759,7 @@ func (x *ExternalIdentity) String() string {
 func (*ExternalIdentity) ProtoMessage() {}
 
 func (x *ExternalIdentity) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[5]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -320,7 +772,7 @@ func (x *ExternalIdentity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExternalIdentity.ProtoReflect.Descriptor instead.
 func (*ExternalIdentity) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{5}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ExternalIdentity) GetId() string {
@@ -360,7 +812,7 @@ type ExternalIdentitiesReply struct {
 
 func (x *ExternalIdentitiesReply) Reset() {
 	*x = ExternalIdentitiesReply{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[6]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -372,7 +824,7 @@ func (x *ExternalIdentitiesReply) String() string {
 func (*ExternalIdentitiesReply) ProtoMessage() {}
 
 func (x *ExternalIdentitiesReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[6]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -385,7 +837,7 @@ func (x *ExternalIdentitiesReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExternalIdentitiesReply.ProtoReflect.Descriptor instead.
 func (*ExternalIdentitiesReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{6}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ExternalIdentitiesReply) GetItems() []*ExternalIdentity {
@@ -403,7 +855,7 @@ type ListExternalIdentitiesRequest struct {
 
 func (x *ListExternalIdentitiesRequest) Reset() {
 	*x = ListExternalIdentitiesRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[7]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -415,7 +867,7 @@ func (x *ListExternalIdentitiesRequest) String() string {
 func (*ListExternalIdentitiesRequest) ProtoMessage() {}
 
 func (x *ListExternalIdentitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[7]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -428,7 +880,7 @@ func (x *ListExternalIdentitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListExternalIdentitiesRequest.ProtoReflect.Descriptor instead.
 func (*ListExternalIdentitiesRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{7}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{15}
 }
 
 type DeleteExternalIdentityRequest struct {
@@ -440,7 +892,7 @@ type DeleteExternalIdentityRequest struct {
 
 func (x *DeleteExternalIdentityRequest) Reset() {
 	*x = DeleteExternalIdentityRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[8]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -452,7 +904,7 @@ func (x *DeleteExternalIdentityRequest) String() string {
 func (*DeleteExternalIdentityRequest) ProtoMessage() {}
 
 func (x *DeleteExternalIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[8]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -465,7 +917,7 @@ func (x *DeleteExternalIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteExternalIdentityRequest.ProtoReflect.Descriptor instead.
 func (*DeleteExternalIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{8}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DeleteExternalIdentityRequest) GetId() string {
@@ -483,7 +935,7 @@ type GetSecurityRequest struct {
 
 func (x *GetSecurityRequest) Reset() {
 	*x = GetSecurityRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[9]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -495,7 +947,7 @@ func (x *GetSecurityRequest) String() string {
 func (*GetSecurityRequest) ProtoMessage() {}
 
 func (x *GetSecurityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[9]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -508,7 +960,7 @@ func (x *GetSecurityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSecurityRequest.ProtoReflect.Descriptor instead.
 func (*GetSecurityRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{9}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{17}
 }
 
 type SecurityStatus struct {
@@ -526,7 +978,7 @@ type SecurityStatus struct {
 
 func (x *SecurityStatus) Reset() {
 	*x = SecurityStatus{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[10]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -538,7 +990,7 @@ func (x *SecurityStatus) String() string {
 func (*SecurityStatus) ProtoMessage() {}
 
 func (x *SecurityStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[10]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -551,7 +1003,7 @@ func (x *SecurityStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecurityStatus.ProtoReflect.Descriptor instead.
 func (*SecurityStatus) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{10}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SecurityStatus) GetMfaEnabled() bool {
@@ -612,7 +1064,7 @@ type SetupMFARequest struct {
 
 func (x *SetupMFARequest) Reset() {
 	*x = SetupMFARequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[11]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -624,7 +1076,7 @@ func (x *SetupMFARequest) String() string {
 func (*SetupMFARequest) ProtoMessage() {}
 
 func (x *SetupMFARequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[11]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -637,7 +1089,7 @@ func (x *SetupMFARequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupMFARequest.ProtoReflect.Descriptor instead.
 func (*SetupMFARequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{11}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SetupMFARequest) GetCurrentPassword() string {
@@ -658,7 +1110,7 @@ type SetupMFAReply struct {
 
 func (x *SetupMFAReply) Reset() {
 	*x = SetupMFAReply{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[12]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -670,7 +1122,7 @@ func (x *SetupMFAReply) String() string {
 func (*SetupMFAReply) ProtoMessage() {}
 
 func (x *SetupMFAReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[12]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -683,7 +1135,7 @@ func (x *SetupMFAReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupMFAReply.ProtoReflect.Descriptor instead.
 func (*SetupMFAReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{12}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *SetupMFAReply) GetSecret() string {
@@ -716,7 +1168,7 @@ type ConfirmMFARequest struct {
 
 func (x *ConfirmMFARequest) Reset() {
 	*x = ConfirmMFARequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[13]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +1180,7 @@ func (x *ConfirmMFARequest) String() string {
 func (*ConfirmMFARequest) ProtoMessage() {}
 
 func (x *ConfirmMFARequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[13]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +1193,7 @@ func (x *ConfirmMFARequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmMFARequest.ProtoReflect.Descriptor instead.
 func (*ConfirmMFARequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{13}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ConfirmMFARequest) GetCode() string {
@@ -760,7 +1212,7 @@ type RecoveryCodesReply struct {
 
 func (x *RecoveryCodesReply) Reset() {
 	*x = RecoveryCodesReply{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[14]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -772,7 +1224,7 @@ func (x *RecoveryCodesReply) String() string {
 func (*RecoveryCodesReply) ProtoMessage() {}
 
 func (x *RecoveryCodesReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[14]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -785,7 +1237,7 @@ func (x *RecoveryCodesReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryCodesReply.ProtoReflect.Descriptor instead.
 func (*RecoveryCodesReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{14}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RecoveryCodesReply) GetRecoveryCodes() []string {
@@ -805,7 +1257,7 @@ type DisableMFARequest struct {
 
 func (x *DisableMFARequest) Reset() {
 	*x = DisableMFARequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[15]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -817,7 +1269,7 @@ func (x *DisableMFARequest) String() string {
 func (*DisableMFARequest) ProtoMessage() {}
 
 func (x *DisableMFARequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[15]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -830,7 +1282,7 @@ func (x *DisableMFARequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisableMFARequest.ProtoReflect.Descriptor instead.
 func (*DisableMFARequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{15}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DisableMFARequest) GetCurrentPassword() string {
@@ -857,7 +1309,7 @@ type RotateRecoveryCodesRequest struct {
 
 func (x *RotateRecoveryCodesRequest) Reset() {
 	*x = RotateRecoveryCodesRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[16]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -869,7 +1321,7 @@ func (x *RotateRecoveryCodesRequest) String() string {
 func (*RotateRecoveryCodesRequest) ProtoMessage() {}
 
 func (x *RotateRecoveryCodesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[16]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -882,7 +1334,7 @@ func (x *RotateRecoveryCodesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateRecoveryCodesRequest.ProtoReflect.Descriptor instead.
 func (*RotateRecoveryCodesRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{16}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RotateRecoveryCodesRequest) GetCurrentPassword() string {
@@ -909,7 +1361,7 @@ type VerifySecurityRequest struct {
 
 func (x *VerifySecurityRequest) Reset() {
 	*x = VerifySecurityRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[17]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -921,7 +1373,7 @@ func (x *VerifySecurityRequest) String() string {
 func (*VerifySecurityRequest) ProtoMessage() {}
 
 func (x *VerifySecurityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[17]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -934,7 +1386,7 @@ func (x *VerifySecurityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifySecurityRequest.ProtoReflect.Descriptor instead.
 func (*VerifySecurityRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{17}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *VerifySecurityRequest) GetCurrentPassword() string {
@@ -961,7 +1413,7 @@ type VerifySecurityReply struct {
 
 func (x *VerifySecurityReply) Reset() {
 	*x = VerifySecurityReply{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[18]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -973,7 +1425,7 @@ func (x *VerifySecurityReply) String() string {
 func (*VerifySecurityReply) ProtoMessage() {}
 
 func (x *VerifySecurityReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[18]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -986,7 +1438,7 @@ func (x *VerifySecurityReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifySecurityReply.ProtoReflect.Descriptor instead.
 func (*VerifySecurityReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{18}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *VerifySecurityReply) GetVerified() bool {
@@ -1011,7 +1463,7 @@ type ListSessionsRequest struct {
 
 func (x *ListSessionsRequest) Reset() {
 	*x = ListSessionsRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[19]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1023,7 +1475,7 @@ func (x *ListSessionsRequest) String() string {
 func (*ListSessionsRequest) ProtoMessage() {}
 
 func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[19]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1036,7 +1488,7 @@ func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{19}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{27}
 }
 
 type RevokeSessionRequest struct {
@@ -1048,7 +1500,7 @@ type RevokeSessionRequest struct {
 
 func (x *RevokeSessionRequest) Reset() {
 	*x = RevokeSessionRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[20]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1060,7 +1512,7 @@ func (x *RevokeSessionRequest) String() string {
 func (*RevokeSessionRequest) ProtoMessage() {}
 
 func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[20]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1073,7 +1525,7 @@ func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionRequest.ProtoReflect.Descriptor instead.
 func (*RevokeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{20}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *RevokeSessionRequest) GetId() string {
@@ -1091,7 +1543,7 @@ type RevokeOtherSessionsRequest struct {
 
 func (x *RevokeOtherSessionsRequest) Reset() {
 	*x = RevokeOtherSessionsRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[21]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1103,7 +1555,7 @@ func (x *RevokeOtherSessionsRequest) String() string {
 func (*RevokeOtherSessionsRequest) ProtoMessage() {}
 
 func (x *RevokeOtherSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[21]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1116,7 +1568,7 @@ func (x *RevokeOtherSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeOtherSessionsRequest.ProtoReflect.Descriptor instead.
 func (*RevokeOtherSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{21}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{29}
 }
 
 type SessionRole struct {
@@ -1132,7 +1584,7 @@ type SessionRole struct {
 
 func (x *SessionRole) Reset() {
 	*x = SessionRole{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[22]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1144,7 +1596,7 @@ func (x *SessionRole) String() string {
 func (*SessionRole) ProtoMessage() {}
 
 func (x *SessionRole) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[22]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1157,7 +1609,7 @@ func (x *SessionRole) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionRole.ProtoReflect.Descriptor instead.
 func (*SessionRole) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{22}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *SessionRole) GetId() string {
@@ -1203,7 +1655,7 @@ type GetSessionRolesRequest struct {
 
 func (x *GetSessionRolesRequest) Reset() {
 	*x = GetSessionRolesRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[23]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1215,7 +1667,7 @@ func (x *GetSessionRolesRequest) String() string {
 func (*GetSessionRolesRequest) ProtoMessage() {}
 
 func (x *GetSessionRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[23]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1228,7 +1680,7 @@ func (x *GetSessionRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionRolesRequest.ProtoReflect.Descriptor instead.
 func (*GetSessionRolesRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{23}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{31}
 }
 
 type SessionRolesReply struct {
@@ -1241,7 +1693,7 @@ type SessionRolesReply struct {
 
 func (x *SessionRolesReply) Reset() {
 	*x = SessionRolesReply{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[24]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1253,7 +1705,7 @@ func (x *SessionRolesReply) String() string {
 func (*SessionRolesReply) ProtoMessage() {}
 
 func (x *SessionRolesReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[24]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1266,7 +1718,7 @@ func (x *SessionRolesReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionRolesReply.ProtoReflect.Descriptor instead.
 func (*SessionRolesReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{24}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *SessionRolesReply) GetItems() []*SessionRole {
@@ -1293,7 +1745,7 @@ type PutSessionRolesRequest struct {
 
 func (x *PutSessionRolesRequest) Reset() {
 	*x = PutSessionRolesRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[25]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1305,7 +1757,7 @@ func (x *PutSessionRolesRequest) String() string {
 func (*PutSessionRolesRequest) ProtoMessage() {}
 
 func (x *PutSessionRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[25]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1318,7 +1770,7 @@ func (x *PutSessionRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutSessionRolesRequest.ProtoReflect.Descriptor instead.
 func (*PutSessionRolesRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{25}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *PutSessionRolesRequest) GetRoleIds() []string {
@@ -1348,7 +1800,7 @@ type AuthorizationGrant struct {
 
 func (x *AuthorizationGrant) Reset() {
 	*x = AuthorizationGrant{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[26]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1360,7 +1812,7 @@ func (x *AuthorizationGrant) String() string {
 func (*AuthorizationGrant) ProtoMessage() {}
 
 func (x *AuthorizationGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[26]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1373,7 +1825,7 @@ func (x *AuthorizationGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizationGrant.ProtoReflect.Descriptor instead.
 func (*AuthorizationGrant) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{26}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *AuthorizationGrant) GetOperation() string {
@@ -1423,7 +1875,7 @@ type AuthorizationReply struct {
 
 func (x *AuthorizationReply) Reset() {
 	*x = AuthorizationReply{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[27]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1435,7 +1887,7 @@ func (x *AuthorizationReply) String() string {
 func (*AuthorizationReply) ProtoMessage() {}
 
 func (x *AuthorizationReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[27]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1448,7 +1900,7 @@ func (x *AuthorizationReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizationReply.ProtoReflect.Descriptor instead.
 func (*AuthorizationReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{27}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *AuthorizationReply) GetPermissions() []*PermissionSummary {
@@ -1487,7 +1939,7 @@ type GetAuthorizationRequest struct {
 
 func (x *GetAuthorizationRequest) Reset() {
 	*x = GetAuthorizationRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[28]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1499,7 +1951,7 @@ func (x *GetAuthorizationRequest) String() string {
 func (*GetAuthorizationRequest) ProtoMessage() {}
 
 func (x *GetAuthorizationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[28]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1512,7 +1964,7 @@ func (x *GetAuthorizationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAuthorizationRequest.ProtoReflect.Descriptor instead.
 func (*GetAuthorizationRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{28}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{36}
 }
 
 type ListSecurityEventsRequest struct {
@@ -1525,7 +1977,7 @@ type ListSecurityEventsRequest struct {
 
 func (x *ListSecurityEventsRequest) Reset() {
 	*x = ListSecurityEventsRequest{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[29]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1537,7 +1989,7 @@ func (x *ListSecurityEventsRequest) String() string {
 func (*ListSecurityEventsRequest) ProtoMessage() {}
 
 func (x *ListSecurityEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[29]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +2002,7 @@ func (x *ListSecurityEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSecurityEventsRequest.ProtoReflect.Descriptor instead.
 func (*ListSecurityEventsRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{29}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ListSecurityEventsRequest) GetPageSize() int32 {
@@ -1577,7 +2029,7 @@ type SecurityEventsReply struct {
 
 func (x *SecurityEventsReply) Reset() {
 	*x = SecurityEventsReply{}
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[30]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1589,7 +2041,7 @@ func (x *SecurityEventsReply) String() string {
 func (*SecurityEventsReply) ProtoMessage() {}
 
 func (x *SecurityEventsReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_me_proto_msgTypes[30]
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1602,7 +2054,7 @@ func (x *SecurityEventsReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecurityEventsReply.ProtoReflect.Descriptor instead.
 func (*SecurityEventsReply) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{30}
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *SecurityEventsReply) GetItems() []*SecurityEvent {
@@ -1623,7 +2075,40 @@ var File_api_usercenter_v1_me_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_me_proto_rawDesc = "" +
 	"\n" +
-	"\x1aapi/usercenter/v1/me.proto\x12\x11api.usercenter.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1eapi/usercenter/v1/common.proto\"\x0e\n" +
+	"\x1aapi/usercenter/v1/me.proto\x12\x11api.usercenter.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1eapi/usercenter/v1/common.proto\"\xb6\x02\n" +
+	"\x16OIDCConsentRequestView\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x1f\n" +
+	"\vclient_name\x18\x02 \x01(\tR\n" +
+	"clientName\x12#\n" +
+	"\rservice_owner\x18\x03 \x01(\tR\fserviceOwner\x12\x16\n" +
+	"\x06scopes\x18\x04 \x03(\tR\x06scopes\x12:\n" +
+	"\x19previously_granted_scopes\x18\x05 \x03(\tR\x17previouslyGrantedScopes\x12#\n" +
+	"\rredirect_host\x18\x06 \x01(\tR\fredirectHost\x12!\n" +
+	"\frequested_at\x18\a \x01(\tR\vrequestedAt\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\b \x01(\tR\texpiresAt\"6\n" +
+	"\x1cGetOIDCConsentRequestRequest\x12\x16\n" +
+	"\x06handle\x18\x01 \x01(\tR\x06handle\"h\n" +
+	"\x18DecideOIDCConsentRequest\x12\x16\n" +
+	"\x06handle\x18\x01 \x01(\tR\x06handle\x12\x18\n" +
+	"\aapprove\x18\x02 \x01(\bR\aapprove\x12\x1a\n" +
+	"\bremember\x18\x03 \x01(\bR\bremember\";\n" +
+	"\x16DecideOIDCConsentReply\x12!\n" +
+	"\fredirect_url\x18\x01 \x01(\tR\vredirectUrl\"\xa1\x01\n" +
+	"\vOIDCConsent\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x1f\n" +
+	"\vclient_name\x18\x02 \x01(\tR\n" +
+	"clientName\x12\x16\n" +
+	"\x06scopes\x18\x03 \x03(\tR\x06scopes\x12\x1d\n" +
+	"\n" +
+	"granted_at\x18\x04 \x01(\tR\tgrantedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\tR\tupdatedAt\"I\n" +
+	"\x11OIDCConsentsReply\x124\n" +
+	"\x05items\x18\x01 \x03(\v2\x1e.api.usercenter.v1.OIDCConsentR\x05items\"\x19\n" +
+	"\x17ListOIDCConsentsRequest\"7\n" +
+	"\x18RevokeOIDCConsentRequest\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\"\x0e\n" +
 	"\fGetMeRequest\"\x82\x01\n" +
 	"\x0fUpdateMeRequest\x12!\n" +
 	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12\x1f\n" +
@@ -1721,7 +2206,7 @@ const file_api_usercenter_v1_me_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"~\n" +
 	"\x13SecurityEventsReply\x126\n" +
 	"\x05items\x18\x01 \x03(\v2 .api.usercenter.v1.SecurityEventR\x05items\x12/\n" +
-	"\x04meta\x18\x02 \x01(\v2\x1b.api.usercenter.v1.ListMetaR\x04meta2\x9f\x14\n" +
+	"\x04meta\x18\x02 \x01(\v2\x1b.api.usercenter.v1.ListMetaR\x04meta2\xf5\x18\n" +
 	"\tMeService\x12U\n" +
 	"\x05GetMe\x12\x1f.api.usercenter.v1.GetMeRequest\x1a\x17.api.usercenter.v1.User\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
 	"/api/v1/me\x12^\n" +
@@ -1746,7 +2231,11 @@ const file_api_usercenter_v1_me_proto_rawDesc = "" +
 	"\x0fGetSessionRoles\x12).api.usercenter.v1.GetSessionRolesRequest\x1a$.api.usercenter.v1.SessionRolesReply\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/me/session-roles\x12\x87\x01\n" +
 	"\x0fPutSessionRoles\x12).api.usercenter.v1.PutSessionRolesRequest\x1a$.api.usercenter.v1.SessionRolesReply\"#\x82\xd3\xe4\x93\x02\x1d:\x01*\x1a\x18/api/v1/me/session-roles\x12\x87\x01\n" +
 	"\x10GetAuthorization\x12*.api.usercenter.v1.GetAuthorizationRequest\x1a%.api.usercenter.v1.AuthorizationReply\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/me/authorization\x12\x8e\x01\n" +
-	"\x12ListSecurityEvents\x12,.api.usercenter.v1.ListSecurityEventsRequest\x1a&.api.usercenter.v1.SecurityEventsReply\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/me/security-eventsB<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
+	"\x12ListSecurityEvents\x12,.api.usercenter.v1.ListSecurityEventsRequest\x1a&.api.usercenter.v1.SecurityEventsReply\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/me/security-events\x12\x9e\x01\n" +
+	"\x15GetOIDCConsentRequest\x12/.api.usercenter.v1.GetOIDCConsentRequestRequest\x1a).api.usercenter.v1.OIDCConsentRequestView\")\x82\xd3\xe4\x93\x02#\x12!/api/v1/me/oidc-requests/{handle}\x12\xa0\x01\n" +
+	"\x11DecideOIDCConsent\x12+.api.usercenter.v1.DecideOIDCConsentRequest\x1a).api.usercenter.v1.DecideOIDCConsentReply\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/api/v1/me/oidc-requests/{handle}:decide\x12\x86\x01\n" +
+	"\x10ListOIDCConsents\x12*.api.usercenter.v1.ListOIDCConsentsRequest\x1a$.api.usercenter.v1.OIDCConsentsReply\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/me/oidc-consents\x12\x86\x01\n" +
+	"\x11RevokeOIDCConsent\x12+.api.usercenter.v1.RevokeOIDCConsentRequest\x1a\x16.google.protobuf.Empty\",\x82\xd3\xe4\x93\x02&*$/api/v1/me/oidc-consents/{client_id}B<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
 
 var (
 	file_api_usercenter_v1_me_proto_rawDescOnce sync.Once
@@ -1760,98 +2249,115 @@ func file_api_usercenter_v1_me_proto_rawDescGZIP() []byte {
 	return file_api_usercenter_v1_me_proto_rawDescData
 }
 
-var file_api_usercenter_v1_me_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_api_usercenter_v1_me_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_api_usercenter_v1_me_proto_goTypes = []any{
-	(*GetMeRequest)(nil),                  // 0: api.usercenter.v1.GetMeRequest
-	(*UpdateMeRequest)(nil),               // 1: api.usercenter.v1.UpdateMeRequest
-	(*ChangePasswordRequest)(nil),         // 2: api.usercenter.v1.ChangePasswordRequest
-	(*CreateEmailChallengeRequest)(nil),   // 3: api.usercenter.v1.CreateEmailChallengeRequest
-	(*ConfirmEmailRequest)(nil),           // 4: api.usercenter.v1.ConfirmEmailRequest
-	(*ExternalIdentity)(nil),              // 5: api.usercenter.v1.ExternalIdentity
-	(*ExternalIdentitiesReply)(nil),       // 6: api.usercenter.v1.ExternalIdentitiesReply
-	(*ListExternalIdentitiesRequest)(nil), // 7: api.usercenter.v1.ListExternalIdentitiesRequest
-	(*DeleteExternalIdentityRequest)(nil), // 8: api.usercenter.v1.DeleteExternalIdentityRequest
-	(*GetSecurityRequest)(nil),            // 9: api.usercenter.v1.GetSecurityRequest
-	(*SecurityStatus)(nil),                // 10: api.usercenter.v1.SecurityStatus
-	(*SetupMFARequest)(nil),               // 11: api.usercenter.v1.SetupMFARequest
-	(*SetupMFAReply)(nil),                 // 12: api.usercenter.v1.SetupMFAReply
-	(*ConfirmMFARequest)(nil),             // 13: api.usercenter.v1.ConfirmMFARequest
-	(*RecoveryCodesReply)(nil),            // 14: api.usercenter.v1.RecoveryCodesReply
-	(*DisableMFARequest)(nil),             // 15: api.usercenter.v1.DisableMFARequest
-	(*RotateRecoveryCodesRequest)(nil),    // 16: api.usercenter.v1.RotateRecoveryCodesRequest
-	(*VerifySecurityRequest)(nil),         // 17: api.usercenter.v1.VerifySecurityRequest
-	(*VerifySecurityReply)(nil),           // 18: api.usercenter.v1.VerifySecurityReply
-	(*ListSessionsRequest)(nil),           // 19: api.usercenter.v1.ListSessionsRequest
-	(*RevokeSessionRequest)(nil),          // 20: api.usercenter.v1.RevokeSessionRequest
-	(*RevokeOtherSessionsRequest)(nil),    // 21: api.usercenter.v1.RevokeOtherSessionsRequest
-	(*SessionRole)(nil),                   // 22: api.usercenter.v1.SessionRole
-	(*GetSessionRolesRequest)(nil),        // 23: api.usercenter.v1.GetSessionRolesRequest
-	(*SessionRolesReply)(nil),             // 24: api.usercenter.v1.SessionRolesReply
-	(*PutSessionRolesRequest)(nil),        // 25: api.usercenter.v1.PutSessionRolesRequest
-	(*AuthorizationGrant)(nil),            // 26: api.usercenter.v1.AuthorizationGrant
-	(*AuthorizationReply)(nil),            // 27: api.usercenter.v1.AuthorizationReply
-	(*GetAuthorizationRequest)(nil),       // 28: api.usercenter.v1.GetAuthorizationRequest
-	(*ListSecurityEventsRequest)(nil),     // 29: api.usercenter.v1.ListSecurityEventsRequest
-	(*SecurityEventsReply)(nil),           // 30: api.usercenter.v1.SecurityEventsReply
-	(*PermissionSummary)(nil),             // 31: api.usercenter.v1.PermissionSummary
-	(*SecurityEvent)(nil),                 // 32: api.usercenter.v1.SecurityEvent
-	(*ListMeta)(nil),                      // 33: api.usercenter.v1.ListMeta
-	(*User)(nil),                          // 34: api.usercenter.v1.User
-	(*emptypb.Empty)(nil),                 // 35: google.protobuf.Empty
-	(*ChallengeReply)(nil),                // 36: api.usercenter.v1.ChallengeReply
-	(*SessionsReply)(nil),                 // 37: api.usercenter.v1.SessionsReply
+	(*OIDCConsentRequestView)(nil),        // 0: api.usercenter.v1.OIDCConsentRequestView
+	(*GetOIDCConsentRequestRequest)(nil),  // 1: api.usercenter.v1.GetOIDCConsentRequestRequest
+	(*DecideOIDCConsentRequest)(nil),      // 2: api.usercenter.v1.DecideOIDCConsentRequest
+	(*DecideOIDCConsentReply)(nil),        // 3: api.usercenter.v1.DecideOIDCConsentReply
+	(*OIDCConsent)(nil),                   // 4: api.usercenter.v1.OIDCConsent
+	(*OIDCConsentsReply)(nil),             // 5: api.usercenter.v1.OIDCConsentsReply
+	(*ListOIDCConsentsRequest)(nil),       // 6: api.usercenter.v1.ListOIDCConsentsRequest
+	(*RevokeOIDCConsentRequest)(nil),      // 7: api.usercenter.v1.RevokeOIDCConsentRequest
+	(*GetMeRequest)(nil),                  // 8: api.usercenter.v1.GetMeRequest
+	(*UpdateMeRequest)(nil),               // 9: api.usercenter.v1.UpdateMeRequest
+	(*ChangePasswordRequest)(nil),         // 10: api.usercenter.v1.ChangePasswordRequest
+	(*CreateEmailChallengeRequest)(nil),   // 11: api.usercenter.v1.CreateEmailChallengeRequest
+	(*ConfirmEmailRequest)(nil),           // 12: api.usercenter.v1.ConfirmEmailRequest
+	(*ExternalIdentity)(nil),              // 13: api.usercenter.v1.ExternalIdentity
+	(*ExternalIdentitiesReply)(nil),       // 14: api.usercenter.v1.ExternalIdentitiesReply
+	(*ListExternalIdentitiesRequest)(nil), // 15: api.usercenter.v1.ListExternalIdentitiesRequest
+	(*DeleteExternalIdentityRequest)(nil), // 16: api.usercenter.v1.DeleteExternalIdentityRequest
+	(*GetSecurityRequest)(nil),            // 17: api.usercenter.v1.GetSecurityRequest
+	(*SecurityStatus)(nil),                // 18: api.usercenter.v1.SecurityStatus
+	(*SetupMFARequest)(nil),               // 19: api.usercenter.v1.SetupMFARequest
+	(*SetupMFAReply)(nil),                 // 20: api.usercenter.v1.SetupMFAReply
+	(*ConfirmMFARequest)(nil),             // 21: api.usercenter.v1.ConfirmMFARequest
+	(*RecoveryCodesReply)(nil),            // 22: api.usercenter.v1.RecoveryCodesReply
+	(*DisableMFARequest)(nil),             // 23: api.usercenter.v1.DisableMFARequest
+	(*RotateRecoveryCodesRequest)(nil),    // 24: api.usercenter.v1.RotateRecoveryCodesRequest
+	(*VerifySecurityRequest)(nil),         // 25: api.usercenter.v1.VerifySecurityRequest
+	(*VerifySecurityReply)(nil),           // 26: api.usercenter.v1.VerifySecurityReply
+	(*ListSessionsRequest)(nil),           // 27: api.usercenter.v1.ListSessionsRequest
+	(*RevokeSessionRequest)(nil),          // 28: api.usercenter.v1.RevokeSessionRequest
+	(*RevokeOtherSessionsRequest)(nil),    // 29: api.usercenter.v1.RevokeOtherSessionsRequest
+	(*SessionRole)(nil),                   // 30: api.usercenter.v1.SessionRole
+	(*GetSessionRolesRequest)(nil),        // 31: api.usercenter.v1.GetSessionRolesRequest
+	(*SessionRolesReply)(nil),             // 32: api.usercenter.v1.SessionRolesReply
+	(*PutSessionRolesRequest)(nil),        // 33: api.usercenter.v1.PutSessionRolesRequest
+	(*AuthorizationGrant)(nil),            // 34: api.usercenter.v1.AuthorizationGrant
+	(*AuthorizationReply)(nil),            // 35: api.usercenter.v1.AuthorizationReply
+	(*GetAuthorizationRequest)(nil),       // 36: api.usercenter.v1.GetAuthorizationRequest
+	(*ListSecurityEventsRequest)(nil),     // 37: api.usercenter.v1.ListSecurityEventsRequest
+	(*SecurityEventsReply)(nil),           // 38: api.usercenter.v1.SecurityEventsReply
+	(*PermissionSummary)(nil),             // 39: api.usercenter.v1.PermissionSummary
+	(*SecurityEvent)(nil),                 // 40: api.usercenter.v1.SecurityEvent
+	(*ListMeta)(nil),                      // 41: api.usercenter.v1.ListMeta
+	(*User)(nil),                          // 42: api.usercenter.v1.User
+	(*emptypb.Empty)(nil),                 // 43: google.protobuf.Empty
+	(*ChallengeReply)(nil),                // 44: api.usercenter.v1.ChallengeReply
+	(*SessionsReply)(nil),                 // 45: api.usercenter.v1.SessionsReply
 }
 var file_api_usercenter_v1_me_proto_depIdxs = []int32{
-	5,  // 0: api.usercenter.v1.ExternalIdentitiesReply.items:type_name -> api.usercenter.v1.ExternalIdentity
-	22, // 1: api.usercenter.v1.SessionRolesReply.items:type_name -> api.usercenter.v1.SessionRole
-	31, // 2: api.usercenter.v1.AuthorizationReply.permissions:type_name -> api.usercenter.v1.PermissionSummary
-	32, // 3: api.usercenter.v1.SecurityEventsReply.items:type_name -> api.usercenter.v1.SecurityEvent
-	33, // 4: api.usercenter.v1.SecurityEventsReply.meta:type_name -> api.usercenter.v1.ListMeta
-	0,  // 5: api.usercenter.v1.MeService.GetMe:input_type -> api.usercenter.v1.GetMeRequest
-	1,  // 6: api.usercenter.v1.MeService.UpdateMe:input_type -> api.usercenter.v1.UpdateMeRequest
-	2,  // 7: api.usercenter.v1.MeService.ChangePassword:input_type -> api.usercenter.v1.ChangePasswordRequest
-	3,  // 8: api.usercenter.v1.MeService.CreateEmailChallenge:input_type -> api.usercenter.v1.CreateEmailChallengeRequest
-	4,  // 9: api.usercenter.v1.MeService.ConfirmEmail:input_type -> api.usercenter.v1.ConfirmEmailRequest
-	7,  // 10: api.usercenter.v1.MeService.ListExternalIdentities:input_type -> api.usercenter.v1.ListExternalIdentitiesRequest
-	8,  // 11: api.usercenter.v1.MeService.DeleteExternalIdentity:input_type -> api.usercenter.v1.DeleteExternalIdentityRequest
-	9,  // 12: api.usercenter.v1.MeService.GetSecurity:input_type -> api.usercenter.v1.GetSecurityRequest
-	11, // 13: api.usercenter.v1.MeService.SetupMFA:input_type -> api.usercenter.v1.SetupMFARequest
-	13, // 14: api.usercenter.v1.MeService.ConfirmMFA:input_type -> api.usercenter.v1.ConfirmMFARequest
-	15, // 15: api.usercenter.v1.MeService.DisableMFA:input_type -> api.usercenter.v1.DisableMFARequest
-	16, // 16: api.usercenter.v1.MeService.RotateRecoveryCodes:input_type -> api.usercenter.v1.RotateRecoveryCodesRequest
-	17, // 17: api.usercenter.v1.MeService.VerifySecurity:input_type -> api.usercenter.v1.VerifySecurityRequest
-	19, // 18: api.usercenter.v1.MeService.ListSessions:input_type -> api.usercenter.v1.ListSessionsRequest
-	20, // 19: api.usercenter.v1.MeService.RevokeSession:input_type -> api.usercenter.v1.RevokeSessionRequest
-	21, // 20: api.usercenter.v1.MeService.RevokeOtherSessions:input_type -> api.usercenter.v1.RevokeOtherSessionsRequest
-	23, // 21: api.usercenter.v1.MeService.GetSessionRoles:input_type -> api.usercenter.v1.GetSessionRolesRequest
-	25, // 22: api.usercenter.v1.MeService.PutSessionRoles:input_type -> api.usercenter.v1.PutSessionRolesRequest
-	28, // 23: api.usercenter.v1.MeService.GetAuthorization:input_type -> api.usercenter.v1.GetAuthorizationRequest
-	29, // 24: api.usercenter.v1.MeService.ListSecurityEvents:input_type -> api.usercenter.v1.ListSecurityEventsRequest
-	34, // 25: api.usercenter.v1.MeService.GetMe:output_type -> api.usercenter.v1.User
-	34, // 26: api.usercenter.v1.MeService.UpdateMe:output_type -> api.usercenter.v1.User
-	35, // 27: api.usercenter.v1.MeService.ChangePassword:output_type -> google.protobuf.Empty
-	36, // 28: api.usercenter.v1.MeService.CreateEmailChallenge:output_type -> api.usercenter.v1.ChallengeReply
-	34, // 29: api.usercenter.v1.MeService.ConfirmEmail:output_type -> api.usercenter.v1.User
-	6,  // 30: api.usercenter.v1.MeService.ListExternalIdentities:output_type -> api.usercenter.v1.ExternalIdentitiesReply
-	35, // 31: api.usercenter.v1.MeService.DeleteExternalIdentity:output_type -> google.protobuf.Empty
-	10, // 32: api.usercenter.v1.MeService.GetSecurity:output_type -> api.usercenter.v1.SecurityStatus
-	12, // 33: api.usercenter.v1.MeService.SetupMFA:output_type -> api.usercenter.v1.SetupMFAReply
-	14, // 34: api.usercenter.v1.MeService.ConfirmMFA:output_type -> api.usercenter.v1.RecoveryCodesReply
-	35, // 35: api.usercenter.v1.MeService.DisableMFA:output_type -> google.protobuf.Empty
-	14, // 36: api.usercenter.v1.MeService.RotateRecoveryCodes:output_type -> api.usercenter.v1.RecoveryCodesReply
-	18, // 37: api.usercenter.v1.MeService.VerifySecurity:output_type -> api.usercenter.v1.VerifySecurityReply
-	37, // 38: api.usercenter.v1.MeService.ListSessions:output_type -> api.usercenter.v1.SessionsReply
-	35, // 39: api.usercenter.v1.MeService.RevokeSession:output_type -> google.protobuf.Empty
-	35, // 40: api.usercenter.v1.MeService.RevokeOtherSessions:output_type -> google.protobuf.Empty
-	24, // 41: api.usercenter.v1.MeService.GetSessionRoles:output_type -> api.usercenter.v1.SessionRolesReply
-	24, // 42: api.usercenter.v1.MeService.PutSessionRoles:output_type -> api.usercenter.v1.SessionRolesReply
-	27, // 43: api.usercenter.v1.MeService.GetAuthorization:output_type -> api.usercenter.v1.AuthorizationReply
-	30, // 44: api.usercenter.v1.MeService.ListSecurityEvents:output_type -> api.usercenter.v1.SecurityEventsReply
-	25, // [25:45] is the sub-list for method output_type
-	5,  // [5:25] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	4,  // 0: api.usercenter.v1.OIDCConsentsReply.items:type_name -> api.usercenter.v1.OIDCConsent
+	13, // 1: api.usercenter.v1.ExternalIdentitiesReply.items:type_name -> api.usercenter.v1.ExternalIdentity
+	30, // 2: api.usercenter.v1.SessionRolesReply.items:type_name -> api.usercenter.v1.SessionRole
+	39, // 3: api.usercenter.v1.AuthorizationReply.permissions:type_name -> api.usercenter.v1.PermissionSummary
+	40, // 4: api.usercenter.v1.SecurityEventsReply.items:type_name -> api.usercenter.v1.SecurityEvent
+	41, // 5: api.usercenter.v1.SecurityEventsReply.meta:type_name -> api.usercenter.v1.ListMeta
+	8,  // 6: api.usercenter.v1.MeService.GetMe:input_type -> api.usercenter.v1.GetMeRequest
+	9,  // 7: api.usercenter.v1.MeService.UpdateMe:input_type -> api.usercenter.v1.UpdateMeRequest
+	10, // 8: api.usercenter.v1.MeService.ChangePassword:input_type -> api.usercenter.v1.ChangePasswordRequest
+	11, // 9: api.usercenter.v1.MeService.CreateEmailChallenge:input_type -> api.usercenter.v1.CreateEmailChallengeRequest
+	12, // 10: api.usercenter.v1.MeService.ConfirmEmail:input_type -> api.usercenter.v1.ConfirmEmailRequest
+	15, // 11: api.usercenter.v1.MeService.ListExternalIdentities:input_type -> api.usercenter.v1.ListExternalIdentitiesRequest
+	16, // 12: api.usercenter.v1.MeService.DeleteExternalIdentity:input_type -> api.usercenter.v1.DeleteExternalIdentityRequest
+	17, // 13: api.usercenter.v1.MeService.GetSecurity:input_type -> api.usercenter.v1.GetSecurityRequest
+	19, // 14: api.usercenter.v1.MeService.SetupMFA:input_type -> api.usercenter.v1.SetupMFARequest
+	21, // 15: api.usercenter.v1.MeService.ConfirmMFA:input_type -> api.usercenter.v1.ConfirmMFARequest
+	23, // 16: api.usercenter.v1.MeService.DisableMFA:input_type -> api.usercenter.v1.DisableMFARequest
+	24, // 17: api.usercenter.v1.MeService.RotateRecoveryCodes:input_type -> api.usercenter.v1.RotateRecoveryCodesRequest
+	25, // 18: api.usercenter.v1.MeService.VerifySecurity:input_type -> api.usercenter.v1.VerifySecurityRequest
+	27, // 19: api.usercenter.v1.MeService.ListSessions:input_type -> api.usercenter.v1.ListSessionsRequest
+	28, // 20: api.usercenter.v1.MeService.RevokeSession:input_type -> api.usercenter.v1.RevokeSessionRequest
+	29, // 21: api.usercenter.v1.MeService.RevokeOtherSessions:input_type -> api.usercenter.v1.RevokeOtherSessionsRequest
+	31, // 22: api.usercenter.v1.MeService.GetSessionRoles:input_type -> api.usercenter.v1.GetSessionRolesRequest
+	33, // 23: api.usercenter.v1.MeService.PutSessionRoles:input_type -> api.usercenter.v1.PutSessionRolesRequest
+	36, // 24: api.usercenter.v1.MeService.GetAuthorization:input_type -> api.usercenter.v1.GetAuthorizationRequest
+	37, // 25: api.usercenter.v1.MeService.ListSecurityEvents:input_type -> api.usercenter.v1.ListSecurityEventsRequest
+	1,  // 26: api.usercenter.v1.MeService.GetOIDCConsentRequest:input_type -> api.usercenter.v1.GetOIDCConsentRequestRequest
+	2,  // 27: api.usercenter.v1.MeService.DecideOIDCConsent:input_type -> api.usercenter.v1.DecideOIDCConsentRequest
+	6,  // 28: api.usercenter.v1.MeService.ListOIDCConsents:input_type -> api.usercenter.v1.ListOIDCConsentsRequest
+	7,  // 29: api.usercenter.v1.MeService.RevokeOIDCConsent:input_type -> api.usercenter.v1.RevokeOIDCConsentRequest
+	42, // 30: api.usercenter.v1.MeService.GetMe:output_type -> api.usercenter.v1.User
+	42, // 31: api.usercenter.v1.MeService.UpdateMe:output_type -> api.usercenter.v1.User
+	43, // 32: api.usercenter.v1.MeService.ChangePassword:output_type -> google.protobuf.Empty
+	44, // 33: api.usercenter.v1.MeService.CreateEmailChallenge:output_type -> api.usercenter.v1.ChallengeReply
+	42, // 34: api.usercenter.v1.MeService.ConfirmEmail:output_type -> api.usercenter.v1.User
+	14, // 35: api.usercenter.v1.MeService.ListExternalIdentities:output_type -> api.usercenter.v1.ExternalIdentitiesReply
+	43, // 36: api.usercenter.v1.MeService.DeleteExternalIdentity:output_type -> google.protobuf.Empty
+	18, // 37: api.usercenter.v1.MeService.GetSecurity:output_type -> api.usercenter.v1.SecurityStatus
+	20, // 38: api.usercenter.v1.MeService.SetupMFA:output_type -> api.usercenter.v1.SetupMFAReply
+	22, // 39: api.usercenter.v1.MeService.ConfirmMFA:output_type -> api.usercenter.v1.RecoveryCodesReply
+	43, // 40: api.usercenter.v1.MeService.DisableMFA:output_type -> google.protobuf.Empty
+	22, // 41: api.usercenter.v1.MeService.RotateRecoveryCodes:output_type -> api.usercenter.v1.RecoveryCodesReply
+	26, // 42: api.usercenter.v1.MeService.VerifySecurity:output_type -> api.usercenter.v1.VerifySecurityReply
+	45, // 43: api.usercenter.v1.MeService.ListSessions:output_type -> api.usercenter.v1.SessionsReply
+	43, // 44: api.usercenter.v1.MeService.RevokeSession:output_type -> google.protobuf.Empty
+	43, // 45: api.usercenter.v1.MeService.RevokeOtherSessions:output_type -> google.protobuf.Empty
+	32, // 46: api.usercenter.v1.MeService.GetSessionRoles:output_type -> api.usercenter.v1.SessionRolesReply
+	32, // 47: api.usercenter.v1.MeService.PutSessionRoles:output_type -> api.usercenter.v1.SessionRolesReply
+	35, // 48: api.usercenter.v1.MeService.GetAuthorization:output_type -> api.usercenter.v1.AuthorizationReply
+	38, // 49: api.usercenter.v1.MeService.ListSecurityEvents:output_type -> api.usercenter.v1.SecurityEventsReply
+	0,  // 50: api.usercenter.v1.MeService.GetOIDCConsentRequest:output_type -> api.usercenter.v1.OIDCConsentRequestView
+	3,  // 51: api.usercenter.v1.MeService.DecideOIDCConsent:output_type -> api.usercenter.v1.DecideOIDCConsentReply
+	5,  // 52: api.usercenter.v1.MeService.ListOIDCConsents:output_type -> api.usercenter.v1.OIDCConsentsReply
+	43, // 53: api.usercenter.v1.MeService.RevokeOIDCConsent:output_type -> google.protobuf.Empty
+	30, // [30:54] is the sub-list for method output_type
+	6,  // [6:30] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_api_usercenter_v1_me_proto_init() }
@@ -1866,7 +2372,7 @@ func file_api_usercenter_v1_me_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_usercenter_v1_me_proto_rawDesc), len(file_api_usercenter_v1_me_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

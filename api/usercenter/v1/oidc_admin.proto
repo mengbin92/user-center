@@ -34,6 +34,8 @@ message OIDCClient {
   string status = 5;
   repeated string redirect_uris = 6;
   repeated string scopes = 7;
+  // RP-initiated logout targets; matched exactly, never by prefix.
+  repeated string post_logout_redirect_uris = 14;
   bool public = 8;
   bool require_pkce = 9;
   int32 access_token_ttl_seconds = 10;
@@ -65,6 +67,7 @@ message CreateOIDCClientRequest {
   int32 refresh_token_ttl_seconds = 8;
   string reason = 9;
   string expected_policy_revision = 10;
+  repeated string post_logout_redirect_uris = 11;
 }
 
 message UpdateOIDCClientRequest {
@@ -79,6 +82,7 @@ message UpdateOIDCClientRequest {
   string expected_revision = 9;
   string reason = 10;
   string expected_policy_revision = 11;
+  repeated string post_logout_redirect_uris = 12;
 }
 
 message RotateOIDCClientSecretRequest {

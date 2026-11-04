@@ -1285,6 +1285,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/oidc-consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MeService_ListOIDCConsents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/oidc-consents/{client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["MeService_RevokeOIDCConsent"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/oidc-requests/{handle}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description OIDC consent (V2.4). The authorize endpoint redirects the browser here with
+         *      an opaque one-time handle; the client never sees the handle contents.
+         */
+        get: operations["MeService_GetOIDCConsentRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/oidc-requests/{handle}:decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeService_DecideOIDCConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/password:change": {
         parameters: {
             query?: never;
@@ -1981,6 +2049,7 @@ export interface components {
             refresh_token_ttl_seconds?: number;
             reason?: string;
             expected_policy_revision?: string;
+            post_logout_redirect_uris?: string[];
         };
         "api.usercenter.v1.CreateOrgAssignmentRequest": {
             id?: string;
@@ -2047,6 +2116,16 @@ export interface components {
             initial_password?: string;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.DecideOIDCConsentReply": {
+            /** @description Absolute or path-relative redirect the browser must follow. */
+            redirect_url?: string;
+        };
+        "api.usercenter.v1.DecideOIDCConsentRequest": {
+            handle?: string;
+            approve?: boolean;
+            /** @description Remember the granted scopes so later authorizations skip this page. */
+            remember?: boolean;
         };
         "api.usercenter.v1.Delegation": {
             id?: string;
@@ -2279,6 +2358,8 @@ export interface components {
             status?: string;
             redirect_uris?: string[];
             scopes?: string[];
+            /** @description RP-initiated logout targets; matched exactly, never by prefix. */
+            post_logout_redirect_uris?: string[];
             public?: boolean;
             require_pkce?: boolean;
             /** Format: int32 */
@@ -2295,6 +2376,28 @@ export interface components {
         };
         "api.usercenter.v1.OIDCClientsReply": {
             items?: components["schemas"]["api.usercenter.v1.OIDCClient"][];
+        };
+        "api.usercenter.v1.OIDCConsent": {
+            client_id?: string;
+            client_name?: string;
+            scopes?: string[];
+            granted_at?: string;
+            updated_at?: string;
+        };
+        "api.usercenter.v1.OIDCConsentRequestView": {
+            client_id?: string;
+            client_name?: string;
+            service_owner?: string;
+            scopes?: string[];
+            /** @description Scopes the user already granted to this client in an earlier consent. */
+            previously_granted_scopes?: string[];
+            /** @description Host of the redirect target; the full URI stays server-side. */
+            redirect_host?: string;
+            requested_at?: string;
+            expires_at?: string;
+        };
+        "api.usercenter.v1.OIDCConsentsReply": {
+            items?: components["schemas"]["api.usercenter.v1.OIDCConsent"][];
         };
         "api.usercenter.v1.OrgAssignment": {
             id?: string;
@@ -2788,6 +2891,7 @@ export interface components {
             expected_revision?: string;
             reason?: string;
             expected_policy_revision?: string;
+            post_logout_redirect_uris?: string[];
         };
         "api.usercenter.v1.UpdateOrgRoleRequest": {
             id?: string;
@@ -5215,6 +5319,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.SetupMFAReply"];
+                };
+            };
+        };
+    };
+    MeService_ListOIDCConsents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OIDCConsentsReply"];
+                };
+            };
+        };
+    };
+    MeService_RevokeOIDCConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeService_GetOIDCConsentRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handle: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OIDCConsentRequestView"];
+                };
+            };
+        };
+    };
+    MeService_DecideOIDCConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handle: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.DecideOIDCConsentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DecideOIDCConsentReply"];
                 };
             };
         };

@@ -20,6 +20,8 @@ import type {
   CompleteMFARequest,
   ConfirmEmailRequest,
   ConfirmMFARequest,
+  DecideOIDCConsentReply,
+  DecideOIDCConsentRequest,
   Constraint,
   ConstraintsReply,
   CopyRoleRequest,
@@ -47,6 +49,8 @@ import type {
   LoginRequest,
   MenuItem,
   MenusReply,
+  OIDCConsentRequestView,
+  OIDCConsentsReply,
   OverviewReply,
   PasswordResetTaskReply,
   Permission,
@@ -317,6 +321,16 @@ export const api = {
       get<SessionRolesReply>('/api/v1/me/session-roles'),
     putSessionRoles: (body: PutSessionRolesRequest) =>
       put<SessionRolesReply>('/api/v1/me/session-roles', body),
+    oidcConsentRequest: (handle: string) =>
+      get<OIDCConsentRequestView>(`/api/v1/me/oidc-requests/${enc(handle)}`),
+    decideOIDCConsent: (handle: string, body: DecideOIDCConsentRequest) =>
+      post<DecideOIDCConsentReply>(
+        `/api/v1/me/oidc-requests/${enc(handle)}:decide`,
+        body,
+      ),
+    oidcConsents: () => get<OIDCConsentsReply>('/api/v1/me/oidc-consents'),
+    revokeOIDCConsent: (clientId: string) =>
+      del(`/api/v1/me/oidc-consents/${enc(clientId)}`),
   },
 
   orgs: {

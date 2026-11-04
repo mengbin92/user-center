@@ -36,14 +36,15 @@ type OIDCClientCredential struct {
 }
 
 type OIDCClientInput struct {
-	Name         string
-	ServiceOwner string
-	RedirectURIs []string
-	Scopes       []string
-	Public       bool
-	RequirePKCE  bool
-	AccessTTL    int
-	RefreshTTL   int
+	Name                   string
+	ServiceOwner           string
+	RedirectURIs           []string
+	PostLogoutRedirectURIs []string
+	Scopes                 []string
+	Public                 bool
+	RequirePKCE            bool
+	AccessTTL              int
+	RefreshTTL             int
 }
 
 type OIDCAuthorizeRequest struct {
@@ -102,6 +103,7 @@ func (uc *OIDCUsecase) Discovery() map[string]any {
 		"authorization_endpoint":                base + "/oidc/authorize",
 		"token_endpoint":                        base + "/oidc/token",
 		"userinfo_endpoint":                     base + "/oidc/userinfo",
+		"end_session_endpoint":                  base + "/oidc/logout",
 		"jwks_uri":                              base + "/oidc/jwks",
 		"response_types_supported":              []string{"code"},
 		"subject_types_supported":               []string{"public"},
@@ -159,6 +161,15 @@ func (uc *OIDCUsecase) validateClient(in *OIDCClientInput) ([]string, error) {
 			return nil, Validation("redirect_uri 必须是 HTTPS（localhost 可用 HTTP），不能含用户信息/fragment，最长 512 字节")
 		}
 	}
+	if len(in.PostLogoutRedirectURIs) > 10 {
+		return nil, Validation("登出回调地址最多 10 个")
+	}
+	for _, u := range in.PostLogoutRedirectURIs {
+		if !validRedirectURI(u) {
+			return nil, Validation("post_logout_redirect_uri 必须是 HTTPS（localhost 可用 HTTP），不能含用户信息/fragment")
+		}
+	}
+	in.PostLogoutRedirectURIs = slices.Compact(in.PostLogoutRedirectURIs)
 	scopes, err := normalizeScopes(in.Scopes)
 	if err != nil {
 		return nil, err
@@ -232,7 +243,7 @@ func (uc *OIDCUsecase) CreateClient(ctx context.Context, actor ActorContext, in 
 	}
 	client := &OIDCClient{
 		ClientID: "oidc_" + rawID, Name: in.Name, ServiceOwner: in.ServiceOwner,
-		Status: "active", RedirectURIs: in.RedirectURIs, Scopes: scopes,
+		Status: "active", RedirectURIs: in.RedirectURIs, PostLogoutRedirectURIs: in.PostLogoutRedirectURIs, Scopes: scopes,
 		Public: in.Public, RequirePKCE: in.RequirePKCE, AccessTTL: in.AccessTTL, RefreshTTL: in.RefreshTTL,
 	}
 	secret := ""
@@ -281,6 +292,7 @@ func (uc *OIDCUsecase) UpdateClient(ctx context.Context, actor ActorContext, id 
 		return nil, Validation("public 属性不可修改，请新建客户端")
 	}
 	existing.Name, existing.RedirectURIs, existing.Scopes = in.Name, in.RedirectURIs, scopes
+	existing.PostLogoutRedirectURIs = in.PostLogoutRedirectURIs
 	existing.Public, existing.RequirePKCE = in.Public, in.RequirePKCE
 	if existing.Public {
 		existing.RequirePKCE = true
@@ -431,11 +443,9 @@ func (uc *OIDCUsecase) AuthorizeRequest(ctx context.Context, actor ActorContext,
 	}
 	for _, prompt := range prompts {
 		switch prompt {
-		case "none":
+		case "none", "consent":
 		case "login":
 			return reject("login_required", "fresh authentication is required")
-		case "consent":
-			return reject("consent_required", "interactive consent is not available")
 		case "select_account":
 			return reject("account_selection_required", "account selection is not available")
 		default:
@@ -481,13 +491,27 @@ func (uc *OIDCUsecase) AuthorizeRequest(ctx context.Context, actor ActorContext,
 	if req.MaxAge != "" && (maxAge == 0 || uc.Clock.Now().Unix()-actor.Session.IssuedAt.Unix() > maxAge) {
 		return reject("login_required", "authentication is older than max_age")
 	}
-	rawCode, err := newToken(32)
-	if err != nil {
-		return "", ErrDependency
-	}
 	authTime := actor.Session.IssuedAt
 	if authTime.IsZero() {
 		authTime = uc.Clock.Now()
+	}
+	// Consent (V2.4 R1): an unapproved or widened scope set is parked behind a
+	// one-time handle instead of issuing a code. prompt=consent always
+	// re-prompts; prompt=none fails with interaction_required instead of
+	// silently granting.
+	needConsent, cerr := uc.consentRequired(ctx, client, actor.User.ID, scopes, slices.Contains(prompts, "consent"))
+	if cerr != nil {
+		return "", ErrDependency
+	}
+	if needConsent {
+		if slices.Contains(prompts, "none") {
+			return reject("interaction_required", "user consent is required")
+		}
+		return uc.parkConsentRequest(ctx, actor, client, req, redirect, scope, challenge, method, authTime)
+	}
+	rawCode, err := newToken(32)
+	if err != nil {
+		return "", ErrDependency
 	}
 	code := &OIDCCode{
 		CodeHash: HashToken(rawCode), ClientID: client.ClientID, UserID: actor.User.ID,

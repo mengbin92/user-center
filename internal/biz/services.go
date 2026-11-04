@@ -25,6 +25,7 @@ type Services struct {
 	IntegrationClients IntegrationClientRepo
 	OIDCClients        OIDCClientRepo
 	OIDCCodes          OIDCCodeRepo
+	OIDCConsents       OIDCConsentRepo
 	OIDCSigner         OIDCSigner
 	OIDCIssuer         string
 	OIDCAccessTTL      time.Duration
@@ -49,6 +50,8 @@ type Services struct {
 	PublicBaseURL    string
 	CodeSecret       string
 	MaxLoginAttempts int
+	// OrgInvitationTTL is how long an invitation token stays valid.
+	OrgInvitationTTL time.Duration
 }
 
 type AuthUsecase struct{ *Services }
@@ -95,6 +98,8 @@ type RuntimeConfig struct {
 	PublicBaseURL    string
 	CodeSecret       string
 	MaxLoginAttempts int
+	// OrgInvitationTTL is how long an invitation token stays valid.
+	OrgInvitationTTL time.Duration
 }
 
 // NewServices assembles the shared usecase dependency graph.
@@ -105,7 +110,7 @@ func NewServices(
 	challenges ChallengeStore, limiter RateLimiter, stepUp StepUpStore, mail MailSender,
 	audit AuditRepo, policy PolicyRepo, iam IAMRepo, outbox OutboxRepo,
 	settings SettingsRepo, exports ExportRepo, integrationClients IntegrationClientRepo,
-	oidcClients OIDCClientRepo, oidcCodes OIDCCodeRepo, oidcSigner OIDCSigner,
+	oidcClients OIDCClientRepo, oidcCodes OIDCCodeRepo, oidcConsents OIDCConsentRepo, oidcSigner OIDCSigner,
 	organizations OrganizationRepo, orgIAM OrgIAMRepo, tx TxManager, clock Clock, ids IDGenerator, secrets SecretBox,
 	oauth map[string]OAuthProvider, cfg *RuntimeConfig,
 ) *Services {
@@ -115,12 +120,12 @@ func NewServices(
 		Limiter: limiter, StepUp: stepUp, Mail: mail, Audit: audit, Policy: policy,
 		IAM: iam, Outbox: outbox, Settings: settings, Exports: exports,
 		IntegrationClients: integrationClients, OIDCClients: oidcClients,
-		OIDCCodes: oidcCodes, OIDCSigner: oidcSigner, Organizations: organizations,
+		OIDCCodes: oidcCodes, OIDCConsents: oidcConsents, OIDCSigner: oidcSigner, Organizations: organizations,
 		OrgIAM: orgIAM, Tx: tx,
 		Clock: clock, IDs: ids, Secrets: secrets, OAuth: oauth,
 		SessionTTL: 12 * time.Hour, IdleTimeout: time.Hour, StepUpTTL: 5 * time.Minute,
 		ChallengeTTL: 10 * time.Minute, ResetTTL: 30 * time.Minute,
-		ActivationTTL: 24 * time.Hour, MaxLoginAttempts: 10,
+		ActivationTTL: 24 * time.Hour, MaxLoginAttempts: 10, OrgInvitationTTL: 72 * time.Hour,
 		ArtifactDir: "artifacts", PublicBaseURL: "http://localhost:5173",
 	}
 	if cfg != nil {
@@ -153,6 +158,9 @@ func NewServices(
 		}
 		if cfg.MaxLoginAttempts > 0 {
 			s.MaxLoginAttempts = cfg.MaxLoginAttempts
+		}
+		if cfg.OrgInvitationTTL > 0 {
+			s.OrgInvitationTTL = cfg.OrgInvitationTTL
 		}
 		s.OIDCIssuer = cfg.OIDCIssuer
 		if cfg.OIDCAccessTTL > 0 {

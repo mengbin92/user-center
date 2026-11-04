@@ -10,6 +10,7 @@ import (
 	khttp "github.com/go-kratos/kratos/v3/transport/http"
 
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/internal/service"
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
@@ -139,11 +140,45 @@ func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase) {
 		body, _ := jsonx.Marshal(info)
 		_, _ = w.Write(body)
 	})
+	logout := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		if !oidcMethods(w, r, http.MethodGet, http.MethodPost) {
+			return
+		}
+		form, ok := oidcForm(w, r, true)
+		if !ok {
+			return
+		}
+		actor, _ := biz.ActorFromContext(r.Context())
+		redirect, err := uc.Logout(r.Context(), actor, biz.OIDCLogoutRequest{
+			IDTokenHint:           form.Get("id_token_hint"),
+			ClientID:              form.Get("client_id"),
+			PostLogoutRedirectURI: form.Get("post_logout_redirect_uri"),
+			State:                 form.Get("state"),
+		})
+		if err != nil {
+			writeOIDCError(w, err)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name: service.SessionCookie, Value: "", Path: "/", HttpOnly: true, MaxAge: -1,
+			Secure: mw.CookieSecure(), SameSite: http.SameSiteLaxMode, Domain: mw.CookieDomain(),
+		})
+		if redirect != "" {
+			http.Redirect(w, r, redirect, http.StatusFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>已退出登录</title></head><body style="font-family:system-ui;padding:48px;text-align:center"><p>已退出用户中心登录。</p><p><a href="/login">重新登录</a></p></body></html>`))
+	})
 	srv.HandleFunc("/.well-known/openid-configuration", mw.Filter(discovery).ServeHTTP)
 	srv.HandleFunc("/oidc/jwks", mw.Filter(jwks).ServeHTTP)
 	srv.HandleFunc("/oidc/authorize", mw.Filter(authorize).ServeHTTP)
 	srv.HandleFunc("/oidc/token", mw.Filter(token).ServeHTTP)
 	srv.HandleFunc("/oidc/userinfo", mw.Filter(userinfo).ServeHTTP)
+	srv.HandleFunc("/oidc/logout", mw.Filter(logout).ServeHTTP)
 }
 
 func oidcMethods(w http.ResponseWriter, r *http.Request, allowed ...string) bool {

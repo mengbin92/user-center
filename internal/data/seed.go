@@ -77,6 +77,8 @@ var seededPermissions = []seedPermission{
 	{"integration.delivery.update", "重试事件投递", "settings", "high", "重试失败的事件投递", []string{"all"}, 630},
 	{"oidc.client.read", "查看 OIDC 应用", "settings", "medium", "读取 OIDC 客户端", []string{"all"}, 700},
 	{"oidc.client.update", "管理 OIDC 应用", "settings", "critical", "创建、轮换与停用 OIDC 客户端", []string{"all"}, 710},
+	{"settings.organization.read", "查看组织策略", "settings", "medium", "读取组织创建配额等平台策略", []string{"all"}, 540},
+	{"settings.organization.update", "修改组织策略", "settings", "high", "修改组织创建配额与全局开关", []string{"all"}, 550},
 	{"organization.admin.read", "查看所有组织", "identity", "medium", "平台管理员查看组织目录", []string{"all"}, 800},
 	{"organization.admin.update", "管理所有组织", "identity", "high", "平台管理员归档组织", []string{"all"}, 810},
 
@@ -110,6 +112,7 @@ var seededMenus = []menuPO{
 	{RouteKey: "account/sessions", Name: "会话管理", IconKey: "monitor", Sort: 30, RequiredAny: "[]"},
 	{RouteKey: "account/roles", Name: "会话角色", IconKey: "key", Sort: 40, RequiredAny: "[]"},
 	{RouteKey: "account/activity", Name: "登录记录", IconKey: "activity", Sort: 50, RequiredAny: "[]"},
+	{RouteKey: "account/consents", Name: "应用授权", IconKey: "shield", Sort: 60, RequiredAny: "[]"},
 	{RouteKey: "admin", Name: "控制台", IconKey: "layout", Sort: 100, RequiredAll: `["identity.user.list"]`},
 	{RouteKey: "admin/users", Name: "用户管理", IconKey: "users", Sort: 110, RequiredAll: `["identity.user.list"]`},
 	{RouteKey: "admin/iam/roles", Name: "角色管理", IconKey: "shield", Sort: 120, RequiredAll: `["iam.role.read"]`},
@@ -118,6 +121,8 @@ var seededMenus = []menuPO{
 	{RouteKey: "admin/iam/delegations", Name: "委派管理", IconKey: "share", Sort: 145, RequiredAll: `["iam.delegation.read"]`},
 	{RouteKey: "admin/audits", Name: "审计", IconKey: "file", Sort: 150, RequiredAll: `["audit.read"]`},
 	{RouteKey: "admin/settings/auth", Name: "认证配置", IconKey: "settings", Sort: 160, RequiredAll: `["settings.auth.read"]`},
+	{RouteKey: "admin/settings/providers", Name: "身份提供方", IconKey: "plug", Sort: 162, RequiredAll: `["settings.auth.read"]`},
+	{RouteKey: "admin/settings/organization", Name: "组织策略", IconKey: "building", Sort: 164, RequiredAll: `["settings.organization.read"]`},
 	{RouteKey: "admin/integrations", Name: "接入服务", IconKey: "plug", Sort: 170, RequiredAll: `["integration.client.read"]`},
 	{RouteKey: "admin/applications", Name: "OIDC 应用", IconKey: "app", Sort: 180, RequiredAll: `["oidc.client.read"]`},
 	{RouteKey: "admin/organizations", Name: "组织管理", IconKey: "building", Sort: 190, RequiredAll: `["organization.admin.read"]`},
@@ -273,6 +278,7 @@ var adminCodes = func() map[string]bool {
 		"iam.menu.read", "iam.authorization.explain", "audit.read", "oidc.client.read", "oidc.client.update",
 		"organization.admin.read", "organization.admin.update",
 		"settings.auth.read",
+		"settings.organization.read",
 	} {
 		out[code] = true
 	}

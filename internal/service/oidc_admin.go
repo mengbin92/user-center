@@ -22,6 +22,7 @@ func oidcClientProto(c *biz.OIDCClient) *usercv1.OIDCClient {
 	return &usercv1.OIDCClient{
 		Id: id(c.ID), ClientId: c.ClientID, Name: c.Name, ServiceOwner: c.ServiceOwner,
 		Status: c.Status, RedirectUris: c.RedirectURIs, Scopes: c.Scopes,
+		PostLogoutRedirectUris: c.PostLogoutRedirectURIs,
 		Public: c.Public, RequirePkce: c.RequirePKCE,
 		AccessTokenTtlSeconds: int32(c.AccessTTL), RefreshTokenTtlSeconds: int32(c.RefreshTTL),
 		Revision: rev(c.Revision), CreatedAt: ts(c.CreatedAt),
@@ -48,7 +49,8 @@ func (s *OIDCAdminService) CreateOIDCClient(ctx context.Context, req *usercv1.Cr
 	result, err := s.uc.CreateClient(ctx, actor, biz.OIDCClientInput{
 		Name: req.GetName(), ServiceOwner: req.GetServiceOwner(),
 		RedirectURIs: req.GetRedirectUris(), Scopes: req.GetScopes(),
-		Public: req.GetPublic(), RequirePKCE: req.GetRequirePkce(),
+		PostLogoutRedirectURIs: req.GetPostLogoutRedirectUris(),
+		Public:                 req.GetPublic(), RequirePKCE: req.GetRequirePkce(),
 		AccessTTL: int(req.GetAccessTokenTtlSeconds()), RefreshTTL: int(req.GetRefreshTokenTtlSeconds()),
 	}, req.GetReason())
 	if err != nil {
@@ -72,7 +74,8 @@ func (s *OIDCAdminService) UpdateOIDCClient(ctx context.Context, req *usercv1.Up
 	}
 	c, err := s.uc.UpdateClient(ctx, actor, clientID, biz.OIDCClientInput{
 		Name: req.GetName(), RedirectURIs: req.GetRedirectUris(), Scopes: req.GetScopes(),
-		Public: req.GetPublic(), RequirePKCE: req.GetRequirePkce(),
+		PostLogoutRedirectURIs: req.GetPostLogoutRedirectUris(),
+		Public:                 req.GetPublic(), RequirePKCE: req.GetRequirePkce(),
 		AccessTTL: int(req.GetAccessTokenTtlSeconds()), RefreshTTL: int(req.GetRefreshTokenTtlSeconds()),
 	}, expected, req.GetReason())
 	if err != nil {

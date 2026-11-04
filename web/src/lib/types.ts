@@ -265,3 +265,13 @@ export type ApiList<T> = {
   items: T[]
   meta: ListMeta
 }
+
+// V2.4 OIDC consent
+export type OIDCConsent = Schemas['api.usercenter.v1.OIDCConsent']
+export type OIDCConsentsReply = Schemas['api.usercenter.v1.OIDCConsentsReply']
+export type OIDCConsentRequestView =
+  Schemas['api.usercenter.v1.OIDCConsentRequestView']
+export type DecideOIDCConsentRequest =
+  Schemas['api.usercenter.v1.DecideOIDCConsentRequest']
+export type DecideOIDCConsentReply =
+  Schemas['api.usercenter.v1.DecideOIDCConsentReply']

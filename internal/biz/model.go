@@ -290,6 +290,8 @@ type ExportJob struct {
 	Error           string
 	CreatedAt       time.Time
 	ExpiresAt       time.Time
+	// OrganizationID scopes tenant exports; 0 is a platform export.
+	OrganizationID int64
 }
 
 type Event struct {
@@ -376,13 +378,41 @@ type OIDCClient struct {
 	Status       string
 	SecretHash   string
 	RedirectURIs []string
-	Scopes       []string
-	Public       bool
-	RequirePKCE  bool
-	AccessTTL    int
-	RefreshTTL   int
-	Revision     uint64
-	CreatedAt    time.Time
+	// PostLogoutRedirectURIs is the exact-match whitelist for end_session.
+	PostLogoutRedirectURIs []string
+	Scopes                 []string
+	Public                 bool
+	RequirePKCE            bool
+	AccessTTL              int
+	RefreshTTL             int
+	Revision               uint64
+	CreatedAt              time.Time
+}
+
+// OIDCConsent is the scope set a user already approved for one client.
+type OIDCConsent struct {
+	ClientID  string
+	UserID    int64
+	Scopes    []string
+	GrantedAt time.Time
+	UpdatedAt time.Time
+	Revision  uint64
+}
+
+// OIDCConsentRequest is the parked authorize request awaiting a decision.
+type OIDCConsentRequest struct {
+	HandleHash          string
+	ClientID            string
+	UserID              int64
+	RedirectURI         string
+	Scope               string
+	State               string
+	Nonce               string
+	CodeChallenge       string
+	CodeChallengeMethod string
+	AuthTime            time.Time
+	IdentityVersion     uint64
+	ExpiresAt           time.Time
 }
 
 type OIDCCode struct {
@@ -497,4 +527,46 @@ type Department struct {
 	Revision       uint64
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+const (
+	OrgInvitationPending  = "pending"
+	OrgInvitationAccepted = "accepted"
+	OrgInvitationRevoked  = "revoked"
+	OrgInvitationExpired  = "expired"
+)
+
+// OrganizationInvitation is an e-mail invitation to join a tenant. The raw
+// token only ever exists in the invitation message; the row stores its hash.
+type OrganizationInvitation struct {
+	ID                int64
+	OrganizationID    int64
+	Email             string
+	EmailNormalized   string
+	Role              string
+	DepartmentID      *int64
+	TokenHash         string
+	Status            string
+	InvitedBy         int64
+	InvitedByUsername string
+	AcceptedBy        int64
+	ExpiresAt         time.Time
+	AcceptedAt        *time.Time
+	Revision          uint64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+func (i OrganizationInvitation) Pending(now time.Time) bool {
+	return i.Status == OrgInvitationPending && now.Before(i.ExpiresAt)
+}
+
+// OrganizationSettings is the platform-level organization policy. Quota is off
+// by default: enabling it is an operator decision, not a silent restriction.
+type OrganizationSettings struct {
+	QuotaEnabled    bool
+	MaxOwnedPerUser int
+	CountArchived   bool
+	Revision        uint64
+	UpdatedAt       time.Time
 }

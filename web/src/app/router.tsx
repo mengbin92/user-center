@@ -12,6 +12,7 @@ import {
 import { AuthCallbackPage } from '../features/auth/callback-page'
 import { ForgotPasswordPage } from '../features/auth/forgot-password-page'
 import { PrivacyPage, TermsPage } from '../features/auth/legal-pages'
+import { ConsentPage } from '../features/auth/consent-page'
 import { LoginPage } from '../features/auth/login-page'
 import { RegisterPage } from '../features/auth/register-page'
 import { ResetPasswordPage } from '../features/auth/reset-password-page'
@@ -29,6 +30,7 @@ function lazyPage(loader: () => Promise<PageModule>, name: string) {
 }
 
 const ActivityPage = lazyPage(() => import('../features/account/activity-page'), 'ActivityPage')
+const ConsentsPage = lazyPage(() => import('../features/account/consents-page'), 'ConsentsPage')
 const ProfilePage = lazyPage(() => import('../features/account/profile-page'), 'ProfilePage')
 const SessionRolesPage = lazyPage(() => import('../features/account/roles-page'), 'SessionRolesPage')
 const SecurityPage = lazyPage(() => import('../features/account/security-page'), 'SecurityPage')
@@ -77,12 +79,15 @@ export function AppRoutes() {
         <Route path="/auth/callback/:provider" element={<AuthCallbackPage />} />
 
         <Route element={<RequireAuth />}>
+          <Route path="/consent" element={<ConsentPage />} />
+
           <Route path="/account" element={<AccountLayout />}>
             <Route index element={<ProfilePage />} />
             <Route path="security" element={<SecurityPage />} />
             <Route path="sessions" element={<SessionsPage />} />
             <Route path="roles" element={<SessionRolesPage />} />
             <Route path="activity" element={<ActivityPage />} />
+            <Route path="consents" element={<ConsentsPage />} />
           </Route>
 
           <Route path="/orgs" element={<AccountLayout />}>

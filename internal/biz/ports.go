@@ -268,6 +268,8 @@ type SettingsRepo interface {
 	SaveAuth(context.Context, Tx, *AuthSettings, uint64) (*AuthSettings, error)
 	GetEmail(context.Context, Tx) (*EmailSettings, string, error)
 	SaveEmail(context.Context, Tx, *EmailSettings, string, uint64) (*EmailSettings, error)
+	GetOrganization(context.Context, Tx) (*OrganizationSettings, error)
+	SaveOrganization(context.Context, Tx, *OrganizationSettings, uint64) (*OrganizationSettings, error)
 }
 
 type ExportRepo interface {
@@ -298,6 +300,20 @@ type OIDCCodeRepo interface {
 	ConsumeOIDCCode(context.Context, Tx, string, string, string, time.Time) (*OIDCCode, error)
 	CreateOIDCRefreshToken(context.Context, Tx, *OIDCRefreshToken) error
 	ConsumeOIDCRefreshToken(context.Context, Tx, string, string, time.Time) (*OIDCRefreshToken, error)
+}
+
+// OIDCConsentRepo owns granted scopes and the parked authorize requests.
+type OIDCConsentRepo interface {
+	GetConsent(context.Context, Tx, string, int64) (*OIDCConsent, error)
+	ListConsentsByUser(context.Context, Tx, int64) ([]*OIDCConsent, error)
+	UpsertConsent(context.Context, Tx, *OIDCConsent) error
+	DeleteConsent(context.Context, Tx, string, int64) error
+
+	CreateConsentRequest(context.Context, Tx, *OIDCConsentRequest) error
+	GetConsentRequest(context.Context, Tx, string, int64) (*OIDCConsentRequest, error)
+	// ConsumeConsentRequest marks the handle used and returns the snapshot. A
+	// second attempt, an expired handle or another user's handle is not found.
+	ConsumeConsentRequest(context.Context, Tx, string, int64, time.Time) (*OIDCConsentRequest, error)
 }
 
 // OIDCSigner owns the RSA key used for ID/access tokens.
@@ -334,4 +350,14 @@ type OrganizationRepo interface {
 	UpdateDepartment(context.Context, Tx, *Department, uint64) (*Department, error)
 	ArchiveDepartment(context.Context, Tx, int64, int64, uint64) error
 	ClearDepartmentMembers(context.Context, Tx, int64, int64) error
+
+	CountOwnedOrganizations(context.Context, Tx, int64, bool) (int64, error)
+
+	CreateInvitation(context.Context, Tx, *OrganizationInvitation) (*OrganizationInvitation, error)
+	GetInvitation(context.Context, Tx, int64) (*OrganizationInvitation, error)
+	GetInvitationByTokenHash(context.Context, Tx, string) (*OrganizationInvitation, error)
+	GetInvitationByEmail(context.Context, Tx, int64, string) (*OrganizationInvitation, error)
+	ListInvitations(context.Context, Tx, int64, string) ([]*OrganizationInvitation, error)
+	UpdateInvitation(context.Context, Tx, *OrganizationInvitation, uint64) (*OrganizationInvitation, error)
+	CountPendingInvitations(context.Context, Tx, int64, time.Time) (int64, error)
 }

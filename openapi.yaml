@@ -1958,6 +1958,78 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.SetupMFAReply'
+    /api/v1/me/oidc-consents:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_ListOIDCConsents
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OIDCConsentsReply'
+    /api/v1/me/oidc-consents/{client_id}:
+        delete:
+            tags:
+                - MeService
+            operationId: MeService_RevokeOIDCConsent
+            parameters:
+                - name: client_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/me/oidc-requests/{handle}:
+        get:
+            tags:
+                - MeService
+            description: |-
+                OIDC consent (V2.4). The authorize endpoint redirects the browser here with
+                 an opaque one-time handle; the client never sees the handle contents.
+            operationId: MeService_GetOIDCConsentRequest
+            parameters:
+                - name: handle
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OIDCConsentRequestView'
+    /api/v1/me/oidc-requests/{handle}:decide:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_DecideOIDCConsent
+            parameters:
+                - name: handle
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.DecideOIDCConsentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DecideOIDCConsentReply'
     /api/v1/me/password:change:
         post:
             tags:
@@ -3238,6 +3310,10 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+                post_logout_redirect_uris:
+                    type: array
+                    items:
+                        type: string
         api.usercenter.v1.CreateOrgAssignmentRequest:
             type: object
             properties:
@@ -3371,6 +3447,22 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.DecideOIDCConsentReply:
+            type: object
+            properties:
+                redirect_url:
+                    type: string
+                    description: Absolute or path-relative redirect the browser must follow.
+        api.usercenter.v1.DecideOIDCConsentRequest:
+            type: object
+            properties:
+                handle:
+                    type: string
+                approve:
+                    type: boolean
+                remember:
+                    type: boolean
+                    description: Remember the granted scopes so later authorizations skip this page.
         api.usercenter.v1.Delegation:
             type: object
             properties:
@@ -3834,6 +3926,11 @@ components:
                     type: array
                     items:
                         type: string
+                post_logout_redirect_uris:
+                    type: array
+                    items:
+                        type: string
+                    description: RP-initiated logout targets; matched exactly, never by prefix.
                 public:
                     type: boolean
                 require_pkce:
@@ -3863,6 +3960,53 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.OIDCClient'
+        api.usercenter.v1.OIDCConsent:
+            type: object
+            properties:
+                client_id:
+                    type: string
+                client_name:
+                    type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                granted_at:
+                    type: string
+                updated_at:
+                    type: string
+        api.usercenter.v1.OIDCConsentRequestView:
+            type: object
+            properties:
+                client_id:
+                    type: string
+                client_name:
+                    type: string
+                service_owner:
+                    type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                previously_granted_scopes:
+                    type: array
+                    items:
+                        type: string
+                    description: Scopes the user already granted to this client in an earlier consent.
+                redirect_host:
+                    type: string
+                    description: Host of the redirect target; the full URI stays server-side.
+                requested_at:
+                    type: string
+                expires_at:
+                    type: string
+        api.usercenter.v1.OIDCConsentsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.OIDCConsent'
         api.usercenter.v1.OrgAssignment:
             type: object
             properties:
@@ -4861,6 +5005,10 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+                post_logout_redirect_uris:
+                    type: array
+                    items:
+                        type: string
         api.usercenter.v1.UpdateOrgRoleRequest:
             type: object
             properties:

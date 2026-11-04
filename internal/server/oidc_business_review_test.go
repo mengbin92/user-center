@@ -35,10 +35,7 @@ func oidcReviewAuthorization(t *testing.T, h *harness, scope string) (string, st
 	q := url.Values{"client_id": {"review_client"}, "redirect_uri": {"https://app.example.com/callback"},
 		"response_type": {"code"}, "scope": {scope}, "code_challenge_method": {"S256"},
 		"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}}
-	rec := h.do(http.MethodGet, "/oidc/authorize?"+q.Encode(), nil, "", false)
-	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
-	loc, err := url.Parse(rec.Header().Get("Location"))
-	require.NoError(t, err)
+	loc := h.authorize(t, q)
 	return loc.Query().Get("code"), verifier
 }
 
@@ -301,7 +298,7 @@ func TestOIDCReviewValidatesPromptMaxAgeAndPKCE(t *testing.T) {
 		"response_type": {"code"}, "scope": {"openid"}, "code_challenge_method": {"S256"},
 		"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}}
 	for _, test := range []struct{ field, value, code string }{
-		{"prompt", "login", "login_required"}, {"prompt", "consent", "consent_required"},
+		{"prompt", "login", "login_required"},
 		{"prompt", "none login", "invalid_request"}, {"prompt", "select_account", "account_selection_required"},
 		{"prompt", "unknown", "invalid_request"}, {"max_age", "0", "login_required"},
 		{"max_age", "-1", "invalid_request"}, {"max_age", "x", "invalid_request"},
@@ -323,11 +320,8 @@ func TestOIDCReviewValidatesPromptMaxAgeAndPKCE(t *testing.T) {
 	for _, invalidVerifier := range []string{"short", strings.Repeat("v", 129), strings.Repeat("!", 64)} {
 		sum := sha256.Sum256([]byte(invalidVerifier))
 		q.Set("code_challenge", base64.RawURLEncoding.EncodeToString(sum[:]))
-		rec := h.do(http.MethodGet, "/oidc/authorize?"+q.Encode(), nil, "", false)
-		require.Equal(t, http.StatusFound, rec.Code)
-		location, err := url.Parse(rec.Header().Get("Location"))
-		require.NoError(t, err)
-		rec = oidcReviewExchange(h, location.Query().Get("code"), invalidVerifier)
+		location := h.authorize(t, q)
+		rec := oidcReviewExchange(h, location.Query().Get("code"), invalidVerifier)
 		require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	}
 }

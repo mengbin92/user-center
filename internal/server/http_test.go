@@ -106,7 +106,7 @@ func newHarness(t *testing.T) *harness {
 		data.NewStepUpStore(d), mailer,
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
 		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
-		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), oidcSigner,
+		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), data.NewOIDCConsentRepo(d), oidcSigner,
 		data.NewOrganizationRepo(d), data.NewOrgIAMRepo(d), d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
 		map[string]biz.OAuthProvider{"mock": &mockOAuthProvider{}},
@@ -133,7 +133,7 @@ func newHarness(t *testing.T) *harness {
 	hs := server.NewHTTPServer(
 		srvCfg, sec, mw, zap.NewNop(),
 		service.NewAuthService(auth, deps),
-		service.NewMeService(users, security, sessions, deps),
+		service.NewMeService(users, security, sessions, biz.NewOIDCUsecase(svc), deps),
 		service.NewAdminUserService(users, sessions),
 		service.NewIAMService(iam),
 		service.NewAuditService(audit),
@@ -214,6 +214,34 @@ func (h *harness) doForm(path string, form url.Values, clientID, secret string) 
 
 func (h *harness) login(username, password string) *httptest.ResponseRecorder {
 	return h.do(http.MethodPost, "/api/v1/auth/login", map[string]any{"username": username, "password": password}, "", true)
+}
+
+// authorize runs the OIDC authorize request and, when the provider asks for
+// consent, completes the one-time consent flow as the signed-in user. It
+// returns the final redirect location (with the code on approval).
+func (h *harness) authorize(t *testing.T, query url.Values) *url.URL {
+	t.Helper()
+	rec := h.do(http.MethodGet, "/oidc/authorize?"+query.Encode(), nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
+	loc, err := url.Parse(rec.Header().Get("Location"))
+	require.NoError(t, err)
+	if loc.Path == "/consent" {
+		handle := loc.Query().Get("handle")
+		require.NotEmpty(t, handle)
+		view := h.do(http.MethodGet, "/api/v1/me/oidc-requests/"+url.PathEscape(handle), nil, "", false)
+		require.Equal(t, http.StatusOK, view.Code, view.Body.String())
+		decided := h.do(http.MethodPost,
+			"/api/v1/me/oidc-requests/"+url.PathEscape(handle)+":decide",
+			map[string]any{"handle": handle, "approve": true, "remember": true}, "", true)
+		require.Equal(t, http.StatusOK, decided.Code, decided.Body.String())
+		var reply struct {
+			RedirectUrl string `json:"redirect_url"`
+		}
+		require.NoError(t, json.Unmarshal(decided.Body.Bytes(), &reply))
+		loc, err = url.Parse(reply.RedirectUrl)
+		require.NoError(t, err)
+	}
+	return loc
 }
 
 func decode[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
@@ -748,15 +776,12 @@ func TestOIDCAuthorizationCodeFlow(t *testing.T) {
 		"code_challenge":        {challenge},
 		"code_challenge_method": {"S256"},
 	}
-	rec := h.do(http.MethodGet, "/oidc/authorize?"+query.Encode(), nil, "", false)
-	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
-	location, err := url.Parse(rec.Header().Get("Location"))
-	require.NoError(t, err)
+	location := h.authorize(t, query)
 	require.Equal(t, "state-1", location.Query().Get("state"))
 	code := location.Query().Get("code")
 	require.NotEmpty(t, code)
 
-	rec = h.doForm("/oidc/token", url.Values{
+	rec := h.doForm("/oidc/token", url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"redirect_uri":  {redirectURI},
@@ -854,9 +879,7 @@ func TestOIDCPublicClientPKCE(t *testing.T) {
 	sum := sha256.Sum256([]byte(verifier))
 	base.Set("code_challenge", base64.RawURLEncoding.EncodeToString(sum[:]))
 	base.Set("code_challenge_method", "S256")
-	rec = h.do(http.MethodGet, "/oidc/authorize?"+base.Encode(), nil, "", false)
-	require.Equal(t, http.StatusFound, rec.Code)
-	loc, _ := url.Parse(rec.Header().Get("Location"))
+	loc := h.authorize(t, base)
 	code := loc.Query().Get("code")
 	require.NotEmpty(t, code)
 

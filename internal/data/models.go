@@ -302,6 +302,8 @@ type exportJobPO struct {
 	Error           string    `gorm:"column:error;size:512"`
 	CreatedAt       time.Time `gorm:"column:created_at;not null"`
 	ExpiresAt       time.Time `gorm:"column:expires_at;not null"`
+	// OrganizationID scopes tenant exports; 0 is a platform export.
+	OrganizationID int64 `gorm:"column:organization_id;not null;default:0;index:idx_export_jobs_org"`
 }
 
 func (exportJobPO) TableName() string { return "export_jobs" }
@@ -339,24 +341,60 @@ type integrationClientPO struct {
 func (integrationClientPO) TableName() string { return "integration_clients" }
 
 type oidcClientPO struct {
-	ID           int64     `gorm:"column:id;primaryKey;autoIncrement"`
-	ClientID     string    `gorm:"column:client_id;size:64;not null;uniqueIndex"`
-	Name         string    `gorm:"column:name;size:128;not null"`
-	ServiceOwner string    `gorm:"column:service_owner;size:64;not null"`
-	Status       string    `gorm:"column:status;size:16;not null"`
-	SecretHash   string    `gorm:"column:secret_hash;size:64"`
-	RedirectURIs string    `gorm:"column:redirect_uris;type:text;not null"`
-	Scopes       string    `gorm:"column:scopes;type:text;not null"`
-	Public       bool      `gorm:"column:public;not null;default:false"`
-	RequirePKCE  bool      `gorm:"column:require_pkce;not null"`
-	AccessTTL    int       `gorm:"column:access_token_ttl_seconds;not null;default:900"`
-	RefreshTTL   int       `gorm:"column:refresh_token_ttl_seconds;not null;default:86400"`
-	Revision     uint64    `gorm:"column:revision;not null;default:1"`
-	CreatedAt    time.Time `gorm:"column:created_at;not null"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;not null"`
+	ID           int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	ClientID     string `gorm:"column:client_id;size:64;not null;uniqueIndex"`
+	Name         string `gorm:"column:name;size:128;not null"`
+	ServiceOwner string `gorm:"column:service_owner;size:64;not null"`
+	Status       string `gorm:"column:status;size:16;not null"`
+	SecretHash   string `gorm:"column:secret_hash;size:64"`
+	RedirectURIs string `gorm:"column:redirect_uris;type:text;not null"`
+	Scopes       string `gorm:"column:scopes;type:text;not null"`
+	// PostLogoutRedirectURIs is the RP-initiated logout whitelist.
+	PostLogoutRedirectURIs string    `gorm:"column:post_logout_redirect_uris;type:text"`
+	Public                 bool      `gorm:"column:public;not null;default:false"`
+	RequirePKCE            bool      `gorm:"column:require_pkce;not null"`
+	AccessTTL              int       `gorm:"column:access_token_ttl_seconds;not null;default:900"`
+	RefreshTTL             int       `gorm:"column:refresh_token_ttl_seconds;not null;default:86400"`
+	Revision               uint64    `gorm:"column:revision;not null;default:1"`
+	CreatedAt              time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt              time.Time `gorm:"column:updated_at;not null"`
 }
 
 func (oidcClientPO) TableName() string { return "oidc_clients" }
+
+// oidcConsentPO records the scopes a user granted a client. The pair is unique:
+// a user has at most one consent per client, and scope growth re-prompts.
+type oidcConsentPO struct {
+	ClientID  string    `gorm:"column:client_id;size:64;primaryKey"`
+	UserID    int64     `gorm:"column:user_id;primaryKey;index:idx_oidc_consent_user"`
+	Scopes    string    `gorm:"column:scopes;type:text;not null"`
+	GrantedAt time.Time `gorm:"column:granted_at;not null"`
+	UpdatedAt time.Time `gorm:"column:updated_at;not null"`
+	Revision  uint64    `gorm:"column:revision;not null;default:1"`
+}
+
+func (oidcConsentPO) TableName() string { return "oidc_consents" }
+
+// oidcConsentRequestPO is the one-time authorize request parked while the user
+// decides. Only the hash of the handle is stored.
+type oidcConsentRequestPO struct {
+	HandleHash          string     `gorm:"column:handle_hash;size:64;primaryKey"`
+	ClientID            string     `gorm:"column:client_id;size:64;not null"`
+	UserID              int64      `gorm:"column:user_id;not null"`
+	RedirectURI         string     `gorm:"column:redirect_uri;size:512;not null"`
+	Scope               string     `gorm:"column:scope;size:512;not null"`
+	State               string     `gorm:"column:state;size:512"`
+	Nonce               string     `gorm:"column:nonce;size:255"`
+	CodeChallenge       string     `gorm:"column:code_challenge;size:128"`
+	CodeChallengeMethod string     `gorm:"column:code_challenge_method;size:8"`
+	AuthTime            time.Time  `gorm:"column:auth_time;not null"`
+	IdentityVersion     uint64     `gorm:"column:identity_version;not null"`
+	ExpiresAt           time.Time  `gorm:"column:expires_at;not null;index:idx_oidc_consent_request_expiry"`
+	ConsumedAt          *time.Time `gorm:"column:consumed_at"`
+	CreatedAt           time.Time  `gorm:"column:created_at;not null"`
+}
+
+func (oidcConsentRequestPO) TableName() string { return "oidc_consent_requests" }
 
 type oidcCodePO struct {
 	CodeHash            string     `gorm:"column:code_hash;size:64;primaryKey"`
@@ -433,6 +471,28 @@ type organizationDepartmentPO struct {
 }
 
 func (organizationDepartmentPO) TableName() string { return "organization_departments" }
+
+// organizationInvitationPO holds a pending invitation. Only the hash of the
+// token is stored; the raw token exists solely in the invitation e-mail.
+type organizationInvitationPO struct {
+	ID              int64      `gorm:"column:id;primaryKey;autoIncrement"`
+	OrganizationID  int64      `gorm:"column:organization_id;not null;index:idx_org_invitation_org,priority:1"`
+	Email           string     `gorm:"column:email;size:254;not null"`
+	EmailNormalized string     `gorm:"column:email_normalized;size:254;not null;index:idx_org_invitation_email"`
+	Role            string     `gorm:"column:role;size:16;not null"`
+	DepartmentID    *int64     `gorm:"column:department_id"`
+	TokenHash       string     `gorm:"column:token_hash;size:64;not null;uniqueIndex"`
+	Status          string     `gorm:"column:status;size:16;not null;index:idx_org_invitation_org,priority:2"`
+	InvitedBy       int64      `gorm:"column:invited_by;not null;default:0"`
+	AcceptedBy      int64      `gorm:"column:accepted_by;not null;default:0"`
+	ExpiresAt       time.Time  `gorm:"column:expires_at;not null"`
+	AcceptedAt      *time.Time `gorm:"column:accepted_at"`
+	Revision        uint64     `gorm:"column:revision;not null;default:1"`
+	CreatedAt       time.Time  `gorm:"column:created_at;not null"`
+	UpdatedAt       time.Time  `gorm:"column:updated_at;not null"`
+}
+
+func (organizationInvitationPO) TableName() string { return "organization_invitations" }
 
 type legacyImportBatchPO struct {
 	BatchID          string     `gorm:"column:batch_id;size:64;primaryKey"`
