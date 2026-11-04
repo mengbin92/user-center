@@ -60,6 +60,13 @@
 - 密码重置、MFA 重置、邮箱换绑在用户中心完成后，原系统只消费事件/查询，不复制凭据。
 - 事件消费端以 `event_id` 去重，并拒绝旧 `aggregate_revision` 覆盖新状态。
 
+## 4.1 V2.3 升级（组织域 IAM）
+
+- 执行 `cmd/migrate` 应用 `006_org_iam.sql`：为 `iam_roles`、`iam_user_roles` 增加 `context_type`/`context_id` 并把 `iam_roles.code` 唯一键改为 `(context_type, context_id, code)`；为 `iam_audit_events` 增加 `organization_id`。
+- 迁移完成后 `cmd/migrate` 会调用 `BackfillOrganizationIAM`：为已有组织落地内置角色，并按当前成员角色补齐内置分配。该步骤幂等，可重复执行。
+- 未执行回填时，首次访问组织端点也会懒回填；升级窗口内不会出现"旧组织无管理入口"。
+- 平台 IAM 行为不变：平台查询固定过滤 `context_type='platform'`，组织角色不会出现在 `/admin/iam/roles` 或会话角色列表中。
+
 ## 5. 接入原系统
 
 推荐顺序：

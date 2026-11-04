@@ -25,7 +25,7 @@
 | 第三方身份 | GitHub/Google OAuth2，服务端 code 交换；浏览器不接触 provider token |
 | Outbox worker | 随主进程启动，订阅客户端 Webhook 投递，HMAC 签名 + 指数退避 |
 | OIDC Provider | 标准 discovery/JWKS/authorization code+PKCE/token/userinfo；RSA 签名密钥由部署提供 |
-| Organization | 组织/部门/成员与组织角色；平台管理员跨组织治理；组织域 IAM 留待 V2.3 |
+| Organization | 组织/部门/成员、组织角色与组织域 IAM；`organization:{id}` 授权上下文，租户内角色/授权/审计隔离；平台管理员跨组织治理 |
 | SPA | 用户门户 + 管理控制台，仅消费 `/api/v1` |
 
 ## 3. 分层契约
@@ -92,6 +92,23 @@ sequenceDiagram
 受限角色（非 All scope）执行分配/撤销时，还必须命中一条有效委派：管理角色、目标角色、动作、目标用户范围与分配边界同时满足；root/All scope 不受此额外约束。
 
 列表查询把 allow Scope 并集与 deny 排除集合一起下推到 SQL，先应用范围再计数和分页；self 解析为当前 actor ID。概览的用户、MFA、会话及登录事件统计使用同一可见用户集合。列表逐行决策保留为附加校验。
+
+### 6.1 授权上下文与多租户隔离（V2.3）
+
+授权不只有"操作 + 数据范围"，还有**上下文**。一个 Grant 只在签发它的上下文里生效：
+
+```text
+platform                     → 平台管理（用户、平台 IAM、OIDC、接入服务）
+organization:{id}            → 单个组织的成员、部门、组织角色与租户审计
+```
+
+- `authorization.Context` 校验 `type/id/key` 一致性；零值规范化为 `platform`，用于兼容 V2.2 之前写入的存量行。
+- `GrantSource.Context` 与决策上下文不一致时被跳过；`Permission.ContextTypes` 不含请求上下文时直接拒绝（`CONTEXT_UNSUPPORTED`），不会回退到平台策略。
+- 组织角色/分配在 `iam_roles`、`iam_user_roles` 上携带 `context_type/context_id`；平台查询（`ListAllRolesWithGrants`、`ListAssignmentsForUser` 等）固定附加 `context_type='platform' AND context_id=0`，反之组织查询固定附加该组织的上下文。
+- 组织成员角色（`owner/admin/member`）是粗粒度投影：创建组织时落地三份内置角色（`org_owner/org_admin/org_member`），成员角色变更时同步替换内置分配；成员移除或退出时撤销该组织内全部（含自定义角色）分配。
+- 组织域决策不使用会话角色激活：成员身份即租户闸门，分配的有效期/撤销是唯一的时间维度。
+- 组织可定义自定义角色，但只能授予 `context_types` 含 `organization` 的权限；`org_` 前缀与内置角色不可修改/归档，内置角色的调整必须走成员角色接口，从而保留"最后一名 owner"保护。
+- 存量组织在 `cmd/migrate` 启动时回填（`BackfillOrganizationIAM`），首次访问也会懒回填，避免升级后旧组织失去管理入口。
 
 ## 7. 事务与幂等
 

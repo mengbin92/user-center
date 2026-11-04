@@ -71,16 +71,18 @@
 | `iam_policy_state` | `policy_revision`、`catalog_revision`、`authorization_mode`、`cutover_state` | 单行 `id=1`；每次 IAM 写提升 policy revision |
 | `iam_resources` | `code` 唯一、`owner`、`enabled` | 业务资源目录 |
 | `iam_permissions` | `code` 唯一、`resource_id`、`status`、`binding`、`supported_scopes` JSON、`protected`、`revision` | 未绑定执行点的权限不可生效 |
-| `iam_roles` | `code` 唯一、`builtin`、`status`、`max_members`、`revision` | `root/admin/member` 内置；内置 root 不可归档/停用 |
+| `iam_roles` | `(context_type, context_id, code)` 唯一、`builtin`、`status`、`max_members`、`revision` | 平台角色 `context_id=0`；组织角色 `context_type='organization'` 且 `context_id=组织 ID`；内置组织角色不可修改/归档 |
 | `iam_role_permissions` | `(role_id, operation)` 主键、`effect`、`scope` JSON | 每个角色每个操作一条 grant |
 | `iam_role_inheritance` | `(role_id, inherits_role_id)` 主键 | 禁止自环与循环，写入前验证 |
-| `iam_user_roles` | `user_id`、`role_id`、`boundary` JSON、`starts_at`/`expires_at`、`status`、`origin`、`revision` | 分配 = 角色 + 边界 + 有效期；撤销保留行 |
+| `iam_user_roles` | `user_id`、`role_id`、`context_type`/`context_id`、`boundary` JSON、`starts_at`/`expires_at`、`status`、`origin`、`revision` | 分配 = 上下文 + 角色 + 边界 + 有效期；撤销保留行；查询必须带上下文 |
 | `iam_role_constraints` | `kind`、`role_ids` JSON、`max_count`、`enabled`、`revision` | `mutual_exclusion` / `max_roles` |
 | `iam_delegations` | `manager_role_id`、`target_role_id`、`target_kind`、`actions` JSON、`target_user_scope` JSON、`grant_ceiling` JSON、`can_redelegate`、有效期、`revoked_at`、`revision` | 只授权分配/撤销角色，不授予策略修改 |
 | `iam_menu_items` | `route_key` 唯一、`required_all/any`、`enabled` | 仅展示投影，不参与 API 鉴权 |
-| `iam_audit_events` | `event_id`、actor、action、target、before/after/diff、result、reason、request_id、versions、occurred_at | 只追加；不对用户删除级联 |
+| `iam_audit_events` | `event_id`、actor、action、target、before/after/diff、result、reason、request_id、versions、`organization_id`、occurred_at | 只追加；不对用户删除级联；`organization_id>0` 表示租户事件 |
 
-`iam_policy_state` 同时承担迁移状态与策略版本；`iam_user_roles.origin` 取值为 `default` / `bootstrap` / `explicit` / `legacy_candidate`，用于识别迁移来源。
+`iam_policy_state` 同时承担迁移状态与策略版本；`iam_user_roles.origin` 取值为 `default` / `bootstrap` / `explicit` / `legacy_candidate` / `organization_membership`，用于识别迁移与同步来源。
+
+V2.3 起角色/分配合法上下文为 `platform` 与 `organization:{id}`：零值按平台处理以兼容存量行，组织查询在 SQL 中固定携带 `context_type/context_id`，跨上下文的行等同不存在。
 
 ## 4. 集成与运维
 
@@ -93,8 +95,8 @@
 | `oidc_clients` | `client_id` 唯一、`name`、`service_owner`、`status`、`secret_hash`、`redirect_uris` JSON、`scopes` JSON、`public`、`require_pkce`、access/refresh TTL、`revision` |
 | `oidc_authorization_codes` | `code_hash` 主键、`client_id`、`user_id`、`redirect_uri`、`scope`、`nonce`、`code_challenge`/method、`auth_time`、`expires_at`、`consumed_at` |
 | `oidc_refresh_tokens` | `token_hash` 主键、`client_id`、`user_id`、`scope`、`auth_time`、`expires_at`、`revoked_at` |
-| `organizations` | `code` 唯一、`name`、`status`、`revision`、`created_by`、`archived_at` | 组织是成员与部门边界；平台管理员可见全部 |
-| `organization_members` | `(organization_id,user_id)` 唯一、`role` (`owner/admin/member`)、`department_id`、`status`、`revision`、`joined_at` | 组织角色独立于平台 IAM 角色；至少保留一名 owner |
+| `organizations` | `code` 唯一、`name`、`status`、`revision`、`created_by`、`archived_at` | 组织是成员、部门与 IAM 策略的边界；平台管理员可见全部 |
+| `organization_members` | `(organization_id,user_id)` 唯一、`role` (`owner/admin/member`)、`department_id`、`status`、`revision`、`joined_at` | 成员角色是内置组织角色（`org_owner/org_admin/org_member`）的投影；至少保留一名 owner |
 | `organization_departments` | `(organization_id,code)` 唯一、`parent_id`、`name`、`status`、`revision` | 部门树禁止环；成员可挂接部门 |
 | `export_jobs` | 导出任务；`scope_snapshot`、字段、状态、制品名、过期时间；下载时重新鉴权 |
 | `schema_migrations` | `cmd/migrate` 维护的已执行版本 |

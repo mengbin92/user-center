@@ -112,7 +112,7 @@ OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必
 
 所有 IAM 管理写必须携带 `reason` 与 `expected_policy_revision`，修改/复制/撤销已有资源还需其 `expected_revision`；角色/分配/约束变更要求 Step-up。
 
-## 6.1 组织、部门与成员（V2.2）
+## 6.1 组织、部门、成员与组织域 IAM（V2.2 / V2.3）
 
 | 接口 | 说明 |
 |---|---|
@@ -131,7 +131,30 @@ OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必
 - `member` 只读组织与部门；成员列表中的邮箱对普通 member 隐藏。
 - 平台 `root/admin` 对组织拥有 `platform` 角色，可查看与归档全部组织。
 - 组织归档、成员添加/角色变更/移除和平台归档要求近期 Step-up（MFA）；成员退出、创建组织与部门维护不要求 Step-up。
-- 组织角色与平台 IAM 角色相互独立；组织域内的 IAM 策略上下文属于 V2.3。
+- 组织角色与平台 IAM 角色相互独立；组织域 IAM 在 `organization:{id}` 上下文求值，平台角色不会获得组织内权限。
+
+组织域 IAM（V2.3）：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/v1/orgs/{id}/iam/roles` | 本组织角色（含内置 `org_owner/org_admin/org_member`）与 Grant |
+| `GET /api/v1/orgs/{id}/iam/permissions` | 可授予的组织域权限目录（`context_types` 含 `organization`） |
+| `POST /api/v1/orgs/{id}/iam/roles` | 创建自定义角色（`org_` 前缀保留；仅 allow；scope 受权限支持范围约束） |
+| `PATCH /api/v1/orgs/{id}/iam/roles/{role_id}` | 修改名称/描述；要求 `expected_revision` |
+| `PUT /api/v1/orgs/{id}/iam/roles/{role_id}/permissions` | 覆盖角色 Grant；要求 `expected_revision` |
+| `POST /api/v1/orgs/{id}/iam/roles/{role_id}:archive` | 归档自定义角色；仍被分配时返回 `ORGANIZATION_ROLE_IN_USE` |
+| `GET /api/v1/orgs/{id}/iam/assignments` | 本组织授权列表（含成员、角色、来源、有效期） |
+| `POST /api/v1/orgs/{id}/iam/assignments` | 给本组织成员分配自定义角色；内置角色必须经成员角色接口调整 |
+| `DELETE /api/v1/orgs/{id}/iam/assignments/{assignment_id}` | 撤销授权；`expected_revision`、`reason` 走 query |
+| `GET /api/v1/orgs/{id}/audits` | 本组织审计（`action`/`from`/`to`/`offset`/`page_size`） |
+
+租户隔离语义：
+
+- `{id}` 是唯一租户选择器，请求体不能覆盖；其他组织的角色/分配/事件 ID 一律按不存在处理。
+- 组织操作要求有效成员身份；平台 `root/admin` 保留显式覆盖，用于治理与支持。
+- 自定义角色不能授予平台权限（`identity.*`、`iam.*`、`settings.*` 等），内置角色不可修改或归档。
+- 组织审计只返回 `organization_id` 匹配的事件；平台审计仍保留全量可见性。
+- 创建/修改/归档角色、分配/撤销角色与成员增改删要求近期 Step-up。
 
 ## 6.2 OIDC Provider（V2）
 

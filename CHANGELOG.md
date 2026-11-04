@@ -6,6 +6,50 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-04
+
+V2.3 delivers organization-scoped IAM and tenant isolation.
+
+### Added
+
+- Authorization contexts: `platform` and `organization:{id}`. A grant only
+  applies inside the context it was issued for, and a permission whose
+  `context_types` lacks the request context is refused.
+- Organization-scoped IAM API: list roles/permissions, create/update/archive
+  custom roles, replace role grants, list/assign/revoke member assignments and
+  read tenant audit at `/api/v1/orgs/{id}/iam/*` and `/organizations/{id}/audits`.
+- Built-in organization roles `org_owner/org_admin/org_member` materialized per
+  organization; membership roles are projected onto them and stay in sync.
+- Tenant-scoped audit: `iam_audit_events.organization_id`, filtered on read.
+- Backfill for organizations created before V2.3 (`cmd/migrate` plus lazy
+  provisioning on first access).
+- SPA: organization "角色与授权" and "审计" tabs (custom roles, grants,
+  assignments, tenant audit with action filter).
+
+### Changed
+
+- Organization endpoints are now permission-driven (`organization.member.*`,
+  `organization.department.*`, `organization.iam.*`, `organization.audit.read`,
+  `organization.settings.update`, `organization.archive`) instead of only
+  comparing the membership role.
+- Platform role/assignment queries exclude organization-context rows, and vice
+  versa, at the SQL layer.
+
+### Fixed
+
+- Organization member list returned zero-valued ids, roles and status: the query
+  scanned into an embedded unexported PO, which GORM could not populate. The
+  scan now uses explicit fields, so member lists and member-based UIs are
+  correct again.
+
+### Security
+
+- Cross-tenant role/assignment identifiers in URL or body resolve to
+  `RESOURCE_NOT_FOUND`; tenant queries always carry the context in the WHERE
+  clause.
+- Custom organization roles may only grant organization-context permissions
+  with allow semantics; `org_` codes and built-in roles are immutable.
+
 ## [0.4.0] - 2026-11-04
 
 V2.2 delivers organization, department and membership management.
