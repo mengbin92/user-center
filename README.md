@@ -159,7 +159,7 @@ scripts/                  开发与检查脚本
 - v0.4.0：组织、部门与成员管理；owner/admin/member 组织角色；最后 owner 保护；平台管理员组织目录与归档；成员邮箱按角色脱敏。
 - v0.5.0：组织域 IAM（`organization:{id}` 上下文、内置/自定义组织角色、组织内授权分配与权限目录）与多租户隔离（上下文查询、租户审计、跨租户拒绝）；存量组织自动回填。
 
-**仍延后（V2 后续里程碑）**：
+**仍延后（V2 后续里程碑）**：排期、验收标准与明确不做的项见 [V2.4 路线图](docs/roadmap-v2.4.md)。
 
 - WebAuthn/Passkey、SCIM、企业目录同步；
 - OIDC 交互式 consent 页面与 RP-initiated logout（V2.2）；
@@ -204,6 +204,7 @@ docker compose up -d --build
 - [运维手册](docs/operations.md)
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
+- [V2.4 路线图](docs/roadmap-v2.4.md)
 - [v0.5.1 发布说明](docs/releases/release-v0.5.1.md)
 - [v0.5.0 发布说明](docs/releases/release-v0.5.0.md)
 - [v0.4.0 发布说明](docs/releases/release-v0.4.0.md)
