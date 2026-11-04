@@ -120,6 +120,21 @@ import type {
   RotateIntegrationClientCredentialRequest,
   UpdateIntegrationClientRequest,
   UpdateOIDCClientRequest,
+  AddOrganizationMemberRequest,
+  AdminArchiveOrganizationRequest,
+  ArchiveDepartmentRequest,
+  ArchiveOrganizationRequest,
+  CreateDepartmentRequest,
+  CreateOrganizationRequest,
+  Department,
+  DepartmentsReply,
+  Organization,
+  OrganizationMember,
+  OrganizationMembersReply,
+  OrganizationsReply,
+  UpdateDepartmentRequest,
+  UpdateOrganizationMemberRequest,
+  UpdateOrganizationRequest,
 } from './types'
 
 type QueryValue = string | number | boolean | null | undefined
@@ -233,6 +248,10 @@ export type ListEventDeliveriesParams = {
   page_token?: string
 }
 
+export type ListOrganizationsParams = {
+  status?: string
+}
+
 export const api = {
   auth: {
     context: () => get<AuthContext>('/api/v1/auth/context'),
@@ -289,8 +308,74 @@ export const api = {
       put<SessionRolesReply>('/api/v1/me/session-roles', body),
   },
 
+  orgs: {
+    listMine: () => get<OrganizationsReply>('/api/v1/orgs'),
+    create: (body: CreateOrganizationRequest) =>
+      post<Organization>('/api/v1/orgs', body),
+    get: (id: string) => get<Organization>(`/api/v1/orgs/${enc(id)}`),
+    update: (id: string, body: UpdateOrganizationRequest) =>
+      patch<Organization>(`/api/v1/orgs/${enc(id)}`, body),
+    archive: (id: string, body: ArchiveOrganizationRequest) =>
+      post<Organization>(`/api/v1/orgs/${enc(id)}:archive`, body),
+    listMembers: (id: string) =>
+      get<OrganizationMembersReply>(`/api/v1/orgs/${enc(id)}/members`),
+    addMember: (id: string, body: AddOrganizationMemberRequest) =>
+      post<OrganizationMember>(`/api/v1/orgs/${enc(id)}/members`, body),
+    updateMember: (
+      id: string,
+      userId: string,
+      body: UpdateOrganizationMemberRequest,
+    ) =>
+      patch<OrganizationMember>(
+        `/api/v1/orgs/${enc(id)}/members/${enc(userId)}`,
+        body,
+      ),
+    // The proto has no body for DELETE, so reason is mapped to a query arg.
+    removeMember: (
+      id: string,
+      userId: string,
+      reason: string,
+      expectedRevision: string,
+    ) =>
+      del(`/api/v1/orgs/${enc(id)}/members/${enc(userId)}`, {
+        reason,
+        expected_revision: expectedRevision,
+      }),
+    leave: (id: string) =>
+      post<void>(`/api/v1/orgs/${enc(id)}/members:leave`, { id }),
+    listDepartments: (id: string) =>
+      get<DepartmentsReply>(`/api/v1/orgs/${enc(id)}/departments`),
+    createDepartment: (id: string, body: CreateDepartmentRequest) =>
+      post<Department>(`/api/v1/orgs/${enc(id)}/departments`, body),
+    updateDepartment: (
+      id: string,
+      departmentId: string,
+      body: UpdateDepartmentRequest,
+    ) =>
+      patch<Department>(
+        `/api/v1/orgs/${enc(id)}/departments/${enc(departmentId)}`,
+        body,
+      ),
+    archiveDepartment: (
+      id: string,
+      departmentId: string,
+      body: ArchiveDepartmentRequest,
+    ) =>
+      post<Department>(
+        `/api/v1/orgs/${enc(id)}/departments/${enc(departmentId)}:archive`,
+        body,
+      ),
+  },
+
   admin: {
     overview: () => get<OverviewReply>('/api/v1/admin/overview'),
+    listOrganizations: (params?: ListOrganizationsParams) =>
+      get<OrganizationsReply>('/api/v1/admin/organizations', params),
+    archiveOrganization: (id: string, body: AdminArchiveOrganizationRequest) =>
+      post<Organization>(
+        `/api/v1/admin/organizations/${enc(id)}:archive`,
+        body,
+      ),
     listUsers: (params?: ListUsersParams) =>
       get<UsersReply>('/api/v1/admin/users', params),
     createUser: (body: CreateUserRequest) =>

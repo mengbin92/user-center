@@ -112,7 +112,28 @@ OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必
 
 所有 IAM 管理写必须携带 `reason` 与 `expected_policy_revision`，修改/复制/撤销已有资源还需其 `expected_revision`；角色/分配/约束变更要求 Step-up。
 
-## 6.1 OIDC Provider（V2）
+## 6.1 组织、部门与成员（V2.2）
+
+| 接口 | 说明 |
+|---|---|
+| `GET/POST /api/v1/orgs` | 我的组织 / 创建组织（创建者为 owner） |
+| `GET/PATCH /api/v1/orgs/{id}`；`{id}:archive` | 组织详情/改名/归档；归档要求 owner 或平台管理员 |
+| `GET/POST /api/v1/orgs/{id}/members` | 成员列表/添加（用户名或邮箱、角色、部门） |
+| `PATCH/DELETE /api/v1/orgs/{id}/members/{user_id}` | 修改角色/部门、移除；要求当前 revision |
+| `POST /api/v1/orgs/{id}/members:leave` | 主动退出；最后一名 owner 不能退出 |
+| `/api/v1/orgs/{id}/departments*` | 部门列表/创建/修改/归档；禁止父子成环 |
+| `GET /api/v1/admin/organizations`；`{id}:archive` | 平台 root/admin 查看/归档全部组织 |
+
+组织角色规则：
+
+- `owner` 可管理成员与部门、授予/撤销 owner；最后一名 owner 不能被降级、移除或退出。
+- `admin` 可管理 member、添加 admin，但不能修改 owner 或其他 admin。
+- `member` 只读组织与部门；成员列表中的邮箱对普通 member 隐藏。
+- 平台 `root/admin` 对组织拥有 `platform` 角色，可查看与归档全部组织。
+- 组织归档、成员添加/角色变更/移除和平台归档要求近期 Step-up（MFA）；成员退出、创建组织与部门维护不要求 Step-up。
+- 组织角色与平台 IAM 角色相互独立；组织域内的 IAM 策略上下文属于 V2.3。
+
+## 6.2 OIDC Provider（V2）
 
 标准授权码 + PKCE 流程：
 

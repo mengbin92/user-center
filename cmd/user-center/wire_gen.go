@@ -52,6 +52,7 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
+	organizationRepo := data.NewOrganizationRepo(dataData)
 	clock := &data.Clock{}
 	iDs := &data.IDs{}
 	secretBox := data.NewSecretBox(security)
@@ -61,7 +62,7 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	services := biz.NewServices(userRepo, credentialRepo, externalIdentityRepo, mfaRepo, sessionRepo, securityEventRepo, flowCompletionRepo, challengeStore, rateLimiter, stepUpStore, mailSender, auditRepo, policyRepo, iamRepo, outboxRepo, settingsRepo, exportRepo, integrationClientRepo, oidcClientRepo, oidcCodeRepo, oidcSigner, dataData, clock, iDs, secretBox, v, runtimeConfig)
+	services := biz.NewServices(userRepo, credentialRepo, externalIdentityRepo, mfaRepo, sessionRepo, securityEventRepo, flowCompletionRepo, challengeStore, rateLimiter, stepUpStore, mailSender, auditRepo, policyRepo, iamRepo, outboxRepo, settingsRepo, exportRepo, integrationClientRepo, oidcClientRepo, oidcCodeRepo, oidcSigner, organizationRepo, dataData, clock, iDs, secretBox, v, runtimeConfig)
 	sessionUsecase := biz.NewSessionUsecase(services)
 	middleware := server.NewMiddleware(sessionUsecase, security, logger)
 	authUsecase := biz.NewAuthUsecase(services)
@@ -81,8 +82,10 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	integrationAdminService := service.NewIntegrationAdminService(integrationAdminUsecase)
 	oidcUsecase := biz.NewOIDCUsecase(services)
 	oidcAdminService := service.NewOIDCAdminService(oidcUsecase)
+	organizationUsecase := biz.NewOrganizationUsecase(services)
+	organizationService := service.NewOrganizationService(organizationUsecase)
 	artifactDir := server.NewArtifactDir()
-	httpServer := server.NewHTTPServer(confServer, security, middleware, logger, authService, meService, adminUserService, iamService, auditService, settingsService, integrationAdminService, oidcAdminService, userUsecase, artifactDir)
+	httpServer := server.NewHTTPServer(confServer, security, middleware, logger, authService, meService, adminUserService, iamService, auditService, settingsService, integrationAdminService, oidcAdminService, organizationService, userUsecase, artifactDir)
 	integrationUsecase := biz.NewIntegrationUsecase(services)
 	integrationService := service.NewIntegrationService(integrationUsecase)
 	grpcServer := server.NewGRPCServer(confServer, logger, integrationService)

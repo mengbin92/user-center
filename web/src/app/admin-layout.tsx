@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   AppWindow,
   BookOpenCheck,
+  Building2,
   ChevronRight,
   ClipboardList,
   Columns3,
@@ -61,6 +62,13 @@ const GROUPS: NavGroup[] = [
         icon: Users,
         menuKey: 'admin/users',
         anyOf: ['identity.user.list'],
+      },
+      {
+        to: '/admin/organizations',
+        label: '组织管理',
+        icon: Building2,
+        menuKey: 'admin/organizations',
+        anyOf: ['organization.admin.read'],
       },
     ],
   },

@@ -6,6 +6,33 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-04
+
+V2.2 delivers organization, department and membership management.
+
+### Added
+
+- Organization lifecycle: create/list/get/rename/archive; creator becomes owner.
+- Organization members with owner/admin/member roles, username/email lookup,
+  department assignment, role changes, removal and self-service leave.
+- Last-owner protection: the final owner cannot be demoted, removed or leave.
+- Departments with parent/child hierarchy, cycle detection, archive and member
+  assignment.
+- Platform admin organization directory and archive endpoints.
+- Org member email masking for plain members; owner/admin/platform see contact.
+- Audit events for organization/member/department changes.
+- SPA organization switcher, `/orgs` list/create, `/orgs/:id` overview/members/
+  departments/settings, and `/admin/organizations` platform directory.
+- MySQL migration `005_organizations.sql`, permissions/menu seed and tests.
+
+### Notes
+
+- Organization roles are separate from platform IAM roles. Organization-scoped
+  IAM contexts (`organization:{id}`), role assignments and tenant data isolation
+  remain V2.3.
+- No invitation acceptance flow yet: managers add existing enabled accounts
+  directly.
+
 ## [0.3.0] - 2026-11-03
 
 V2 starts with a standards-based OIDC Provider.

@@ -93,6 +93,9 @@
 | `oidc_clients` | `client_id` 唯一、`name`、`service_owner`、`status`、`secret_hash`、`redirect_uris` JSON、`scopes` JSON、`public`、`require_pkce`、access/refresh TTL、`revision` |
 | `oidc_authorization_codes` | `code_hash` 主键、`client_id`、`user_id`、`redirect_uri`、`scope`、`nonce`、`code_challenge`/method、`auth_time`、`expires_at`、`consumed_at` |
 | `oidc_refresh_tokens` | `token_hash` 主键、`client_id`、`user_id`、`scope`、`auth_time`、`expires_at`、`revoked_at` |
+| `organizations` | `code` 唯一、`name`、`status`、`revision`、`created_by`、`archived_at` | 组织是成员与部门边界；平台管理员可见全部 |
+| `organization_members` | `(organization_id,user_id)` 唯一、`role` (`owner/admin/member`)、`department_id`、`status`、`revision`、`joined_at` | 组织角色独立于平台 IAM 角色；至少保留一名 owner |
+| `organization_departments` | `(organization_id,code)` 唯一、`parent_id`、`name`、`status`、`revision` | 部门树禁止环；成员可挂接部门 |
 | `export_jobs` | 导出任务；`scope_snapshot`、字段、状态、制品名、过期时间；下载时重新鉴权 |
 | `schema_migrations` | `cmd/migrate` 维护的已执行版本 |
 | `legacy_import_batches` | `cmd/import-legacy` 的批次记录；保留源提交、位点、计数、指纹与终态 |

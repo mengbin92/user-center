@@ -44,6 +44,10 @@ func Validation(msg string) error {
 	return kerrors.BadRequest("VALIDATION_FAILED", msg)
 }
 
+func ConflictCode(reason, msg string) error {
+	return kerrors.Conflict(reason, msg)
+}
+
 func ConflictRevision(current uint64) error {
 	err := kerrors.Conflict("REVISION_CONFLICT", "数据已被更新，请刷新后重试")
 	return err.WithMetadata(map[string]string{"current_revision": uitoa(current), "conflict_type": "target"})
@@ -55,6 +59,7 @@ func ConflictPolicy(current uint64) error {
 }
 
 var (
-	ErrOIDCInvalidGrant   = kerrors.BadRequest("INVALID_GRANT", "授权码、刷新令牌或 PKCE 校验失败")
-	ErrOIDCClientNotFound = kerrors.NotFound("OIDC_CLIENT_NOT_FOUND", "OIDC 客户端不存在")
+	ErrOIDCInvalidGrant      = kerrors.BadRequest("INVALID_GRANT", "授权码、刷新令牌或 PKCE 校验失败")
+	ErrOIDCClientNotFound    = kerrors.NotFound("OIDC_CLIENT_NOT_FOUND", "OIDC 客户端不存在")
+	ErrOrganisationLastOwner = kerrors.Conflict("ORGANIZATION_LAST_OWNER", "组织必须至少保留一名 owner")
 )

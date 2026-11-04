@@ -79,6 +79,35 @@ export type LoginReply = Schemas['api.usercenter.v1.LoginReply']
 export type LoginRequest = Schemas['api.usercenter.v1.LoginRequest']
 export type MenuItem = Schemas['api.usercenter.v1.MenuItem']
 export type MenusReply = Schemas['api.usercenter.v1.MenusReply']
+export type AddOrganizationMemberRequest =
+  Schemas['api.usercenter.v1.AddOrganizationMemberRequest']
+export type AdminArchiveOrganizationRequest =
+  Schemas['api.usercenter.v1.AdminArchiveOrganizationRequest']
+export type ArchiveDepartmentRequest =
+  Schemas['api.usercenter.v1.ArchiveDepartmentRequest']
+export type ArchiveOrganizationRequest =
+  Schemas['api.usercenter.v1.ArchiveOrganizationRequest']
+export type CreateDepartmentRequest =
+  Schemas['api.usercenter.v1.CreateDepartmentRequest']
+export type CreateOrganizationRequest =
+  Schemas['api.usercenter.v1.CreateOrganizationRequest']
+export type Department = Schemas['api.usercenter.v1.Department']
+export type DepartmentsReply = Schemas['api.usercenter.v1.DepartmentsReply']
+export type LeaveOrganizationRequest =
+  Schemas['api.usercenter.v1.LeaveOrganizationRequest']
+export type Organization = Schemas['api.usercenter.v1.Organization']
+export type OrganizationMember =
+  Schemas['api.usercenter.v1.OrganizationMember']
+export type OrganizationMembersReply =
+  Schemas['api.usercenter.v1.OrganizationMembersReply']
+export type OrganizationsReply =
+  Schemas['api.usercenter.v1.OrganizationsReply']
+export type UpdateDepartmentRequest =
+  Schemas['api.usercenter.v1.UpdateDepartmentRequest']
+export type UpdateOrganizationMemberRequest =
+  Schemas['api.usercenter.v1.UpdateOrganizationMemberRequest']
+export type UpdateOrganizationRequest =
+  Schemas['api.usercenter.v1.UpdateOrganizationRequest']
 export type OverviewReply = Schemas['api.usercenter.v1.OverviewReply']
 export type PasswordResetTaskReply =
   Schemas['api.usercenter.v1.PasswordResetTaskReply']

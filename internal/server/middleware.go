@@ -153,7 +153,7 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "登录状态无效或已过期")
 			return ctx, false
 		}
-		if actor.PasswordChangeRequired && strings.HasPrefix(r.URL.Path, "/api/v1/admin") {
+		if actor.PasswordChangeRequired && (strings.HasPrefix(r.URL.Path, "/api/v1/admin") || strings.HasPrefix(r.URL.Path, "/api/v1/orgs")) {
 			writeError(w, http.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "首次登录必须先修改初始密码")
 			return ctx, false
 		}

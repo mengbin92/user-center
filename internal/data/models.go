@@ -382,6 +382,49 @@ type oidcRefreshPO struct {
 
 func (oidcRefreshPO) TableName() string { return "oidc_refresh_tokens" }
 
+type organizationPO struct {
+	ID         int64      `gorm:"column:id;primaryKey;autoIncrement"`
+	Code       string     `gorm:"column:code;size:64;not null;uniqueIndex"`
+	Name       string     `gorm:"column:name;size:128;not null"`
+	Status     string     `gorm:"column:status;size:16;not null"`
+	Revision   uint64     `gorm:"column:revision;not null;default:1"`
+	CreatedBy  int64      `gorm:"column:created_by;not null;default:0"`
+	CreatedAt  time.Time  `gorm:"column:created_at;not null"`
+	UpdatedAt  time.Time  `gorm:"column:updated_at;not null"`
+	ArchivedAt *time.Time `gorm:"column:archived_at"`
+}
+
+func (organizationPO) TableName() string { return "organizations" }
+
+type organizationMemberPO struct {
+	ID             int64     `gorm:"column:id;primaryKey;autoIncrement"`
+	OrganizationID int64     `gorm:"column:organization_id;not null;index"`
+	UserID         int64     `gorm:"column:user_id;not null;index"`
+	Role           string    `gorm:"column:role;size:16;not null"`
+	DepartmentID   *int64    `gorm:"column:department_id"`
+	Status         string    `gorm:"column:status;size:16;not null"`
+	Revision       uint64    `gorm:"column:revision;not null;default:1"`
+	InvitedBy      int64     `gorm:"column:invited_by;not null;default:0"`
+	JoinedAt       time.Time `gorm:"column:joined_at;not null"`
+	UpdatedAt      time.Time `gorm:"column:updated_at;not null"`
+}
+
+func (organizationMemberPO) TableName() string { return "organization_members" }
+
+type organizationDepartmentPO struct {
+	ID             int64     `gorm:"column:id;primaryKey;autoIncrement"`
+	OrganizationID int64     `gorm:"column:organization_id;not null;index"`
+	ParentID       int64     `gorm:"column:parent_id;not null;default:0"`
+	Code           string    `gorm:"column:code;size:64;not null"`
+	Name           string    `gorm:"column:name;size:128;not null"`
+	Status         string    `gorm:"column:status;size:16;not null"`
+	Revision       uint64    `gorm:"column:revision;not null;default:1"`
+	CreatedAt      time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt      time.Time `gorm:"column:updated_at;not null"`
+}
+
+func (organizationDepartmentPO) TableName() string { return "organization_departments" }
+
 type legacyImportBatchPO struct {
 	BatchID          string     `gorm:"column:batch_id;size:64;primaryKey"`
 	SourceCommit     string     `gorm:"column:source_commit;size:64"`

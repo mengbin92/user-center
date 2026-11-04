@@ -29,6 +29,7 @@ import { AdminExportsPage } from '../features/admin/exports-page'
 import { AdminIntegrationsPage } from '../features/admin/integrations-page'
 import { AdminMenusPage } from '../features/admin/menus-page'
 import { AdminOverviewPage } from '../features/admin/overview-page'
+import { AdminOrganizationsPage } from '../features/admin/organizations-page'
 import { AdminPermissionsPage } from '../features/admin/permissions-page'
 import { AdminRoleDetailPage } from '../features/admin/role-detail-page'
 import { AdminRolesPage } from '../features/admin/roles-page'
@@ -36,6 +37,8 @@ import { AdminAuthSettingsPage } from '../features/admin/settings-auth-page'
 import { AdminEmailSettingsPage } from '../features/admin/settings-email-page'
 import { AdminUserDetailPage } from '../features/admin/user-detail-page'
 import { AdminUsersPage } from '../features/admin/users-page'
+import { OrganizationDetailPage } from '../features/orgs/org-detail-page'
+import { OrganizationsPage } from '../features/orgs/orgs-page'
 
 export function AppRoutes() {
   return (
@@ -57,6 +60,11 @@ export function AppRoutes() {
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="roles" element={<SessionRolesPage />} />
           <Route path="activity" element={<ActivityPage />} />
+        </Route>
+
+        <Route path="/orgs" element={<AccountLayout />}>
+          <Route index element={<OrganizationsPage />} />
+          <Route path=":orgId" element={<OrganizationDetailPage />} />
         </Route>
 
         <Route
@@ -88,6 +96,14 @@ export function AppRoutes() {
             element={
               <RequirePermission permission="identity.user.read">
                 <AdminUserDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="organizations"
+            element={
+              <RequirePermission permission="organization.admin.read">
+                <AdminOrganizationsPage />
               </RequirePermission>
             }
           />

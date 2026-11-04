@@ -284,3 +284,30 @@ type OIDCSigner interface {
 	Verify(string) (map[string]any, error)
 	PublicJWK() map[string]any
 }
+
+type OrganizationRepo interface {
+	CreateOrganization(context.Context, Tx, *Organization) (*Organization, error)
+	GetOrganization(context.Context, Tx, int64) (*Organization, error)
+	GetOrganizationByCode(context.Context, Tx, string) (*Organization, error)
+	ListOrganizationsForUser(context.Context, Tx, int64) ([]*Organization, error)
+	ListAllOrganizations(context.Context, Tx, string) ([]*Organization, error)
+	UpdateOrganization(context.Context, Tx, *Organization, uint64) (*Organization, error)
+	ArchiveOrganization(context.Context, Tx, int64, uint64) error
+	CountOrganizations(context.Context, Tx) (int64, error)
+
+	GetMember(context.Context, Tx, int64, int64) (*OrganizationMember, error)
+	ListMembers(context.Context, Tx, int64) ([]*OrganizationMember, error)
+	AddMember(context.Context, Tx, *OrganizationMember) (*OrganizationMember, error)
+	RestoreMember(context.Context, Tx, int64, int64, string, *int64, int64) (*OrganizationMember, error)
+	UpdateMember(context.Context, Tx, *OrganizationMember, uint64) (*OrganizationMember, error)
+	RemoveMember(context.Context, Tx, int64, int64, uint64) error
+	CountActiveOwners(context.Context, Tx, int64) (int64, error)
+	CountActiveMembers(context.Context, Tx, int64) (int64, error)
+
+	ListDepartments(context.Context, Tx, int64) ([]*Department, error)
+	GetDepartment(context.Context, Tx, int64, int64) (*Department, error)
+	CreateDepartment(context.Context, Tx, *Department) (*Department, error)
+	UpdateDepartment(context.Context, Tx, *Department, uint64) (*Department, error)
+	ArchiveDepartment(context.Context, Tx, int64, int64, uint64) error
+	ClearDepartmentMembers(context.Context, Tx, int64, int64) error
+}

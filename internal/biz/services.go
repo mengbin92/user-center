@@ -29,6 +29,7 @@ type Services struct {
 	OIDCIssuer         string
 	OIDCAccessTTL      time.Duration
 	OIDCRefreshTTL     time.Duration
+	Organizations      OrganizationRepo
 	Settings           SettingsRepo
 	Exports            ExportRepo
 	Tx                 TxManager
@@ -58,6 +59,7 @@ type AuditUsecase struct{ *Services }
 type SettingsUsecase struct{ *Services }
 type IntegrationUsecase struct{ *Services }
 type IntegrationAdminUsecase struct{ *Services }
+type OrganizationUsecase struct{ *Services }
 
 func NewAuthUsecase(s *Services) *AuthUsecase               { return &AuthUsecase{Services: s} }
 func NewUserUsecase(s *Services) *UserUsecase               { return &UserUsecase{Services: s} }
@@ -69,6 +71,10 @@ func NewSettingsUsecase(s *Services) *SettingsUsecase       { return &SettingsUs
 func NewIntegrationUsecase(s *Services) *IntegrationUsecase { return &IntegrationUsecase{Services: s} }
 func NewIntegrationAdminUsecase(s *Services) *IntegrationAdminUsecase {
 	return &IntegrationAdminUsecase{Services: s}
+}
+
+func NewOrganizationUsecase(s *Services) *OrganizationUsecase {
+	return &OrganizationUsecase{Services: s}
 }
 
 type RuntimeConfig struct {
@@ -96,7 +102,7 @@ func NewServices(
 	audit AuditRepo, policy PolicyRepo, iam IAMRepo, outbox OutboxRepo,
 	settings SettingsRepo, exports ExportRepo, integrationClients IntegrationClientRepo,
 	oidcClients OIDCClientRepo, oidcCodes OIDCCodeRepo, oidcSigner OIDCSigner,
-	tx TxManager, clock Clock, ids IDGenerator, secrets SecretBox,
+	organizations OrganizationRepo, tx TxManager, clock Clock, ids IDGenerator, secrets SecretBox,
 	oauth map[string]OAuthProvider, cfg *RuntimeConfig,
 ) *Services {
 	s := &Services{
@@ -105,7 +111,7 @@ func NewServices(
 		Limiter: limiter, StepUp: stepUp, Mail: mail, Audit: audit, Policy: policy,
 		IAM: iam, Outbox: outbox, Settings: settings, Exports: exports,
 		IntegrationClients: integrationClients, OIDCClients: oidcClients,
-		OIDCCodes: oidcCodes, OIDCSigner: oidcSigner, Tx: tx,
+		OIDCCodes: oidcCodes, OIDCSigner: oidcSigner, Organizations: organizations, Tx: tx,
 		Clock: clock, IDs: ids, Secrets: secrets, OAuth: oauth,
 		SessionTTL: 12 * time.Hour, IdleTimeout: time.Hour, StepUpTTL: 5 * time.Minute,
 		ChallengeTTL: 10 * time.Minute, ResetTTL: 30 * time.Minute,

@@ -35,6 +35,7 @@
 | 接入客户端 | 凭据只存 SHA-256、一次性展示、按 gRPC 方法白名单校验、可轮换/停用 |
 | Webhook | HMAC-SHA256 原始 body、至少一次投递、重试退避、消费端按 event_id 去重 |
 | OIDC Provider | 授权码一次性消费、PKCE S256、redirect_uri 精确匹配、RS256、短时 access/refresh token、客户端密钥摘要 |
+| 组织成员 | 组织角色校验、最后 owner 保护、平台管理员特权、成员邮箱按角色脱敏、变更 revision CAS；归档/成员增改删要求 Step-up |
 | 审计缺失 | 敏感写与业务事务同提交写审计；安全事件独立表 |
 | 密钥泄露 | 环境变量注入；AES-GCM 加密 TOTP；日志不打印凭据 |
 | 开放重定向 | OAuth 回调只重定向到固定的前端路径；state 单次有效并绑定 HttpOnly Cookie |
@@ -60,11 +61,12 @@
 2. **委派只约束角色分配/撤销**：委派校验覆盖目标角色、目标用户范围、动作与有效期；通过委派不能修改角色 Grant、继承或创建角色，策略变更仍要求直接权限。
 3. **Outbox 为至少一次投递**：消费端按 `event_id` 去重；有订阅客户端时必须配置 `OUTBOX_SIGNING_SECRET`，为空则拒绝投递。队列按订阅方读取未入队历史事件，并使用可过期领取租约，进程中断后可恢复。
 4. **审计读取本身不写审计**：当前只记录写操作与安全事件；有读取审计需求时需增加相应实现。
-5. **无组织/多租户**：仅 platform 授权域，组织相关输入会被拒绝（V2）。
+5. **组织域 IAM/多租户数据隔离仍是 V2.3**：V2.2 已交付组织、部门、成员与组织角色；尚未把角色/分配/资源策略迁移到 `organization:{id}` 授权上下文，也未做租户级数据分区。
 6. **同步导出**：单次最多 100000 行，生成期间占用请求；超大导出需异步任务。
 7. **管理员邮箱变更依赖新邮箱可达**：验证码发送到新邮箱，管理员权限 + Step-up 防止误操作，但无法证明旧邮箱归属；需要旧邮箱确认的场景应走用户自助流程。
 8. **OIDC consent/end-session 尚未提供**：V2.1 对管理员注册的客户端自动同意，discovery 不宣告 end_session；交互式 consent 与 RP-initiated logout 计划在 V2.2。
-9. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。
+9. **组织创建暂无配额/审批**：任意已登录且状态正常的账号可创建组织；如需企业审批或数量上限，应在 V2.3 增加组织创建策略。
+10. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。
 
 ## 5. 上线检查
 

@@ -1,0 +1,211 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "api/usercenter/v1/common.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// OrganizationService owns organization, membership and department management.
+// Organization roles (owner/admin/member) are separate from platform IAM roles.
+service OrganizationService {
+  rpc ListMyOrganizations(ListMyOrganizationsRequest) returns (OrganizationsReply) {
+    option (google.api.http) = {get: "/api/v1/orgs"};
+  }
+  rpc CreateOrganization(CreateOrganizationRequest) returns (Organization) {
+    option (google.api.http) = {post: "/api/v1/orgs" body: "*"};
+  }
+  rpc GetOrganization(GetOrganizationRequest) returns (Organization) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}"};
+  }
+  rpc UpdateOrganization(UpdateOrganizationRequest) returns (Organization) {
+    option (google.api.http) = {patch: "/api/v1/orgs/{id}" body: "*"};
+  }
+  rpc ArchiveOrganization(ArchiveOrganizationRequest) returns (Organization) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}:archive" body: "*"};
+  }
+  rpc ListOrganizationMembers(ListOrganizationMembersRequest) returns (OrganizationMembersReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/members"};
+  }
+  rpc AddOrganizationMember(AddOrganizationMemberRequest) returns (OrganizationMember) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/members" body: "*"};
+  }
+  rpc UpdateOrganizationMember(UpdateOrganizationMemberRequest) returns (OrganizationMember) {
+    option (google.api.http) = {patch: "/api/v1/orgs/{id}/members/{user_id}" body: "*"};
+  }
+  rpc RemoveOrganizationMember(RemoveOrganizationMemberRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/orgs/{id}/members/{user_id}"};
+  }
+  rpc LeaveOrganization(LeaveOrganizationRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/members:leave" body: "*"};
+  }
+  rpc ListDepartments(ListDepartmentsRequest) returns (DepartmentsReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/departments"};
+  }
+  rpc CreateDepartment(CreateDepartmentRequest) returns (Department) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/departments" body: "*"};
+  }
+  rpc UpdateDepartment(UpdateDepartmentRequest) returns (Department) {
+    option (google.api.http) = {patch: "/api/v1/orgs/{id}/departments/{department_id}" body: "*"};
+  }
+  rpc ArchiveDepartment(ArchiveDepartmentRequest) returns (Department) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/departments/{department_id}:archive" body: "*"};
+  }
+
+  // Platform administration; requires root/admin platform role.
+  rpc AdminListOrganizations(AdminListOrganizationsRequest) returns (OrganizationsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/organizations"};
+  }
+  rpc AdminArchiveOrganization(AdminArchiveOrganizationRequest) returns (Organization) {
+    option (google.api.http) = {post: "/api/v1/admin/organizations/{id}:archive" body: "*"};
+  }
+}
+
+message Organization {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  // active | archived
+  string status = 4;
+  // my role in this organization: owner | admin | member | platform
+  string role = 5;
+  int64 member_count = 6;
+  string revision = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message OrganizationMember {
+  string id = 1;
+  string organization_id = 2;
+  string user_id = 3;
+  string username = 4;
+  string display_name = 5;
+  string email = 6;
+  // owner | admin | member
+  string role = 7;
+  string department_id = 8;
+  string status = 9;
+  string revision = 10;
+  string joined_at = 11;
+}
+
+message Department {
+  string id = 1;
+  string organization_id = 2;
+  string parent_id = 3;
+  string code = 4;
+  string name = 5;
+  string status = 6;
+  string revision = 7;
+}
+
+message ListMyOrganizationsRequest {}
+
+message OrganizationsReply {
+  repeated Organization items = 1;
+}
+
+message CreateOrganizationRequest {
+  string code = 1;
+  string name = 2;
+}
+
+message GetOrganizationRequest {
+  string id = 1;
+}
+
+message UpdateOrganizationRequest {
+  string id = 1;
+  string name = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message ArchiveOrganizationRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}
+
+message ListOrganizationMembersRequest {
+  string id = 1;
+}
+
+message OrganizationMembersReply {
+  repeated OrganizationMember items = 1;
+}
+
+message AddOrganizationMemberRequest {
+  string id = 1;
+  // username or email
+  string identifier = 2;
+  // owner | admin | member
+  string role = 3;
+  string department_id = 4;
+  string reason = 5;
+}
+
+message UpdateOrganizationMemberRequest {
+  string id = 1;
+  string user_id = 2;
+  string role = 3;
+  string department_id = 4;
+  string expected_revision = 5;
+  string reason = 6;
+}
+
+message RemoveOrganizationMemberRequest {
+  string id = 1;
+  string user_id = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message LeaveOrganizationRequest {
+  string id = 1;
+}
+
+message ListDepartmentsRequest {
+  string id = 1;
+}
+
+message DepartmentsReply {
+  repeated Department items = 1;
+}
+
+message CreateDepartmentRequest {
+  string id = 1;
+  string parent_id = 2;
+  string code = 3;
+  string name = 4;
+}
+
+message UpdateDepartmentRequest {
+  string id = 1;
+  string department_id = 2;
+  string parent_id = 3;
+  string code = 4;
+  string name = 5;
+  string expected_revision = 6;
+  string reason = 7;
+}
+
+message ArchiveDepartmentRequest {
+  string id = 1;
+  string department_id = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message AdminListOrganizationsRequest {
+  string status = 1;
+}
+
+message AdminArchiveOrganizationRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}

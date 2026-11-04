@@ -45,6 +45,7 @@ func NewHTTPServer(
 	settings *service.SettingsService,
 	integrationAdmin *service.IntegrationAdminService,
 	oidcAdmin *service.OIDCAdminService,
+	organizations *service.OrganizationService,
 	users *biz.UserUsecase,
 	artifactDir ArtifactDir,
 ) *HTTPServer {
@@ -78,6 +79,7 @@ func NewHTTPServer(
 	usercv1.RegisterSettingsServiceHTTPServer(srv, settings)
 	usercv1.RegisterIntegrationAdminServiceHTTPServer(srv, integrationAdmin)
 	usercv1.RegisterOIDCAdminServiceHTTPServer(srv, oidcAdmin)
+	usercv1.RegisterOrganizationServiceHTTPServer(srv, organizations)
 
 	srv.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

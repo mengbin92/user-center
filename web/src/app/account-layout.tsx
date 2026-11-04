@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
+  Building2,
   Fingerprint,
   KeyRound,
   LayoutDashboard,
@@ -16,6 +17,7 @@ import { useAuth } from '../lib/auth'
 import { useSecurityStatus } from '../lib/security'
 import { Button } from '../components/button'
 import { PasswordChangeNotice } from '../features/account/password-change-notice'
+import { OrganizationSwitcher } from '../features/orgs/org-switcher'
 
 type NavItem = {
   to: string
@@ -99,9 +101,26 @@ export function AccountLayout() {
                   {item.label}
                 </NavLink>
               ))}
+              <NavLink
+                to="/orgs"
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    isActive
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                  )
+                }
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                组织
+              </NavLink>
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden sm:block">
+              <OrganizationSwitcher />
+            </div>
             {hasAdmin && !passwordChangeRequired ? (
               <NavLink
                 to="/admin"
@@ -150,6 +169,18 @@ export function AccountLayout() {
                 {item.label}
               </NavLink>
             ))}
+            <NavLink
+              to="/orgs"
+              className={({ isActive }) =>
+                cn(
+                  'flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium',
+                  isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600',
+                )
+              }
+            >
+              <Building2 className="h-3 w-3" />
+              组织
+            </NavLink>
             {hasAdmin && !passwordChangeRequired ? (
               <NavLink
                 to="/admin"

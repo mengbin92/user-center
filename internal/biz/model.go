@@ -401,3 +401,54 @@ type OIDCRefreshToken struct {
 	AuthTime        time.Time
 	ExpiresAt       time.Time
 }
+
+const (
+	OrgStatusActive   = "active"
+	OrgStatusArchived = "archived"
+	OrgRoleOwner      = "owner"
+	OrgRoleAdmin      = "admin"
+	OrgRoleMember     = "member"
+	OrgMemberActive   = "active"
+	OrgMemberRemoved  = "removed"
+)
+
+type Organization struct {
+	ID          int64
+	Code        string
+	Name        string
+	Status      string
+	Revision    uint64
+	CreatedBy   int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	ArchivedAt  *time.Time
+	Role        string
+	MemberCount int64
+}
+
+type OrganizationMember struct {
+	ID             int64
+	OrganizationID int64
+	UserID         int64
+	Username       string
+	DisplayName    string
+	Email          string
+	Role           string
+	DepartmentID   *int64
+	Status         string
+	Revision       uint64
+	InvitedBy      int64
+	JoinedAt       time.Time
+}
+
+type Department struct {
+	ID             int64
+	OrganizationID int64
+	ParentID       int64
+	Code           string
+	Name           string
+	Status         string
+	Revision       uint64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}

@@ -237,3 +237,64 @@ func TestAssignmentListAndDelegationRepo(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, revoked.RevokedAt)
 }
+
+func TestOrganizationRepo(t *testing.T) {
+	d := testData(t)
+	ctx := context.Background()
+	users := NewUserRepo(d)
+	orgs := NewOrganizationRepo(d)
+	now := time.Now().UTC()
+	owner, err := users.Create(ctx, nil, &biz.User{
+		Username: "orgowner", UsernameNormalized: "orgowner", DisplayName: "Owner",
+		Status: biz.UserStatusEnabled, Revision: 1, IdentityVersion: 1, CreatedAt: now, UpdatedAt: now,
+	})
+	require.NoError(t, err)
+	member, err := users.Create(ctx, nil, &biz.User{
+		Username: "orgmember2", UsernameNormalized: "orgmember2", DisplayName: "Member",
+		Status: biz.UserStatusEnabled, Revision: 1, IdentityVersion: 1, CreatedAt: now, UpdatedAt: now,
+	})
+	require.NoError(t, err)
+	org, err := orgs.CreateOrganization(ctx, nil, &biz.Organization{Code: "acme-repo", Name: "Acme", CreatedBy: owner.ID})
+	require.NoError(t, err)
+	require.NotZero(t, org.ID)
+	_, err = orgs.AddMember(ctx, nil, &biz.OrganizationMember{OrganizationID: org.ID, UserID: owner.ID, Role: biz.OrgRoleOwner, InvitedBy: owner.ID})
+	require.NoError(t, err)
+	_, err = orgs.AddMember(ctx, nil, &biz.OrganizationMember{OrganizationID: org.ID, UserID: member.ID, Role: biz.OrgRoleMember, InvitedBy: owner.ID})
+	require.NoError(t, err)
+
+	list, err := orgs.ListOrganizationsForUser(ctx, nil, owner.ID)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	require.Equal(t, "acme-repo", list[0].Code)
+	require.Equal(t, biz.OrgRoleOwner, list[0].Role)
+	require.EqualValues(t, 2, list[0].MemberCount)
+
+	all, err := orgs.ListAllOrganizations(ctx, nil, "")
+	require.NoError(t, err)
+	require.Len(t, all, 1)
+
+	got, err := orgs.GetMember(ctx, nil, org.ID, member.ID)
+	require.NoError(t, err)
+	require.Equal(t, biz.OrgRoleMember, got.Role)
+	updated, err := orgs.UpdateMember(ctx, nil, &biz.OrganizationMember{
+		OrganizationID: org.ID, UserID: member.ID, Role: biz.OrgRoleAdmin,
+	}, got.Revision)
+	require.NoError(t, err)
+	require.Equal(t, biz.OrgRoleAdmin, updated.Role)
+
+	dept, err := orgs.CreateDepartment(ctx, nil, &biz.Department{OrganizationID: org.ID, Code: "eng", Name: "Engineering"})
+	require.NoError(t, err)
+	require.NotZero(t, dept.ID)
+	depts, err := orgs.ListDepartments(ctx, nil, org.ID)
+	require.NoError(t, err)
+	require.Len(t, depts, 1)
+	require.NoError(t, orgs.ArchiveDepartment(ctx, nil, org.ID, dept.ID, dept.Revision))
+
+	archived, err := orgs.UpdateOrganization(ctx, nil, &biz.Organization{ID: org.ID, Name: "Acme 2"}, org.Revision)
+	require.NoError(t, err)
+	require.Equal(t, "Acme 2", archived.Name)
+	require.NoError(t, orgs.ArchiveOrganization(ctx, nil, org.ID, archived.Revision))
+	archived, err = orgs.GetOrganization(ctx, nil, org.ID)
+	require.NoError(t, err)
+	require.Equal(t, biz.OrgStatusArchived, archived.Status)
+}

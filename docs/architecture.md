@@ -25,6 +25,7 @@
 | 第三方身份 | GitHub/Google OAuth2，服务端 code 交换；浏览器不接触 provider token |
 | Outbox worker | 随主进程启动，订阅客户端 Webhook 投递，HMAC 签名 + 指数退避 |
 | OIDC Provider | 标准 discovery/JWKS/authorization code+PKCE/token/userinfo；RSA 签名密钥由部署提供 |
+| Organization | 组织/部门/成员与组织角色；平台管理员跨组织治理；组织域 IAM 留待 V2.3 |
 | SPA | 用户门户 + 管理控制台，仅消费 `/api/v1` |
 
 ## 3. 分层契约

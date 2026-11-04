@@ -26,8 +26,9 @@ web/src/
 ## 页面
 
 - 公开：登录（含 MFA 第二步、GitHub/Google 登录）、注册、忘记/重置密码、协议与隐私。
-- 用户：资料、安全中心（密码/邮箱/MFA/恢复码/Step-up/第三方绑定）、会话、会话角色、登录记录。
-- 管理：概览、用户列表/详情（含管理员邮箱变更）、角色与继承、权限目录、授权分配（`/admin/iam/assignments` 列表/创建/撤销）、委派（`/admin/iam/delegations`）、约束、菜单、授权解释/模拟、审计、导出、认证/邮件配置、接入服务（`/admin/integrations`，客户端凭据/轮换/停用/事件投递重试）、OIDC 应用（`/admin/applications`，客户端/回调/scope/密钥轮换）。
+- 用户：资料、安全中心（密码/邮箱/MFA/恢复码/Step-up/第三方绑定）、会话、会话角色、登录记录、组织切换。
+- 组织：`/orgs` 列表/创建；`/orgs/:id` 概览/成员/部门/设置；owner/admin/member 角色决定可见操作。
+- 管理：概览、用户列表/详情（含管理员邮箱变更）、角色与继承、权限目录、授权分配（`/admin/iam/assignments` 列表/创建/撤销）、委派（`/admin/iam/delegations`）、约束、菜单、授权解释/模拟、审计、导出、认证/邮件配置、接入服务（`/admin/integrations`，客户端凭据/轮换/停用/事件投递重试）、OIDC 应用（`/admin/applications`，客户端/回调/scope/密钥轮换）、组织目录（`/admin/organizations`，平台管理员归档）。
 - 强制流程：登录响应带 `password_change_required` 时跳转安全中心并阻断管理导航；`mfa_enrollment_required` 时提示先绑定 TOTP；`PASSWORD_CHANGE_REQUIRED` / `MFA_ENROLLMENT_REQUIRED` / `DELEGATION_REQUIRED` 都有明确中文提示。
 - OAuth：登录/绑定按钮使用整页跳转 `/api/v1/auth/providers/{provider}/start`，回调结果由 `/auth/callback/:provider` 展示；不在前端保存 provider token。
 - 纯 OAuth 账号在安全中心通过已绑定提供方重新验证（`mode=verify`），之后可设置首个本地密码和 MFA；已有 MFA 时还需当前第二因素。无本地密码时，相应表单不强制填写当前密码。

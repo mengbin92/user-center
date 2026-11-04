@@ -708,6 +708,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Platform administration; requires root/admin platform role. */
+        get: operations["OrganizationService_AdminListOrganizations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations/{id}:archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrganizationService_AdminArchiveOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/overview": {
         parameters: {
             query?: never;
@@ -1380,15 +1413,184 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_ListMyOrganizations"];
+        put?: never;
+        post: operations["OrganizationService_CreateOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_GetOrganization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OrganizationService_UpdateOrganization"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_ListDepartments"];
+        put?: never;
+        post: operations["OrganizationService_CreateDepartment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/departments/{department_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OrganizationService_UpdateDepartment"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/departments/{department_id}:archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrganizationService_ArchiveDepartment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_ListOrganizationMembers"];
+        put?: never;
+        post: operations["OrganizationService_AddOrganizationMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["OrganizationService_RemoveOrganizationMember"];
+        options?: never;
+        head?: never;
+        patch: operations["OrganizationService_UpdateOrganizationMember"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/members:leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrganizationService_LeaveOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}:archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrganizationService_ArchiveOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        "api.usercenter.v1.AddOrganizationMemberRequest": {
+            id?: string;
+            /** @description username or email */
+            identifier?: string;
+            /** @description owner | admin | member */
+            role?: string;
+            department_id?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.AdminArchiveOrganizationRequest": {
+            id?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.ArchiveDepartmentRequest": {
+            id?: string;
+            department_id?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.ArchiveMenuItemRequest": {
             id?: string;
             expected_revision?: string;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.ArchiveOrganizationRequest": {
+            id?: string;
+            expected_revision?: string;
+            reason?: string;
         };
         "api.usercenter.v1.ArchivePermissionRequest": {
             id?: string;
@@ -1589,6 +1791,12 @@ export interface components {
             reason?: string;
             expected_policy_revision?: string;
         };
+        "api.usercenter.v1.CreateDepartmentRequest": {
+            id?: string;
+            parent_id?: string;
+            code?: string;
+            name?: string;
+        };
         "api.usercenter.v1.CreateEmailChallengeRequest": {
             new_email?: string;
             current_password?: string;
@@ -1635,6 +1843,10 @@ export interface components {
             refresh_token_ttl_seconds?: number;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.CreateOrganizationRequest": {
+            code?: string;
+            name?: string;
         };
         "api.usercenter.v1.CreatePasswordResetChallengeRequest": {
             /** @description Username or email. The response never reveals whether the account exists. */
@@ -1705,6 +1917,18 @@ export interface components {
         };
         "api.usercenter.v1.DelegationsReply": {
             items?: components["schemas"]["api.usercenter.v1.Delegation"][];
+        };
+        "api.usercenter.v1.Department": {
+            id?: string;
+            organization_id?: string;
+            parent_id?: string;
+            code?: string;
+            name?: string;
+            status?: string;
+            revision?: string;
+        };
+        "api.usercenter.v1.DepartmentsReply": {
+            items?: components["schemas"]["api.usercenter.v1.Department"][];
         };
         "api.usercenter.v1.DisableIntegrationClientRequest": {
             id?: string;
@@ -1855,6 +2079,9 @@ export interface components {
         "api.usercenter.v1.IntegrationClientsReply": {
             items?: components["schemas"]["api.usercenter.v1.IntegrationClient"][];
         };
+        "api.usercenter.v1.LeaveOrganizationRequest": {
+            id?: string;
+        };
         "api.usercenter.v1.ListMeta": {
             next_page_token?: string;
             total_size?: string;
@@ -1915,6 +2142,39 @@ export interface components {
         };
         "api.usercenter.v1.OIDCClientsReply": {
             items?: components["schemas"]["api.usercenter.v1.OIDCClient"][];
+        };
+        "api.usercenter.v1.Organization": {
+            id?: string;
+            code?: string;
+            name?: string;
+            /** @description active | archived */
+            status?: string;
+            /** @description my role in this organization: owner | admin | member | platform */
+            role?: string;
+            member_count?: string;
+            revision?: string;
+            created_at?: string;
+            updated_at?: string;
+        };
+        "api.usercenter.v1.OrganizationMember": {
+            id?: string;
+            organization_id?: string;
+            user_id?: string;
+            username?: string;
+            display_name?: string;
+            email?: string;
+            /** @description owner | admin | member */
+            role?: string;
+            department_id?: string;
+            status?: string;
+            revision?: string;
+            joined_at?: string;
+        };
+        "api.usercenter.v1.OrganizationMembersReply": {
+            items?: components["schemas"]["api.usercenter.v1.OrganizationMember"][];
+        };
+        "api.usercenter.v1.OrganizationsReply": {
+            items?: components["schemas"]["api.usercenter.v1.Organization"][];
         };
         "api.usercenter.v1.OverviewReply": {
             total_users?: string;
@@ -2257,6 +2517,15 @@ export interface components {
             reason?: string;
             expected_policy_revision?: string;
         };
+        "api.usercenter.v1.UpdateDepartmentRequest": {
+            id?: string;
+            department_id?: string;
+            parent_id?: string;
+            code?: string;
+            name?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.UpdateEmailSettingsRequest": {
             driver?: string;
             from?: string;
@@ -2310,6 +2579,20 @@ export interface components {
             expected_revision?: string;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.UpdateOrganizationMemberRequest": {
+            id?: string;
+            user_id?: string;
+            role?: string;
+            department_id?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.UpdateOrganizationRequest": {
+            id?: string;
+            name?: string;
+            expected_revision?: string;
+            reason?: string;
         };
         "api.usercenter.v1.UpdatePermissionRequest": {
             id?: string;
@@ -3765,6 +4048,54 @@ export interface operations {
             };
         };
     };
+    OrganizationService_AdminListOrganizations: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_AdminArchiveOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.AdminArchiveOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Organization"];
+                };
+            };
+        };
+    };
     AdminUserService_GetOverview: {
         parameters: {
             query?: never;
@@ -4863,6 +5194,349 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    OrganizationService_ListMyOrganizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_CreateOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Organization"];
+                };
+            };
+        };
+    };
+    OrganizationService_GetOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Organization"];
+                };
+            };
+        };
+    };
+    OrganizationService_UpdateOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Organization"];
+                };
+            };
+        };
+    };
+    OrganizationService_ListDepartments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DepartmentsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_CreateDepartment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateDepartmentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Department"];
+                };
+            };
+        };
+    };
+    OrganizationService_UpdateDepartment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                department_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateDepartmentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Department"];
+                };
+            };
+        };
+    };
+    OrganizationService_ArchiveDepartment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                department_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.ArchiveDepartmentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Department"];
+                };
+            };
+        };
+    };
+    OrganizationService_ListOrganizationMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationMembersReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_AddOrganizationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.AddOrganizationMemberRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationMember"];
+                };
+            };
+        };
+    };
+    OrganizationService_RemoveOrganizationMember: {
+        parameters: {
+            query?: {
+                expected_revision?: string;
+                reason?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrganizationService_UpdateOrganizationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateOrganizationMemberRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationMember"];
+                };
+            };
+        };
+    };
+    OrganizationService_LeaveOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.LeaveOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrganizationService_ArchiveOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.ArchiveOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.Organization"];
+                };
             };
         };
     };

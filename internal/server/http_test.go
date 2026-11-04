@@ -106,7 +106,8 @@ func newHarness(t *testing.T) *harness {
 		data.NewStepUpStore(d), mailer,
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
 		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
-		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), oidcSigner, d,
+		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), oidcSigner,
+		data.NewOrganizationRepo(d), d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
 		map[string]biz.OAuthProvider{"mock": &mockOAuthProvider{}},
 		runtime,
@@ -121,6 +122,7 @@ func newHarness(t *testing.T) *harness {
 	integration := biz.NewIntegrationUsecase(svc)
 	integrationAdmin := biz.NewIntegrationAdminUsecase(svc)
 	oidcAdmin := service.NewOIDCAdminService(biz.NewOIDCUsecase(svc))
+	organizations := service.NewOrganizationService(biz.NewOrganizationUsecase(svc))
 
 	_, err = svc.BootstrapRoot(context.Background(), "root", "root@example.com", "ChangeMe-12345")
 	require.NoError(t, err)
@@ -138,6 +140,7 @@ func newHarness(t *testing.T) *harness {
 		service.NewSettingsService(settings),
 		service.NewIntegrationAdminService(integrationAdmin),
 		oidcAdmin,
+		organizations,
 		users,
 		server.ArtifactDir(runtime.ArtifactDir),
 	)
@@ -862,4 +865,129 @@ func TestOIDCPublicClientPKCE(t *testing.T) {
 		"code": {code}, "redirect_uri": {redirectURI}, "code_verifier": {verifier},
 	}, "", "")
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
+
+func TestOrganizationLifecycle(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+
+	rec := h.do(http.MethodPost, "/api/v1/orgs", map[string]any{"code": "acme", "name": "Acme"}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	org := decode[map[string]any](t, rec)
+	orgID := org["id"].(string)
+	require.Equal(t, "owner", org["role"])
+	require.Equal(t, "1", org["member_count"])
+	secret := enrollMFA(t, h, "ChangeMe-12345")
+	stepUp(t, h, "ChangeMe-12345", secret, 1)
+
+	rec = h.do(http.MethodPost, "/api/v1/auth/registration-challenges", map[string]any{
+		"email": "orgmember@example.com",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	registrationChallenge := decode[map[string]any](t, rec)["challenge_id"].(string)
+	registrationCode := regexp.MustCompile(`[0-9]{6}`).FindString(h.mail.last().body)
+	require.NotEmpty(t, registrationCode)
+	rec = h.do(http.MethodPost, "/api/v1/auth/register", map[string]any{
+		"username": "orgmember", "email": "orgmember@example.com", "password": "OrgPass-123",
+		"code": registrationCode, "challenge_id": registrationChallenge, "terms_version": "v1",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	memberUser := decode[map[string]any](t, rec)["user"].(map[string]any)
+	memberID := memberUser["id"].(string)
+
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/members", map[string]any{
+		"identifier": "orgmember", "role": "member", "reason": "test",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/departments", map[string]any{
+		"code": "eng", "name": "Engineering",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	dept := decode[map[string]any](t, rec)
+	deptID := dept["id"].(string)
+
+	rec = h.do(http.MethodPatch, "/api/v1/orgs/"+orgID+"/members/"+memberID, map[string]any{
+		"role": "admin", "department_id": deptID, "expected_revision": "1", "reason": "promote",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	member := decode[map[string]any](t, rec)
+	require.Equal(t, "admin", member["role"])
+
+	// Stale member revision is rejected for removal.
+	rec = h.do(http.MethodDelete, "/api/v1/orgs/"+orgID+"/members/"+memberID+"?expected_revision=999&reason=test", nil, "", true)
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+
+	// Owner cannot be demoted when last owner.
+	rec = h.do(http.MethodPatch, "/api/v1/orgs/"+orgID+"/members/1", map[string]any{
+		"role": "member", "expected_revision": "1", "reason": "demote self",
+	}, "", true)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Contains(t, rec.Body.String(), "ORGANIZATION_LAST_OWNER")
+
+	// Platform admin sees all organizations before the session switches.
+	rec = h.do(http.MethodGet, "/api/v1/admin/organizations", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "Acme")
+
+	// Archiving an organization requires step-up and hides it from members.
+	rec = h.do(http.MethodPost, "/api/v1/orgs", map[string]any{"code": "archive-me", "name": "Archive Me"}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	archiveID := decode[map[string]any](t, rec)["id"].(string)
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+archiveID+":archive", map[string]any{
+		"expected_revision": "1", "reason": "test archive",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	rec = h.do(http.MethodGet, "/api/v1/orgs/"+archiveID, nil, "", false)
+	require.Equal(t, http.StatusNotFound, rec.Code)
+
+	// The member can see the org and manage departments as admin.
+	require.Equal(t, http.StatusOK, h.login("orgmember", "OrgPass-123").Code)
+	rec = h.do(http.MethodPost, "/api/v1/me/password:change", map[string]any{
+		"current_password": "OrgPass-123", "new_password": "OrgPass-456",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	rec = h.do(http.MethodGet, "/api/v1/orgs", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "acme")
+	rec = h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/members", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgID+":archive", map[string]any{
+		"expected_revision": "1", "reason": "test",
+	}, "", true)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+
+}
+
+func TestOrganizationPermissions(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	rec := h.do(http.MethodPost, "/api/v1/orgs", map[string]any{"code": "secure", "name": "Secure"}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	orgID := decode[map[string]any](t, rec)["id"].(string)
+	secret := enrollMFA(t, h, "ChangeMe-12345")
+	stepUp(t, h, "ChangeMe-12345", secret, 1)
+	// Last owner cannot be removed.
+	rec = h.do(http.MethodDelete, "/api/v1/orgs/"+orgID+"/members/1?expected_revision=1&reason=test", nil, "", true)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Contains(t, rec.Body.String(), "ORGANIZATION_LAST_OWNER")
+
+	// Register an outsider and ensure org resources are not visible.
+	rec = h.do(http.MethodPost, "/api/v1/auth/registration-challenges", map[string]any{"email": "outsider@example.com"}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code)
+	challenge := decode[map[string]any](t, rec)["challenge_id"].(string)
+	code := regexp.MustCompile(`[0-9]{6}`).FindString(h.mail.last().body)
+	rec = h.do(http.MethodPost, "/api/v1/auth/register", map[string]any{
+		"username": "outsider", "email": "outsider@example.com", "password": "OutsiderPass-123",
+		"code": code, "challenge_id": challenge, "terms_version": "v1",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, http.StatusOK, h.login("outsider", "OutsiderPass-123").Code)
+	rec = h.do(http.MethodGet, "/api/v1/orgs/"+orgID, nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	rec = h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/members", nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	rec = h.do(http.MethodGet, "/api/v1/orgs", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.NotContains(t, rec.Body.String(), "secure")
 }

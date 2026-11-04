@@ -72,6 +72,8 @@ var seededPermissions = []seedPermission{
 	{"integration.delivery.update", "重试事件投递", "settings", "high", "重试失败的事件投递", []string{"all"}, 630},
 	{"oidc.client.read", "查看 OIDC 应用", "settings", "medium", "读取 OIDC 客户端", []string{"all"}, 700},
 	{"oidc.client.update", "管理 OIDC 应用", "settings", "critical", "创建、轮换与停用 OIDC 客户端", []string{"all"}, 710},
+	{"organization.admin.read", "查看所有组织", "identity", "medium", "平台管理员查看组织目录", []string{"all"}, 800},
+	{"organization.admin.update", "管理所有组织", "identity", "high", "平台管理员归档组织", []string{"all"}, 810},
 }
 
 var seededMenus = []menuPO{
@@ -90,6 +92,7 @@ var seededMenus = []menuPO{
 	{RouteKey: "admin/settings/auth", Name: "认证配置", IconKey: "settings", Sort: 160, RequiredAll: `["settings.auth.read"]`},
 	{RouteKey: "admin/integrations", Name: "接入服务", IconKey: "plug", Sort: 170, RequiredAll: `["integration.client.read"]`},
 	{RouteKey: "admin/applications", Name: "OIDC 应用", IconKey: "app", Sort: 180, RequiredAll: `["oidc.client.read"]`},
+	{RouteKey: "admin/organizations", Name: "组织管理", IconKey: "building", Sort: 190, RequiredAll: `["organization.admin.read"]`},
 }
 
 // SeedCatalog installs the platform resource/permission catalog and the three
@@ -236,6 +239,7 @@ var adminCodes = func() map[string]bool {
 		"iam.resource.read", "iam.permission.read", "iam.role.read", "iam.assignment.read",
 		"iam.assignment.create", "iam.assignment.revoke", "iam.constraint.read",
 		"iam.menu.read", "iam.authorization.explain", "audit.read", "oidc.client.read", "oidc.client.update",
+		"organization.admin.read", "organization.admin.update",
 		"settings.auth.read",
 	} {
 		out[code] = true

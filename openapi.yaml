@@ -1210,6 +1210,48 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.OIDCClientCredentialReply'
+    /api/v1/admin/organizations:
+        get:
+            tags:
+                - OrganizationService
+            description: Platform administration; requires root/admin platform role.
+            operationId: OrganizationService_AdminListOrganizations
+            parameters:
+                - name: status
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrganizationsReply'
+    /api/v1/admin/organizations/{id}:archive:
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_AdminArchiveOrganization
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.AdminArchiveOrganizationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Organization'
     /api/v1/admin/overview:
         get:
             tags:
@@ -2054,8 +2096,354 @@ paths:
                 "200":
                     description: OK
                     content: {}
+    /api/v1/orgs:
+        get:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ListMyOrganizations
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrganizationsReply'
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_CreateOrganization
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateOrganizationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Organization'
+    /api/v1/orgs/{id}:
+        get:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_GetOrganization
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Organization'
+        patch:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_UpdateOrganization
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateOrganizationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Organization'
+    /api/v1/orgs/{id}/departments:
+        get:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ListDepartments
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DepartmentsReply'
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_CreateDepartment
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateDepartmentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Department'
+    /api/v1/orgs/{id}/departments/{department_id}:
+        patch:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_UpdateDepartment
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: department_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateDepartmentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Department'
+    /api/v1/orgs/{id}/departments/{department_id}:archive:
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ArchiveDepartment
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: department_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ArchiveDepartmentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Department'
+    /api/v1/orgs/{id}/members:
+        get:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ListOrganizationMembers
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrganizationMembersReply'
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_AddOrganizationMember
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.AddOrganizationMemberRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrganizationMember'
+    /api/v1/orgs/{id}/members/{user_id}:
+        delete:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_RemoveOrganizationMember
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: user_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: expected_revision
+                  in: query
+                  schema:
+                    type: string
+                - name: reason
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+        patch:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_UpdateOrganizationMember
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: user_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateOrganizationMemberRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrganizationMember'
+    /api/v1/orgs/{id}/members:leave:
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_LeaveOrganization
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.LeaveOrganizationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/orgs/{id}:archive:
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ArchiveOrganization
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ArchiveOrganizationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.Organization'
 components:
     schemas:
+        api.usercenter.v1.AddOrganizationMemberRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                identifier:
+                    type: string
+                    description: username or email
+                role:
+                    type: string
+                    description: owner | admin | member
+                department_id:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.AdminArchiveOrganizationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.ArchiveDepartmentRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                department_id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.ArchiveMenuItemRequest:
             type: object
             properties:
@@ -2066,6 +2454,15 @@ components:
                 reason:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.ArchiveOrganizationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.ArchivePermissionRequest:
             type: object
@@ -2466,6 +2863,17 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.CreateDepartmentRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                parent_id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
         api.usercenter.v1.CreateEmailChallengeRequest:
             type: object
             properties:
@@ -2563,6 +2971,13 @@ components:
                 reason:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.CreateOrganizationRequest:
+            type: object
+            properties:
+                code:
+                    type: string
+                name:
                     type: string
         api.usercenter.v1.CreatePasswordResetChallengeRequest:
             type: object
@@ -2709,6 +3124,30 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Delegation'
+        api.usercenter.v1.Department:
+            type: object
+            properties:
+                id:
+                    type: string
+                organization_id:
+                    type: string
+                parent_id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                status:
+                    type: string
+                revision:
+                    type: string
+        api.usercenter.v1.DepartmentsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Department'
         api.usercenter.v1.DisableIntegrationClientRequest:
             type: object
             properties:
@@ -3001,6 +3440,11 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.IntegrationClient'
+        api.usercenter.v1.LeaveOrganizationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
         api.usercenter.v1.ListMeta:
             type: object
             properties:
@@ -3123,6 +3567,69 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.OIDCClient'
+        api.usercenter.v1.Organization:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                status:
+                    type: string
+                    description: active | archived
+                role:
+                    type: string
+                    description: 'my role in this organization: owner | admin | member | platform'
+                member_count:
+                    type: string
+                revision:
+                    type: string
+                created_at:
+                    type: string
+                updated_at:
+                    type: string
+        api.usercenter.v1.OrganizationMember:
+            type: object
+            properties:
+                id:
+                    type: string
+                organization_id:
+                    type: string
+                user_id:
+                    type: string
+                username:
+                    type: string
+                display_name:
+                    type: string
+                email:
+                    type: string
+                role:
+                    type: string
+                    description: owner | admin | member
+                department_id:
+                    type: string
+                status:
+                    type: string
+                revision:
+                    type: string
+                joined_at:
+                    type: string
+        api.usercenter.v1.OrganizationMembersReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.OrganizationMember'
+        api.usercenter.v1.OrganizationsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Organization'
         api.usercenter.v1.OverviewReply:
             type: object
             properties:
@@ -3817,6 +4324,23 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.UpdateDepartmentRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                department_id:
+                    type: string
+                parent_id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.UpdateEmailSettingsRequest:
             type: object
             properties:
@@ -3926,6 +4450,32 @@ components:
                 reason:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.UpdateOrganizationMemberRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                role:
+                    type: string
+                department_id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateOrganizationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.UpdatePermissionRequest:
             type: object
@@ -4066,6 +4616,10 @@ tags:
       description: MeService owns the authenticated user's self-service surface.
     - name: OIDCAdminService
       description: OIDCAdminService manages OAuth2/OIDC clients for the V2 provider.
+    - name: OrganizationService
+      description: |-
+        OrganizationService owns organization, membership and department management.
+         Organization roles (owner/admin/member) are separate from platform IAM roles.
     - name: SettingsService
       description: |-
         SettingsService owns non-secret authentication policy. Secret material is
