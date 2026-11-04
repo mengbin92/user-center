@@ -7,6 +7,7 @@ import (
 
 	usercv1 "github.com/mengbin92/user-center/api/usercenter/v1"
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/platform/httpx"
 )
 
 type OrganizationService struct {
@@ -17,6 +18,20 @@ type OrganizationService struct {
 
 func NewOrganizationService(uc *biz.OrganizationUsecase, iam *biz.OrgIAMUsecase) *OrganizationService {
 	return &OrganizationService{uc: uc, iam: iam}
+}
+
+// requireActorMeta keeps the audit/request metadata that requestMeta attaches
+// while still failing closed for unauthenticated callers.
+func requireActorMeta(ctx context.Context) (biz.ActorContext, error) {
+	actor, err := requireActor(ctx)
+	if err != nil {
+		return actor, err
+	}
+	info := httpx.From(ctx)
+	actor.RequestID = info.RequestID
+	actor.IP = info.IP
+	actor.UserAgent = info.UserAgent
+	return actor, nil
 }
 
 func organizationProto(o *biz.Organization) *usercv1.Organization {
@@ -47,7 +62,11 @@ func departmentProto(d *biz.Department) *usercv1.Department {
 }
 
 func (s *OrganizationService) ListMyOrganizations(ctx context.Context, _ *usercv1.ListMyOrganizationsRequest) (*usercv1.OrganizationsReply, error) {
-	items, err := s.uc.ListMine(ctx, requestMeta(ctx))
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.uc.ListMine(ctx, actor)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +78,11 @@ func (s *OrganizationService) ListMyOrganizations(ctx context.Context, _ *usercv
 }
 
 func (s *OrganizationService) CreateOrganization(ctx context.Context, req *usercv1.CreateOrganizationRequest) (*usercv1.Organization, error) {
-	org, err := s.uc.Create(ctx, requestMeta(ctx), biz.OrganizationInput{Code: req.GetCode(), Name: req.GetName()})
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	org, err := s.uc.Create(ctx, actor, biz.OrganizationInput{Code: req.GetCode(), Name: req.GetName()})
 	if err != nil {
 		return nil, err
 	}
@@ -67,11 +90,15 @@ func (s *OrganizationService) CreateOrganization(ctx context.Context, req *userc
 }
 
 func (s *OrganizationService) GetOrganization(ctx context.Context, req *usercv1.GetOrganizationRequest) (*usercv1.Organization, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.uc.Get(ctx, requestMeta(ctx), orgID)
+	org, err := s.uc.Get(ctx, actor, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +106,10 @@ func (s *OrganizationService) GetOrganization(ctx context.Context, req *usercv1.
 }
 
 func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *usercv1.UpdateOrganizationRequest) (*usercv1.Organization, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -87,7 +118,7 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *userc
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.uc.Update(ctx, requestMeta(ctx), orgID, req.GetName(), expected, reasonOr(req.GetReason(), "update organization"))
+	org, err := s.uc.Update(ctx, actor, orgID, req.GetName(), expected, reasonOr(req.GetReason(), "update organization"))
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +126,10 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *userc
 }
 
 func (s *OrganizationService) ArchiveOrganization(ctx context.Context, req *usercv1.ArchiveOrganizationRequest) (*usercv1.Organization, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -103,7 +138,7 @@ func (s *OrganizationService) ArchiveOrganization(ctx context.Context, req *user
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.uc.Archive(ctx, requestMeta(ctx), orgID, expected, reasonOr(req.GetReason(), "archive organization"))
+	org, err := s.uc.Archive(ctx, actor, orgID, expected, reasonOr(req.GetReason(), "archive organization"))
 	if err != nil {
 		return nil, err
 	}
@@ -111,11 +146,15 @@ func (s *OrganizationService) ArchiveOrganization(ctx context.Context, req *user
 }
 
 func (s *OrganizationService) ListOrganizationMembers(ctx context.Context, req *usercv1.ListOrganizationMembersRequest) (*usercv1.OrganizationMembersReply, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.uc.Members(ctx, requestMeta(ctx), orgID)
+	items, err := s.uc.Members(ctx, actor, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +166,10 @@ func (s *OrganizationService) ListOrganizationMembers(ctx context.Context, req *
 }
 
 func (s *OrganizationService) AddOrganizationMember(ctx context.Context, req *usercv1.AddOrganizationMemberRequest) (*usercv1.OrganizationMember, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -139,7 +182,7 @@ func (s *OrganizationService) AddOrganizationMember(ctx context.Context, req *us
 		}
 		deptID = &v
 	}
-	m, err := s.uc.AddMember(ctx, requestMeta(ctx), orgID, biz.MemberInput{
+	m, err := s.uc.AddMember(ctx, actor, orgID, biz.MemberInput{
 		Identifier: req.GetIdentifier(), Role: req.GetRole(), DepartmentID: deptID,
 	}, reasonOr(req.GetReason(), "add organization member"))
 	if err != nil {
@@ -149,6 +192,10 @@ func (s *OrganizationService) AddOrganizationMember(ctx context.Context, req *us
 }
 
 func (s *OrganizationService) UpdateOrganizationMember(ctx context.Context, req *usercv1.UpdateOrganizationMemberRequest) (*usercv1.OrganizationMember, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -169,7 +216,7 @@ func (s *OrganizationService) UpdateOrganizationMember(ctx context.Context, req 
 	if err != nil {
 		return nil, err
 	}
-	m, err := s.uc.UpdateMember(ctx, requestMeta(ctx), orgID, userID, req.GetRole(), deptID, expected, reasonOr(req.GetReason(), "update organization member"))
+	m, err := s.uc.UpdateMember(ctx, actor, orgID, userID, req.GetRole(), deptID, expected, reasonOr(req.GetReason(), "update organization member"))
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +224,10 @@ func (s *OrganizationService) UpdateOrganizationMember(ctx context.Context, req 
 }
 
 func (s *OrganizationService) RemoveOrganizationMember(ctx context.Context, req *usercv1.RemoveOrganizationMemberRequest) (*emptypb.Empty, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -189,29 +240,37 @@ func (s *OrganizationService) RemoveOrganizationMember(ctx context.Context, req 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.uc.RemoveMember(ctx, requestMeta(ctx), orgID, userID, expected, reasonOr(req.GetReason(), "remove organization member")); err != nil {
+	if err := s.uc.RemoveMember(ctx, actor, orgID, userID, expected, reasonOr(req.GetReason(), "remove organization member")); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
 }
 
 func (s *OrganizationService) LeaveOrganization(ctx context.Context, req *usercv1.LeaveOrganizationRequest) (*emptypb.Empty, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	if err := s.uc.Leave(ctx, requestMeta(ctx), orgID); err != nil {
+	if err := s.uc.Leave(ctx, actor, orgID); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
 }
 
 func (s *OrganizationService) ListDepartments(ctx context.Context, req *usercv1.ListDepartmentsRequest) (*usercv1.DepartmentsReply, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.uc.Departments(ctx, requestMeta(ctx), orgID)
+	items, err := s.uc.Departments(ctx, actor, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -223,6 +282,10 @@ func (s *OrganizationService) ListDepartments(ctx context.Context, req *usercv1.
 }
 
 func (s *OrganizationService) CreateDepartment(ctx context.Context, req *usercv1.CreateDepartmentRequest) (*usercv1.Department, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -234,7 +297,7 @@ func (s *OrganizationService) CreateDepartment(ctx context.Context, req *usercv1
 			return nil, err
 		}
 	}
-	d, err := s.uc.CreateDepartment(ctx, requestMeta(ctx), orgID, biz.DepartmentInput{
+	d, err := s.uc.CreateDepartment(ctx, actor, orgID, biz.DepartmentInput{
 		ParentID: parentID, Code: req.GetCode(), Name: req.GetName(),
 	})
 	if err != nil {
@@ -244,6 +307,10 @@ func (s *OrganizationService) CreateDepartment(ctx context.Context, req *usercv1
 }
 
 func (s *OrganizationService) UpdateDepartment(ctx context.Context, req *usercv1.UpdateDepartmentRequest) (*usercv1.Department, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -263,7 +330,7 @@ func (s *OrganizationService) UpdateDepartment(ctx context.Context, req *usercv1
 	if err != nil {
 		return nil, err
 	}
-	d, err := s.uc.UpdateDepartment(ctx, requestMeta(ctx), orgID, deptID, biz.DepartmentInput{
+	d, err := s.uc.UpdateDepartment(ctx, actor, orgID, deptID, biz.DepartmentInput{
 		ParentID: parentID, Code: req.GetCode(), Name: req.GetName(),
 	}, expected, reasonOr(req.GetReason(), "update department"))
 	if err != nil {
@@ -273,6 +340,10 @@ func (s *OrganizationService) UpdateDepartment(ctx context.Context, req *usercv1
 }
 
 func (s *OrganizationService) ArchiveDepartment(ctx context.Context, req *usercv1.ArchiveDepartmentRequest) (*usercv1.Department, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -285,14 +356,18 @@ func (s *OrganizationService) ArchiveDepartment(ctx context.Context, req *usercv
 	if err != nil {
 		return nil, err
 	}
-	if err := s.uc.ArchiveDepartment(ctx, requestMeta(ctx), orgID, deptID, expected, reasonOr(req.GetReason(), "archive department")); err != nil {
+	if err := s.uc.ArchiveDepartment(ctx, actor, orgID, deptID, expected, reasonOr(req.GetReason(), "archive department")); err != nil {
 		return nil, err
 	}
 	return &usercv1.Department{Id: id(deptID), OrganizationId: id(orgID), Status: "archived", Revision: rev(expected + 1)}, nil
 }
 
 func (s *OrganizationService) AdminListOrganizations(ctx context.Context, req *usercv1.AdminListOrganizationsRequest) (*usercv1.OrganizationsReply, error) {
-	items, err := s.uc.AdminList(ctx, requestMeta(ctx), req.GetStatus())
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.uc.AdminList(ctx, actor, req.GetStatus())
 	if err != nil {
 		return nil, err
 	}
@@ -304,6 +379,10 @@ func (s *OrganizationService) AdminListOrganizations(ctx context.Context, req *u
 }
 
 func (s *OrganizationService) AdminArchiveOrganization(ctx context.Context, req *usercv1.AdminArchiveOrganizationRequest) (*usercv1.Organization, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -312,7 +391,7 @@ func (s *OrganizationService) AdminArchiveOrganization(ctx context.Context, req 
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.uc.AdminArchive(ctx, requestMeta(ctx), orgID, expected, reasonOr(req.GetReason(), "admin archive organization"))
+	org, err := s.uc.AdminArchive(ctx, actor, orgID, expected, reasonOr(req.GetReason(), "admin archive organization"))
 	if err != nil {
 		return nil, err
 	}

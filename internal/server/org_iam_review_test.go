@@ -292,3 +292,20 @@ func TestLegacyOrganizationGainsIAMOnFirstAccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Contains(t, rec.Body.String(), "org_owner")
 }
+
+func TestOrganizationRoutesRequireAuthentication(t *testing.T) {
+	h := newHarness(t)
+	// Regression: organization handlers used to dereference a zero actor and
+	// panic instead of returning 401 when no session was present.
+	for _, path := range []string{
+		"/api/v1/orgs",
+		"/api/v1/orgs/1",
+		"/api/v1/orgs/1/members",
+		"/api/v1/orgs/1/iam/roles",
+		"/api/v1/orgs/1/iam/assignments",
+		"/api/v1/orgs/1/audits",
+	} {
+		rec := h.do(http.MethodGet, path, nil, "", false)
+		require.Equal(t, http.StatusUnauthorized, rec.Code, "%s: %s", path, rec.Body.String())
+	}
+}

@@ -52,11 +52,15 @@ func orgAuditProto(e *biz.AuditEvent) *usercv1.OrgAuditEvent {
 }
 
 func (s *OrganizationService) ListOrgRoles(ctx context.Context, req *usercv1.GetOrganizationRequest) (*usercv1.OrgRolesReply, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	roles, err := s.iam.Roles(ctx, requestMeta(ctx), orgID)
+	roles, err := s.iam.Roles(ctx, actor, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,11 +72,15 @@ func (s *OrganizationService) ListOrgRoles(ctx context.Context, req *usercv1.Get
 }
 
 func (s *OrganizationService) ListOrgPermissions(ctx context.Context, req *usercv1.GetOrganizationRequest) (*usercv1.OrgPermissionsReply, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.iam.Permissions(ctx, requestMeta(ctx), orgID)
+	items, err := s.iam.Permissions(ctx, actor, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +92,10 @@ func (s *OrganizationService) ListOrgPermissions(ctx context.Context, req *userc
 }
 
 func (s *OrganizationService) CreateOrgRole(ctx context.Context, req *usercv1.CreateOrgRoleRequest) (*usercv1.OrgRole, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -92,7 +104,7 @@ func (s *OrganizationService) CreateOrgRole(ctx context.Context, req *usercv1.Cr
 	if err != nil {
 		return nil, err
 	}
-	role, err := s.iam.CreateRole(ctx, requestMeta(ctx), orgID, biz.OrgRoleInput{
+	role, err := s.iam.CreateRole(ctx, actor, orgID, biz.OrgRoleInput{
 		Code: req.GetCode(), Name: req.GetName(), Description: req.GetDescription(), Grants: grants,
 	}, reasonOr(req.GetReason(), "create organization role"))
 	if err != nil {
@@ -102,6 +114,10 @@ func (s *OrganizationService) CreateOrgRole(ctx context.Context, req *usercv1.Cr
 }
 
 func (s *OrganizationService) UpdateOrgRole(ctx context.Context, req *usercv1.UpdateOrgRoleRequest) (*usercv1.OrgRole, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -114,7 +130,7 @@ func (s *OrganizationService) UpdateOrgRole(ctx context.Context, req *usercv1.Up
 	if err != nil {
 		return nil, err
 	}
-	role, err := s.iam.UpdateRole(ctx, requestMeta(ctx), orgID, roleID, req.GetName(), req.GetDescription(), expected, reasonOr(req.GetReason(), "update organization role"))
+	role, err := s.iam.UpdateRole(ctx, actor, orgID, roleID, req.GetName(), req.GetDescription(), expected, reasonOr(req.GetReason(), "update organization role"))
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +138,10 @@ func (s *OrganizationService) UpdateOrgRole(ctx context.Context, req *usercv1.Up
 }
 
 func (s *OrganizationService) PutOrgRolePermissions(ctx context.Context, req *usercv1.PutOrgRolePermissionsRequest) (*usercv1.OrgRole, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -138,7 +158,7 @@ func (s *OrganizationService) PutOrgRolePermissions(ctx context.Context, req *us
 	if err != nil {
 		return nil, err
 	}
-	role, err := s.iam.PutRoleGrants(ctx, requestMeta(ctx), orgID, roleID, grants, expected, reasonOr(req.GetReason(), "update organization role permissions"))
+	role, err := s.iam.PutRoleGrants(ctx, actor, orgID, roleID, grants, expected, reasonOr(req.GetReason(), "update organization role permissions"))
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +166,10 @@ func (s *OrganizationService) PutOrgRolePermissions(ctx context.Context, req *us
 }
 
 func (s *OrganizationService) ArchiveOrgRole(ctx context.Context, req *usercv1.ArchiveOrgRoleRequest) (*emptypb.Empty, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -158,18 +182,22 @@ func (s *OrganizationService) ArchiveOrgRole(ctx context.Context, req *usercv1.A
 	if err != nil {
 		return nil, err
 	}
-	if err := s.iam.ArchiveRole(ctx, requestMeta(ctx), orgID, roleID, expected, reasonOr(req.GetReason(), "archive organization role")); err != nil {
+	if err := s.iam.ArchiveRole(ctx, actor, orgID, roleID, expected, reasonOr(req.GetReason(), "archive organization role")); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
 }
 
 func (s *OrganizationService) ListOrgAssignments(ctx context.Context, req *usercv1.GetOrganizationRequest) (*usercv1.OrgAssignmentsReply, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.iam.Assignments(ctx, requestMeta(ctx), orgID)
+	items, err := s.iam.Assignments(ctx, actor, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -181,6 +209,10 @@ func (s *OrganizationService) ListOrgAssignments(ctx context.Context, req *userc
 }
 
 func (s *OrganizationService) CreateOrgAssignment(ctx context.Context, req *usercv1.CreateOrgAssignmentRequest) (*usercv1.OrgAssignment, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -201,7 +233,7 @@ func (s *OrganizationService) CreateOrgAssignment(ctx context.Context, req *user
 		}
 		expires = &t
 	}
-	assignment, err := s.iam.AssignRole(ctx, requestMeta(ctx), orgID, biz.OrgAssignmentInput{
+	assignment, err := s.iam.AssignRole(ctx, actor, orgID, biz.OrgAssignmentInput{
 		UserID: userID, RoleID: roleID, ExpiresAt: expires,
 	}, reasonOr(req.GetReason(), "assign organization role"))
 	if err != nil {
@@ -212,6 +244,10 @@ func (s *OrganizationService) CreateOrgAssignment(ctx context.Context, req *user
 }
 
 func (s *OrganizationService) RevokeOrgAssignment(ctx context.Context, req *usercv1.RevokeOrgAssignmentRequest) (*emptypb.Empty, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -224,13 +260,17 @@ func (s *OrganizationService) RevokeOrgAssignment(ctx context.Context, req *user
 	if err != nil {
 		return nil, err
 	}
-	if err := s.iam.RevokeAssignment(ctx, requestMeta(ctx), orgID, assignmentID, expected, reasonOr(req.GetReason(), "revoke organization assignment")); err != nil {
+	if err := s.iam.RevokeAssignment(ctx, actor, orgID, assignmentID, expected, reasonOr(req.GetReason(), "revoke organization assignment")); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
 }
 
 func (s *OrganizationService) ListOrgAudits(ctx context.Context, req *usercv1.ListOrgAuditsRequest) (*usercv1.OrgAuditsReply, error) {
+	actor, err := requireActorMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	orgID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -243,7 +283,7 @@ func (s *OrganizationService) ListOrgAudits(ctx context.Context, req *usercv1.Li
 	if err != nil {
 		return nil, err
 	}
-	events, total, err := s.iam.Audits(ctx, requestMeta(ctx), orgID, req.GetAction(), from, to, int(req.GetOffset()), pageSize(req.GetPageSize()))
+	events, total, err := s.iam.Audits(ctx, actor, orgID, req.GetAction(), from, to, int(req.GetOffset()), pageSize(req.GetPageSize()))
 	if err != nil {
 		return nil, err
 	}
