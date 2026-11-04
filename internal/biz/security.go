@@ -212,8 +212,22 @@ func (uc *SecurityUsecase) Verify(ctx context.Context, actor ActorContext, passw
 	if err := uc.Services.confirmPrimaryAuthentication(ctx, actor, password); err != nil {
 		return time.Time{}, err
 	}
-	if err := uc.verifyMFA(ctx, actor.User.ID, code); err != nil {
-		return time.Time{}, err
+	// Step-up is re-authentication: a second factor is required whenever one is
+	// enrolled, but an account without MFA must still be able to confirm a
+	// sensitive operation with its primary credential instead of being locked
+	// out of every step-up-protected flow.
+	state, err := uc.MFA.Get(ctx, nil, actor.User.ID)
+	switch {
+	case errors.Is(err, ErrResourceNotFound):
+		// no MFA row: password re-entry is the strongest proof available
+	case err != nil:
+		return time.Time{}, ErrDependency
+	case !state.Enabled():
+		// MFA row exists but no confirmed secret
+	default:
+		if err := uc.verifyMFA(ctx, actor.User.ID, code); err != nil {
+			return time.Time{}, err
+		}
 	}
 	until := uc.Clock.Now().Add(uc.StepUpTTL)
 	if err := uc.StepUp.Put(ctx, StepUpKey(actor.Session), until); err != nil {

@@ -14,6 +14,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   panicked (the connection was dropped instead of returning 401). Every
   organization RPC now requires an authenticated actor and keeps the request
   metadata used by tenant audit.
+- Accounts without MFA could never obtain a step-up proof: `Verify` always
+  required a second factor, so every step-up-protected organization write was
+  permanently blocked for them. Step-up now requires the enrolled factor when
+  present and falls back to primary-password re-entry otherwise.
 
 ## [0.5.0] - 2026-11-04
 
