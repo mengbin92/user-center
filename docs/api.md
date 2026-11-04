@@ -12,7 +12,7 @@
 - 失败：使用 HTTP 状态码，响应体 `{code, reason, message, metadata}`；不再使用 HTTP 200 + `success=false`。
 - 分页：`page_size` 默认 20、上限 100；`page_token` 不透明并绑定筛选条件。
 - 并发：敏感写操作必须携带 `expected_revision`；策略写操作携带 `expected_policy_revision`；冲突返回 409 + `current_revision` / `current_policy_revision`。
-- 审计：管理写操作必须携带非空 `reason`，不自动填充默认理由；高风险操作要求近期 Step-up。
+- 审计：管理写操作必须携带非空 `reason`（≤512 字符），不自动填充默认理由；缺失时返回 400 `VALIDATION_FAILED`。高风险操作要求近期 Step-up。
 - 请求大小：JSON 请求体最多 1 MiB，超限返回 413。更新掩码逐字段匹配，未列入掩码的字段保持不变。
 
 ## 2. Cookie 与 CSRF
@@ -108,7 +108,7 @@ OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必
 | 委派 | `GET/POST /admin/iam/delegations`；`PATCH /{id}`；`POST /{id}:revoke`（目标角色、用户范围、assign/revoke、有效期；V1 列表不分页） |
 | 约束 | `GET/POST /admin/iam/constraints`；`PATCH/DELETE /admin/iam/constraints/{id}` |
 | 菜单 | `GET/POST /admin/iam/menus`；`PATCH /admin/iam/menus/{id}`；`{id}:archive` |
-| 解释/模拟 | `POST /admin/iam/authorization:explain`、`authorization:simulate` |
+| 解释/模拟 | `POST /admin/iam/authorization:explain`、`authorization:simulate`；`resource_id` 非空时返回 400，资源级解释需在资源 owner 执行 |
 
 所有 IAM 管理写必须携带 `reason` 与 `expected_policy_revision`，修改/复制/撤销已有资源还需其 `expected_revision`；角色/分配/约束变更要求 Step-up。
 

@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.5.1 — V2.3 交付组织域 IAM 与多租户隔离：`organization:{id}` 授权上下文、组织自定义角色/授权、租户审计与上下文隔离查询；WebAuthn、SCIM、目录同步继续按 V2 里程碑推进。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
+> **状态：v0.5.2 — V2.3 交付组织域 IAM 与多租户隔离：`organization:{id}` 授权上下文、组织自定义角色/授权、租户审计与上下文隔离查询；WebAuthn、SCIM、目录同步继续按 V2 里程碑推进。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
 
 ## 目录
 
@@ -158,6 +158,7 @@ scripts/                  开发与检查脚本
 - v0.3.0：标准 OIDC Provider（discovery/JWKS/authorization code + PKCE/token/userinfo/refresh）、OIDC 客户端管理与 RSA 签名密钥配置。
 - v0.4.0：组织、部门与成员管理；owner/admin/member 组织角色；最后 owner 保护；平台管理员组织目录与归档；成员邮箱按角色脱敏。
 - v0.5.0：组织域 IAM（`organization:{id}` 上下文、内置/自定义组织角色、组织内授权分配与权限目录）与多租户隔离（上下文查询、租户审计、跨租户拒绝）；存量组织自动回填。
+- v0.5.2：全项目审查修复——改密门禁覆盖组织路由、用户列表批量授权查询、组织域并发与隔离加固、`reason` 强制、Webhook 回调限制、迁移可恢复。
 
 **仍延后（V2 后续里程碑）**：排期、验收标准与明确不做的项见 [V2.4 路线图](docs/roadmap-v2.4.md)。
 
@@ -205,6 +206,7 @@ docker compose up -d --build
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
+- [v0.5.2 发布说明](docs/releases/release-v0.5.2.md)
 - [v0.5.1 发布说明](docs/releases/release-v0.5.1.md)
 - [v0.5.0 发布说明](docs/releases/release-v0.5.0.md)
 - [v0.4.0 发布说明](docs/releases/release-v0.4.0.md)

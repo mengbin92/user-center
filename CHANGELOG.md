@@ -6,6 +6,54 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-04
+
+Full-project review follow-up. No schema change.
+
+### Fixed
+
+- The password-change gate skipped `/api/v1/orgs*`: `requiresAuth` only knew
+  `/me` and `/admin`, so the `/orgs` branch was unreachable. An account with an
+  initial password could create and read organizations before changing it.
+  Tenant routes now share one path table with the gate.
+- The user list reloaded all roles, grants, inheritance, assignments and
+  constraints twice per row (about 16 queries per row). It now loads the policy
+  snapshot once and resolves roles and MFA state in two batch queries.
+- Archived organization roles accepted grant edits; the status check was only
+  present in `UpdateRole`.
+- Last-owner and `max_members`/duplicate-assignment checks ran outside the
+  transaction, so concurrent requests could leave an organization without an
+  owner or overfill a role. Both now run inside the transaction under a row
+  lock (`FOR UPDATE`; SQLite skips it).
+- Adding a member distinguished "unknown account" (404) from "disabled account"
+  (400), letting a tenant administrator enumerate the platform directory.
+- `authorization:explain` accepted `resource_id` and silently ignored it,
+  returning an authoritative-looking but incomplete decision. It is now
+  rejected with a validation error and the SPA no longer offers the field.
+- `reason` was optional and silently defaulted at 33 call sites, contradicting
+  the documented audit contract. Management writes now require a non-empty
+  reason (max 512 characters).
+- `memoryKV` never swept expired entries; rate-limit keys embed a time bucket,
+  so a Redis-less deployment grew without bound.
+- Webhook callbacks accepted plaintext `http` for any host and any link-local
+  address (including the metadata endpoint). Public receivers now require
+  `https`; link-local and unspecified hosts are always rejected.
+- Outbox dispatch failures were discarded; they are now logged.
+- The gRPC interceptor forwarded non-integration methods without authentication;
+  it now denies by default.
+- MySQL migrations were wrapped in a transaction even though DDL commits
+  implicitly, so a partial migration could not be resumed. Progress is now
+  recorded per statement.
+- `GetRole` loaded every role and scanned linearly; it now reads one role plus
+  its grants and inheritance.
+
+### Changed
+
+- `authorization:explain` returns `VALIDATION_FAILED` for resource-scoped
+  requests instead of a partial explanation.
+- Swagger/HTTP clients that omitted `reason` on management writes now receive
+  400 `VALIDATION_FAILED`.
+
 ## [0.5.1] - 2026-11-04
 
 ### Fixed
