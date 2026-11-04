@@ -31,4 +31,19 @@ describe('dialog focus', () => {
     expect(trigger).toHaveFocus()
     trigger.remove()
   })
+
+  it('lets only the topmost dialog handle keyboard events during step-up', async () => {
+    const closeParent = vi.fn()
+    const closeVerification = vi.fn()
+    render(<>
+      <Dialog open onClose={closeParent} title="创建应用"><input aria-label="名称" /></Dialog>
+      <Dialog open onClose={closeVerification} title="安全验证"><input aria-label="密码" /><input aria-label="动态码" /></Dialog>
+    </>)
+    await waitFor(() => expect(screen.getByLabelText('密码')).toHaveFocus())
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(screen.getByLabelText('密码')).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(closeVerification).toHaveBeenCalledOnce()
+    expect(closeParent).not.toHaveBeenCalled()
+  })
 })

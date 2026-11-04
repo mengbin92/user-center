@@ -7,7 +7,7 @@ import {
   Plus,
   RefreshCw,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { PageTitle } from '../../app/guards'
@@ -36,7 +36,6 @@ import { useToast } from '../../components/toast'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { errorMessage } from '../../lib/errors'
-import { splitList } from '../../lib/format'
 import { useApiMutation } from '../../lib/mutations'
 import type {
   OIDCClient,
@@ -77,6 +76,10 @@ function scopeSet(scopes?: string[]): Set<string> {
   const next = new Set(scopes ?? [])
   next.add('openid')
   return next
+}
+
+function redirectList(value: string): string[] {
+  return value.split('\n').map((uri) => uri.trim()).filter(Boolean)
 }
 
 function toggleInSet(
@@ -217,23 +220,25 @@ export function ClientSecretDialog({
     <Dialog
       open={credential !== null}
       onClose={onClose}
-      title="请立即保存客户端密钥"
+      title={client?.public && !secret ? `${client?.name || '公开应用'}已创建` : '请立即保存客户端密钥'}
       description="client_secret 仅在本次响应中返回一次，关闭后无法再次查看，也不会写入浏览器存储。"
       size="md"
       bodyClassName="space-y-3"
       footer={
         <>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => void copySecret()}
-            disabled={!secret}
-            icon={<Copy className="h-3.5 w-3.5" />}
-          >
-            复制客户端密钥
-          </Button>
+          {secret ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void copySecret()}
+              disabled={!secret}
+              icon={<Copy className="h-3.5 w-3.5" />}
+            >
+              复制客户端密钥
+            </Button>
+          ) : null}
           <Button variant="primary" size="sm" onClick={onClose}>
-            我已保存
+            {secret ? '我已保存' : '完成'}
           </Button>
         </>
       }
@@ -304,9 +309,11 @@ function ScopePicker({
 }
 
 export function AdminApplicationsPage() {
-  const { can } = useAuth()
+  const { can, authorization, sessionGeneration } = useAuth()
   const canRead = can('oidc.client.read')
   const canWrite = can('oidc.client.update')
+  const canWriteRef = useRef(canWrite)
+  canWriteRef.current = canWrite
 
   const clientsQuery = useQuery({
     queryKey: ['admin', 'oidc-clients'],
@@ -355,7 +362,7 @@ export function AdminApplicationsPage() {
     REFRESH_TTL_MIN,
     REFRESH_TTL_MAX,
   )
-  const createRedirects = splitList(redirectURIs)
+  const createRedirects = redirectList(redirectURIs)
   const createValid =
     createName.trim().length > 0 &&
     serviceOwner.trim().length > 0 &&
@@ -366,6 +373,7 @@ export function AdminApplicationsPage() {
     createReason.trim().length >= 2
 
   const createClient = useApiMutation({
+    gcTime: 0,
     mutationFn: () =>
       api.oidc.createClient({
         name: createName.trim(),
@@ -376,12 +384,15 @@ export function AdminApplicationsPage() {
         require_pkce: isPublic ? true : requirePKCE,
         access_token_ttl_seconds: Number(accessTTL),
         refresh_token_ttl_seconds: Number(refreshTTL),
+        expected_policy_revision: authorization?.policy_revision,
         reason: createReason.trim(),
       }),
     successMessage: 'OIDC 应用已创建',
     successDescription: '请立即保存客户端密钥，关闭后无法再次查看。',
     invalidate: [['admin', 'oidc-clients']],
     onSuccess: (data) => {
+      createClient.reset()
+      if (!canWriteRef.current) return
       setCreateOpen(false)
       resetCreate()
       setCredential(data)
@@ -390,9 +401,10 @@ export function AdminApplicationsPage() {
 
   // Update
   const [editTarget, setEditTarget] = useState<OIDCClient | null>(null)
+  const [editName, setEditName] = useState('')
   const [editRedirectURIs, setEditRedirectURIs] = useState('')
   const [editScopes, setEditScopes] = useState<Set<string>>(new Set())
-  const [editPublic, setEditPublic] = useState(false)
+  const editPublic = Boolean(editTarget?.public)
   const [editPKCE, setEditPKCE] = useState(true)
   const [editAccessTTL, setEditAccessTTL] = useState(DEFAULT_ACCESS_TTL)
   const [editRefreshTTL, setEditRefreshTTL] = useState(DEFAULT_REFRESH_TTL)
@@ -400,9 +412,9 @@ export function AdminApplicationsPage() {
 
   const openEdit = (client: OIDCClient) => {
     setEditTarget(client)
+    setEditName(client.name ?? '')
     setEditRedirectURIs((client.redirect_uris ?? []).join('\n'))
     setEditScopes(scopeSet(client.scopes))
-    setEditPublic(Boolean(client.public))
     setEditPKCE(client.require_pkce ?? Boolean(client.public))
     setEditAccessTTL(
       String(client.access_token_ttl_seconds ?? DEFAULT_ACCESS_TTL),
@@ -423,8 +435,9 @@ export function AdminApplicationsPage() {
     REFRESH_TTL_MIN,
     REFRESH_TTL_MAX,
   )
-  const editRedirects = splitList(editRedirectURIs)
+  const editRedirects = redirectList(editRedirectURIs)
   const editValid =
+    editName.trim().length > 0 &&
     editRedirects.length > 0 &&
     editScopes.has('openid') &&
     !editAccessError &&
@@ -436,7 +449,7 @@ export function AdminApplicationsPage() {
       if (!editTarget) throw new Error('缺少 OIDC 应用')
       return api.oidc.updateClient(editTarget.id ?? '', {
         id: editTarget.id,
-        name: editTarget.name,
+        name: editName.trim(),
         redirect_uris: editRedirects,
         scopes: [...editScopes],
         public: editPublic,
@@ -444,6 +457,7 @@ export function AdminApplicationsPage() {
         access_token_ttl_seconds: Number(editAccessTTL),
         refresh_token_ttl_seconds: Number(editRefreshTTL),
         expected_revision: editTarget.revision ?? '0',
+        expected_policy_revision: authorization?.policy_revision,
         reason: editReason.trim(),
       })
     },
@@ -455,15 +469,20 @@ export function AdminApplicationsPage() {
   // Rotate secret
   const [rotateTarget, setRotateTarget] = useState<OIDCClient | null>(null)
   const rotateSecret = useApiMutation({
+    gcTime: 0,
     mutationFn: (input: { client: OIDCClient; reason: string }) =>
       api.oidc.rotateSecret(input.client.id ?? '', {
         id: input.client.id,
+        expected_revision: input.client.revision,
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: '客户端密钥已轮换',
     successDescription: '旧密钥立即失效，请保存新密钥。',
     invalidate: [['admin', 'oidc-clients']],
     onSuccess: (data) => {
+      rotateSecret.reset()
+      if (!canWriteRef.current) return
       setRotateTarget(null)
       setCredential(data)
     },
@@ -475,12 +494,24 @@ export function AdminApplicationsPage() {
     mutationFn: (input: { client: OIDCClient; reason: string }) =>
       api.oidc.disableClient(input.client.id ?? '', {
         id: input.client.id,
+        expected_revision: input.client.revision,
+        expected_policy_revision: authorization?.policy_revision,
         reason: input.reason,
       }),
     successMessage: 'OIDC 应用已停用',
     invalidate: [['admin', 'oidc-clients']],
     onSuccess: () => setDisableTarget(null),
   })
+
+  useEffect(() => {
+    setCredential(null)
+    setCreateOpen(false)
+    setEditTarget(null)
+    setRotateTarget(null)
+    setDisableTarget(null)
+    createClient.reset()
+    rotateSecret.reset()
+  }, [sessionGeneration, canWrite, createClient.reset, rotateSecret.reset])
 
   return (
     <div className="space-y-4">
@@ -721,7 +752,7 @@ export function AdminApplicationsPage() {
           label="重定向 URI"
           htmlFor="oidc-create-redirects"
           required
-          hint="每行一个，或用逗号分隔。必须为 HTTPS（localhost 可用 HTTP）且不能包含 fragment。"
+          hint="每行一个。必须为 HTTPS（localhost 可用 HTTP）且不能包含 fragment。"
         >
           <Textarea
             id="oidc-create-redirects"
@@ -838,7 +869,7 @@ export function AdminApplicationsPage() {
           if (!updateClient.isPending) setEditTarget(null)
         }}
         title="更新 OIDC 应用"
-        description="名称与服务归属由后端维护；提交时携带当前 revision，其余配置整体覆盖。"
+        description="服务归属与客户端类型不可修改；提交时携带当前版本，其余配置整体覆盖。"
         size="xl"
         bodyClassName="space-y-3"
         dismissible={!updateClient.isPending}
@@ -868,13 +899,12 @@ export function AdminApplicationsPage() {
           <Field
             label="名称"
             htmlFor="oidc-edit-name"
-            hint="由后端维护，更新请求不会修改名称。"
+            required
           >
             <Input
               id="oidc-edit-name"
-              value={editTarget?.name ?? ''}
-              readOnly
-              disabled
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
             />
           </Field>
           <Field
@@ -901,7 +931,7 @@ export function AdminApplicationsPage() {
           label="重定向 URI"
           htmlFor="oidc-edit-redirects"
           required
-          hint="每行一个，或用逗号分隔。必须为 HTTPS（localhost 可用 HTTP）且不能包含 fragment。"
+          hint="每行一个。必须为 HTTPS（localhost 可用 HTTP）且不能包含 fragment。"
         >
           <Textarea
             id="oidc-edit-redirects"
@@ -933,14 +963,9 @@ export function AdminApplicationsPage() {
                 : '机密客户端。'
             }
           >
-            <Switch
-              checked={editPublic}
-              onCheckedChange={(next) => {
-                setEditPublic(next)
-                if (next) setEditPKCE(true)
-              }}
-              label={editPublic ? '公开客户端' : '机密客户端'}
-            />
+            <Badge tone={editPublic ? 'violet' : 'outline'}>
+              {editPublic ? '公开客户端' : '机密客户端'}
+            </Badge>
           </Field>
           <Field label="PKCE" hint="公开客户端必须启用 PKCE（S256）。">
             <Checkbox

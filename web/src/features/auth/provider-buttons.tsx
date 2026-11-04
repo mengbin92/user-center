@@ -22,10 +22,12 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 export function ProviderButtons({
   providers,
   mode = 'login',
+  next,
   className,
 }: {
   providers: string[]
   mode?: OAuthMode
+  next?: string | null
   className?: string
 }) {
   if (providers.length === 0) return null
@@ -37,7 +39,7 @@ export function ProviderButtons({
           <a
             key={provider}
             data-testid={`provider-${provider}`}
-            href={providerStartPath(provider, mode)}
+            href={providerStartPath(provider, mode, next)}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-[11px] font-medium text-slate-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-700"
           >
             <Icon className="h-3.5 w-3.5" />

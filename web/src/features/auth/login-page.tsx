@@ -1,10 +1,11 @@
 import { ArrowLeft, KeyRound, Loader2, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useSearchParams } from 'react-router'
 
 import { Button } from '../../components/button'
+import { FullPageLoading } from '../../app/guards'
 import { InlineAlert } from '../../components/card'
 import { Checkbox, Field, Input } from '../../components/input'
 import { AuthShell } from './auth-shell'
@@ -14,7 +15,7 @@ import { useAuth } from '../../lib/auth'
 import { errorMessage, isApiError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import { oauthErrorMessage } from '../../lib/oauth'
-import { safeNext } from '../../lib/paths'
+import { oidcAuthorizationPath, safeNext } from '../../lib/paths'
 
 function describeAuthError(error: unknown): string {
   if (isApiError(error)) {
@@ -54,6 +55,14 @@ export function LoginPage() {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const destination = postLoginPath ?? next ?? (hasAdmin ? '/admin' : '/account')
+  const oidcNext = oidcAuthorizationPath(destination)
+
+  useEffect(() => {
+    if (status === 'authenticated' && !oauthErrorParam && oidcNext) {
+      window.location.replace(oidcNext)
+    }
+  }, [status, oauthErrorParam, oidcNext])
 
   const contextQuery = useQuery({
     queryKey: ['auth', 'context'],
@@ -73,9 +82,10 @@ export function LoginPage() {
         />
       )
     }
+    if (oidcNext) return <FullPageLoading label="正在继续应用授权…" />
     return (
       <Navigate
-        to={postLoginPath ?? next ?? (hasAdmin ? '/admin' : '/account')}
+        to={destination}
         replace
       />
     )
@@ -100,7 +110,7 @@ export function LoginPage() {
         return
       }
       if (reply.password_change_required) {
-        setPostLoginPath('/account/security?password_change_required=1')
+        setPostLoginPath(`/account/security?password_change_required=1${oidcNext ? `&next=${encodeURIComponent(oidcNext)}` : ''}`)
       }
       await signIn()
     } catch (loginError) {
@@ -125,7 +135,7 @@ export function LoginPage() {
         code: code.trim(),
       })
       if (reply.password_change_required) {
-        setPostLoginPath('/account/security?password_change_required=1')
+        setPostLoginPath(`/account/security?password_change_required=1${oidcNext ? `&next=${encodeURIComponent(oidcNext)}` : ''}`)
       }
       await signIn()
     } catch (mfaError) {
@@ -242,7 +252,7 @@ export function LoginPage() {
                 第三方身份提供方
                 <span className="h-px flex-1 bg-slate-100" />
               </div>
-              <ProviderButtons providers={contextQuery.data.providers} />
+              <ProviderButtons providers={contextQuery.data.providers} next={next} />
               <p className="text-center text-[10px] text-slate-400">
                 将跳转到身份提供方完成授权，回调由服务端校验状态。
               </p>

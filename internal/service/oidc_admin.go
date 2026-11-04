@@ -41,12 +41,16 @@ func (s *OIDCAdminService) ListOIDCClients(ctx context.Context, _ *usercv1.ListO
 }
 
 func (s *OIDCAdminService) CreateOIDCClient(ctx context.Context, req *usercv1.CreateOIDCClientRequest) (*usercv1.OIDCClientCredentialReply, error) {
-	result, err := s.uc.CreateClient(ctx, requestMeta(ctx), biz.OIDCClientInput{
+	actor, err := managementMeta(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.uc.CreateClient(ctx, actor, biz.OIDCClientInput{
 		Name: req.GetName(), ServiceOwner: req.GetServiceOwner(),
 		RedirectURIs: req.GetRedirectUris(), Scopes: req.GetScopes(),
 		Public: req.GetPublic(), RequirePKCE: req.GetRequirePkce(),
 		AccessTTL: int(req.GetAccessTokenTtlSeconds()), RefreshTTL: int(req.GetRefreshTokenTtlSeconds()),
-	}, reasonOr(req.GetReason(), "create oidc client"))
+	}, req.GetReason())
 	if err != nil {
 		return nil, err
 	}
@@ -54,6 +58,10 @@ func (s *OIDCAdminService) CreateOIDCClient(ctx context.Context, req *usercv1.Cr
 }
 
 func (s *OIDCAdminService) UpdateOIDCClient(ctx context.Context, req *usercv1.UpdateOIDCClientRequest) (*usercv1.OIDCClient, error) {
+	actor, err := managementMeta(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	clientID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
@@ -62,11 +70,11 @@ func (s *OIDCAdminService) UpdateOIDCClient(ctx context.Context, req *usercv1.Up
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.uc.UpdateClient(ctx, requestMeta(ctx), clientID, biz.OIDCClientInput{
+	c, err := s.uc.UpdateClient(ctx, actor, clientID, biz.OIDCClientInput{
 		Name: req.GetName(), RedirectURIs: req.GetRedirectUris(), Scopes: req.GetScopes(),
 		Public: req.GetPublic(), RequirePKCE: req.GetRequirePkce(),
 		AccessTTL: int(req.GetAccessTokenTtlSeconds()), RefreshTTL: int(req.GetRefreshTokenTtlSeconds()),
-	}, expected, reasonOr(req.GetReason(), "update oidc client"))
+	}, expected, req.GetReason())
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +82,15 @@ func (s *OIDCAdminService) UpdateOIDCClient(ctx context.Context, req *usercv1.Up
 }
 
 func (s *OIDCAdminService) RotateOIDCClientSecret(ctx context.Context, req *usercv1.RotateOIDCClientSecretRequest) (*usercv1.OIDCClientCredentialReply, error) {
+	actor, err := managementMeta(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	clientID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.uc.RotateSecret(ctx, requestMeta(ctx), clientID, reasonOr(req.GetReason(), "rotate oidc secret"))
+	result, err := s.uc.RotateSecret(ctx, actor, clientID, req.GetReason())
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +98,15 @@ func (s *OIDCAdminService) RotateOIDCClientSecret(ctx context.Context, req *user
 }
 
 func (s *OIDCAdminService) DisableOIDCClient(ctx context.Context, req *usercv1.DisableOIDCClientRequest) (*usercv1.OIDCClient, error) {
+	actor, err := managementMeta(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	clientID, err := parseIDField(req.GetId(), "id")
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.uc.DisableClient(ctx, requestMeta(ctx), clientID, reasonOr(req.GetReason(), "disable oidc client"))
+	c, err := s.uc.DisableClient(ctx, actor, clientID, req.GetReason())
 	if err != nil {
 		return nil, err
 	}

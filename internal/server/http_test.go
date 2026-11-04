@@ -97,7 +97,7 @@ func newHarness(t *testing.T) *harness {
 		PublicBaseURL: "http://localhost:5173", CodeSecret: sec.SessionSecret,
 	}
 	mailer := &captureMail{}
-	oidcSigner, err := data.NewOIDCSigner(zap.NewNop())
+	oidcSigner, err := data.NewOIDCSigner(d, zap.NewNop())
 	require.NoError(t, err)
 	svc := biz.NewServices(
 		data.NewUserRepo(d), data.NewCredentialRepo(d), data.NewExternalIdentityRepo(d),
@@ -560,7 +560,7 @@ func TestOAuthBindAndLogin(t *testing.T) {
 }
 
 func TestIntegrationClientAndOutboxDelivery(t *testing.T) {
-	t.Setenv("OUTBOX_SIGNING_SECRET", "test-webhook-secret")
+	t.Setenv("OUTBOX_SIGNING_SECRET", "test-webhook-secret-at-least-32-bytes")
 	h := newHarness(t)
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	secret := enrollMFA(t, h, "ChangeMe-12345")
@@ -723,7 +723,7 @@ func TestOIDCAuthorizationCodeFlow(t *testing.T) {
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 
 	redirectURI := "http://localhost/callback"
-	verifier := "verifier-0123456789-0123456789-0123456789"
+	verifier := "verifier-0123456789-0123456789-0123456789-0123456789"
 	sum := sha256.Sum256([]byte(verifier))
 	challenge := base64.RawURLEncoding.EncodeToString(sum[:])
 	_, err := h.svc.OIDCClients.CreateOIDCClient(context.Background(), nil, &biz.OIDCClient{
@@ -810,7 +810,7 @@ func TestOIDCClientAdmin(t *testing.T) {
 	secret := enrollMFA(t, h, "ChangeMe-12345")
 	stepUp(t, h, "ChangeMe-12345", secret, 1)
 
-	rec := h.do(http.MethodPost, "/api/v1/admin/oidc-clients", map[string]any{
+	rec := h.management(http.MethodPost, "/api/v1/admin/oidc-clients", map[string]any{
 		"name": "Admin App", "service_owner": "test",
 		"redirect_uris": []string{"https://app.example.com/callback"},
 		"scopes":        []string{"openid", "email"},
@@ -847,7 +847,7 @@ func TestOIDCPublicClientPKCE(t *testing.T) {
 	require.Equal(t, http.StatusFound, rec.Code)
 	require.Contains(t, rec.Header().Get("Location"), "error=invalid_request")
 
-	verifier := "public-verifier-0123456789"
+	verifier := "public-verifier-0123456789-0123456789-0123456789"
 	sum := sha256.Sum256([]byte(verifier))
 	base.Set("code_challenge", base64.RawURLEncoding.EncodeToString(sum[:]))
 	base.Set("code_challenge_method", "S256")

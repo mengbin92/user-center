@@ -20,6 +20,7 @@ export type UseApiMutationOptions<TData, TVariables> = {
   invalidate?: QueryKey[]
   refreshAuth?: boolean
   stepUpRetry?: boolean
+  gcTime?: number
   onSuccess?: (data: TData, variables: TVariables) => void | Promise<void>
   onError?: (error: ApiError) => void
 }
@@ -34,6 +35,7 @@ export function useApiMutation<TData, TVariables>(
   const { refresh, getSessionGeneration } = useAuth()
 
   return useMutation<TData, unknown, TVariables, number>({
+    gcTime: options.gcTime,
     onMutate: () => getSessionGeneration(),
     mutationFn: async (variables: TVariables) => {
       const generation = getSessionGeneration()

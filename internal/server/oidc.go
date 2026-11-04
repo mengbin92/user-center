@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,37 +13,43 @@ import (
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
-func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase, publicBase string) {
+func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase) {
 	discovery := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !oidcMethods(w, r, http.MethodGet, http.MethodHead) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		body, _ := jsonx.Marshal(uc.Discovery())
 		_, _ = w.Write(body)
 	})
 	jwks := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !oidcMethods(w, r, http.MethodGet, http.MethodHead) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		body, _ := jsonx.Marshal(uc.JWKS())
 		_, _ = w.Write(body)
 	})
 	authorize := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		actor, ok := biz.ActorFromContext(r.Context())
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		if !oidcMethods(w, r, http.MethodGet, http.MethodPost) {
+			return
+		}
+		q, ok := oidcForm(w, r, true)
 		if !ok {
-			next := r.URL.RequestURI()
-			http.Redirect(w, r, "/login?next="+url.QueryEscape(next), http.StatusFound)
 			return
 		}
-		if actor.PasswordChangeRequired {
-			http.Redirect(w, r, "/account/security?password_change_required=1", http.StatusFound)
-			return
-		}
-		q := r.URL.Query()
+		actor, loggedIn := biz.ActorFromContext(r.Context())
 		req := biz.OIDCAuthorizeRequest{
 			ClientID: q.Get("client_id"), RedirectURI: q.Get("redirect_uri"),
 			ResponseType: q.Get("response_type"), Scope: q.Get("scope"),
 			State: q.Get("state"), Nonce: q.Get("nonce"),
 			CodeChallenge: q.Get("code_challenge"), CodeChallengeMethod: q.Get("code_challenge_method"),
-			Prompt: q.Get("prompt"),
+			Prompt: q.Get("prompt"), MaxAge: q.Get("max_age"),
 		}
 		target, err := uc.AuthorizeRequest(r.Context(), actor, req)
 		if err != nil {
@@ -50,32 +57,61 @@ func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase, pub
 				http.Redirect(w, r, redirect, http.StatusFound)
 				return
 			}
-			writeOIDCError(w, err, "")
+			var oe *biz.OIDCError
+			if !loggedIn && errors.As(err, &oe) && oe.Code == "login_required" && oe.RedirectURI == "" {
+				next := "/oidc/authorize?" + q.Encode()
+				http.Redirect(w, r, "/login?next="+url.QueryEscape(next), http.StatusFound)
+				return
+			}
+			writeOIDCError(w, err)
 			return
+		}
+		if strings.HasPrefix(target, "/account/security?") {
+			next := "/oidc/authorize?" + q.Encode()
+			target += "&next=" + url.QueryEscape(next)
 		}
 		http.Redirect(w, r, target, http.StatusFound)
 	})
 	token := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeOIDCJSONError(w, http.StatusMethodNotAllowed, "invalid_request", "POST required")
+		if !oidcMethods(w, r, http.MethodPost) {
 			return
 		}
-		if err := r.ParseForm(); err != nil {
-			writeOIDCJSONError(w, http.StatusBadRequest, "invalid_request", "invalid form body")
+		form, ok := oidcForm(w, r, false)
+		if !ok {
 			return
 		}
-		clientID := r.Form.Get("client_id")
-		secret := r.Form.Get("client_secret")
-		if basicID, basicSecret, ok := r.BasicAuth(); ok {
-			clientID, secret = basicID, basicSecret
+		clientID, secret := form.Get("client_id"), form.Get("client_secret")
+		if r.Header.Get("Authorization") != "" {
+			if len(r.Header.Values("Authorization")) != 1 || form.Has("client_secret") {
+				writeOIDCJSONError(w, http.StatusBadRequest, "invalid_request", "multiple client authentication methods")
+				return
+			}
+			basicID, basicSecret, ok := r.BasicAuth()
+			if !ok {
+				writeOIDCJSONError(w, http.StatusUnauthorized, "invalid_client", "HTTP Basic client authentication required")
+				return
+			}
+			var err error
+			clientID, err = url.QueryUnescape(basicID)
+			if err == nil {
+				secret, err = url.QueryUnescape(basicSecret)
+			}
+			if err != nil {
+				writeOIDCJSONError(w, http.StatusUnauthorized, "invalid_client", "invalid client authentication encoding")
+				return
+			}
+			if form.Has("client_id") && form.Get("client_id") != clientID {
+				writeOIDCJSONError(w, http.StatusBadRequest, "invalid_request", "conflicting client identifiers")
+				return
+			}
 		}
 		resp, err := uc.Token(r.Context(), biz.OIDCTokenRequest{
-			GrantType: r.Form.Get("grant_type"), Code: r.Form.Get("code"),
-			RedirectURI: r.Form.Get("redirect_uri"), ClientID: clientID, ClientSecret: secret,
-			CodeVerifier: r.Form.Get("code_verifier"), RefreshToken: r.Form.Get("refresh_token"),
+			GrantType: form.Get("grant_type"), Code: form.Get("code"),
+			RedirectURI: form.Get("redirect_uri"), ClientID: clientID, ClientSecret: secret,
+			CodeVerifier: form.Get("code_verifier"), RefreshToken: form.Get("refresh_token"), Scope: form.Get("scope"),
 		})
 		if err != nil {
-			writeOIDCError(w, err, "")
+			writeOIDCError(w, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -85,14 +121,17 @@ func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase, pub
 		_, _ = w.Write(body)
 	})
 	userinfo := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw := strings.TrimSpace(r.Header.Get("Authorization"))
-		if !strings.HasPrefix(raw, "Bearer ") {
+		if !oidcMethods(w, r, http.MethodGet, http.MethodPost) {
+			return
+		}
+		auth := strings.Fields(r.Header.Get("Authorization"))
+		if len(auth) != 2 || !strings.EqualFold(auth[0], "Bearer") || len(r.Header.Values("Authorization")) != 1 {
 			writeOIDCJSONError(w, http.StatusUnauthorized, "invalid_token", "bearer token required")
 			return
 		}
-		info, err := uc.UserInfo(r.Context(), strings.TrimSpace(strings.TrimPrefix(raw, "Bearer ")))
+		info, err := uc.UserInfo(r.Context(), auth[1])
 		if err != nil {
-			writeOIDCError(w, err, "")
+			writeOIDCError(w, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -105,10 +144,56 @@ func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase, pub
 	srv.HandleFunc("/oidc/authorize", mw.Filter(authorize).ServeHTTP)
 	srv.HandleFunc("/oidc/token", mw.Filter(token).ServeHTTP)
 	srv.HandleFunc("/oidc/userinfo", mw.Filter(userinfo).ServeHTTP)
-	_ = publicBase
 }
 
-func writeOIDCError(w http.ResponseWriter, err error, fallbackRedirect string) {
+func oidcMethods(w http.ResponseWriter, r *http.Request, allowed ...string) bool {
+	for _, method := range allowed {
+		if r.Method == method {
+			return true
+		}
+	}
+	w.Header().Set("Allow", strings.Join(allowed, ", "))
+	writeOIDCJSONError(w, http.StatusMethodNotAllowed, "invalid_request", "HTTP method is not allowed")
+	return false
+}
+
+func oidcForm(w http.ResponseWriter, r *http.Request, allowQuery bool) (url.Values, bool) {
+	const maxBody = 1 << 20
+	if r.ContentLength > maxBody || len(r.URL.RawQuery) > maxBody {
+		writeOIDCJSONError(w, http.StatusRequestEntityTooLarge, "invalid_request", "request exceeds 1 MiB")
+		return nil, false
+	}
+	if !allowQuery && r.URL.RawQuery != "" {
+		writeOIDCJSONError(w, http.StatusBadRequest, "invalid_request", "token parameters must be sent in the request body")
+		return nil, false
+	}
+	if r.Method == http.MethodPost {
+		contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil || contentType != "application/x-www-form-urlencoded" {
+			writeOIDCJSONError(w, http.StatusBadRequest, "invalid_request", "form-encoded body required")
+			return nil, false
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxBody)
+	}
+	if err := r.ParseForm(); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeOIDCJSONError(w, http.StatusRequestEntityTooLarge, "invalid_request", "request exceeds 1 MiB")
+		} else {
+			writeOIDCJSONError(w, http.StatusBadRequest, "invalid_request", "invalid form parameters")
+		}
+		return nil, false
+	}
+	for _, values := range r.Form {
+		if len(values) != 1 {
+			writeOIDCJSONError(w, http.StatusBadRequest, "invalid_request", "duplicate parameters are not allowed")
+			return nil, false
+		}
+	}
+	return r.Form, true
+}
+
+func writeOIDCError(w http.ResponseWriter, err error) {
 	var oe *biz.OIDCError
 	if errors.As(err, &oe) {
 		status := oe.Status
@@ -124,6 +209,15 @@ func writeOIDCError(w http.ResponseWriter, err error, fallbackRedirect string) {
 func writeOIDCJSONError(w http.ResponseWriter, status int, code, description string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	if status == http.StatusUnauthorized {
+		switch code {
+		case "invalid_client":
+			w.Header().Set("WWW-Authenticate", `Basic realm="user-center"`)
+		case "invalid_token":
+			w.Header().Set("WWW-Authenticate", `Bearer realm="user-center", error="invalid_token"`)
+		}
+	}
 	w.WriteHeader(status)
 	body, _ := jsonx.Marshal(map[string]string{"error": code, "error_description": description})
 	_, _ = w.Write(body)

@@ -306,6 +306,7 @@ type CreateOIDCClientRequest struct {
 	AccessTokenTtlSeconds  int32                  `protobuf:"varint,7,opt,name=access_token_ttl_seconds,json=accessTokenTtlSeconds,proto3" json:"access_token_ttl_seconds,omitempty"`
 	RefreshTokenTtlSeconds int32                  `protobuf:"varint,8,opt,name=refresh_token_ttl_seconds,json=refreshTokenTtlSeconds,proto3" json:"refresh_token_ttl_seconds,omitempty"`
 	Reason                 string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,10,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -403,6 +404,13 @@ func (x *CreateOIDCClientRequest) GetReason() string {
 	return ""
 }
 
+func (x *CreateOIDCClientRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type UpdateOIDCClientRequest struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -415,6 +423,7 @@ type UpdateOIDCClientRequest struct {
 	RefreshTokenTtlSeconds int32                  `protobuf:"varint,8,opt,name=refresh_token_ttl_seconds,json=refreshTokenTtlSeconds,proto3" json:"refresh_token_ttl_seconds,omitempty"`
 	ExpectedRevision       string                 `protobuf:"bytes,9,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
 	Reason                 string                 `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,11,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -519,12 +528,21 @@ func (x *UpdateOIDCClientRequest) GetReason() string {
 	return ""
 }
 
+func (x *UpdateOIDCClientRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type RotateOIDCClientSecretRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reason                 string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,4,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *RotateOIDCClientSecretRequest) Reset() {
@@ -571,12 +589,28 @@ func (x *RotateOIDCClientSecretRequest) GetReason() string {
 	return ""
 }
 
+func (x *RotateOIDCClientSecretRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return ""
+}
+
+func (x *RotateOIDCClientSecretRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 type DisableOIDCClientRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reason                 string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedRevision       string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	ExpectedPolicyRevision string                 `protobuf:"bytes,4,opt,name=expected_policy_revision,json=expectedPolicyRevision,proto3" json:"expected_policy_revision,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *DisableOIDCClientRequest) Reset() {
@@ -623,6 +657,20 @@ func (x *DisableOIDCClientRequest) GetReason() string {
 	return ""
 }
 
+func (x *DisableOIDCClientRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return ""
+}
+
+func (x *DisableOIDCClientRequest) GetExpectedPolicyRevision() string {
+	if x != nil {
+		return x.ExpectedPolicyRevision
+	}
+	return ""
+}
+
 var File_api_usercenter_v1_oidc_admin_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
@@ -650,7 +698,7 @@ const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
 	"\rclient_secret\x18\x02 \x01(\tR\fclientSecret\"\x18\n" +
 	"\x16ListOIDCClientsRequest\"G\n" +
 	"\x10OIDCClientsReply\x123\n" +
-	"\x05items\x18\x01 \x03(\v2\x1d.api.usercenter.v1.OIDCClientR\x05items\"\xd6\x02\n" +
+	"\x05items\x18\x01 \x03(\v2\x1d.api.usercenter.v1.OIDCClientR\x05items\"\x90\x03\n" +
 	"\x17CreateOIDCClientRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12#\n" +
 	"\rservice_owner\x18\x02 \x01(\tR\fserviceOwner\x12#\n" +
@@ -660,7 +708,9 @@ const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
 	"\frequire_pkce\x18\x06 \x01(\bR\vrequirePkce\x127\n" +
 	"\x18access_token_ttl_seconds\x18\a \x01(\x05R\x15accessTokenTtlSeconds\x129\n" +
 	"\x19refresh_token_ttl_seconds\x18\b \x01(\x05R\x16refreshTokenTtlSeconds\x12\x16\n" +
-	"\x06reason\x18\t \x01(\tR\x06reason\"\xee\x02\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\n" +
+	" \x01(\tR\x16expectedPolicyRevision\"\xa8\x03\n" +
 	"\x17UpdateOIDCClientRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12#\n" +
@@ -672,13 +722,18 @@ const file_api_usercenter_v1_oidc_admin_proto_rawDesc = "" +
 	"\x19refresh_token_ttl_seconds\x18\b \x01(\x05R\x16refreshTokenTtlSeconds\x12+\n" +
 	"\x11expected_revision\x18\t \x01(\tR\x10expectedRevision\x12\x16\n" +
 	"\x06reason\x18\n" +
-	" \x01(\tR\x06reason\"G\n" +
+	" \x01(\tR\x06reason\x128\n" +
+	"\x18expected_policy_revision\x18\v \x01(\tR\x16expectedPolicyRevision\"\xae\x01\n" +
 	"\x1dRotateOIDCClientSecretRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"B\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12+\n" +
+	"\x11expected_revision\x18\x03 \x01(\tR\x10expectedRevision\x128\n" +
+	"\x18expected_policy_revision\x18\x04 \x01(\tR\x16expectedPolicyRevision\"\xa9\x01\n" +
 	"\x18DisableOIDCClientRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason2\x87\x06\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12+\n" +
+	"\x11expected_revision\x18\x03 \x01(\tR\x10expectedRevision\x128\n" +
+	"\x18expected_policy_revision\x18\x04 \x01(\tR\x16expectedPolicyRevision2\x87\x06\n" +
 	"\x10OIDCAdminService\x12\x85\x01\n" +
 	"\x0fListOIDCClients\x12).api.usercenter.v1.ListOIDCClientsRequest\x1a#.api.usercenter.v1.OIDCClientsReply\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/admin/oidc-clients\x12\x93\x01\n" +
 	"\x10CreateOIDCClient\x12*.api.usercenter.v1.CreateOIDCClientRequest\x1a,.api.usercenter.v1.OIDCClientCredentialReply\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/admin/oidc-clients\x12\x89\x01\n" +

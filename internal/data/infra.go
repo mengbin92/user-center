@@ -363,6 +363,8 @@ func sendSMTP(ctx context.Context, addr, host string, auth smtp.Auth, from, to s
 			if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
 				return err
 			}
+		} else if !strings.EqualFold(host, "localhost") && !net.ParseIP(host).IsLoopback() {
+			return errors.New("remote SMTP submission requires TLS")
 		}
 	}
 	if auth != nil {

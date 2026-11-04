@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func ProvideMail(b *conf.Bootstrap) *conf.Mail {
 	return b.Mail
 }
 
-func NewRuntimeConfig(b *conf.Bootstrap) *biz.RuntimeConfig {
+func NewRuntimeConfig(b *conf.Bootstrap) (*biz.RuntimeConfig, error) {
 	sec := ProvideSecurity(b)
 	srv := ProvideServer(b)
 	cfg := &biz.RuntimeConfig{
@@ -84,20 +85,38 @@ func NewRuntimeConfig(b *conf.Bootstrap) *biz.RuntimeConfig {
 		OIDCAccessTTL:    15 * time.Minute,
 		OIDCRefreshTTL:   24 * time.Hour,
 	}
-	if v := os.Getenv("OIDC_ACCESS_TTL_SECONDS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			cfg.OIDCAccessTTL = time.Duration(n) * time.Second
-		}
-	}
-	if v := os.Getenv("OIDC_REFRESH_TTL_SECONDS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			cfg.OIDCRefreshTTL = time.Duration(n) * time.Second
-		}
-	}
 	if cfg.PublicBaseURL == "" {
 		cfg.PublicBaseURL = "http://localhost:5173"
 	}
-	return cfg
+	if cfg.OIDCIssuer == "" {
+		cfg.OIDCIssuer = cfg.PublicBaseURL
+	}
+	cfg.OIDCIssuer = strings.TrimRight(cfg.OIDCIssuer, "/")
+	u, err := url.Parse(cfg.OIDCIssuer)
+	dataConfig := ProvideData(b)
+	development := dataConfig.Database != nil && (dataConfig.Database.Driver == "sqlite" || dataConfig.Database.Driver == "sqlite3") && !sec.CookieSecure
+	loopback := err == nil && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1")
+	if err != nil || u.Host == "" || u.Opaque != "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(cfg.OIDCIssuer, "?#") ||
+		(u.Scheme != "https" && !(development && loopback && u.Scheme == "http")) {
+		return nil, errors.New("OIDC_ISSUER must be an HTTPS URL without user info, query or fragment (HTTP loopback is allowed only in development)")
+	}
+	for _, field := range []struct {
+		name     string
+		min, max int
+		target   *time.Duration
+	}{
+		{"OIDC_ACCESS_TTL_SECONDS", 60, 86400, &cfg.OIDCAccessTTL},
+		{"OIDC_REFRESH_TTL_SECONDS", 300, 2592000, &cfg.OIDCRefreshTTL},
+	} {
+		if raw := os.Getenv(field.name); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < field.min || n > field.max {
+				return nil, fmt.Errorf("%s must be an integer from %d to %d", field.name, field.min, field.max)
+			}
+			*field.target = time.Duration(n) * time.Second
+		}
+	}
+	return cfg, nil
 }
 
 func durationMinutes(v int32, def time.Duration) time.Duration {
@@ -164,12 +183,7 @@ func (a *App) bootstrap(ctx context.Context) error {
 // BuildServices assembles the usecase graph for CLI tools (migrate/rescue)
 // without Wire. It reuses the exact production repositories.
 func BuildServices(d *data.Data, b *conf.Bootstrap) *biz.Services {
-	cfg := NewRuntimeConfig(b)
 	sec := ProvideSecurity(b)
-	signer, err := data.NewOIDCSigner(zap.NewNop())
-	if err != nil {
-		return nil
-	}
 	return biz.NewServices(
 		data.NewUserRepo(d), data.NewCredentialRepo(d), data.NewExternalIdentityRepo(d),
 		data.NewMFARepo(d), data.NewSessionRepo(d), data.NewSecurityEventRepo(d),
@@ -177,9 +191,9 @@ func BuildServices(d *data.Data, b *conf.Bootstrap) *biz.Services {
 		data.NewStepUpStore(d), data.NewMailSender(d, zap.NewNop(), ProvideMail(b)),
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
 		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
-		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), signer, d,
+		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), nil, d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
-		map[string]biz.OAuthProvider{}, cfg,
+		map[string]biz.OAuthProvider{}, nil,
 	)
 }
 

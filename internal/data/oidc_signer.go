@@ -29,7 +29,7 @@ type oidcSigner struct {
 // OIDC_SIGNING_KEY_PATH. A development instance without a key generates an
 // ephemeral key so tokens become invalid on restart; production must mount a
 // stable key.
-func NewOIDCSigner(log *zap.Logger) (biz.OIDCSigner, error) {
+func NewOIDCSigner(d *Data, log *zap.Logger) (biz.OIDCSigner, error) {
 	pemData := os.Getenv("OIDC_SIGNING_KEY_PEM")
 	if path := os.Getenv("OIDC_SIGNING_KEY_PATH"); pemData == "" && path != "" {
 		raw, err := os.ReadFile(path)
@@ -46,6 +46,11 @@ func NewOIDCSigner(log *zap.Logger) (biz.OIDCSigner, error) {
 		}
 		key = parsed
 	} else {
+		if d == nil || d.conf == nil || d.conf.Database == nil ||
+			(d.conf.Database.Driver != "sqlite" && d.conf.Database.Driver != "sqlite3") ||
+			(d.secure != nil && d.secure.CookieSecure) {
+			return nil, errors.New("OIDC signing key must be configured in production")
+		}
 		generated, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
 			return nil, err
@@ -68,16 +73,23 @@ func parseRSAKey(raw []byte) (*rsa.PrivateKey, error) {
 	if block == nil {
 		return nil, errors.New("OIDC signing key is not PEM")
 	}
-	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
-		return key, nil
-	}
-	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("parse OIDC signing key: %w", err)
+		parsed, parseErr := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if parseErr != nil {
+			return nil, fmt.Errorf("parse OIDC signing key: %w", parseErr)
+		}
+		var ok bool
+		key, ok = parsed.(*rsa.PrivateKey)
+		if !ok {
+			return nil, errors.New("OIDC signing key must be RSA")
+		}
 	}
-	key, ok := parsed.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("OIDC signing key must be RSA")
+	if key.N.BitLen() < 2048 {
+		return nil, errors.New("OIDC signing key must be at least 2048 bits")
+	}
+	if err := key.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid OIDC signing key: %w", err)
 	}
 	return key, nil
 }
@@ -105,10 +117,21 @@ func (s *oidcSigner) Verify(raw string) (map[string]any, error) {
 		if t.Method != jwt.SigningMethodRS256 {
 			return nil, errors.New("unexpected OIDC signing method")
 		}
+		if t.Header["kid"] != s.keyID {
+			return nil, errors.New("unexpected OIDC signing key")
+		}
 		return &s.key.PublicKey, nil
-	}, jwt.WithValidMethods([]string{"RS256"}))
-	if err != nil || !token.Valid {
+	}, jwt.WithValidMethods([]string{"RS256"}), jwt.WithExpirationRequired(), jwt.WithIssuedAt())
+	if err != nil || token == nil || !token.Valid {
 		return nil, bespokeInvalidToken(err)
+	}
+	issuedAt, err := claims.GetIssuedAt()
+	if err != nil || issuedAt == nil {
+		return nil, errors.New("OIDC token requires iat")
+	}
+	sub, err := claims.GetSubject()
+	if err != nil || sub == "" {
+		return nil, errors.New("OIDC token requires sub")
 	}
 	return map[string]any(claims), nil
 }
