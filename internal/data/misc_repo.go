@@ -419,7 +419,7 @@ func exportToBiz(p exportJobPO) *biz.ExportJob {
 		ID: p.ID, Kind: p.Kind, ActorUserID: p.ActorUserID, ActorSessionID: p.ActorSessionID,
 		ScopeSnapshot: p.ScopeSnapshot, RequestedFields: fields, Status: p.Status,
 		ArtifactName: p.ArtifactName, Error: p.Error, CreatedAt: p.CreatedAt.UTC(),
-		ExpiresAt: p.ExpiresAt.UTC(),
+		ExpiresAt: p.ExpiresAt.UTC(), OrganizationID: p.OrganizationID,
 	}
 }
 
@@ -429,6 +429,7 @@ func (r *exportRepo) Create(ctx context.Context, tx biz.Tx, job *biz.ExportJob) 
 		Kind: job.Kind, ActorUserID: job.ActorUserID, ActorSessionID: job.ActorSessionID,
 		ScopeSnapshot: job.ScopeSnapshot, RequestedFields: string(fields), Status: job.Status,
 		ArtifactName: job.ArtifactName, Error: job.Error, CreatedAt: job.CreatedAt, ExpiresAt: job.ExpiresAt,
+		OrganizationID: job.OrganizationID,
 	}
 	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err

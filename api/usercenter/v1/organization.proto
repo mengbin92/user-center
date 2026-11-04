@@ -87,6 +87,24 @@ service OrganizationService {
   rpc ListOrgAudits(ListOrgAuditsRequest) returns (OrgAuditsReply) {
     option (google.api.http) = {get: "/api/v1/orgs/{id}/audits"};
   }
+  rpc ExportOrgAudits(ExportOrgAuditsRequest) returns (ExportJob) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/audits:export" body: "*"};
+  }
+  rpc ExplainOrgAuthorization(ExplainOrgAuthorizationRequest) returns (ExplainOrgAuthorizationReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/iam/authorization:explain"};
+  }
+  rpc CreateOrganizationInvitation(CreateOrganizationInvitationRequest) returns (OrganizationInvitation) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/invitations" body: "*"};
+  }
+  rpc ListOrganizationInvitations(ListOrganizationInvitationsRequest) returns (OrganizationInvitationsReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/invitations"};
+  }
+  rpc RevokeOrganizationInvitation(RevokeOrganizationInvitationRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/orgs/{id}/invitations/{invitation_id}"};
+  }
+  rpc AcceptOrganizationInvitation(AcceptOrganizationInvitationRequest) returns (OrganizationMember) {
+    option (google.api.http) = {post: "/api/v1/orgs/invitations:accept" body: "*"};
+  }
 
   // Platform administration; requires root/admin platform role.
   rpc AdminListOrganizations(AdminListOrganizationsRequest) returns (OrganizationsReply) {
@@ -355,4 +373,77 @@ message ListOrgAuditsRequest {
 message OrgAuditsReply {
   repeated OrgAuditEvent items = 1;
   int64 total = 2;
+}
+
+message ExportOrgAuditsRequest {
+  string id = 1;
+  string action = 2;
+  string from = 3;
+  string to = 4;
+  repeated string fields = 5;
+  string reason = 6;
+}
+
+message ExplainOrgAuthorizationRequest {
+  string id = 1;
+  string user_id = 2;
+  string operation = 3;
+}
+
+message ExplainOrgAuthorizationReply {
+  bool allowed = 1;
+  string reason = 2;
+  repeated GrantSource sources = 3;
+  // Scope boundary, expiry and missing facts derived from the same decision.
+  string context = 4;
+  string scope = 5;
+  string valid_until = 6;
+  repeated string missing = 7;
+  string policy_revision = 8;
+  string user_revision = 9;
+}
+
+message OrganizationInvitation {
+  string id = 1;
+  string organization_id = 2;
+  string email = 3;
+  // owner | admin | member
+  string role = 4;
+  string department_id = 5;
+  // pending | accepted | revoked | expired
+  string status = 6;
+  string invited_by = 7;
+  string expires_at = 8;
+  string accepted_at = 9;
+  string created_at = 10;
+  string revision = 11;
+}
+
+message OrganizationInvitationsReply {
+  repeated OrganizationInvitation items = 1;
+}
+
+message CreateOrganizationInvitationRequest {
+  string id = 1;
+  string email = 2;
+  string role = 3;
+  string department_id = 4;
+  string reason = 5;
+}
+
+message ListOrganizationInvitationsRequest {
+  string id = 1;
+  string status = 2;
+}
+
+message RevokeOrganizationInvitationRequest {
+  string id = 1;
+  string invitation_id = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message AcceptOrganizationInvitationRequest {
+  // Raw invitation token from the e-mail; never stored in plaintext.
+  string token = 1;
 }

@@ -13,6 +13,7 @@ import { AuthCallbackPage } from '../features/auth/callback-page'
 import { ForgotPasswordPage } from '../features/auth/forgot-password-page'
 import { PrivacyPage, TermsPage } from '../features/auth/legal-pages'
 import { ConsentPage } from '../features/auth/consent-page'
+import { AcceptInvitationPage } from '../features/orgs/accept-invitation-page'
 import { LoginPage } from '../features/auth/login-page'
 import { RegisterPage } from '../features/auth/register-page'
 import { ResetPasswordPage } from '../features/auth/reset-password-page'
@@ -80,6 +81,7 @@ export function AppRoutes() {
 
         <Route element={<RequireAuth />}>
           <Route path="/consent" element={<ConsentPage />} />
+          <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
           <Route path="/account" element={<AccountLayout />}>
             <Route index element={<ProfilePage />} />

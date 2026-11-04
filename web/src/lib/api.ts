@@ -130,6 +130,7 @@ import type {
   ArchiveOrganizationRequest,
   ArchiveOrgRoleRequest,
   CreateDepartmentRequest,
+  CreateOrganizationInvitationRequest,
   CreateOrganizationRequest,
   CreateOrgAssignmentRequest,
   CreateOrgRoleRequest,
@@ -141,7 +142,12 @@ import type {
   OrgPermissionsReply,
   OrgRole,
   OrgRolesReply,
+  AcceptOrganizationInvitationRequest,
+  ExplainOrgAuthorizationReply,
+  ExportOrgAuditsRequest,
   Organization,
+  OrganizationInvitation,
+  OrganizationInvitationsReply,
   OrganizationMember,
   OrganizationMembersReply,
   OrganizationsReply,
@@ -436,6 +442,33 @@ export const api = {
         reason,
         expected_revision: expectedRevision,
       }),
+    exportAudits: (id: string, body: ExportOrgAuditsRequest) =>
+      post<ExportJob>(`/api/v1/orgs/${enc(id)}/audits:export`, body),
+    downloadAuditExport: (id: string, jobId: string) =>
+      getBlob(`/api/v1/orgs/${enc(id)}/audits/exports/${enc(jobId)}/download`),
+    explainAuthorization: (id: string, params: { user_id: string; operation: string }) =>
+      get<ExplainOrgAuthorizationReply>(
+        `/api/v1/orgs/${enc(id)}/iam/authorization:explain`,
+        params,
+      ),
+    listInvitations: (id: string, status?: string) =>
+      get<OrganizationInvitationsReply>(`/api/v1/orgs/${enc(id)}/invitations`, {
+        status: status || undefined,
+      }),
+    createInvitation: (id: string, body: CreateOrganizationInvitationRequest) =>
+      post<OrganizationInvitation>(`/api/v1/orgs/${enc(id)}/invitations`, body),
+    revokeInvitation: (
+      id: string,
+      invitationId: string,
+      reason: string,
+      expectedRevision: string,
+    ) =>
+      del(
+        `/api/v1/orgs/${enc(id)}/invitations/${enc(invitationId)}`,
+        { reason, expected_revision: expectedRevision },
+      ),
+    acceptInvitation: (body: AcceptOrganizationInvitationRequest) =>
+      post<OrganizationMember>('/api/v1/orgs/invitations:accept', body),
     listAudits: (id: string, params?: { action?: string; offset?: number; page_size?: number }) =>
       get<OrgAuditsReply>(`/api/v1/orgs/${enc(id)}/audits`, params),
   },

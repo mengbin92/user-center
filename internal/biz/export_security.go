@@ -2,7 +2,6 @@ package biz
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"time"
 
@@ -42,43 +41,6 @@ func (s *Services) exportSnapshot(ctx context.Context, actor ActorContext) (stri
 		return "", ErrDependency
 	}
 	return string(data), nil
-}
-
-func (uc *UserUsecase) authorizeExport(ctx context.Context, actor ActorContext, job *ExportJob) error {
-	if !uc.Clock.Now().Before(job.ExpiresAt) {
-		return ErrResourceNotFound
-	}
-	var authority exportAuthority
-	if jsonx.Unmarshal([]byte(job.ScopeSnapshot), &authority) != nil || authority.PolicyRevision == 0 {
-		return ErrPermissionDenied
-	}
-	policy, err := uc.Policy.PolicyRevision(ctx, nil)
-	if err != nil {
-		return ErrDependency
-	}
-	if policy != authority.PolicyRevision || actor.Session.Revision != authority.SessionRevision || !uc.Clock.Now().Before(authority.ValidUntil) {
-		return ErrPermissionDenied
-	}
-	switch job.Kind {
-	case "users":
-		if _, err := uc.ListScope(ctx, actor, "identity.user.export"); err != nil {
-			return err
-		}
-		// Contact scope is covered by the unchanged policy and session snapshot;
-		// still require a current contact grant when sensitive fields are present.
-		if slices.Contains(job.RequestedFields, "email") || slices.Contains(job.RequestedFields, "email_verified") {
-			if _, err := uc.ListScope(ctx, actor, "identity.user.contact.read"); err != nil {
-				return err
-			}
-		}
-	case "audits":
-		if _, err := uc.Authorize(ctx, actor, "audit.export", 0, true); err != nil {
-			return err
-		}
-	default:
-		return ErrResourceNotFound
-	}
-	return nil
 }
 
 func csvSafeRow(row []string) []string {

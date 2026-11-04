@@ -275,3 +275,17 @@ export type DecideOIDCConsentRequest =
   Schemas['api.usercenter.v1.DecideOIDCConsentRequest']
 export type DecideOIDCConsentReply =
   Schemas['api.usercenter.v1.DecideOIDCConsentReply']
+
+// V2.4 organization invitations, explain and tenant audit export
+export type OrganizationInvitation =
+  Schemas['api.usercenter.v1.OrganizationInvitation']
+export type OrganizationInvitationsReply =
+  Schemas['api.usercenter.v1.OrganizationInvitationsReply']
+export type CreateOrganizationInvitationRequest =
+  Schemas['api.usercenter.v1.CreateOrganizationInvitationRequest']
+export type AcceptOrganizationInvitationRequest =
+  Schemas['api.usercenter.v1.AcceptOrganizationInvitationRequest']
+export type ExplainOrgAuthorizationReply =
+  Schemas['api.usercenter.v1.ExplainOrgAuthorizationReply']
+export type ExportOrgAuditsRequest =
+  Schemas['api.usercenter.v1.ExportOrgAuditsRequest']

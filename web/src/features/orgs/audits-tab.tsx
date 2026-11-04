@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { Download, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
@@ -10,6 +10,7 @@ import {
   InlineAlert,
 } from '../../components/card'
 import { Field, Input } from '../../components/input'
+import { ReasonDialog } from '../../components/reason-dialog'
 import { QueryBoundary } from '../../components/query-state'
 import {
   TBody,
@@ -20,7 +21,9 @@ import {
   Table,
 } from '../../components/table'
 import { api } from '../../lib/api'
+import { saveBlob } from '../../lib/download'
 import { formatDateTime, formatNumber } from '../../lib/format'
+import { useApiMutation } from '../../lib/mutations'
 
 export function OrganizationAuditsTab({
   orgId,
@@ -31,6 +34,7 @@ export function OrganizationAuditsTab({
 }) {
   const [action, setAction] = useState('')
   const [applied, setApplied] = useState('')
+  const [exportOpen, setExportOpen] = useState(false)
 
   const auditsQuery = useQuery({
     queryKey: ['orgs', orgId, 'audits', applied],
@@ -41,6 +45,27 @@ export function OrganizationAuditsTab({
       }),
     retry: false,
     enabled: active,
+  })
+
+  const exportAudits = useApiMutation({
+    mutationFn: async (reason: string) => {
+      const job = await api.orgs.exportAudits(orgId, {
+        id: orgId,
+        action: applied || undefined,
+        reason,
+        fields: [
+          'event_id', 'occurred_at', 'actor_user_id', 'action',
+          'target', 'result', 'reason', 'request_id',
+        ],
+      })
+      const { blob, filename } = await api.orgs.downloadAuditExport(
+        orgId,
+        job.id ?? '',
+      )
+      saveBlob(blob, filename ?? `org-${orgId}-audits.csv`)
+    },
+    successMessage: '租户审计已导出',
+    onSuccess: () => setExportOpen(false),
   })
 
   const items = auditsQuery.data?.items ?? []
@@ -57,15 +82,26 @@ export function OrganizationAuditsTab({
           title="组织审计"
           description={`共 ${formatNumber(total)} 条事件`}
           actions={
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => auditsQuery.refetch()}
-              loading={auditsQuery.isFetching}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              刷新
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => auditsQuery.refetch()}
+                loading={auditsQuery.isFetching}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                刷新
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!active}
+                onClick={() => setExportOpen(true)}
+              >
+                <Download className="h-3.5 w-3.5" />
+                导出本组织审计
+              </Button>
+            </div>
           }
         />
         <div className="border-b border-slate-100 px-4 py-3">
@@ -138,6 +174,16 @@ export function OrganizationAuditsTab({
           )}
         </QueryBoundary>
       </Card>
+
+      <ReasonDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        onConfirm={(reason) => void exportAudits.mutateAsync(reason)}
+        title="导出本组织审计"
+        description="导出内容严格限定当前组织，沿用平台导出的 CSV 字段与下载校验。"
+        confirmLabel="生成并下载"
+        busy={exportAudits.isPending}
+      />
     </div>
   )
 }

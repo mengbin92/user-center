@@ -23,6 +23,7 @@ import {
 } from '../../components/table'
 import { api } from '../../lib/api'
 import { formatDateTime } from '../../lib/format'
+import { OrgExplainPanel } from './org-explain-panel'
 import { useApiMutation } from '../../lib/mutations'
 import type { Organization, OrgRole } from '../../lib/types'
 
@@ -232,6 +233,8 @@ export function OrganizationIAMTab({
       <InlineAlert tone="info" title="组织域 IAM">
         角色、权限与授权只在本组织内生效。平台角色不会获得组织内权限，组织角色也不会影响平台管理。
       </InlineAlert>
+
+      <OrgExplainPanel orgId={orgId} />
 
       <Card>
         <CardHeader

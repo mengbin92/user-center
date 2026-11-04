@@ -2494,6 +2494,670 @@ func (x *OrgAuditsReply) GetTotal() int64 {
 	return 0
 }
 
+type ExportOrgAuditsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
+	From          string                 `protobuf:"bytes,3,opt,name=from,proto3" json:"from,omitempty"`
+	To            string                 `protobuf:"bytes,4,opt,name=to,proto3" json:"to,omitempty"`
+	Fields        []string               `protobuf:"bytes,5,rep,name=fields,proto3" json:"fields,omitempty"`
+	Reason        string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportOrgAuditsRequest) Reset() {
+	*x = ExportOrgAuditsRequest{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportOrgAuditsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportOrgAuditsRequest) ProtoMessage() {}
+
+func (x *ExportOrgAuditsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportOrgAuditsRequest.ProtoReflect.Descriptor instead.
+func (*ExportOrgAuditsRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ExportOrgAuditsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExportOrgAuditsRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *ExportOrgAuditsRequest) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *ExportOrgAuditsRequest) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+func (x *ExportOrgAuditsRequest) GetFields() []string {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+func (x *ExportOrgAuditsRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ExplainOrgAuthorizationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Operation     string                 `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExplainOrgAuthorizationRequest) Reset() {
+	*x = ExplainOrgAuthorizationRequest{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExplainOrgAuthorizationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExplainOrgAuthorizationRequest) ProtoMessage() {}
+
+func (x *ExplainOrgAuthorizationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExplainOrgAuthorizationRequest.ProtoReflect.Descriptor instead.
+func (*ExplainOrgAuthorizationRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ExplainOrgAuthorizationRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExplainOrgAuthorizationRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ExplainOrgAuthorizationRequest) GetOperation() string {
+	if x != nil {
+		return x.Operation
+	}
+	return ""
+}
+
+type ExplainOrgAuthorizationReply struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Allowed bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	Reason  string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	Sources []*GrantSource         `protobuf:"bytes,3,rep,name=sources,proto3" json:"sources,omitempty"`
+	// Scope boundary, expiry and missing facts derived from the same decision.
+	Context        string   `protobuf:"bytes,4,opt,name=context,proto3" json:"context,omitempty"`
+	Scope          string   `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`
+	ValidUntil     string   `protobuf:"bytes,6,opt,name=valid_until,json=validUntil,proto3" json:"valid_until,omitempty"`
+	Missing        []string `protobuf:"bytes,7,rep,name=missing,proto3" json:"missing,omitempty"`
+	PolicyRevision string   `protobuf:"bytes,8,opt,name=policy_revision,json=policyRevision,proto3" json:"policy_revision,omitempty"`
+	UserRevision   string   `protobuf:"bytes,9,opt,name=user_revision,json=userRevision,proto3" json:"user_revision,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ExplainOrgAuthorizationReply) Reset() {
+	*x = ExplainOrgAuthorizationReply{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExplainOrgAuthorizationReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExplainOrgAuthorizationReply) ProtoMessage() {}
+
+func (x *ExplainOrgAuthorizationReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExplainOrgAuthorizationReply.ProtoReflect.Descriptor instead.
+func (*ExplainOrgAuthorizationReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ExplainOrgAuthorizationReply) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *ExplainOrgAuthorizationReply) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ExplainOrgAuthorizationReply) GetSources() []*GrantSource {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+func (x *ExplainOrgAuthorizationReply) GetContext() string {
+	if x != nil {
+		return x.Context
+	}
+	return ""
+}
+
+func (x *ExplainOrgAuthorizationReply) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *ExplainOrgAuthorizationReply) GetValidUntil() string {
+	if x != nil {
+		return x.ValidUntil
+	}
+	return ""
+}
+
+func (x *ExplainOrgAuthorizationReply) GetMissing() []string {
+	if x != nil {
+		return x.Missing
+	}
+	return nil
+}
+
+func (x *ExplainOrgAuthorizationReply) GetPolicyRevision() string {
+	if x != nil {
+		return x.PolicyRevision
+	}
+	return ""
+}
+
+func (x *ExplainOrgAuthorizationReply) GetUserRevision() string {
+	if x != nil {
+		return x.UserRevision
+	}
+	return ""
+}
+
+type OrganizationInvitation struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Email          string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	// owner | admin | member
+	Role         string `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
+	DepartmentId string `protobuf:"bytes,5,opt,name=department_id,json=departmentId,proto3" json:"department_id,omitempty"`
+	// pending | accepted | revoked | expired
+	Status        string `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	InvitedBy     string `protobuf:"bytes,7,opt,name=invited_by,json=invitedBy,proto3" json:"invited_by,omitempty"`
+	ExpiresAt     string `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	AcceptedAt    string `protobuf:"bytes,9,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
+	CreatedAt     string `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Revision      string `protobuf:"bytes,11,opt,name=revision,proto3" json:"revision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OrganizationInvitation) Reset() {
+	*x = OrganizationInvitation{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OrganizationInvitation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OrganizationInvitation) ProtoMessage() {}
+
+func (x *OrganizationInvitation) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OrganizationInvitation.ProtoReflect.Descriptor instead.
+func (*OrganizationInvitation) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *OrganizationInvitation) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetDepartmentId() string {
+	if x != nil {
+		return x.DepartmentId
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetInvitedBy() string {
+	if x != nil {
+		return x.InvitedBy
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetExpiresAt() string {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetAcceptedAt() string {
+	if x != nil {
+		return x.AcceptedAt
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *OrganizationInvitation) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+type OrganizationInvitationsReply struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Items         []*OrganizationInvitation `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OrganizationInvitationsReply) Reset() {
+	*x = OrganizationInvitationsReply{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OrganizationInvitationsReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OrganizationInvitationsReply) ProtoMessage() {}
+
+func (x *OrganizationInvitationsReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OrganizationInvitationsReply.ProtoReflect.Descriptor instead.
+func (*OrganizationInvitationsReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *OrganizationInvitationsReply) GetItems() []*OrganizationInvitation {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type CreateOrganizationInvitationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Role          string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	DepartmentId  string                 `protobuf:"bytes,4,opt,name=department_id,json=departmentId,proto3" json:"department_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateOrganizationInvitationRequest) Reset() {
+	*x = CreateOrganizationInvitationRequest{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateOrganizationInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateOrganizationInvitationRequest) ProtoMessage() {}
+
+func (x *CreateOrganizationInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateOrganizationInvitationRequest.ProtoReflect.Descriptor instead.
+func (*CreateOrganizationInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *CreateOrganizationInvitationRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CreateOrganizationInvitationRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *CreateOrganizationInvitationRequest) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *CreateOrganizationInvitationRequest) GetDepartmentId() string {
+	if x != nil {
+		return x.DepartmentId
+	}
+	return ""
+}
+
+func (x *CreateOrganizationInvitationRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ListOrganizationInvitationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOrganizationInvitationsRequest) Reset() {
+	*x = ListOrganizationInvitationsRequest{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOrganizationInvitationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOrganizationInvitationsRequest) ProtoMessage() {}
+
+func (x *ListOrganizationInvitationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOrganizationInvitationsRequest.ProtoReflect.Descriptor instead.
+func (*ListOrganizationInvitationsRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ListOrganizationInvitationsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ListOrganizationInvitationsRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type RevokeOrganizationInvitationRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	InvitationId     string                 `protobuf:"bytes,2,opt,name=invitation_id,json=invitationId,proto3" json:"invitation_id,omitempty"`
+	ExpectedRevision string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	Reason           string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *RevokeOrganizationInvitationRequest) Reset() {
+	*x = RevokeOrganizationInvitationRequest{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeOrganizationInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeOrganizationInvitationRequest) ProtoMessage() {}
+
+func (x *RevokeOrganizationInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeOrganizationInvitationRequest.ProtoReflect.Descriptor instead.
+func (*RevokeOrganizationInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *RevokeOrganizationInvitationRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RevokeOrganizationInvitationRequest) GetInvitationId() string {
+	if x != nil {
+		return x.InvitationId
+	}
+	return ""
+}
+
+func (x *RevokeOrganizationInvitationRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return ""
+}
+
+func (x *RevokeOrganizationInvitationRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AcceptOrganizationInvitationRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Raw invitation token from the e-mail; never stored in plaintext.
+	Token         string `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AcceptOrganizationInvitationRequest) Reset() {
+	*x = AcceptOrganizationInvitationRequest{}
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcceptOrganizationInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcceptOrganizationInvitationRequest) ProtoMessage() {}
+
+func (x *AcceptOrganizationInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_organization_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcceptOrganizationInvitationRequest.ProtoReflect.Descriptor instead.
+func (*AcceptOrganizationInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_organization_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *AcceptOrganizationInvitationRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
 var File_api_usercenter_v1_organization_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_organization_proto_rawDesc = "" +
@@ -2691,7 +3355,64 @@ const file_api_usercenter_v1_organization_proto_rawDesc = "" +
 	"\tpage_size\x18\x06 \x01(\x05R\bpageSize\"^\n" +
 	"\x0eOrgAuditsReply\x126\n" +
 	"\x05items\x18\x01 \x03(\v2 .api.usercenter.v1.OrgAuditEventR\x05items\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x03R\x05total2\xca\x1d\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total\"\x94\x01\n" +
+	"\x16ExportOrgAuditsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\x12\x12\n" +
+	"\x04from\x18\x03 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x04 \x01(\tR\x02to\x12\x16\n" +
+	"\x06fields\x18\x05 \x03(\tR\x06fields\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\"g\n" +
+	"\x1eExplainOrgAuthorizationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1c\n" +
+	"\toperation\x18\x03 \x01(\tR\toperation\"\xc3\x02\n" +
+	"\x1cExplainOrgAuthorizationReply\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x128\n" +
+	"\asources\x18\x03 \x03(\v2\x1e.api.usercenter.v1.GrantSourceR\asources\x12\x18\n" +
+	"\acontext\x18\x04 \x01(\tR\acontext\x12\x14\n" +
+	"\x05scope\x18\x05 \x01(\tR\x05scope\x12\x1f\n" +
+	"\vvalid_until\x18\x06 \x01(\tR\n" +
+	"validUntil\x12\x18\n" +
+	"\amissing\x18\a \x03(\tR\amissing\x12'\n" +
+	"\x0fpolicy_revision\x18\b \x01(\tR\x0epolicyRevision\x12#\n" +
+	"\ruser_revision\x18\t \x01(\tR\fuserRevision\"\xd2\x02\n" +
+	"\x16OrganizationInvitation\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
+	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x12\n" +
+	"\x04role\x18\x04 \x01(\tR\x04role\x12#\n" +
+	"\rdepartment_id\x18\x05 \x01(\tR\fdepartmentId\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"invited_by\x18\a \x01(\tR\tinvitedBy\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\b \x01(\tR\texpiresAt\x12\x1f\n" +
+	"\vaccepted_at\x18\t \x01(\tR\n" +
+	"acceptedAt\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\n" +
+	" \x01(\tR\tcreatedAt\x12\x1a\n" +
+	"\brevision\x18\v \x01(\tR\brevision\"_\n" +
+	"\x1cOrganizationInvitationsReply\x12?\n" +
+	"\x05items\x18\x01 \x03(\v2).api.usercenter.v1.OrganizationInvitationR\x05items\"\x9c\x01\n" +
+	"#CreateOrganizationInvitationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\x12#\n" +
+	"\rdepartment_id\x18\x04 \x01(\tR\fdepartmentId\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"L\n" +
+	"\"ListOrganizationInvitationsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\"\x9f\x01\n" +
+	"#RevokeOrganizationInvitationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rinvitation_id\x18\x02 \x01(\tR\finvitationId\x12+\n" +
+	"\x11expected_revision\x18\x03 \x01(\tR\x10expectedRevision\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\";\n" +
+	"#AcceptOrganizationInvitationRequest\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token2\xb9%\n" +
 	"\x13OrganizationService\x12\x81\x01\n" +
 	"\x13ListMyOrganizations\x12-.api.usercenter.v1.ListMyOrganizationsRequest\x1a%.api.usercenter.v1.OrganizationsReply\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/api/v1/orgs\x12|\n" +
 	"\x12CreateOrganization\x12,.api.usercenter.v1.CreateOrganizationRequest\x1a\x1f.api.usercenter.v1.Organization\"\x17\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/api/v1/orgs\x12x\n" +
@@ -2716,7 +3437,13 @@ const file_api_usercenter_v1_organization_proto_rawDesc = "" +
 	"\x12ListOrgAssignments\x12).api.usercenter.v1.GetOrganizationRequest\x1a&.api.usercenter.v1.OrgAssignmentsReply\")\x82\xd3\xe4\x93\x02#\x12!/api/v1/orgs/{id}/iam/assignments\x12\x94\x01\n" +
 	"\x13CreateOrgAssignment\x12-.api.usercenter.v1.CreateOrgAssignmentRequest\x1a .api.usercenter.v1.OrgAssignment\",\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/orgs/{id}/iam/assignments\x12\x97\x01\n" +
 	"\x13RevokeOrgAssignment\x12-.api.usercenter.v1.RevokeOrgAssignmentRequest\x1a\x16.google.protobuf.Empty\"9\x82\xd3\xe4\x93\x023*1/api/v1/orgs/{id}/iam/assignments/{assignment_id}\x12}\n" +
-	"\rListOrgAudits\x12'.api.usercenter.v1.ListOrgAuditsRequest\x1a!.api.usercenter.v1.OrgAuditsReply\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/orgs/{id}/audits\x12\x96\x01\n" +
+	"\rListOrgAudits\x12'.api.usercenter.v1.ListOrgAuditsRequest\x1a!.api.usercenter.v1.OrgAuditsReply\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/orgs/{id}/audits\x12\x86\x01\n" +
+	"\x0fExportOrgAudits\x12).api.usercenter.v1.ExportOrgAuditsRequest\x1a\x1c.api.usercenter.v1.ExportJob\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/orgs/{id}/audits:export\x12\xb2\x01\n" +
+	"\x17ExplainOrgAuthorization\x121.api.usercenter.v1.ExplainOrgAuthorizationRequest\x1a/.api.usercenter.v1.ExplainOrgAuthorizationReply\"3\x82\xd3\xe4\x93\x02-\x12+/api/v1/orgs/{id}/iam/authorization:explain\x12\xab\x01\n" +
+	"\x1cCreateOrganizationInvitation\x126.api.usercenter.v1.CreateOrganizationInvitationRequest\x1a).api.usercenter.v1.OrganizationInvitation\"(\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/api/v1/orgs/{id}/invitations\x12\xac\x01\n" +
+	"\x1bListOrganizationInvitations\x125.api.usercenter.v1.ListOrganizationInvitationsRequest\x1a/.api.usercenter.v1.OrganizationInvitationsReply\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/orgs/{id}/invitations\x12\xa5\x01\n" +
+	"\x1cRevokeOrganizationInvitation\x126.api.usercenter.v1.RevokeOrganizationInvitationRequest\x1a\x16.google.protobuf.Empty\"5\x82\xd3\xe4\x93\x02/*-/api/v1/orgs/{id}/invitations/{invitation_id}\x12\xa9\x01\n" +
+	"\x1cAcceptOrganizationInvitation\x126.api.usercenter.v1.AcceptOrganizationInvitationRequest\x1a%.api.usercenter.v1.OrganizationMember\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/orgs/invitations:accept\x12\x96\x01\n" +
 	"\x16AdminListOrganizations\x120.api.usercenter.v1.AdminListOrganizationsRequest\x1a%.api.usercenter.v1.OrganizationsReply\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/admin/organizations\x12\xa4\x01\n" +
 	"\x18AdminArchiveOrganization\x122.api.usercenter.v1.AdminArchiveOrganizationRequest\x1a\x1f.api.usercenter.v1.Organization\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/api/v1/admin/organizations/{id}:archiveB<Z:github.com/mengbin92/user-center/api/usercenter/v1;usercv1b\x06proto3"
 
@@ -2732,118 +3459,143 @@ func file_api_usercenter_v1_organization_proto_rawDescGZIP() []byte {
 	return file_api_usercenter_v1_organization_proto_rawDescData
 }
 
-var file_api_usercenter_v1_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
+var file_api_usercenter_v1_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_api_usercenter_v1_organization_proto_goTypes = []any{
-	(*Organization)(nil),                    // 0: api.usercenter.v1.Organization
-	(*OrganizationMember)(nil),              // 1: api.usercenter.v1.OrganizationMember
-	(*Department)(nil),                      // 2: api.usercenter.v1.Department
-	(*ListMyOrganizationsRequest)(nil),      // 3: api.usercenter.v1.ListMyOrganizationsRequest
-	(*OrganizationsReply)(nil),              // 4: api.usercenter.v1.OrganizationsReply
-	(*CreateOrganizationRequest)(nil),       // 5: api.usercenter.v1.CreateOrganizationRequest
-	(*GetOrganizationRequest)(nil),          // 6: api.usercenter.v1.GetOrganizationRequest
-	(*UpdateOrganizationRequest)(nil),       // 7: api.usercenter.v1.UpdateOrganizationRequest
-	(*ArchiveOrganizationRequest)(nil),      // 8: api.usercenter.v1.ArchiveOrganizationRequest
-	(*ListOrganizationMembersRequest)(nil),  // 9: api.usercenter.v1.ListOrganizationMembersRequest
-	(*OrganizationMembersReply)(nil),        // 10: api.usercenter.v1.OrganizationMembersReply
-	(*AddOrganizationMemberRequest)(nil),    // 11: api.usercenter.v1.AddOrganizationMemberRequest
-	(*UpdateOrganizationMemberRequest)(nil), // 12: api.usercenter.v1.UpdateOrganizationMemberRequest
-	(*RemoveOrganizationMemberRequest)(nil), // 13: api.usercenter.v1.RemoveOrganizationMemberRequest
-	(*LeaveOrganizationRequest)(nil),        // 14: api.usercenter.v1.LeaveOrganizationRequest
-	(*ListDepartmentsRequest)(nil),          // 15: api.usercenter.v1.ListDepartmentsRequest
-	(*DepartmentsReply)(nil),                // 16: api.usercenter.v1.DepartmentsReply
-	(*CreateDepartmentRequest)(nil),         // 17: api.usercenter.v1.CreateDepartmentRequest
-	(*UpdateDepartmentRequest)(nil),         // 18: api.usercenter.v1.UpdateDepartmentRequest
-	(*ArchiveDepartmentRequest)(nil),        // 19: api.usercenter.v1.ArchiveDepartmentRequest
-	(*AdminListOrganizationsRequest)(nil),   // 20: api.usercenter.v1.AdminListOrganizationsRequest
-	(*AdminArchiveOrganizationRequest)(nil), // 21: api.usercenter.v1.AdminArchiveOrganizationRequest
-	(*OrgRole)(nil),                         // 22: api.usercenter.v1.OrgRole
-	(*OrgRolesReply)(nil),                   // 23: api.usercenter.v1.OrgRolesReply
-	(*OrgPermissionsReply)(nil),             // 24: api.usercenter.v1.OrgPermissionsReply
-	(*CreateOrgRoleRequest)(nil),            // 25: api.usercenter.v1.CreateOrgRoleRequest
-	(*UpdateOrgRoleRequest)(nil),            // 26: api.usercenter.v1.UpdateOrgRoleRequest
-	(*PutOrgRolePermissionsRequest)(nil),    // 27: api.usercenter.v1.PutOrgRolePermissionsRequest
-	(*ArchiveOrgRoleRequest)(nil),           // 28: api.usercenter.v1.ArchiveOrgRoleRequest
-	(*OrgAssignment)(nil),                   // 29: api.usercenter.v1.OrgAssignment
-	(*OrgAssignmentsReply)(nil),             // 30: api.usercenter.v1.OrgAssignmentsReply
-	(*CreateOrgAssignmentRequest)(nil),      // 31: api.usercenter.v1.CreateOrgAssignmentRequest
-	(*RevokeOrgAssignmentRequest)(nil),      // 32: api.usercenter.v1.RevokeOrgAssignmentRequest
-	(*OrgAuditEvent)(nil),                   // 33: api.usercenter.v1.OrgAuditEvent
-	(*ListOrgAuditsRequest)(nil),            // 34: api.usercenter.v1.ListOrgAuditsRequest
-	(*OrgAuditsReply)(nil),                  // 35: api.usercenter.v1.OrgAuditsReply
-	(*Grant)(nil),                           // 36: api.usercenter.v1.Grant
-	(*Permission)(nil),                      // 37: api.usercenter.v1.Permission
-	(*Scope)(nil),                           // 38: api.usercenter.v1.Scope
-	(*emptypb.Empty)(nil),                   // 39: google.protobuf.Empty
+	(*Organization)(nil),                        // 0: api.usercenter.v1.Organization
+	(*OrganizationMember)(nil),                  // 1: api.usercenter.v1.OrganizationMember
+	(*Department)(nil),                          // 2: api.usercenter.v1.Department
+	(*ListMyOrganizationsRequest)(nil),          // 3: api.usercenter.v1.ListMyOrganizationsRequest
+	(*OrganizationsReply)(nil),                  // 4: api.usercenter.v1.OrganizationsReply
+	(*CreateOrganizationRequest)(nil),           // 5: api.usercenter.v1.CreateOrganizationRequest
+	(*GetOrganizationRequest)(nil),              // 6: api.usercenter.v1.GetOrganizationRequest
+	(*UpdateOrganizationRequest)(nil),           // 7: api.usercenter.v1.UpdateOrganizationRequest
+	(*ArchiveOrganizationRequest)(nil),          // 8: api.usercenter.v1.ArchiveOrganizationRequest
+	(*ListOrganizationMembersRequest)(nil),      // 9: api.usercenter.v1.ListOrganizationMembersRequest
+	(*OrganizationMembersReply)(nil),            // 10: api.usercenter.v1.OrganizationMembersReply
+	(*AddOrganizationMemberRequest)(nil),        // 11: api.usercenter.v1.AddOrganizationMemberRequest
+	(*UpdateOrganizationMemberRequest)(nil),     // 12: api.usercenter.v1.UpdateOrganizationMemberRequest
+	(*RemoveOrganizationMemberRequest)(nil),     // 13: api.usercenter.v1.RemoveOrganizationMemberRequest
+	(*LeaveOrganizationRequest)(nil),            // 14: api.usercenter.v1.LeaveOrganizationRequest
+	(*ListDepartmentsRequest)(nil),              // 15: api.usercenter.v1.ListDepartmentsRequest
+	(*DepartmentsReply)(nil),                    // 16: api.usercenter.v1.DepartmentsReply
+	(*CreateDepartmentRequest)(nil),             // 17: api.usercenter.v1.CreateDepartmentRequest
+	(*UpdateDepartmentRequest)(nil),             // 18: api.usercenter.v1.UpdateDepartmentRequest
+	(*ArchiveDepartmentRequest)(nil),            // 19: api.usercenter.v1.ArchiveDepartmentRequest
+	(*AdminListOrganizationsRequest)(nil),       // 20: api.usercenter.v1.AdminListOrganizationsRequest
+	(*AdminArchiveOrganizationRequest)(nil),     // 21: api.usercenter.v1.AdminArchiveOrganizationRequest
+	(*OrgRole)(nil),                             // 22: api.usercenter.v1.OrgRole
+	(*OrgRolesReply)(nil),                       // 23: api.usercenter.v1.OrgRolesReply
+	(*OrgPermissionsReply)(nil),                 // 24: api.usercenter.v1.OrgPermissionsReply
+	(*CreateOrgRoleRequest)(nil),                // 25: api.usercenter.v1.CreateOrgRoleRequest
+	(*UpdateOrgRoleRequest)(nil),                // 26: api.usercenter.v1.UpdateOrgRoleRequest
+	(*PutOrgRolePermissionsRequest)(nil),        // 27: api.usercenter.v1.PutOrgRolePermissionsRequest
+	(*ArchiveOrgRoleRequest)(nil),               // 28: api.usercenter.v1.ArchiveOrgRoleRequest
+	(*OrgAssignment)(nil),                       // 29: api.usercenter.v1.OrgAssignment
+	(*OrgAssignmentsReply)(nil),                 // 30: api.usercenter.v1.OrgAssignmentsReply
+	(*CreateOrgAssignmentRequest)(nil),          // 31: api.usercenter.v1.CreateOrgAssignmentRequest
+	(*RevokeOrgAssignmentRequest)(nil),          // 32: api.usercenter.v1.RevokeOrgAssignmentRequest
+	(*OrgAuditEvent)(nil),                       // 33: api.usercenter.v1.OrgAuditEvent
+	(*ListOrgAuditsRequest)(nil),                // 34: api.usercenter.v1.ListOrgAuditsRequest
+	(*OrgAuditsReply)(nil),                      // 35: api.usercenter.v1.OrgAuditsReply
+	(*ExportOrgAuditsRequest)(nil),              // 36: api.usercenter.v1.ExportOrgAuditsRequest
+	(*ExplainOrgAuthorizationRequest)(nil),      // 37: api.usercenter.v1.ExplainOrgAuthorizationRequest
+	(*ExplainOrgAuthorizationReply)(nil),        // 38: api.usercenter.v1.ExplainOrgAuthorizationReply
+	(*OrganizationInvitation)(nil),              // 39: api.usercenter.v1.OrganizationInvitation
+	(*OrganizationInvitationsReply)(nil),        // 40: api.usercenter.v1.OrganizationInvitationsReply
+	(*CreateOrganizationInvitationRequest)(nil), // 41: api.usercenter.v1.CreateOrganizationInvitationRequest
+	(*ListOrganizationInvitationsRequest)(nil),  // 42: api.usercenter.v1.ListOrganizationInvitationsRequest
+	(*RevokeOrganizationInvitationRequest)(nil), // 43: api.usercenter.v1.RevokeOrganizationInvitationRequest
+	(*AcceptOrganizationInvitationRequest)(nil), // 44: api.usercenter.v1.AcceptOrganizationInvitationRequest
+	(*Grant)(nil),                               // 45: api.usercenter.v1.Grant
+	(*Permission)(nil),                          // 46: api.usercenter.v1.Permission
+	(*Scope)(nil),                               // 47: api.usercenter.v1.Scope
+	(*GrantSource)(nil),                         // 48: api.usercenter.v1.GrantSource
+	(*emptypb.Empty)(nil),                       // 49: google.protobuf.Empty
+	(*ExportJob)(nil),                           // 50: api.usercenter.v1.ExportJob
 }
 var file_api_usercenter_v1_organization_proto_depIdxs = []int32{
 	0,  // 0: api.usercenter.v1.OrganizationsReply.items:type_name -> api.usercenter.v1.Organization
 	1,  // 1: api.usercenter.v1.OrganizationMembersReply.items:type_name -> api.usercenter.v1.OrganizationMember
 	2,  // 2: api.usercenter.v1.DepartmentsReply.items:type_name -> api.usercenter.v1.Department
-	36, // 3: api.usercenter.v1.OrgRole.grants:type_name -> api.usercenter.v1.Grant
+	45, // 3: api.usercenter.v1.OrgRole.grants:type_name -> api.usercenter.v1.Grant
 	22, // 4: api.usercenter.v1.OrgRolesReply.items:type_name -> api.usercenter.v1.OrgRole
-	37, // 5: api.usercenter.v1.OrgPermissionsReply.items:type_name -> api.usercenter.v1.Permission
-	36, // 6: api.usercenter.v1.CreateOrgRoleRequest.grants:type_name -> api.usercenter.v1.Grant
-	36, // 7: api.usercenter.v1.PutOrgRolePermissionsRequest.grants:type_name -> api.usercenter.v1.Grant
-	38, // 8: api.usercenter.v1.OrgAssignment.boundary:type_name -> api.usercenter.v1.Scope
+	46, // 5: api.usercenter.v1.OrgPermissionsReply.items:type_name -> api.usercenter.v1.Permission
+	45, // 6: api.usercenter.v1.CreateOrgRoleRequest.grants:type_name -> api.usercenter.v1.Grant
+	45, // 7: api.usercenter.v1.PutOrgRolePermissionsRequest.grants:type_name -> api.usercenter.v1.Grant
+	47, // 8: api.usercenter.v1.OrgAssignment.boundary:type_name -> api.usercenter.v1.Scope
 	29, // 9: api.usercenter.v1.OrgAssignmentsReply.items:type_name -> api.usercenter.v1.OrgAssignment
 	33, // 10: api.usercenter.v1.OrgAuditsReply.items:type_name -> api.usercenter.v1.OrgAuditEvent
-	3,  // 11: api.usercenter.v1.OrganizationService.ListMyOrganizations:input_type -> api.usercenter.v1.ListMyOrganizationsRequest
-	5,  // 12: api.usercenter.v1.OrganizationService.CreateOrganization:input_type -> api.usercenter.v1.CreateOrganizationRequest
-	6,  // 13: api.usercenter.v1.OrganizationService.GetOrganization:input_type -> api.usercenter.v1.GetOrganizationRequest
-	7,  // 14: api.usercenter.v1.OrganizationService.UpdateOrganization:input_type -> api.usercenter.v1.UpdateOrganizationRequest
-	8,  // 15: api.usercenter.v1.OrganizationService.ArchiveOrganization:input_type -> api.usercenter.v1.ArchiveOrganizationRequest
-	9,  // 16: api.usercenter.v1.OrganizationService.ListOrganizationMembers:input_type -> api.usercenter.v1.ListOrganizationMembersRequest
-	11, // 17: api.usercenter.v1.OrganizationService.AddOrganizationMember:input_type -> api.usercenter.v1.AddOrganizationMemberRequest
-	12, // 18: api.usercenter.v1.OrganizationService.UpdateOrganizationMember:input_type -> api.usercenter.v1.UpdateOrganizationMemberRequest
-	13, // 19: api.usercenter.v1.OrganizationService.RemoveOrganizationMember:input_type -> api.usercenter.v1.RemoveOrganizationMemberRequest
-	14, // 20: api.usercenter.v1.OrganizationService.LeaveOrganization:input_type -> api.usercenter.v1.LeaveOrganizationRequest
-	15, // 21: api.usercenter.v1.OrganizationService.ListDepartments:input_type -> api.usercenter.v1.ListDepartmentsRequest
-	17, // 22: api.usercenter.v1.OrganizationService.CreateDepartment:input_type -> api.usercenter.v1.CreateDepartmentRequest
-	18, // 23: api.usercenter.v1.OrganizationService.UpdateDepartment:input_type -> api.usercenter.v1.UpdateDepartmentRequest
-	19, // 24: api.usercenter.v1.OrganizationService.ArchiveDepartment:input_type -> api.usercenter.v1.ArchiveDepartmentRequest
-	6,  // 25: api.usercenter.v1.OrganizationService.ListOrgRoles:input_type -> api.usercenter.v1.GetOrganizationRequest
-	6,  // 26: api.usercenter.v1.OrganizationService.ListOrgPermissions:input_type -> api.usercenter.v1.GetOrganizationRequest
-	25, // 27: api.usercenter.v1.OrganizationService.CreateOrgRole:input_type -> api.usercenter.v1.CreateOrgRoleRequest
-	26, // 28: api.usercenter.v1.OrganizationService.UpdateOrgRole:input_type -> api.usercenter.v1.UpdateOrgRoleRequest
-	27, // 29: api.usercenter.v1.OrganizationService.PutOrgRolePermissions:input_type -> api.usercenter.v1.PutOrgRolePermissionsRequest
-	28, // 30: api.usercenter.v1.OrganizationService.ArchiveOrgRole:input_type -> api.usercenter.v1.ArchiveOrgRoleRequest
-	6,  // 31: api.usercenter.v1.OrganizationService.ListOrgAssignments:input_type -> api.usercenter.v1.GetOrganizationRequest
-	31, // 32: api.usercenter.v1.OrganizationService.CreateOrgAssignment:input_type -> api.usercenter.v1.CreateOrgAssignmentRequest
-	32, // 33: api.usercenter.v1.OrganizationService.RevokeOrgAssignment:input_type -> api.usercenter.v1.RevokeOrgAssignmentRequest
-	34, // 34: api.usercenter.v1.OrganizationService.ListOrgAudits:input_type -> api.usercenter.v1.ListOrgAuditsRequest
-	20, // 35: api.usercenter.v1.OrganizationService.AdminListOrganizations:input_type -> api.usercenter.v1.AdminListOrganizationsRequest
-	21, // 36: api.usercenter.v1.OrganizationService.AdminArchiveOrganization:input_type -> api.usercenter.v1.AdminArchiveOrganizationRequest
-	4,  // 37: api.usercenter.v1.OrganizationService.ListMyOrganizations:output_type -> api.usercenter.v1.OrganizationsReply
-	0,  // 38: api.usercenter.v1.OrganizationService.CreateOrganization:output_type -> api.usercenter.v1.Organization
-	0,  // 39: api.usercenter.v1.OrganizationService.GetOrganization:output_type -> api.usercenter.v1.Organization
-	0,  // 40: api.usercenter.v1.OrganizationService.UpdateOrganization:output_type -> api.usercenter.v1.Organization
-	0,  // 41: api.usercenter.v1.OrganizationService.ArchiveOrganization:output_type -> api.usercenter.v1.Organization
-	10, // 42: api.usercenter.v1.OrganizationService.ListOrganizationMembers:output_type -> api.usercenter.v1.OrganizationMembersReply
-	1,  // 43: api.usercenter.v1.OrganizationService.AddOrganizationMember:output_type -> api.usercenter.v1.OrganizationMember
-	1,  // 44: api.usercenter.v1.OrganizationService.UpdateOrganizationMember:output_type -> api.usercenter.v1.OrganizationMember
-	39, // 45: api.usercenter.v1.OrganizationService.RemoveOrganizationMember:output_type -> google.protobuf.Empty
-	39, // 46: api.usercenter.v1.OrganizationService.LeaveOrganization:output_type -> google.protobuf.Empty
-	16, // 47: api.usercenter.v1.OrganizationService.ListDepartments:output_type -> api.usercenter.v1.DepartmentsReply
-	2,  // 48: api.usercenter.v1.OrganizationService.CreateDepartment:output_type -> api.usercenter.v1.Department
-	2,  // 49: api.usercenter.v1.OrganizationService.UpdateDepartment:output_type -> api.usercenter.v1.Department
-	2,  // 50: api.usercenter.v1.OrganizationService.ArchiveDepartment:output_type -> api.usercenter.v1.Department
-	23, // 51: api.usercenter.v1.OrganizationService.ListOrgRoles:output_type -> api.usercenter.v1.OrgRolesReply
-	24, // 52: api.usercenter.v1.OrganizationService.ListOrgPermissions:output_type -> api.usercenter.v1.OrgPermissionsReply
-	22, // 53: api.usercenter.v1.OrganizationService.CreateOrgRole:output_type -> api.usercenter.v1.OrgRole
-	22, // 54: api.usercenter.v1.OrganizationService.UpdateOrgRole:output_type -> api.usercenter.v1.OrgRole
-	22, // 55: api.usercenter.v1.OrganizationService.PutOrgRolePermissions:output_type -> api.usercenter.v1.OrgRole
-	39, // 56: api.usercenter.v1.OrganizationService.ArchiveOrgRole:output_type -> google.protobuf.Empty
-	30, // 57: api.usercenter.v1.OrganizationService.ListOrgAssignments:output_type -> api.usercenter.v1.OrgAssignmentsReply
-	29, // 58: api.usercenter.v1.OrganizationService.CreateOrgAssignment:output_type -> api.usercenter.v1.OrgAssignment
-	39, // 59: api.usercenter.v1.OrganizationService.RevokeOrgAssignment:output_type -> google.protobuf.Empty
-	35, // 60: api.usercenter.v1.OrganizationService.ListOrgAudits:output_type -> api.usercenter.v1.OrgAuditsReply
-	4,  // 61: api.usercenter.v1.OrganizationService.AdminListOrganizations:output_type -> api.usercenter.v1.OrganizationsReply
-	0,  // 62: api.usercenter.v1.OrganizationService.AdminArchiveOrganization:output_type -> api.usercenter.v1.Organization
-	37, // [37:63] is the sub-list for method output_type
-	11, // [11:37] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	48, // 11: api.usercenter.v1.ExplainOrgAuthorizationReply.sources:type_name -> api.usercenter.v1.GrantSource
+	39, // 12: api.usercenter.v1.OrganizationInvitationsReply.items:type_name -> api.usercenter.v1.OrganizationInvitation
+	3,  // 13: api.usercenter.v1.OrganizationService.ListMyOrganizations:input_type -> api.usercenter.v1.ListMyOrganizationsRequest
+	5,  // 14: api.usercenter.v1.OrganizationService.CreateOrganization:input_type -> api.usercenter.v1.CreateOrganizationRequest
+	6,  // 15: api.usercenter.v1.OrganizationService.GetOrganization:input_type -> api.usercenter.v1.GetOrganizationRequest
+	7,  // 16: api.usercenter.v1.OrganizationService.UpdateOrganization:input_type -> api.usercenter.v1.UpdateOrganizationRequest
+	8,  // 17: api.usercenter.v1.OrganizationService.ArchiveOrganization:input_type -> api.usercenter.v1.ArchiveOrganizationRequest
+	9,  // 18: api.usercenter.v1.OrganizationService.ListOrganizationMembers:input_type -> api.usercenter.v1.ListOrganizationMembersRequest
+	11, // 19: api.usercenter.v1.OrganizationService.AddOrganizationMember:input_type -> api.usercenter.v1.AddOrganizationMemberRequest
+	12, // 20: api.usercenter.v1.OrganizationService.UpdateOrganizationMember:input_type -> api.usercenter.v1.UpdateOrganizationMemberRequest
+	13, // 21: api.usercenter.v1.OrganizationService.RemoveOrganizationMember:input_type -> api.usercenter.v1.RemoveOrganizationMemberRequest
+	14, // 22: api.usercenter.v1.OrganizationService.LeaveOrganization:input_type -> api.usercenter.v1.LeaveOrganizationRequest
+	15, // 23: api.usercenter.v1.OrganizationService.ListDepartments:input_type -> api.usercenter.v1.ListDepartmentsRequest
+	17, // 24: api.usercenter.v1.OrganizationService.CreateDepartment:input_type -> api.usercenter.v1.CreateDepartmentRequest
+	18, // 25: api.usercenter.v1.OrganizationService.UpdateDepartment:input_type -> api.usercenter.v1.UpdateDepartmentRequest
+	19, // 26: api.usercenter.v1.OrganizationService.ArchiveDepartment:input_type -> api.usercenter.v1.ArchiveDepartmentRequest
+	6,  // 27: api.usercenter.v1.OrganizationService.ListOrgRoles:input_type -> api.usercenter.v1.GetOrganizationRequest
+	6,  // 28: api.usercenter.v1.OrganizationService.ListOrgPermissions:input_type -> api.usercenter.v1.GetOrganizationRequest
+	25, // 29: api.usercenter.v1.OrganizationService.CreateOrgRole:input_type -> api.usercenter.v1.CreateOrgRoleRequest
+	26, // 30: api.usercenter.v1.OrganizationService.UpdateOrgRole:input_type -> api.usercenter.v1.UpdateOrgRoleRequest
+	27, // 31: api.usercenter.v1.OrganizationService.PutOrgRolePermissions:input_type -> api.usercenter.v1.PutOrgRolePermissionsRequest
+	28, // 32: api.usercenter.v1.OrganizationService.ArchiveOrgRole:input_type -> api.usercenter.v1.ArchiveOrgRoleRequest
+	6,  // 33: api.usercenter.v1.OrganizationService.ListOrgAssignments:input_type -> api.usercenter.v1.GetOrganizationRequest
+	31, // 34: api.usercenter.v1.OrganizationService.CreateOrgAssignment:input_type -> api.usercenter.v1.CreateOrgAssignmentRequest
+	32, // 35: api.usercenter.v1.OrganizationService.RevokeOrgAssignment:input_type -> api.usercenter.v1.RevokeOrgAssignmentRequest
+	34, // 36: api.usercenter.v1.OrganizationService.ListOrgAudits:input_type -> api.usercenter.v1.ListOrgAuditsRequest
+	36, // 37: api.usercenter.v1.OrganizationService.ExportOrgAudits:input_type -> api.usercenter.v1.ExportOrgAuditsRequest
+	37, // 38: api.usercenter.v1.OrganizationService.ExplainOrgAuthorization:input_type -> api.usercenter.v1.ExplainOrgAuthorizationRequest
+	41, // 39: api.usercenter.v1.OrganizationService.CreateOrganizationInvitation:input_type -> api.usercenter.v1.CreateOrganizationInvitationRequest
+	42, // 40: api.usercenter.v1.OrganizationService.ListOrganizationInvitations:input_type -> api.usercenter.v1.ListOrganizationInvitationsRequest
+	43, // 41: api.usercenter.v1.OrganizationService.RevokeOrganizationInvitation:input_type -> api.usercenter.v1.RevokeOrganizationInvitationRequest
+	44, // 42: api.usercenter.v1.OrganizationService.AcceptOrganizationInvitation:input_type -> api.usercenter.v1.AcceptOrganizationInvitationRequest
+	20, // 43: api.usercenter.v1.OrganizationService.AdminListOrganizations:input_type -> api.usercenter.v1.AdminListOrganizationsRequest
+	21, // 44: api.usercenter.v1.OrganizationService.AdminArchiveOrganization:input_type -> api.usercenter.v1.AdminArchiveOrganizationRequest
+	4,  // 45: api.usercenter.v1.OrganizationService.ListMyOrganizations:output_type -> api.usercenter.v1.OrganizationsReply
+	0,  // 46: api.usercenter.v1.OrganizationService.CreateOrganization:output_type -> api.usercenter.v1.Organization
+	0,  // 47: api.usercenter.v1.OrganizationService.GetOrganization:output_type -> api.usercenter.v1.Organization
+	0,  // 48: api.usercenter.v1.OrganizationService.UpdateOrganization:output_type -> api.usercenter.v1.Organization
+	0,  // 49: api.usercenter.v1.OrganizationService.ArchiveOrganization:output_type -> api.usercenter.v1.Organization
+	10, // 50: api.usercenter.v1.OrganizationService.ListOrganizationMembers:output_type -> api.usercenter.v1.OrganizationMembersReply
+	1,  // 51: api.usercenter.v1.OrganizationService.AddOrganizationMember:output_type -> api.usercenter.v1.OrganizationMember
+	1,  // 52: api.usercenter.v1.OrganizationService.UpdateOrganizationMember:output_type -> api.usercenter.v1.OrganizationMember
+	49, // 53: api.usercenter.v1.OrganizationService.RemoveOrganizationMember:output_type -> google.protobuf.Empty
+	49, // 54: api.usercenter.v1.OrganizationService.LeaveOrganization:output_type -> google.protobuf.Empty
+	16, // 55: api.usercenter.v1.OrganizationService.ListDepartments:output_type -> api.usercenter.v1.DepartmentsReply
+	2,  // 56: api.usercenter.v1.OrganizationService.CreateDepartment:output_type -> api.usercenter.v1.Department
+	2,  // 57: api.usercenter.v1.OrganizationService.UpdateDepartment:output_type -> api.usercenter.v1.Department
+	2,  // 58: api.usercenter.v1.OrganizationService.ArchiveDepartment:output_type -> api.usercenter.v1.Department
+	23, // 59: api.usercenter.v1.OrganizationService.ListOrgRoles:output_type -> api.usercenter.v1.OrgRolesReply
+	24, // 60: api.usercenter.v1.OrganizationService.ListOrgPermissions:output_type -> api.usercenter.v1.OrgPermissionsReply
+	22, // 61: api.usercenter.v1.OrganizationService.CreateOrgRole:output_type -> api.usercenter.v1.OrgRole
+	22, // 62: api.usercenter.v1.OrganizationService.UpdateOrgRole:output_type -> api.usercenter.v1.OrgRole
+	22, // 63: api.usercenter.v1.OrganizationService.PutOrgRolePermissions:output_type -> api.usercenter.v1.OrgRole
+	49, // 64: api.usercenter.v1.OrganizationService.ArchiveOrgRole:output_type -> google.protobuf.Empty
+	30, // 65: api.usercenter.v1.OrganizationService.ListOrgAssignments:output_type -> api.usercenter.v1.OrgAssignmentsReply
+	29, // 66: api.usercenter.v1.OrganizationService.CreateOrgAssignment:output_type -> api.usercenter.v1.OrgAssignment
+	49, // 67: api.usercenter.v1.OrganizationService.RevokeOrgAssignment:output_type -> google.protobuf.Empty
+	35, // 68: api.usercenter.v1.OrganizationService.ListOrgAudits:output_type -> api.usercenter.v1.OrgAuditsReply
+	50, // 69: api.usercenter.v1.OrganizationService.ExportOrgAudits:output_type -> api.usercenter.v1.ExportJob
+	38, // 70: api.usercenter.v1.OrganizationService.ExplainOrgAuthorization:output_type -> api.usercenter.v1.ExplainOrgAuthorizationReply
+	39, // 71: api.usercenter.v1.OrganizationService.CreateOrganizationInvitation:output_type -> api.usercenter.v1.OrganizationInvitation
+	40, // 72: api.usercenter.v1.OrganizationService.ListOrganizationInvitations:output_type -> api.usercenter.v1.OrganizationInvitationsReply
+	49, // 73: api.usercenter.v1.OrganizationService.RevokeOrganizationInvitation:output_type -> google.protobuf.Empty
+	1,  // 74: api.usercenter.v1.OrganizationService.AcceptOrganizationInvitation:output_type -> api.usercenter.v1.OrganizationMember
+	4,  // 75: api.usercenter.v1.OrganizationService.AdminListOrganizations:output_type -> api.usercenter.v1.OrganizationsReply
+	0,  // 76: api.usercenter.v1.OrganizationService.AdminArchiveOrganization:output_type -> api.usercenter.v1.Organization
+	45, // [45:77] is the sub-list for method output_type
+	13, // [13:45] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_api_usercenter_v1_organization_proto_init() }
@@ -2859,7 +3611,7 @@ func file_api_usercenter_v1_organization_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_usercenter_v1_organization_proto_rawDesc), len(file_api_usercenter_v1_organization_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   36,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

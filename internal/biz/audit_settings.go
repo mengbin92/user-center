@@ -2,12 +2,8 @@ package biz
 
 import (
 	"context"
-	"encoding/csv"
 	"net/mail"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 )
 
 func (uc *AuditUsecase) List(ctx context.Context, actor ActorContext, filter AuditFilter) ([]*AuditEvent, int64, error) {
@@ -35,100 +31,7 @@ func (uc *AuditUsecase) Export(ctx context.Context, actor ActorContext, filter A
 	if _, err := uc.Authorize(ctx, actor, "audit.export", 0, true); err != nil {
 		return nil, err
 	}
-	snapshot, err := uc.exportSnapshot(ctx, actor)
-	if err != nil {
-		return nil, err
-	}
-	if len(fields) == 0 {
-		fields = []string{"event_id", "occurred_at", "actor_user_id", "action", "target", "result", "reason", "request_id"}
-	}
-	allowed := map[string]bool{"event_id": true, "occurred_at": true, "actor_user_id": true, "actor_session_id": true, "action": true, "target": true, "result": true, "reason": true, "request_id": true, "before": true, "after": true, "diff": true}
-	for _, f := range fields {
-		if !allowed[f] {
-			return nil, Validation("不支持的导出字段: " + f)
-		}
-	}
-	filter.Limit = 100000
-	events, _, err := uc.Audit.List(ctx, nil, filter)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	if err := os.MkdirAll(uc.ArtifactDir, 0o750); err != nil {
-		return nil, ErrDependency
-	}
-	job := &ExportJob{
-		Kind: "audits", ScopeSnapshot: snapshot, ActorUserID: actor.User.ID, ActorSessionID: actor.Session.ID,
-		RequestedFields: fields, Status: ExportPending, CreatedAt: uc.Clock.Now().UTC(),
-		ExpiresAt: uc.Clock.Now().Add(24 * time.Hour), ArtifactName: uc.IDs.NewID() + ".csv",
-	}
-	path := filepath.Join(uc.ArtifactDir, job.ArtifactName)
-	keepArtifact := false
-	defer func() {
-		if !keepArtifact {
-			_ = os.Remove(path)
-		}
-	}()
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	w := csv.NewWriter(f)
-	_ = w.Write(fields)
-	for _, e := range events {
-		row := make([]string, 0, len(fields))
-		for _, field := range fields {
-			switch field {
-			case "event_id":
-				row = append(row, e.EventID)
-			case "occurred_at":
-				row = append(row, e.OccurredAt.Format(time.RFC3339))
-			case "actor_user_id":
-				row = append(row, itoa(e.ActorUserID))
-			case "actor_session_id":
-				row = append(row, e.ActorSessionID)
-			case "action":
-				row = append(row, e.Action)
-			case "target":
-				row = append(row, e.Target)
-			case "result":
-				row = append(row, e.Result)
-			case "reason":
-				row = append(row, e.Reason)
-			case "request_id":
-				row = append(row, e.RequestID)
-			case "before":
-				row = append(row, e.Before)
-			case "after":
-				row = append(row, e.After)
-			case "diff":
-				row = append(row, e.Diff)
-			}
-		}
-		_ = w.Write(csvSafeRow(row))
-	}
-	w.Flush()
-	if err := w.Error(); err != nil {
-		_ = f.Close()
-		return nil, ErrDependency
-	}
-	if err := f.Close(); err != nil {
-		return nil, ErrDependency
-	}
-	job.Status = ExportReady
-	var saved *ExportJob
-	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		var err error
-		saved, err = uc.Exports.Create(ctx, tx, job)
-		if err != nil {
-			return err
-		}
-		return uc.audit(ctx, tx, actor, "audit.export", "audits", "{}", "{}", string(mustJSON(map[string]any{"fields": fields})), reason, "success")
-	})
-	if err != nil {
-		return nil, err
-	}
-	keepArtifact = true
-	return saved, nil
+	return uc.writeAuditExport(ctx, actor, filter, fields, reason, "audit.export", "audits", 0)
 }
 
 func (uc *SettingsUsecase) GetAuth(ctx context.Context, actor ActorContext) (*AuthSettings, error) {

@@ -89,23 +89,11 @@ func NewHTTPServer(
 	mountOIDCRoutes(srv, mw, oidcAdmin.Usecase())
 
 	// CSV artifact download is a raw stream; it re-verifies the actor, job
-	// ownership and expiry on every request.
-	download := mw.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		actor, _ := biz.ActorFromContext(r.Context())
-		rawID := strings.TrimPrefix(r.URL.Path, "/api/v1/admin/exports/")
-		rawID = strings.TrimSuffix(rawID, "/download")
-		jobID, err := biz.ParseID(rawID, "id")
-		if err != nil {
-			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在")
-			return
-		}
-		job, err := users.GetExport(r.Context(), actor, jobID)
-		if err != nil || job.Status != biz.ExportReady {
-			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在或尚未完成")
-			return
-		}
-		if job.ExpiresAt.Before(time.Now().UTC()) {
-			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务已过期")
+	// ownership and expiry on every request. Platform and tenant downloads
+	// share exactly one streaming path.
+	serveArtifact := func(w http.ResponseWriter, r *http.Request, job *biz.ExportJob) {
+		if job == nil || job.Status != biz.ExportReady || job.ExpiresAt.Before(time.Now().UTC()) {
+			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在或已过期")
 			return
 		}
 		name := filepath.Base(job.ArtifactName)
@@ -119,9 +107,52 @@ func NewHTTPServer(
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 		w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 		http.ServeContent(w, r, name, job.CreatedAt, f)
+	}
+	download := mw.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actor, _ := biz.ActorFromContext(r.Context())
+		rawID := strings.TrimPrefix(r.URL.Path, "/api/v1/admin/exports/")
+		rawID = strings.TrimSuffix(rawID, "/download")
+		jobID, err := biz.ParseID(rawID, "id")
+		if err != nil {
+			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在")
+			return
+		}
+		job, err := users.GetExport(r.Context(), actor, jobID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在")
+			return
+		}
+		serveArtifact(w, r, job)
 	}))
 	srv.HandleFunc("/api/v1/admin/exports/{id}/download", func(w http.ResponseWriter, r *http.Request) {
 		download.ServeHTTP(w, r)
+	})
+
+	orgDownload := mw.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) != 8 || parts[0] != "api" || parts[4] != "audits" || parts[5] != "exports" {
+			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在")
+			return
+		}
+		orgID, err := biz.ParseID(parts[3], "id")
+		if err != nil {
+			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在")
+			return
+		}
+		jobID, err := biz.ParseID(parts[6], "export_id")
+		if err != nil {
+			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在")
+			return
+		}
+		job, err := organizations.AuditExportForDownload(r.Context(), orgID, jobID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在")
+			return
+		}
+		serveArtifact(w, r, job)
+	}))
+	srv.HandleFunc("/api/v1/orgs/{id}/audits/exports/{export_id}/download", func(w http.ResponseWriter, r *http.Request) {
+		orgDownload.ServeHTTP(w, r)
 	})
 
 	webDir := os.Getenv("WEB_DIST")

@@ -134,6 +134,21 @@ organization:{id}            → 单个组织的成员、部门、组织角色�
 
 请求头 `X-UserCenter-Signature: sha256=...` 对原始 body 做 HMAC（`OUTBOX_SIGNING_SECRET`）。投递为至少一次，消费端按 `event_id` 去重。事件载荷不含密码摘要、验证码、TOTP 秘钥、恢复码或第三方令牌。
 
+### 8.1 组织域事件（V2.4）
+
+组织写事务与 Outbox 同提交；载荷只含 ID、revision、角色码等最小字段，不含邮箱、昵称、用户名等个人数据。订阅方按 `event_type` 过滤（`event_subscriptions` 支持 `*` 或精确类型），并按 `aggregate_revision` 判断新旧，旧版本不得覆盖新状态。
+
+| event_type | 触发点 | 最小载荷字段 |
+|---|---|---|
+| `organization.created` | 创建组织 | organization_id, code, created_at |
+| `organization.archived` | 归档组织（含平台管理员归档） | organization_id, revision |
+| `organization.member.added` | 添加/恢复成员、接受邀请 | organization_id, user_id, role_code, revision |
+| `organization.member.updated` | 修改成员角色或部门 | organization_id, user_id, role_code, revision |
+| `organization.member.removed` | 移除成员、退出组织 | organization_id, user_id, revision |
+| `organization.department.created` / `.updated` / `.archived` | 部门写操作 | organization_id, department_id, revision |
+| `organization.role.created` / `.updated` / `.archived` | 组织角色写操作 | organization_id, role_id, role_code, revision |
+| `organization.assignment.created` / `.revoked` | 组织角色分配写操作 | organization_id, assignment_id, user_id, role_id, revision |
+
 ## 9. 可观测性
 
 - 每个请求生成/透传 `X-Request-ID`，写入安全事件与审计。

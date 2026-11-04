@@ -341,7 +341,12 @@ func (uc *OrgIAMUsecase) CreateRole(ctx context.Context, actor ActorContext, org
 			}
 		}
 		created = role
-		return uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.role.create", itoa(role.ID), reason)
+		if err := uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.role.create", itoa(role.ID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, role.Revision, "organization.role.created", map[string]any{
+			"organization_id": orgID, "role_id": role.ID, "role_code": role.Code, "revision": role.Revision,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -379,7 +384,12 @@ func (uc *OrgIAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, org
 			return err
 		}
 		updated = row
-		return uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.role.update", itoa(roleID), reason)
+		if err := uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.role.update", itoa(roleID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, updated.Revision, "organization.role.updated", map[string]any{
+			"organization_id": orgID, "role_id": roleID, "revision": updated.Revision,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -415,7 +425,12 @@ func (uc *OrgIAMUsecase) PutRoleGrants(ctx context.Context, actor ActorContext, 
 			return err
 		}
 		revision = rev
-		return uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.role.permissions", itoa(roleID), reason)
+		if err := uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.role.permissions", itoa(roleID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, revision, "organization.role.updated", map[string]any{
+			"organization_id": orgID, "role_id": roleID, "revision": revision,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -453,7 +468,12 @@ func (uc *OrgIAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, or
 		if _, err := uc.OrgIAM.UpdateRole(ctx, tx, authCtx, role, expected); err != nil {
 			return err
 		}
-		return uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.role.archive", itoa(roleID), reason)
+		if err := uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.role.archive", itoa(roleID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, expected+1, "organization.role.archived", map[string]any{
+			"organization_id": orgID, "role_id": roleID, "revision": expected + 1,
+		})
 	})
 }
 
@@ -532,7 +552,13 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 			return err
 		}
 		created = row
-		return uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.assignment.create", itoa(row.ID), reason)
+		if err := uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.assignment.create", itoa(row.ID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, row.Revision, "organization.assignment.created", map[string]any{
+			"organization_id": orgID, "assignment_id": row.ID, "user_id": row.UserID,
+			"role_id": row.RoleID, "revision": row.Revision,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -565,7 +591,12 @@ func (uc *OrgIAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContex
 		if err := uc.OrgIAM.RevokeAssignment(ctx, tx, authCtx, assignmentID, expected, actor.User.ID); err != nil {
 			return err
 		}
-		return uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.assignment.revoke", itoa(assignmentID), reason)
+		if err := uc.auditOrg(ctx, tx, actor, orgID, "organization.iam.assignment.revoke", itoa(assignmentID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, expected+1, "organization.assignment.revoked", map[string]any{
+			"organization_id": orgID, "assignment_id": assignmentID, "revision": expected + 1,
+		})
 	})
 }
 

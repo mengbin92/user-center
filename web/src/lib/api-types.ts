@@ -1497,6 +1497,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/invitations:accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrganizationService_AcceptOrganizationInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{id}": {
         parameters: {
             query?: never;
@@ -1523,6 +1539,22 @@ export interface paths {
         get: operations["OrganizationService_ListOrgAudits"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/audits:export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrganizationService_ExportOrgAudits"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1604,6 +1636,22 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["OrganizationService_RevokeOrgAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/authorization:explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_ExplainOrgAuthorization"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1693,6 +1741,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{id}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_ListOrganizationInvitations"];
+        put?: never;
+        post: operations["OrganizationService_CreateOrganizationInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/invitations/{invitation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["OrganizationService_RevokeOrganizationInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{id}/members": {
         parameters: {
             query?: never;
@@ -1761,6 +1841,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        "api.usercenter.v1.AcceptOrganizationInvitationRequest": {
+            /** @description Raw invitation token from the e-mail; never stored in plaintext. */
+            token?: string;
+        };
         "api.usercenter.v1.AddOrganizationMemberRequest": {
             id?: string;
             /** @description username or email */
@@ -2066,6 +2150,13 @@ export interface components {
             grants?: components["schemas"]["api.usercenter.v1.Grant"][];
             reason?: string;
         };
+        "api.usercenter.v1.CreateOrganizationInvitationRequest": {
+            id?: string;
+            email?: string;
+            role?: string;
+            department_id?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.CreateOrganizationRequest": {
             code?: string;
             name?: string;
@@ -2230,6 +2321,18 @@ export interface components {
             resource_id?: string;
             owner_user_id?: string;
         };
+        "api.usercenter.v1.ExplainOrgAuthorizationReply": {
+            allowed?: boolean;
+            reason?: string;
+            sources?: components["schemas"]["api.usercenter.v1.GrantSource"][];
+            /** @description Scope boundary, expiry and missing facts derived from the same decision. */
+            context?: string;
+            scope?: string;
+            valid_until?: string;
+            missing?: string[];
+            policy_revision?: string;
+            user_revision?: string;
+        };
         "api.usercenter.v1.ExportAuditEventsRequest": {
             action?: string;
             actor_user_id?: string;
@@ -2248,6 +2351,14 @@ export interface components {
             expires_at?: string;
             created_at?: string;
             error?: string;
+        };
+        "api.usercenter.v1.ExportOrgAuditsRequest": {
+            id?: string;
+            action?: string;
+            from?: string;
+            to?: string;
+            fields?: string[];
+            reason?: string;
         };
         "api.usercenter.v1.ExportUsersRequest": {
             keyword?: string;
@@ -2460,6 +2571,24 @@ export interface components {
             revision?: string;
             created_at?: string;
             updated_at?: string;
+        };
+        "api.usercenter.v1.OrganizationInvitation": {
+            id?: string;
+            organization_id?: string;
+            email?: string;
+            /** @description owner | admin | member */
+            role?: string;
+            department_id?: string;
+            /** @description pending | accepted | revoked | expired */
+            status?: string;
+            invited_by?: string;
+            expires_at?: string;
+            accepted_at?: string;
+            created_at?: string;
+            revision?: string;
+        };
+        "api.usercenter.v1.OrganizationInvitationsReply": {
+            items?: components["schemas"]["api.usercenter.v1.OrganizationInvitation"][];
         };
         "api.usercenter.v1.OrganizationMember": {
             id?: string;
@@ -5650,6 +5779,30 @@ export interface operations {
             };
         };
     };
+    OrganizationService_AcceptOrganizationInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.AcceptOrganizationInvitationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationMember"];
+                };
+            };
+        };
+    };
     OrganizationService_GetOrganization: {
         parameters: {
             query?: never;
@@ -5722,6 +5875,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.OrgAuditsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_ExportOrgAudits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.ExportOrgAuditsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.ExportJob"];
                 };
             };
         };
@@ -5900,6 +6079,31 @@ export interface operations {
             };
         };
     };
+    OrganizationService_ExplainOrgAuthorization: {
+        parameters: {
+            query?: {
+                user_id?: string;
+                operation?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.ExplainOrgAuthorizationReply"];
+                };
+            };
+        };
+    };
     OrganizationService_ListOrgPermissions: {
         parameters: {
             query?: never;
@@ -6039,6 +6243,80 @@ export interface operations {
                 "application/json": components["schemas"]["api.usercenter.v1.ArchiveOrgRoleRequest"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrganizationService_ListOrganizationInvitations: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationInvitationsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_CreateOrganizationInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateOrganizationInvitationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrganizationInvitation"];
+                };
+            };
+        };
+    };
+    OrganizationService_RevokeOrganizationInvitation: {
+        parameters: {
+            query?: {
+                expected_revision?: string;
+                reason?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {

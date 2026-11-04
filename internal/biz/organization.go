@@ -211,7 +211,12 @@ func (uc *OrganizationUsecase) Archive(ctx context.Context, actor ActorContext, 
 		if err := uc.Organizations.ArchiveOrganization(ctx, tx, orgID, expected); err != nil {
 			return err
 		}
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.archive", itoa(orgID), reason)
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.archive", itoa(orgID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, expected+1, "organization.archived", map[string]any{
+			"organization_id": orgID, "revision": expected + 1,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -312,7 +317,12 @@ func (uc *OrganizationUsecase) AddMember(ctx context.Context, actor ActorContext
 			if err := syncOrgMembershipRole(ctx, uc.Services, tx, orgID, user.ID, in.Role, actor.User.ID); err != nil {
 				return err
 			}
-			return uc.auditIn(ctx, tx, actor, orgID, "organization.member.add", itoa(orgID), reason)
+			if err := uc.auditIn(ctx, tx, actor, orgID, "organization.member.add", itoa(orgID), reason); err != nil {
+				return err
+			}
+			return orgEvent(ctx, uc.Services, tx, orgID, restored.Revision, "organization.member.added", map[string]any{
+				"organization_id": orgID, "user_id": user.ID, "role_code": OrgRoleCode(in.Role), "revision": restored.Revision,
+			})
 		})
 		if err != nil {
 			return nil, err
@@ -333,7 +343,12 @@ func (uc *OrganizationUsecase) AddMember(ctx context.Context, actor ActorContext
 		if err := syncOrgMembershipRole(ctx, uc.Services, tx, orgID, user.ID, in.Role, actor.User.ID); err != nil {
 			return err
 		}
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.member.add", itoa(orgID), reason)
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.member.add", itoa(orgID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, created.Revision, "organization.member.added", map[string]any{
+			"organization_id": orgID, "user_id": user.ID, "role_code": OrgRoleCode(in.Role), "revision": created.Revision,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -390,7 +405,12 @@ func (uc *OrganizationUsecase) UpdateMember(ctx context.Context, actor ActorCont
 		if err := syncOrgMembershipRole(ctx, uc.Services, tx, orgID, userID, role, actor.User.ID); err != nil {
 			return err
 		}
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.member.update", itoa(orgID), reason)
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.member.update", itoa(orgID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, updated.Revision, "organization.member.updated", map[string]any{
+			"organization_id": orgID, "user_id": userID, "role_code": OrgRoleCode(role), "revision": updated.Revision,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -441,7 +461,12 @@ func (uc *OrganizationUsecase) RemoveMember(ctx context.Context, actor ActorCont
 		if err := revokeOrgMemberAssignments(ctx, uc.Services, tx, orgID, userID, actor.User.ID); err != nil {
 			return err
 		}
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.member.remove", itoa(orgID), reason)
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.member.remove", itoa(orgID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, expected+1, "organization.member.removed", map[string]any{
+			"organization_id": orgID, "user_id": userID, "revision": expected + 1,
+		})
 	})
 }
 
@@ -462,7 +487,12 @@ func (uc *OrganizationUsecase) Leave(ctx context.Context, actor ActorContext, or
 		if err := revokeOrgMemberAssignments(ctx, uc.Services, tx, orgID, actor.User.ID, actor.User.ID); err != nil {
 			return err
 		}
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.member.leave", itoa(orgID), "self-service leave")
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.member.leave", itoa(orgID), "self-service leave"); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, member.Revision+1, "organization.member.removed", map[string]any{
+			"organization_id": orgID, "user_id": actor.User.ID, "revision": member.Revision + 1,
+		})
 	})
 }
 
@@ -505,7 +535,12 @@ func (uc *OrganizationUsecase) CreateDepartment(ctx context.Context, actor Actor
 			return err
 		}
 		created = row
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.department.create", itoa(orgID), "create department")
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.department.create", itoa(orgID), "create department"); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, created.Revision, "organization.department.created", map[string]any{
+			"organization_id": orgID, "department_id": created.ID, "revision": created.Revision,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -559,7 +594,12 @@ func (uc *OrganizationUsecase) UpdateDepartment(ctx context.Context, actor Actor
 			return err
 		}
 		updated = row
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.department.update", itoa(orgID), reason)
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.department.update", itoa(orgID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, updated.Revision, "organization.department.updated", map[string]any{
+			"organization_id": orgID, "department_id": updated.ID, "revision": updated.Revision,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -581,7 +621,12 @@ func (uc *OrganizationUsecase) ArchiveDepartment(ctx context.Context, actor Acto
 		if err := uc.Organizations.ClearDepartmentMembers(ctx, tx, orgID, deptID); err != nil {
 			return err
 		}
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.department.archive", itoa(orgID), reason)
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.department.archive", itoa(orgID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, expected+1, "organization.department.archived", map[string]any{
+			"organization_id": orgID, "department_id": deptID, "revision": expected + 1,
+		})
 	})
 }
 
@@ -600,7 +645,12 @@ func (uc *OrganizationUsecase) AdminArchive(ctx context.Context, actor ActorCont
 		if err := uc.Organizations.ArchiveOrganization(ctx, tx, orgID, expected); err != nil {
 			return err
 		}
-		return uc.auditIn(ctx, tx, actor, orgID, "organization.admin_archive", itoa(orgID), reason)
+		if err := uc.auditIn(ctx, tx, actor, orgID, "organization.admin_archive", itoa(orgID), reason); err != nil {
+			return err
+		}
+		return orgEvent(ctx, uc.Services, tx, orgID, expected+1, "organization.archived", map[string]any{
+			"organization_id": orgID, "revision": expected + 1,
+		})
 	})
 	if err != nil {
 		return nil, err

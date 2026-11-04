@@ -18,6 +18,7 @@ var _ = new(context.Context)
 
 const _ = http.SupportPackageIsVersion3
 
+const OperationOrganizationServiceAcceptOrganizationInvitation = "/api.usercenter.v1.OrganizationService/AcceptOrganizationInvitation"
 const OperationOrganizationServiceAddOrganizationMember = "/api.usercenter.v1.OrganizationService/AddOrganizationMember"
 const OperationOrganizationServiceAdminArchiveOrganization = "/api.usercenter.v1.OrganizationService/AdminArchiveOrganization"
 const OperationOrganizationServiceAdminListOrganizations = "/api.usercenter.v1.OrganizationService/AdminListOrganizations"
@@ -28,6 +29,9 @@ const OperationOrganizationServiceCreateDepartment = "/api.usercenter.v1.Organiz
 const OperationOrganizationServiceCreateOrgAssignment = "/api.usercenter.v1.OrganizationService/CreateOrgAssignment"
 const OperationOrganizationServiceCreateOrgRole = "/api.usercenter.v1.OrganizationService/CreateOrgRole"
 const OperationOrganizationServiceCreateOrganization = "/api.usercenter.v1.OrganizationService/CreateOrganization"
+const OperationOrganizationServiceCreateOrganizationInvitation = "/api.usercenter.v1.OrganizationService/CreateOrganizationInvitation"
+const OperationOrganizationServiceExplainOrgAuthorization = "/api.usercenter.v1.OrganizationService/ExplainOrgAuthorization"
+const OperationOrganizationServiceExportOrgAudits = "/api.usercenter.v1.OrganizationService/ExportOrgAudits"
 const OperationOrganizationServiceGetOrganization = "/api.usercenter.v1.OrganizationService/GetOrganization"
 const OperationOrganizationServiceLeaveOrganization = "/api.usercenter.v1.OrganizationService/LeaveOrganization"
 const OperationOrganizationServiceListDepartments = "/api.usercenter.v1.OrganizationService/ListDepartments"
@@ -36,16 +40,19 @@ const OperationOrganizationServiceListOrgAssignments = "/api.usercenter.v1.Organ
 const OperationOrganizationServiceListOrgAudits = "/api.usercenter.v1.OrganizationService/ListOrgAudits"
 const OperationOrganizationServiceListOrgPermissions = "/api.usercenter.v1.OrganizationService/ListOrgPermissions"
 const OperationOrganizationServiceListOrgRoles = "/api.usercenter.v1.OrganizationService/ListOrgRoles"
+const OperationOrganizationServiceListOrganizationInvitations = "/api.usercenter.v1.OrganizationService/ListOrganizationInvitations"
 const OperationOrganizationServiceListOrganizationMembers = "/api.usercenter.v1.OrganizationService/ListOrganizationMembers"
 const OperationOrganizationServicePutOrgRolePermissions = "/api.usercenter.v1.OrganizationService/PutOrgRolePermissions"
 const OperationOrganizationServiceRemoveOrganizationMember = "/api.usercenter.v1.OrganizationService/RemoveOrganizationMember"
 const OperationOrganizationServiceRevokeOrgAssignment = "/api.usercenter.v1.OrganizationService/RevokeOrgAssignment"
+const OperationOrganizationServiceRevokeOrganizationInvitation = "/api.usercenter.v1.OrganizationService/RevokeOrganizationInvitation"
 const OperationOrganizationServiceUpdateDepartment = "/api.usercenter.v1.OrganizationService/UpdateDepartment"
 const OperationOrganizationServiceUpdateOrgRole = "/api.usercenter.v1.OrganizationService/UpdateOrgRole"
 const OperationOrganizationServiceUpdateOrganization = "/api.usercenter.v1.OrganizationService/UpdateOrganization"
 const OperationOrganizationServiceUpdateOrganizationMember = "/api.usercenter.v1.OrganizationService/UpdateOrganizationMember"
 
 type OrganizationServiceHTTPServer interface {
+	AcceptOrganizationInvitation(context.Context, *AcceptOrganizationInvitationRequest) (*OrganizationMember, error)
 	AddOrganizationMember(context.Context, *AddOrganizationMemberRequest) (*OrganizationMember, error)
 	AdminArchiveOrganization(context.Context, *AdminArchiveOrganizationRequest) (*Organization, error)
 	// AdminListOrganizations Platform administration; requires root/admin platform role.
@@ -57,6 +64,9 @@ type OrganizationServiceHTTPServer interface {
 	CreateOrgAssignment(context.Context, *CreateOrgAssignmentRequest) (*OrgAssignment, error)
 	CreateOrgRole(context.Context, *CreateOrgRoleRequest) (*OrgRole, error)
 	CreateOrganization(context.Context, *CreateOrganizationRequest) (*Organization, error)
+	CreateOrganizationInvitation(context.Context, *CreateOrganizationInvitationRequest) (*OrganizationInvitation, error)
+	ExplainOrgAuthorization(context.Context, *ExplainOrgAuthorizationRequest) (*ExplainOrgAuthorizationReply, error)
+	ExportOrgAudits(context.Context, *ExportOrgAuditsRequest) (*ExportJob, error)
 	GetOrganization(context.Context, *GetOrganizationRequest) (*Organization, error)
 	LeaveOrganization(context.Context, *LeaveOrganizationRequest) (*emptypb.Empty, error)
 	ListDepartments(context.Context, *ListDepartmentsRequest) (*DepartmentsReply, error)
@@ -67,10 +77,12 @@ type OrganizationServiceHTTPServer interface {
 	// ListOrgRoles Organization-scoped IAM (V2.3). Every request is evaluated in the
 	// organization:{id} context; identifiers of another tenant are not found.
 	ListOrgRoles(context.Context, *GetOrganizationRequest) (*OrgRolesReply, error)
+	ListOrganizationInvitations(context.Context, *ListOrganizationInvitationsRequest) (*OrganizationInvitationsReply, error)
 	ListOrganizationMembers(context.Context, *ListOrganizationMembersRequest) (*OrganizationMembersReply, error)
 	PutOrgRolePermissions(context.Context, *PutOrgRolePermissionsRequest) (*OrgRole, error)
 	RemoveOrganizationMember(context.Context, *RemoveOrganizationMemberRequest) (*emptypb.Empty, error)
 	RevokeOrgAssignment(context.Context, *RevokeOrgAssignmentRequest) (*emptypb.Empty, error)
+	RevokeOrganizationInvitation(context.Context, *RevokeOrganizationInvitationRequest) (*emptypb.Empty, error)
 	UpdateDepartment(context.Context, *UpdateDepartmentRequest) (*Department, error)
 	UpdateOrgRole(context.Context, *UpdateOrgRoleRequest) (*OrgRole, error)
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*Organization, error)
@@ -103,6 +115,12 @@ func RegisterOrganizationServiceHTTPServer(s *http.Server, srv OrganizationServi
 	r.Handle("POST", "/api/v1/orgs/{id}/iam/assignments", _OrganizationService_CreateOrgAssignment0_HTTP_Handler(srv))
 	r.Handle("DELETE", "/api/v1/orgs/{id}/iam/assignments/{assignment_id}", _OrganizationService_RevokeOrgAssignment0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/orgs/{id}/audits", _OrganizationService_ListOrgAudits0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/orgs/{id}/audits:export", _OrganizationService_ExportOrgAudits0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/orgs/{id}/iam/authorization:explain", _OrganizationService_ExplainOrgAuthorization0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/orgs/{id}/invitations", _OrganizationService_CreateOrganizationInvitation0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/orgs/{id}/invitations", _OrganizationService_ListOrganizationInvitations0_HTTP_Handler(srv))
+	r.Handle("DELETE", "/api/v1/orgs/{id}/invitations/{invitation_id}", _OrganizationService_RevokeOrganizationInvitation0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/orgs/invitations:accept", _OrganizationService_AcceptOrganizationInvitation0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/admin/organizations", _OrganizationService_AdminListOrganizations0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/admin/organizations/{id}:archive", _OrganizationService_AdminArchiveOrganization0_HTTP_Handler(srv))
 }
@@ -629,6 +647,135 @@ func _OrganizationService_ListOrgAudits0_HTTP_Handler(srv OrganizationServiceHTT
 	}
 }
 
+func _OrganizationService_ExportOrgAudits0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ExportOrgAuditsRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceExportOrgAudits)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ExportOrgAudits(ctx, req.(*ExportOrgAuditsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ExportJob)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _OrganizationService_ExplainOrgAuthorization0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ExplainOrgAuthorizationRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceExplainOrgAuthorization)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ExplainOrgAuthorization(ctx, req.(*ExplainOrgAuthorizationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ExplainOrgAuthorizationReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _OrganizationService_CreateOrganizationInvitation0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CreateOrganizationInvitationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceCreateOrganizationInvitation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CreateOrganizationInvitation(ctx, req.(*CreateOrganizationInvitationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrganizationInvitation)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _OrganizationService_ListOrganizationInvitations0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ListOrganizationInvitationsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceListOrganizationInvitations)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListOrganizationInvitations(ctx, req.(*ListOrganizationInvitationsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrganizationInvitationsReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _OrganizationService_RevokeOrganizationInvitation0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in RevokeOrganizationInvitationRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceRevokeOrganizationInvitation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.RevokeOrganizationInvitation(ctx, req.(*RevokeOrganizationInvitationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*emptypb.Empty)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _OrganizationService_AcceptOrganizationInvitation0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in AcceptOrganizationInvitationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceAcceptOrganizationInvitation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.AcceptOrganizationInvitation(ctx, req.(*AcceptOrganizationInvitationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrganizationMember)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _OrganizationService_AdminListOrganizations0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in AdminListOrganizationsRequest
@@ -671,6 +818,7 @@ func _OrganizationService_AdminArchiveOrganization0_HTTP_Handler(srv Organizatio
 }
 
 type OrganizationServiceHTTPClient interface {
+	AcceptOrganizationInvitation(ctx context.Context, req *AcceptOrganizationInvitationRequest, opts ...http.CallOption) (rsp *OrganizationMember, err error)
 	AddOrganizationMember(ctx context.Context, req *AddOrganizationMemberRequest, opts ...http.CallOption) (rsp *OrganizationMember, err error)
 	AdminArchiveOrganization(ctx context.Context, req *AdminArchiveOrganizationRequest, opts ...http.CallOption) (rsp *Organization, err error)
 	// AdminListOrganizations Platform administration; requires root/admin platform role.
@@ -682,6 +830,9 @@ type OrganizationServiceHTTPClient interface {
 	CreateOrgAssignment(ctx context.Context, req *CreateOrgAssignmentRequest, opts ...http.CallOption) (rsp *OrgAssignment, err error)
 	CreateOrgRole(ctx context.Context, req *CreateOrgRoleRequest, opts ...http.CallOption) (rsp *OrgRole, err error)
 	CreateOrganization(ctx context.Context, req *CreateOrganizationRequest, opts ...http.CallOption) (rsp *Organization, err error)
+	CreateOrganizationInvitation(ctx context.Context, req *CreateOrganizationInvitationRequest, opts ...http.CallOption) (rsp *OrganizationInvitation, err error)
+	ExplainOrgAuthorization(ctx context.Context, req *ExplainOrgAuthorizationRequest, opts ...http.CallOption) (rsp *ExplainOrgAuthorizationReply, err error)
+	ExportOrgAudits(ctx context.Context, req *ExportOrgAuditsRequest, opts ...http.CallOption) (rsp *ExportJob, err error)
 	GetOrganization(ctx context.Context, req *GetOrganizationRequest, opts ...http.CallOption) (rsp *Organization, err error)
 	LeaveOrganization(ctx context.Context, req *LeaveOrganizationRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	ListDepartments(ctx context.Context, req *ListDepartmentsRequest, opts ...http.CallOption) (rsp *DepartmentsReply, err error)
@@ -692,10 +843,12 @@ type OrganizationServiceHTTPClient interface {
 	// ListOrgRoles Organization-scoped IAM (V2.3). Every request is evaluated in the
 	// organization:{id} context; identifiers of another tenant are not found.
 	ListOrgRoles(ctx context.Context, req *GetOrganizationRequest, opts ...http.CallOption) (rsp *OrgRolesReply, err error)
+	ListOrganizationInvitations(ctx context.Context, req *ListOrganizationInvitationsRequest, opts ...http.CallOption) (rsp *OrganizationInvitationsReply, err error)
 	ListOrganizationMembers(ctx context.Context, req *ListOrganizationMembersRequest, opts ...http.CallOption) (rsp *OrganizationMembersReply, err error)
 	PutOrgRolePermissions(ctx context.Context, req *PutOrgRolePermissionsRequest, opts ...http.CallOption) (rsp *OrgRole, err error)
 	RemoveOrganizationMember(ctx context.Context, req *RemoveOrganizationMemberRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	RevokeOrgAssignment(ctx context.Context, req *RevokeOrgAssignmentRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
+	RevokeOrganizationInvitation(ctx context.Context, req *RevokeOrganizationInvitationRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	UpdateDepartment(ctx context.Context, req *UpdateDepartmentRequest, opts ...http.CallOption) (rsp *Department, err error)
 	UpdateOrgRole(ctx context.Context, req *UpdateOrgRoleRequest, opts ...http.CallOption) (rsp *OrgRole, err error)
 	UpdateOrganization(ctx context.Context, req *UpdateOrganizationRequest, opts ...http.CallOption) (rsp *Organization, err error)
@@ -708,6 +861,23 @@ type OrganizationServiceHTTPClientImpl struct {
 
 func NewOrganizationServiceHTTPClient(client *http.Client) OrganizationServiceHTTPClient {
 	return &OrganizationServiceHTTPClientImpl{client}
+}
+
+func (c *OrganizationServiceHTTPClientImpl) AcceptOrganizationInvitation(ctx context.Context, in *AcceptOrganizationInvitationRequest, opts ...http.CallOption) (*OrganizationMember, error) {
+	var out OrganizationMember
+	pattern := "/api/v1/orgs/invitations:accept"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationOrganizationServiceAcceptOrganizationInvitation),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 func (c *OrganizationServiceHTTPClientImpl) AddOrganizationMember(ctx context.Context, in *AddOrganizationMemberRequest, opts ...http.CallOption) (*OrganizationMember, error) {
@@ -880,6 +1050,56 @@ func (c *OrganizationServiceHTTPClientImpl) CreateOrganization(ctx context.Conte
 	return &out, nil
 }
 
+func (c *OrganizationServiceHTTPClientImpl) CreateOrganizationInvitation(ctx context.Context, in *CreateOrganizationInvitationRequest, opts ...http.CallOption) (*OrganizationInvitation, error) {
+	var out OrganizationInvitation
+	pattern := "/api/v1/orgs/{id}/invitations"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationOrganizationServiceCreateOrganizationInvitation),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *OrganizationServiceHTTPClientImpl) ExplainOrgAuthorization(ctx context.Context, in *ExplainOrgAuthorizationRequest, opts ...http.CallOption) (*ExplainOrgAuthorizationReply, error) {
+	var out ExplainOrgAuthorizationReply
+	pattern := "/api/v1/orgs/{id}/iam/authorization:explain"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationOrganizationServiceExplainOrgAuthorization),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *OrganizationServiceHTTPClientImpl) ExportOrgAudits(ctx context.Context, in *ExportOrgAuditsRequest, opts ...http.CallOption) (*ExportJob, error) {
+	var out ExportJob
+	pattern := "/api/v1/orgs/{id}/audits:export"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationOrganizationServiceExportOrgAudits),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *OrganizationServiceHTTPClientImpl) GetOrganization(ctx context.Context, in *GetOrganizationRequest, opts ...http.CallOption) (*Organization, error) {
 	var out Organization
 	pattern := "/api/v1/orgs/{id}"
@@ -1011,6 +1231,22 @@ func (c *OrganizationServiceHTTPClientImpl) ListOrgRoles(ctx context.Context, in
 	return &out, nil
 }
 
+func (c *OrganizationServiceHTTPClientImpl) ListOrganizationInvitations(ctx context.Context, in *ListOrganizationInvitationsRequest, opts ...http.CallOption) (*OrganizationInvitationsReply, error) {
+	var out OrganizationInvitationsReply
+	pattern := "/api/v1/orgs/{id}/invitations"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationOrganizationServiceListOrganizationInvitations),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *OrganizationServiceHTTPClientImpl) ListOrganizationMembers(ctx context.Context, in *ListOrganizationMembersRequest, opts ...http.CallOption) (*OrganizationMembersReply, error) {
 	var out OrganizationMembersReply
 	pattern := "/api/v1/orgs/{id}/members"
@@ -1067,6 +1303,22 @@ func (c *OrganizationServiceHTTPClientImpl) RevokeOrgAssignment(ctx context.Cont
 	opts = append([]http.CallOption{
 		http.Accept("application/protojson"),
 		http.Operation(OperationOrganizationServiceRevokeOrgAssignment),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *OrganizationServiceHTTPClientImpl) RevokeOrganizationInvitation(ctx context.Context, in *RevokeOrganizationInvitationRequest, opts ...http.CallOption) (*emptypb.Empty, error) {
+	var out emptypb.Empty
+	pattern := "/api/v1/orgs/{id}/invitations/{invitation_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationOrganizationServiceRevokeOrganizationInvitation),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
