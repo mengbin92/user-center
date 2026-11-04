@@ -5,6 +5,7 @@ package api.usercenter.v1;
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 import "api/usercenter/v1/common.proto";
+import "api/usercenter/v1/iam.proto";
 
 option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
 
@@ -52,6 +53,39 @@ service OrganizationService {
   }
   rpc ArchiveDepartment(ArchiveDepartmentRequest) returns (Department) {
     option (google.api.http) = {post: "/api/v1/orgs/{id}/departments/{department_id}:archive" body: "*"};
+  }
+
+  // Organization-scoped IAM (V2.3). Every request is evaluated in the
+  // organization:{id} context; identifiers of another tenant are not found.
+  rpc ListOrgRoles(GetOrganizationRequest) returns (OrgRolesReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/iam/roles"};
+  }
+  rpc ListOrgPermissions(GetOrganizationRequest) returns (OrgPermissionsReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/iam/permissions"};
+  }
+  rpc CreateOrgRole(CreateOrgRoleRequest) returns (OrgRole) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/iam/roles" body: "*"};
+  }
+  rpc UpdateOrgRole(UpdateOrgRoleRequest) returns (OrgRole) {
+    option (google.api.http) = {patch: "/api/v1/orgs/{id}/iam/roles/{role_id}" body: "*"};
+  }
+  rpc PutOrgRolePermissions(PutOrgRolePermissionsRequest) returns (OrgRole) {
+    option (google.api.http) = {put: "/api/v1/orgs/{id}/iam/roles/{role_id}/permissions" body: "*"};
+  }
+  rpc ArchiveOrgRole(ArchiveOrgRoleRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/iam/roles/{role_id}:archive" body: "*"};
+  }
+  rpc ListOrgAssignments(GetOrganizationRequest) returns (OrgAssignmentsReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/iam/assignments"};
+  }
+  rpc CreateOrgAssignment(CreateOrgAssignmentRequest) returns (OrgAssignment) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/iam/assignments" body: "*"};
+  }
+  rpc RevokeOrgAssignment(RevokeOrgAssignmentRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/orgs/{id}/iam/assignments/{assignment_id}"};
+  }
+  rpc ListOrgAudits(ListOrgAuditsRequest) returns (OrgAuditsReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/audits"};
   }
 
   // Platform administration; requires root/admin platform role.
@@ -208,4 +242,117 @@ message AdminArchiveOrganizationRequest {
   string id = 1;
   string expected_revision = 2;
   string reason = 3;
+}
+
+message OrgRole {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string description = 4;
+  bool builtin = 5;
+  // active | archived
+  string status = 6;
+  string revision = 7;
+  repeated Grant grants = 8;
+}
+
+message OrgRolesReply {
+  repeated OrgRole items = 1;
+}
+
+message OrgPermissionsReply {
+  repeated Permission items = 1;
+}
+
+message CreateOrgRoleRequest {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string description = 4;
+  repeated Grant grants = 5;
+  string reason = 6;
+}
+
+message UpdateOrgRoleRequest {
+  string id = 1;
+  string role_id = 2;
+  string name = 3;
+  string description = 4;
+  string expected_revision = 5;
+  string reason = 6;
+}
+
+message PutOrgRolePermissionsRequest {
+  string id = 1;
+  string role_id = 2;
+  repeated Grant grants = 3;
+  string expected_revision = 4;
+  string reason = 5;
+}
+
+message ArchiveOrgRoleRequest {
+  string id = 1;
+  string role_id = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message OrgAssignment {
+  string id = 1;
+  string user_id = 2;
+  string username = 3;
+  string display_name = 4;
+  string role_id = 5;
+  string role_code = 6;
+  string role_name = 7;
+  Scope boundary = 8;
+  // active | revoked
+  string status = 9;
+  string revision = 10;
+  string origin = 11;
+  string expires_at = 12;
+  string created_at = 13;
+}
+
+message OrgAssignmentsReply {
+  repeated OrgAssignment items = 1;
+}
+
+message CreateOrgAssignmentRequest {
+  string id = 1;
+  string user_id = 2;
+  string role_id = 3;
+  string expires_at = 4;
+  string reason = 5;
+}
+
+message RevokeOrgAssignmentRequest {
+  string id = 1;
+  string assignment_id = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message OrgAuditEvent {
+  string event_id = 1;
+  string actor_user_id = 2;
+  string action = 3;
+  string target = 4;
+  string result = 5;
+  string reason = 6;
+  string occurred_at = 7;
+}
+
+message ListOrgAuditsRequest {
+  string id = 1;
+  string action = 2;
+  string from = 3;
+  string to = 4;
+  int32 offset = 5;
+  int32 page_size = 6;
+}
+
+message OrgAuditsReply {
+  repeated OrgAuditEvent items = 1;
+  int64 total = 2;
 }

@@ -27,7 +27,16 @@ func TestOIDCMySQLMigrations(t *testing.T) {
 		require.True(t, d.DB().Migrator().HasColumn(table, "identity_version"))
 	}
 	require.True(t, d.DB().Migrator().HasColumn("oidc_refresh_tokens", "family_id"))
+	for _, column := range []struct{ table, name string }{
+		{"iam_roles", "context_type"},
+		{"iam_roles", "context_id"},
+		{"iam_user_roles", "context_type"},
+		{"iam_user_roles", "context_id"},
+		{"iam_audit_events", "organization_id"},
+	} {
+		require.True(t, d.DB().Migrator().HasColumn(column.table, column.name), "%s.%s", column.table, column.name)
+	}
 	var versions int64
 	require.NoError(t, d.DB().Table("schema_migrations").Count(&versions).Error)
-	require.GreaterOrEqual(t, versions, int64(4))
+	require.GreaterOrEqual(t, versions, int64(6))
 }

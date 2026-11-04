@@ -34,6 +34,16 @@ const (
 	OrganizationService_CreateDepartment_FullMethodName         = "/api.usercenter.v1.OrganizationService/CreateDepartment"
 	OrganizationService_UpdateDepartment_FullMethodName         = "/api.usercenter.v1.OrganizationService/UpdateDepartment"
 	OrganizationService_ArchiveDepartment_FullMethodName        = "/api.usercenter.v1.OrganizationService/ArchiveDepartment"
+	OrganizationService_ListOrgRoles_FullMethodName             = "/api.usercenter.v1.OrganizationService/ListOrgRoles"
+	OrganizationService_ListOrgPermissions_FullMethodName       = "/api.usercenter.v1.OrganizationService/ListOrgPermissions"
+	OrganizationService_CreateOrgRole_FullMethodName            = "/api.usercenter.v1.OrganizationService/CreateOrgRole"
+	OrganizationService_UpdateOrgRole_FullMethodName            = "/api.usercenter.v1.OrganizationService/UpdateOrgRole"
+	OrganizationService_PutOrgRolePermissions_FullMethodName    = "/api.usercenter.v1.OrganizationService/PutOrgRolePermissions"
+	OrganizationService_ArchiveOrgRole_FullMethodName           = "/api.usercenter.v1.OrganizationService/ArchiveOrgRole"
+	OrganizationService_ListOrgAssignments_FullMethodName       = "/api.usercenter.v1.OrganizationService/ListOrgAssignments"
+	OrganizationService_CreateOrgAssignment_FullMethodName      = "/api.usercenter.v1.OrganizationService/CreateOrgAssignment"
+	OrganizationService_RevokeOrgAssignment_FullMethodName      = "/api.usercenter.v1.OrganizationService/RevokeOrgAssignment"
+	OrganizationService_ListOrgAudits_FullMethodName            = "/api.usercenter.v1.OrganizationService/ListOrgAudits"
 	OrganizationService_AdminListOrganizations_FullMethodName   = "/api.usercenter.v1.OrganizationService/AdminListOrganizations"
 	OrganizationService_AdminArchiveOrganization_FullMethodName = "/api.usercenter.v1.OrganizationService/AdminArchiveOrganization"
 )
@@ -59,6 +69,18 @@ type OrganizationServiceClient interface {
 	CreateDepartment(ctx context.Context, in *CreateDepartmentRequest, opts ...grpc.CallOption) (*Department, error)
 	UpdateDepartment(ctx context.Context, in *UpdateDepartmentRequest, opts ...grpc.CallOption) (*Department, error)
 	ArchiveDepartment(ctx context.Context, in *ArchiveDepartmentRequest, opts ...grpc.CallOption) (*Department, error)
+	// Organization-scoped IAM (V2.3). Every request is evaluated in the
+	// organization:{id} context; identifiers of another tenant are not found.
+	ListOrgRoles(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgRolesReply, error)
+	ListOrgPermissions(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgPermissionsReply, error)
+	CreateOrgRole(ctx context.Context, in *CreateOrgRoleRequest, opts ...grpc.CallOption) (*OrgRole, error)
+	UpdateOrgRole(ctx context.Context, in *UpdateOrgRoleRequest, opts ...grpc.CallOption) (*OrgRole, error)
+	PutOrgRolePermissions(ctx context.Context, in *PutOrgRolePermissionsRequest, opts ...grpc.CallOption) (*OrgRole, error)
+	ArchiveOrgRole(ctx context.Context, in *ArchiveOrgRoleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListOrgAssignments(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgAssignmentsReply, error)
+	CreateOrgAssignment(ctx context.Context, in *CreateOrgAssignmentRequest, opts ...grpc.CallOption) (*OrgAssignment, error)
+	RevokeOrgAssignment(ctx context.Context, in *RevokeOrgAssignmentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListOrgAudits(ctx context.Context, in *ListOrgAuditsRequest, opts ...grpc.CallOption) (*OrgAuditsReply, error)
 	// Platform administration; requires root/admin platform role.
 	AdminListOrganizations(ctx context.Context, in *AdminListOrganizationsRequest, opts ...grpc.CallOption) (*OrganizationsReply, error)
 	AdminArchiveOrganization(ctx context.Context, in *AdminArchiveOrganizationRequest, opts ...grpc.CallOption) (*Organization, error)
@@ -212,6 +234,106 @@ func (c *organizationServiceClient) ArchiveDepartment(ctx context.Context, in *A
 	return out, nil
 }
 
+func (c *organizationServiceClient) ListOrgRoles(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgRolesReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgRolesReply)
+	err := c.cc.Invoke(ctx, OrganizationService_ListOrgRoles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) ListOrgPermissions(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgPermissionsReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgPermissionsReply)
+	err := c.cc.Invoke(ctx, OrganizationService_ListOrgPermissions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) CreateOrgRole(ctx context.Context, in *CreateOrgRoleRequest, opts ...grpc.CallOption) (*OrgRole, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgRole)
+	err := c.cc.Invoke(ctx, OrganizationService_CreateOrgRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) UpdateOrgRole(ctx context.Context, in *UpdateOrgRoleRequest, opts ...grpc.CallOption) (*OrgRole, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgRole)
+	err := c.cc.Invoke(ctx, OrganizationService_UpdateOrgRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) PutOrgRolePermissions(ctx context.Context, in *PutOrgRolePermissionsRequest, opts ...grpc.CallOption) (*OrgRole, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgRole)
+	err := c.cc.Invoke(ctx, OrganizationService_PutOrgRolePermissions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) ArchiveOrgRole(ctx context.Context, in *ArchiveOrgRoleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, OrganizationService_ArchiveOrgRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) ListOrgAssignments(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgAssignmentsReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgAssignmentsReply)
+	err := c.cc.Invoke(ctx, OrganizationService_ListOrgAssignments_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) CreateOrgAssignment(ctx context.Context, in *CreateOrgAssignmentRequest, opts ...grpc.CallOption) (*OrgAssignment, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgAssignment)
+	err := c.cc.Invoke(ctx, OrganizationService_CreateOrgAssignment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) RevokeOrgAssignment(ctx context.Context, in *RevokeOrgAssignmentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, OrganizationService_RevokeOrgAssignment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) ListOrgAudits(ctx context.Context, in *ListOrgAuditsRequest, opts ...grpc.CallOption) (*OrgAuditsReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgAuditsReply)
+	err := c.cc.Invoke(ctx, OrganizationService_ListOrgAudits_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationServiceClient) AdminListOrganizations(ctx context.Context, in *AdminListOrganizationsRequest, opts ...grpc.CallOption) (*OrganizationsReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(OrganizationsReply)
@@ -253,6 +375,18 @@ type OrganizationServiceServer interface {
 	CreateDepartment(context.Context, *CreateDepartmentRequest) (*Department, error)
 	UpdateDepartment(context.Context, *UpdateDepartmentRequest) (*Department, error)
 	ArchiveDepartment(context.Context, *ArchiveDepartmentRequest) (*Department, error)
+	// Organization-scoped IAM (V2.3). Every request is evaluated in the
+	// organization:{id} context; identifiers of another tenant are not found.
+	ListOrgRoles(context.Context, *GetOrganizationRequest) (*OrgRolesReply, error)
+	ListOrgPermissions(context.Context, *GetOrganizationRequest) (*OrgPermissionsReply, error)
+	CreateOrgRole(context.Context, *CreateOrgRoleRequest) (*OrgRole, error)
+	UpdateOrgRole(context.Context, *UpdateOrgRoleRequest) (*OrgRole, error)
+	PutOrgRolePermissions(context.Context, *PutOrgRolePermissionsRequest) (*OrgRole, error)
+	ArchiveOrgRole(context.Context, *ArchiveOrgRoleRequest) (*emptypb.Empty, error)
+	ListOrgAssignments(context.Context, *GetOrganizationRequest) (*OrgAssignmentsReply, error)
+	CreateOrgAssignment(context.Context, *CreateOrgAssignmentRequest) (*OrgAssignment, error)
+	RevokeOrgAssignment(context.Context, *RevokeOrgAssignmentRequest) (*emptypb.Empty, error)
+	ListOrgAudits(context.Context, *ListOrgAuditsRequest) (*OrgAuditsReply, error)
 	// Platform administration; requires root/admin platform role.
 	AdminListOrganizations(context.Context, *AdminListOrganizationsRequest) (*OrganizationsReply, error)
 	AdminArchiveOrganization(context.Context, *AdminArchiveOrganizationRequest) (*Organization, error)
@@ -307,6 +441,36 @@ func (UnimplementedOrganizationServiceServer) UpdateDepartment(context.Context, 
 }
 func (UnimplementedOrganizationServiceServer) ArchiveDepartment(context.Context, *ArchiveDepartmentRequest) (*Department, error) {
 	return nil, status.Error(codes.Unimplemented, "method ArchiveDepartment not implemented")
+}
+func (UnimplementedOrganizationServiceServer) ListOrgRoles(context.Context, *GetOrganizationRequest) (*OrgRolesReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOrgRoles not implemented")
+}
+func (UnimplementedOrganizationServiceServer) ListOrgPermissions(context.Context, *GetOrganizationRequest) (*OrgPermissionsReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOrgPermissions not implemented")
+}
+func (UnimplementedOrganizationServiceServer) CreateOrgRole(context.Context, *CreateOrgRoleRequest) (*OrgRole, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOrgRole not implemented")
+}
+func (UnimplementedOrganizationServiceServer) UpdateOrgRole(context.Context, *UpdateOrgRoleRequest) (*OrgRole, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateOrgRole not implemented")
+}
+func (UnimplementedOrganizationServiceServer) PutOrgRolePermissions(context.Context, *PutOrgRolePermissionsRequest) (*OrgRole, error) {
+	return nil, status.Error(codes.Unimplemented, "method PutOrgRolePermissions not implemented")
+}
+func (UnimplementedOrganizationServiceServer) ArchiveOrgRole(context.Context, *ArchiveOrgRoleRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ArchiveOrgRole not implemented")
+}
+func (UnimplementedOrganizationServiceServer) ListOrgAssignments(context.Context, *GetOrganizationRequest) (*OrgAssignmentsReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOrgAssignments not implemented")
+}
+func (UnimplementedOrganizationServiceServer) CreateOrgAssignment(context.Context, *CreateOrgAssignmentRequest) (*OrgAssignment, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOrgAssignment not implemented")
+}
+func (UnimplementedOrganizationServiceServer) RevokeOrgAssignment(context.Context, *RevokeOrgAssignmentRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeOrgAssignment not implemented")
+}
+func (UnimplementedOrganizationServiceServer) ListOrgAudits(context.Context, *ListOrgAuditsRequest) (*OrgAuditsReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOrgAudits not implemented")
 }
 func (UnimplementedOrganizationServiceServer) AdminListOrganizations(context.Context, *AdminListOrganizationsRequest) (*OrganizationsReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method AdminListOrganizations not implemented")
@@ -587,6 +751,186 @@ func _OrganizationService_ArchiveDepartment_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrganizationService_ListOrgRoles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).ListOrgRoles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_ListOrgRoles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).ListOrgRoles(ctx, req.(*GetOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_ListOrgPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).ListOrgPermissions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_ListOrgPermissions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).ListOrgPermissions(ctx, req.(*GetOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_CreateOrgRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOrgRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).CreateOrgRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_CreateOrgRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).CreateOrgRole(ctx, req.(*CreateOrgRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_UpdateOrgRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateOrgRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).UpdateOrgRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_UpdateOrgRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).UpdateOrgRole(ctx, req.(*UpdateOrgRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_PutOrgRolePermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PutOrgRolePermissionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).PutOrgRolePermissions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_PutOrgRolePermissions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).PutOrgRolePermissions(ctx, req.(*PutOrgRolePermissionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_ArchiveOrgRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveOrgRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).ArchiveOrgRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_ArchiveOrgRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).ArchiveOrgRole(ctx, req.(*ArchiveOrgRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_ListOrgAssignments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).ListOrgAssignments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_ListOrgAssignments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).ListOrgAssignments(ctx, req.(*GetOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_CreateOrgAssignment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOrgAssignmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).CreateOrgAssignment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_CreateOrgAssignment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).CreateOrgAssignment(ctx, req.(*CreateOrgAssignmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_RevokeOrgAssignment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeOrgAssignmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).RevokeOrgAssignment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_RevokeOrgAssignment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).RevokeOrgAssignment(ctx, req.(*RevokeOrgAssignmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_ListOrgAudits_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOrgAuditsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).ListOrgAudits(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_ListOrgAudits_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).ListOrgAudits(ctx, req.(*ListOrgAuditsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _OrganizationService_AdminListOrganizations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AdminListOrganizationsRequest)
 	if err := dec(in); err != nil {
@@ -685,6 +1029,46 @@ var OrganizationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ArchiveDepartment",
 			Handler:    _OrganizationService_ArchiveDepartment_Handler,
+		},
+		{
+			MethodName: "ListOrgRoles",
+			Handler:    _OrganizationService_ListOrgRoles_Handler,
+		},
+		{
+			MethodName: "ListOrgPermissions",
+			Handler:    _OrganizationService_ListOrgPermissions_Handler,
+		},
+		{
+			MethodName: "CreateOrgRole",
+			Handler:    _OrganizationService_CreateOrgRole_Handler,
+		},
+		{
+			MethodName: "UpdateOrgRole",
+			Handler:    _OrganizationService_UpdateOrgRole_Handler,
+		},
+		{
+			MethodName: "PutOrgRolePermissions",
+			Handler:    _OrganizationService_PutOrgRolePermissions_Handler,
+		},
+		{
+			MethodName: "ArchiveOrgRole",
+			Handler:    _OrganizationService_ArchiveOrgRole_Handler,
+		},
+		{
+			MethodName: "ListOrgAssignments",
+			Handler:    _OrganizationService_ListOrgAssignments_Handler,
+		},
+		{
+			MethodName: "CreateOrgAssignment",
+			Handler:    _OrganizationService_CreateOrgAssignment_Handler,
+		},
+		{
+			MethodName: "RevokeOrgAssignment",
+			Handler:    _OrganizationService_RevokeOrgAssignment_Handler,
+		},
+		{
+			MethodName: "ListOrgAudits",
+			Handler:    _OrganizationService_ListOrgAudits_Handler,
 		},
 		{
 			MethodName: "AdminListOrganizations",

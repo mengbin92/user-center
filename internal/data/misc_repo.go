@@ -24,7 +24,7 @@ func (r *auditRepo) Append(ctx context.Context, tx biz.Tx, e *biz.AuditEvent) er
 		ActorSessionID: e.ActorSessionID, Action: e.Action, Target: e.Target,
 		BeforeData: e.Before, AfterData: e.After, Diff: e.Diff, Result: e.Result,
 		Reason: e.Reason, RequestID: e.RequestID, Versions: e.Versions,
-		OccurredAt: e.OccurredAt,
+		OccurredAt: e.OccurredAt, OrganizationID: e.OrganizationID,
 	}
 	if p.OccurredAt.IsZero() {
 		p.OccurredAt = time.Now().UTC()
@@ -42,6 +42,9 @@ func (r *auditRepo) List(ctx context.Context, tx biz.Tx, f biz.AuditFilter) ([]*
 	}
 	if f.Target != "" {
 		db = db.Where("target = ?", f.Target)
+	}
+	if f.OrganizationID > 0 {
+		db = db.Where("organization_id = ?", f.OrganizationID)
 	}
 	if f.From != nil {
 		db = db.Where("occurred_at >= ?", *f.From)
@@ -64,7 +67,7 @@ func (r *auditRepo) List(ctx context.Context, tx biz.Tx, f biz.AuditFilter) ([]*
 			ActorSessionID: p.ActorSessionID, Action: p.Action, Target: p.Target,
 			Before: p.BeforeData, After: p.AfterData, Diff: p.Diff, Result: p.Result,
 			Reason: p.Reason, RequestID: p.RequestID, Versions: p.Versions,
-			OccurredAt: p.OccurredAt.UTC(),
+			OccurredAt: p.OccurredAt.UTC(), OrganizationID: p.OrganizationID,
 		})
 	}
 	return out, total, nil
@@ -84,7 +87,7 @@ func (r *auditRepo) Get(ctx context.Context, tx biz.Tx, id string) (*biz.AuditEv
 		ActorSessionID: p.ActorSessionID, Action: p.Action, Target: p.Target,
 		Before: p.BeforeData, After: p.AfterData, Diff: p.Diff, Result: p.Result,
 		Reason: p.Reason, RequestID: p.RequestID, Versions: p.Versions,
-		OccurredAt: p.OccurredAt.UTC(),
+		OccurredAt: p.OccurredAt.UTC(), OrganizationID: p.OrganizationID,
 	}, nil
 }
 

@@ -137,8 +137,10 @@ type AuditFilter struct {
 	Target      string
 	From        *time.Time
 	To          *time.Time
-	Offset      int
-	Limit       int
+	// OrganizationID restricts the result to one tenant when > 0.
+	OrganizationID int64
+	Offset         int
+	Limit          int
 }
 
 type PolicyRepo interface {
@@ -184,6 +186,24 @@ type IAMRepo interface {
 	GetMenu(context.Context, Tx, int64) (*MenuItem, error)
 	CreateMenu(context.Context, Tx, *MenuItem) (*MenuItem, error)
 	UpdateMenu(context.Context, Tx, *MenuItem, uint64) (*MenuItem, error)
+}
+
+// OrgIAMRepo owns tenant-scoped roles and assignments. Every method takes the
+// authorization context explicitly: implementations must include it in the
+// WHERE clause and return ErrResourceNotFound for rows of another tenant.
+type OrgIAMRepo interface {
+	ListRoles(context.Context, Tx, authorization.Context) ([]*Role, error)
+	GetRole(context.Context, Tx, authorization.Context, int64) (*Role, error)
+	GetRoleByCode(context.Context, Tx, authorization.Context, string) (*Role, error)
+	CreateRole(context.Context, Tx, authorization.Context, *Role) (*Role, error)
+	UpdateRole(context.Context, Tx, authorization.Context, *Role, uint64) (*Role, error)
+	PutRoleGrants(context.Context, Tx, authorization.Context, int64, []Grant, uint64) (uint64, error)
+	ListAssignments(context.Context, Tx, authorization.Context, int64) ([]*AssignmentItem, error)
+	GetAssignment(context.Context, Tx, authorization.Context, int64) (*Assignment, error)
+	CreateAssignment(context.Context, Tx, authorization.Context, *Assignment) (*Assignment, error)
+	RevokeAssignment(context.Context, Tx, authorization.Context, int64, uint64, int64) error
+	RevokeMemberAssignments(context.Context, Tx, authorization.Context, int64, []int64, int64) (int64, error)
+	CountActiveAssignments(context.Context, Tx, authorization.Context, int64) (int64, error)
 }
 
 type PermissionFilter struct {

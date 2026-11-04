@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
@@ -75,18 +76,27 @@ func (uc *OrganizationUsecase) orgAccess(ctx context.Context, actor ActorContext
 	return org, member.Role, nil
 }
 
-func requireOrgManager(role string) error {
-	if role == "platform" || role == OrgRoleOwner || role == OrgRoleAdmin {
-		return nil
-	}
-	return ErrPermissionDenied
-}
-
 func requireOrgOwner(role string) error {
 	if role == "platform" || role == OrgRoleOwner {
 		return nil
 	}
 	return ErrPermissionDenied
+}
+
+// orgPermission evaluates an organization-domain operation in the tenant
+// context. Platform administrators keep an explicit override; everyone else
+// must hold the permission through an assignment in this organization.
+func (uc *OrganizationUsecase) orgPermission(ctx context.Context, actor ActorContext, orgID int64, operation string, targetUserID int64, wholeObject bool) error {
+	if isPlatformAdmin(actor) {
+		return nil
+	}
+	if err := uc.ensureOrganizationIAM(ctx, orgID); err != nil {
+		return err
+	}
+	if _, err := uc.AuthorizeIn(ctx, actor, authorization.Organization(orgID), operation, targetUserID, wholeObject); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (uc *OrganizationUsecase) ListMine(ctx context.Context, actor ActorContext) ([]*Organization, error) {
@@ -120,7 +130,13 @@ func (uc *OrganizationUsecase) Create(ctx context.Context, actor ActorContext, i
 		}); err != nil {
 			return err
 		}
-		if err := uc.audit(ctx, tx, actor, "organization.create", itoa(org.ID), "{}", "{}", string(mustJSON(map[string]string{"code": org.Code, "name": org.Name})), "self-service organization creation", "success"); err != nil {
+		if err := provisionOrgIAM(ctx, uc.Services, tx, org.ID); err != nil {
+			return err
+		}
+		if err := syncOrgMembershipRole(ctx, uc.Services, tx, org.ID, actor.User.ID, OrgRoleOwner, actor.User.ID); err != nil {
+			return err
+		}
+		if err := uc.auditIn(ctx, tx, actor, org.ID, "organization.create", itoa(org.ID), "self-service organization creation"); err != nil {
 			return err
 		}
 		payload, _ := jsonx.Marshal(map[string]any{"organization_id": org.ID, "code": org.Code, "created_at": now})
@@ -139,6 +155,9 @@ func (uc *OrganizationUsecase) Get(ctx context.Context, actor ActorContext, orgI
 	if err != nil {
 		return nil, err
 	}
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgMemberRead, actor.User.ID, false); err != nil {
+		return nil, err
+	}
 	org.Role = role
 	count, _ := uc.Organizations.CountActiveMembers(ctx, nil, orgID)
 	org.MemberCount = count
@@ -150,7 +169,7 @@ func (uc *OrganizationUsecase) Update(ctx context.Context, actor ActorContext, o
 	if err != nil {
 		return nil, err
 	}
-	if err := requireOrgManager(role); err != nil {
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgSettingsUpdate, 0, true); err != nil {
 		return nil, err
 	}
 	name = strings.TrimSpace(name)
@@ -182,6 +201,9 @@ func (uc *OrganizationUsecase) Archive(ctx context.Context, actor ActorContext, 
 	if err := requireOrgOwner(role); err != nil {
 		return nil, err
 	}
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgArchive, 0, true); err != nil {
+		return nil, err
+	}
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return nil, err
 	}
@@ -189,7 +211,7 @@ func (uc *OrganizationUsecase) Archive(ctx context.Context, actor ActorContext, 
 		if err := uc.Organizations.ArchiveOrganization(ctx, tx, orgID, expected); err != nil {
 			return err
 		}
-		return uc.audit(ctx, tx, actor, "organization.archive", itoa(orgID), "{}", "{}", "{}", reason, "success")
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.archive", itoa(orgID), reason)
 	})
 	if err != nil {
 		return nil, err
@@ -218,6 +240,9 @@ func (uc *OrganizationUsecase) Members(ctx context.Context, actor ActorContext, 
 	if err != nil {
 		return nil, err
 	}
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgMemberRead, 0, true); err != nil {
+		return nil, err
+	}
 	members, err := uc.Organizations.ListMembers(ctx, nil, orgID)
 	if err != nil {
 		return nil, ErrDependency
@@ -235,7 +260,7 @@ func (uc *OrganizationUsecase) AddMember(ctx context.Context, actor ActorContext
 	if err != nil {
 		return nil, err
 	}
-	if err := requireOrgManager(role); err != nil {
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgMemberManage, 0, true); err != nil {
 		return nil, err
 	}
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
@@ -282,7 +307,10 @@ func (uc *OrganizationUsecase) AddMember(ctx context.Context, actor ActorContext
 				return err
 			}
 			restored = row
-			return uc.audit(ctx, tx, actor, "organization.member.add", itoa(orgID), "{}", "{}", "{}", reason, "success")
+			if err := syncOrgMembershipRole(ctx, uc.Services, tx, orgID, user.ID, in.Role, actor.User.ID); err != nil {
+				return err
+			}
+			return uc.auditIn(ctx, tx, actor, orgID, "organization.member.add", itoa(orgID), reason)
 		})
 		if err != nil {
 			return nil, err
@@ -300,7 +328,10 @@ func (uc *OrganizationUsecase) AddMember(ctx context.Context, actor ActorContext
 			return err
 		}
 		created = row
-		return uc.audit(ctx, tx, actor, "organization.member.add", itoa(orgID), "{}", "{}", "{}", reason, "success")
+		if err := syncOrgMembershipRole(ctx, uc.Services, tx, orgID, user.ID, in.Role, actor.User.ID); err != nil {
+			return err
+		}
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.member.add", itoa(orgID), reason)
 	})
 	if err != nil {
 		return nil, err
@@ -314,7 +345,7 @@ func (uc *OrganizationUsecase) UpdateMember(ctx context.Context, actor ActorCont
 	if err != nil {
 		return nil, err
 	}
-	if err := requireOrgManager(actorRole); err != nil {
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgMemberManage, userID, false); err != nil {
 		return nil, err
 	}
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
@@ -353,7 +384,10 @@ func (uc *OrganizationUsecase) UpdateMember(ctx context.Context, actor ActorCont
 			return err
 		}
 		updated = row
-		return uc.audit(ctx, tx, actor, "organization.member.update", itoa(orgID), "{}", "{}", "{}", reason, "success")
+		if err := syncOrgMembershipRole(ctx, uc.Services, tx, orgID, userID, role, actor.User.ID); err != nil {
+			return err
+		}
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.member.update", itoa(orgID), reason)
 	})
 	if err != nil {
 		return nil, err
@@ -377,7 +411,7 @@ func (uc *OrganizationUsecase) RemoveMember(ctx context.Context, actor ActorCont
 	if err != nil {
 		return err
 	}
-	if err := requireOrgManager(actorRole); err != nil {
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgMemberManage, userID, false); err != nil {
 		return err
 	}
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
@@ -401,7 +435,10 @@ func (uc *OrganizationUsecase) RemoveMember(ctx context.Context, actor ActorCont
 		if err := uc.Organizations.RemoveMember(ctx, tx, orgID, userID, expected); err != nil {
 			return err
 		}
-		return uc.audit(ctx, tx, actor, "organization.member.remove", itoa(orgID), "{}", "{}", "{}", reason, "success")
+		if err := revokeOrgMemberAssignments(ctx, uc.Services, tx, orgID, userID, actor.User.ID); err != nil {
+			return err
+		}
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.member.remove", itoa(orgID), reason)
 	})
 }
 
@@ -419,7 +456,10 @@ func (uc *OrganizationUsecase) Leave(ctx context.Context, actor ActorContext, or
 		if err := uc.Organizations.RemoveMember(ctx, tx, orgID, actor.User.ID, member.Revision); err != nil {
 			return err
 		}
-		return uc.audit(ctx, tx, actor, "organization.member.leave", itoa(orgID), "{}", "{}", "{}", "self-service leave", "success")
+		if err := revokeOrgMemberAssignments(ctx, uc.Services, tx, orgID, actor.User.ID, actor.User.ID); err != nil {
+			return err
+		}
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.member.leave", itoa(orgID), "self-service leave")
 	})
 }
 
@@ -427,15 +467,21 @@ func (uc *OrganizationUsecase) Departments(ctx context.Context, actor ActorConte
 	if _, _, err := uc.orgAccess(ctx, actor, orgID); err != nil {
 		return nil, err
 	}
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgDepartmentRead, 0, true); err != nil {
+		return nil, err
+	}
 	return uc.Organizations.ListDepartments(ctx, nil, orgID)
 }
 
 func (uc *OrganizationUsecase) CreateDepartment(ctx context.Context, actor ActorContext, orgID int64, in DepartmentInput) (*Department, error) {
-	_, role, err := uc.orgAccess(ctx, actor, orgID)
+	if _, _, err := uc.orgAccess(ctx, actor, orgID); err != nil {
+		return nil, err
+	}
+	var err error
 	if err != nil {
 		return nil, err
 	}
-	if err := requireOrgManager(role); err != nil {
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgDepartmentManage, 0, true); err != nil {
 		return nil, err
 	}
 	in.Code, in.Name = strings.ToLower(strings.TrimSpace(in.Code)), strings.TrimSpace(in.Name)
@@ -456,7 +502,7 @@ func (uc *OrganizationUsecase) CreateDepartment(ctx context.Context, actor Actor
 			return err
 		}
 		created = row
-		return uc.audit(ctx, tx, actor, "organization.department.create", itoa(orgID), "{}", "{}", "{}", "create department", "success")
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.department.create", itoa(orgID), "create department")
 	})
 	if err != nil {
 		return nil, err
@@ -465,11 +511,14 @@ func (uc *OrganizationUsecase) CreateDepartment(ctx context.Context, actor Actor
 }
 
 func (uc *OrganizationUsecase) UpdateDepartment(ctx context.Context, actor ActorContext, orgID, deptID int64, in DepartmentInput, expected uint64, reason string) (*Department, error) {
-	_, role, err := uc.orgAccess(ctx, actor, orgID)
+	if _, _, err := uc.orgAccess(ctx, actor, orgID); err != nil {
+		return nil, err
+	}
+	var err error
 	if err != nil {
 		return nil, err
 	}
-	if err := requireOrgManager(role); err != nil {
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgDepartmentManage, 0, true); err != nil {
 		return nil, err
 	}
 	dept, err := uc.Organizations.GetDepartment(ctx, nil, orgID, deptID)
@@ -507,7 +556,7 @@ func (uc *OrganizationUsecase) UpdateDepartment(ctx context.Context, actor Actor
 			return err
 		}
 		updated = row
-		return uc.audit(ctx, tx, actor, "organization.department.update", itoa(orgID), "{}", "{}", "{}", reason, "success")
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.department.update", itoa(orgID), reason)
 	})
 	if err != nil {
 		return nil, err
@@ -516,11 +565,10 @@ func (uc *OrganizationUsecase) UpdateDepartment(ctx context.Context, actor Actor
 }
 
 func (uc *OrganizationUsecase) ArchiveDepartment(ctx context.Context, actor ActorContext, orgID, deptID int64, expected uint64, reason string) error {
-	_, role, err := uc.orgAccess(ctx, actor, orgID)
-	if err != nil {
+	if _, _, err := uc.orgAccess(ctx, actor, orgID); err != nil {
 		return err
 	}
-	if err := requireOrgManager(role); err != nil {
+	if err := uc.orgPermission(ctx, actor, orgID, PermOrgDepartmentManage, 0, true); err != nil {
 		return err
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
@@ -530,7 +578,7 @@ func (uc *OrganizationUsecase) ArchiveDepartment(ctx context.Context, actor Acto
 		if err := uc.Organizations.ClearDepartmentMembers(ctx, tx, orgID, deptID); err != nil {
 			return err
 		}
-		return uc.audit(ctx, tx, actor, "organization.department.archive", itoa(orgID), "{}", "{}", "{}", reason, "success")
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.department.archive", itoa(orgID), reason)
 	})
 }
 
@@ -549,7 +597,7 @@ func (uc *OrganizationUsecase) AdminArchive(ctx context.Context, actor ActorCont
 		if err := uc.Organizations.ArchiveOrganization(ctx, tx, orgID, expected); err != nil {
 			return err
 		}
-		return uc.audit(ctx, tx, actor, "organization.admin_archive", itoa(orgID), "{}", "{}", "{}", reason, "success")
+		return uc.auditIn(ctx, tx, actor, orgID, "organization.admin_archive", itoa(orgID), reason)
 	})
 	if err != nil {
 		return nil, err

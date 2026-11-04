@@ -11,11 +11,12 @@ import (
 
 type OrganizationService struct {
 	usercv1.UnimplementedOrganizationServiceServer
-	uc *biz.OrganizationUsecase
+	uc  *biz.OrganizationUsecase
+	iam *biz.OrgIAMUsecase
 }
 
-func NewOrganizationService(uc *biz.OrganizationUsecase) *OrganizationService {
-	return &OrganizationService{uc: uc}
+func NewOrganizationService(uc *biz.OrganizationUsecase, iam *biz.OrgIAMUsecase) *OrganizationService {
+	return &OrganizationService{uc: uc, iam: iam}
 }
 
 func organizationProto(o *biz.Organization) *usercv1.Organization {

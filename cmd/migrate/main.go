@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -53,6 +54,11 @@ func main() {
 	}
 	if err := data.SeedCatalog(d.DB()); err != nil {
 		log.Fatal("seed catalog", zap.Error(err))
+	}
+	// V2.3: materialize organization-scoped roles and grants for organizations
+	// created before the upgrade. Idempotent.
+	if err := wiring.BuildServices(d, bootstrap).BackfillOrganizationIAM(context.Background()); err != nil {
+		log.Fatal("backfill organization iam", zap.Error(err))
 	}
 	log.Info("migrations complete", zap.String("driver", driver))
 }

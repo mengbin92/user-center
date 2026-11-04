@@ -191,7 +191,10 @@ func (r *iamRepo) UpdatePermission(ctx context.Context, tx biz.Tx, p *biz.Permis
 var _ = fmt.Sprintf
 
 func (r *iamRepo) loadRoles(ctx context.Context, tx biz.Tx, filter biz.RoleFilter) ([]*biz.Role, error) {
-	db := r.d.dbOr(tx).WithContext(ctx).Model(&rolePO{})
+	// Platform policy only: organization-scoped roles live in another context
+	// and must never participate in a platform decision.
+	db := r.d.dbOr(tx).WithContext(ctx).Model(&rolePO{}).
+		Where("context_type = ? AND context_id = 0", authorization.ContextTypePlatform)
 	if filter.Status != "" {
 		db = db.Where("status = ?", filter.Status)
 	}
@@ -237,6 +240,7 @@ func (r *iamRepo) loadRoles(ctx context.Context, tx biz.Tx, filter biz.RoleFilte
 			Builtin: p.Builtin, Status: p.Status, MaxMembers: p.MaxMembers,
 			Revision: p.Revision, CreationDelegationID: p.CreationDelegationID,
 			Grants: grantMap[p.ID], Inherits: inheritMap[p.ID],
+			Context: authorization.Platform(),
 		})
 	}
 	return out, nil
@@ -252,7 +256,9 @@ func (r *iamRepo) ListAllRolesWithGrants(ctx context.Context, tx biz.Tx) ([]*biz
 
 func (r *iamRepo) GetRole(ctx context.Context, tx biz.Tx, id int64) (*biz.Role, error) {
 	var p rolePO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).First(&p).Error
+	err := r.d.dbOr(tx).WithContext(ctx).
+		Where("id = ? AND context_type = ? AND context_id = 0", id, authorization.ContextTypePlatform).
+		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -273,7 +279,9 @@ func (r *iamRepo) GetRole(ctx context.Context, tx biz.Tx, id int64) (*biz.Role, 
 
 func (r *iamRepo) GetRoleByCode(ctx context.Context, tx biz.Tx, code string) (*biz.Role, error) {
 	var p rolePO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("code = ?", code).First(&p).Error
+	err := r.d.dbOr(tx).WithContext(ctx).
+		Where("code = ? AND context_type = ? AND context_id = 0", code, authorization.ContextTypePlatform).
+		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -288,6 +296,7 @@ func (r *iamRepo) CreateRole(ctx context.Context, tx biz.Tx, role *biz.Role) (*b
 		Code: role.Code, Name: role.Name, Description: role.Description,
 		Builtin: role.Builtin, Status: role.Status, MaxMembers: role.MaxMembers,
 		Revision: 1, CreationDelegationID: role.CreationDelegationID,
+		ContextType: authorization.ContextTypePlatform, ContextID: 0,
 	}
 	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
@@ -388,12 +397,15 @@ func assignmentToBiz(p assignmentPO) (*biz.Assignment, error) {
 		ID: p.ID, UserID: p.UserID, RoleID: p.RoleID, Boundary: scope,
 		StartsAt: p.StartsAt.UTC(), ExpiresAt: p.ExpiresAt, Revoked: p.Status != "active",
 		Origin: p.Origin, Revision: p.Revision, AssignedBy: p.AssignedBy, CreatedAt: p.CreatedAt.UTC(),
+		Context: assignmentContextFromPO(&p),
 	}, nil
 }
 
 func (r *iamRepo) ListAssignmentsForUser(ctx context.Context, tx biz.Tx, userID int64) ([]*biz.Assignment, error) {
 	var rows []assignmentPO
-	if err := r.d.dbOr(tx).WithContext(ctx).Where("user_id = ?", userID).Order("id").Find(&rows).Error; err != nil {
+	if err := r.d.dbOr(tx).WithContext(ctx).
+		Where("user_id = ? AND context_type = ? AND context_id = 0", userID, authorization.ContextTypePlatform).
+		Order("id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*biz.Assignment, 0, len(rows))
@@ -409,7 +421,9 @@ func (r *iamRepo) ListAssignmentsForUser(ctx context.Context, tx biz.Tx, userID 
 
 func (r *iamRepo) GetAssignment(ctx context.Context, tx biz.Tx, id int64) (*biz.Assignment, error) {
 	var p assignmentPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).First(&p).Error
+	err := r.d.dbOr(tx).WithContext(ctx).
+		Where("id = ? AND context_type = ? AND context_id = 0", id, authorization.ContextTypePlatform).
+		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -428,6 +442,7 @@ func (r *iamRepo) CreateAssignment(ctx context.Context, tx biz.Tx, a *biz.Assign
 		UserID: a.UserID, RoleID: a.RoleID, Boundary: string(scope),
 		StartsAt: a.StartsAt, ExpiresAt: a.ExpiresAt, Status: "active",
 		Origin: a.Origin, Revision: 1, AssignedBy: a.AssignedBy, CreatedAt: a.CreatedAt,
+		ContextType: authorization.ContextTypePlatform, ContextID: 0,
 	}
 	if p.CreatedAt.IsZero() {
 		p.CreatedAt = time.Now().UTC()
@@ -442,9 +457,11 @@ func (r *iamRepo) CreateAssignment(ctx context.Context, tx biz.Tx, a *biz.Assign
 }
 
 func (r *iamRepo) RevokeAssignment(ctx context.Context, tx biz.Tx, id int64, expected uint64, by int64) error {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).Where("id = ? AND revision = ?", id, expected).Updates(map[string]any{
-		"status": "revoked", "revision": expected + 1, "assigned_by": by,
-	})
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).
+		Where("id = ? AND revision = ? AND context_type = ? AND context_id = 0", id, expected, authorization.ContextTypePlatform).
+		Updates(map[string]any{
+			"status": "revoked", "revision": expected + 1, "assigned_by": by,
+		})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -456,7 +473,9 @@ func (r *iamRepo) RevokeAssignment(ctx context.Context, tx biz.Tx, id int64, exp
 
 func (r *iamRepo) ListAssignmentsForRole(ctx context.Context, tx biz.Tx, roleID int64) ([]*biz.Assignment, error) {
 	var rows []assignmentPO
-	if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id = ?", roleID).Find(&rows).Error; err != nil {
+	if err := r.d.dbOr(tx).WithContext(ctx).
+		Where("role_id = ? AND context_type = ? AND context_id = 0", roleID, authorization.ContextTypePlatform).
+		Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*biz.Assignment, 0, len(rows))
@@ -474,14 +493,17 @@ func (r *iamRepo) CountActiveAssignmentsForRole(ctx context.Context, tx biz.Tx, 
 	now := time.Now().UTC()
 	var n int64
 	err := r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).
-		Where("role_id = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?)", roleID, "active", now).Count(&n).Error
+		Where("role_id = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?) AND context_type = ? AND context_id = 0", roleID, "active", now, authorization.ContextTypePlatform).
+		Count(&n).Error
 	return n, err
 }
 
 func (r *iamRepo) ListAssignments(ctx context.Context, tx biz.Tx, f biz.AssignmentFilter) ([]*biz.AssignmentItem, int64, error) {
 	db := r.d.dbOr(tx).WithContext(ctx).Table("iam_user_roles AS ur").
 		Joins("JOIN users AS u ON u.id = ur.user_id").
-		Joins("JOIN iam_roles AS r ON r.id = ur.role_id")
+		Joins("JOIN iam_roles AS r ON r.id = ur.role_id").
+		Where("ur.context_type = ? AND ur.context_id = 0 AND r.context_type = ? AND r.context_id = 0",
+			authorization.ContextTypePlatform, authorization.ContextTypePlatform)
 	if f.UserID > 0 {
 		db = db.Where("ur.user_id = ?", f.UserID)
 	}
@@ -547,7 +569,7 @@ func (r *iamRepo) ListRoleMembers(ctx context.Context, tx biz.Tx, roleID int64) 
 	err := db.Table("iam_user_roles AS ur").
 		Select("ur.user_id, u.username, u.display_name, ur.id AS assignment_id, ur.created_at, ur.expires_at, ur.origin").
 		Joins("JOIN users AS u ON u.id = ur.user_id").
-		Where("ur.role_id = ? AND ur.status = ?", roleID, "active").
+		Where("ur.role_id = ? AND ur.status = ? AND ur.context_type = ? AND ur.context_id = 0", roleID, "active", authorization.ContextTypePlatform).
 		Order("ur.id").Scan(&rows).Error
 	if err != nil {
 		return nil, err

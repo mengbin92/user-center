@@ -149,7 +149,7 @@ func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, svc *biz.Ser
 func (a *App) Run() error {
 	opts := []kratos.Option{
 		kratos.Name("user-center"),
-		kratos.Version("0.4.0"),
+		kratos.Version("0.5.0"),
 		kratos.Logger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))),
 		kratos.Server(a.http.Server, a.grpc.Server),
 		kratos.BeforeStart(a.bootstrap),
@@ -192,7 +192,7 @@ func BuildServices(d *data.Data, b *conf.Bootstrap) *biz.Services {
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
 		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
 		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), nil,
-		data.NewOrganizationRepo(d), d,
+		data.NewOrganizationRepo(d), data.NewOrgIAMRepo(d), d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
 		map[string]biz.OAuthProvider{}, nil,
 	)

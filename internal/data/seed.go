@@ -17,11 +17,16 @@ type seedPermission struct {
 	Sort                                    int32
 }
 
+// organizationContextPermissions is the subset of the catalog that is evaluated
+// inside organization:{id}. Everything else is platform-only.
+var organizationContextPermissions = map[string]bool{}
+
 var seededResources = []resourcePO{
 	{Code: "identity", Name: "账号与身份", Owner: "user-center", Enabled: true},
 	{Code: "iam", Name: "权限治理", Owner: "user-center", Enabled: true},
 	{Code: "audit", Name: "审计", Owner: "user-center", Enabled: true},
 	{Code: "settings", Name: "认证配置", Owner: "user-center", Enabled: true},
+	{Code: "organization", Name: "组织与租户", Owner: "user-center", Enabled: true},
 }
 
 var seededPermissions = []seedPermission{
@@ -74,6 +79,29 @@ var seededPermissions = []seedPermission{
 	{"oidc.client.update", "管理 OIDC 应用", "settings", "critical", "创建、轮换与停用 OIDC 客户端", []string{"all"}, 710},
 	{"organization.admin.read", "查看所有组织", "identity", "medium", "平台管理员查看组织目录", []string{"all"}, 800},
 	{"organization.admin.update", "管理所有组织", "identity", "high", "平台管理员归档组织", []string{"all"}, 810},
+
+	// Organization-scoped catalog (V2.3). These operations are only ever
+	// evaluated inside organization:{id}; a platform role cannot use them and
+	// an organization role cannot use the platform catalog above.
+	{"organization.member.read", "查看组织成员", "organization", "medium", "查看本组织成员列表", []string{"all", "self", "user_ids"}, 900},
+	{"organization.member.manage", "管理组织成员", "organization", "high", "添加、调整与移除本组织成员", []string{"all", "user_ids"}, 910},
+	{"organization.department.read", "查看部门", "organization", "low", "查看本组织部门结构", []string{"all"}, 920},
+	{"organization.department.manage", "管理部门", "organization", "high", "创建、修改与归档本组织部门", []string{"all"}, 930},
+	{"organization.iam.role.read", "查看组织角色", "organization", "low", "查看本组织角色与授权", []string{"all"}, 940},
+	{"organization.iam.role.manage", "管理组织角色", "organization", "high", "创建、修改与归档本组织角色", []string{"all"}, 950},
+	{"organization.iam.assignment.read", "查看组织授权", "organization", "low", "查看本组织成员的角色分配", []string{"all"}, 960},
+	{"organization.iam.assignment.manage", "管理组织授权", "organization", "high", "向本组织成员分配或撤销角色", []string{"all", "user_ids"}, 970},
+	{"organization.audit.read", "查看组织审计", "organization", "medium", "读取本组织的授权审计", []string{"all"}, 980},
+	{"organization.settings.update", "修改组织设置", "organization", "high", "修改组织名称等基础设置", []string{"all"}, 990},
+	{"organization.archive", "归档组织", "organization", "critical", "归档本组织并冻结成员访问", []string{"all"}, 1000},
+}
+
+func init() {
+	for _, p := range seededPermissions {
+		if p.Category == "organization" {
+			organizationContextPermissions[p.Code] = true
+		}
+	}
 }
 
 var seededMenus = []menuPO{
@@ -116,7 +144,11 @@ func SeedCatalog(db *gorm.DB) error {
 		permissions := make([]permissionPO, 0, len(seededPermissions))
 		for _, p := range seededPermissions {
 			scopes, _ := jsonx.Marshal(p.Scopes)
-			contexts, _ := jsonx.Marshal([]string{"platform"})
+			contextTypes := []string{"platform"}
+			if organizationContextPermissions[p.Code] {
+				contextTypes = []string{"organization"}
+			}
+			contexts, _ := jsonx.Marshal(contextTypes)
 			po := permissionPO{
 				ResourceID: resources[p.Category], Code: p.Code, Name: p.Name,
 				Category: p.Category, RiskLevel: p.Risk, Status: "active", Binding: "bound",

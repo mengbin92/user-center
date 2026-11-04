@@ -232,6 +232,30 @@ func SummizeAgent(ua string) string {
 
 // Transactional audit + outbox helpers shared by usecases.
 
+// auditIn writes an audit event scoped to one organization. Tenant audit
+// queries filter on the same organization_id, so a tenant never sees platform
+// events and platform audit keeps full visibility.
+func (s *Services) auditIn(ctx context.Context, tx Tx, actor ActorContext, orgID int64, action, target, reason string) error {
+	e := &AuditEvent{
+		EventID:        s.IDs.NewID(),
+		Action:         action,
+		Target:         target,
+		Reason:         reason,
+		Result:         "success",
+		RequestID:      RequestID(ctx),
+		OccurredAt:     s.Clock.Now().UTC(),
+		OrganizationID: orgID,
+		Before:         "{}", After: "{}", Diff: "{}",
+	}
+	if actor.User != nil {
+		e.ActorUserID = actor.User.ID
+	}
+	if actor.Session != nil {
+		e.ActorSessionID = actor.Session.ID
+	}
+	return s.Audit.Append(ctx, tx, e)
+}
+
 func (s *Services) audit(ctx context.Context, tx Tx, actor ActorContext, action, target, before, after, diff, reason string, result string) error {
 	e := &AuditEvent{
 		EventID:    s.IDs.NewID(),

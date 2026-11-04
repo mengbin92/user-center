@@ -139,6 +139,9 @@ type Role struct {
 	CreationDelegationID int64
 	Inherits             []int64
 	Grants               []Grant
+	// Context is the authorization domain the role belongs to. The zero value
+	// is the platform context.
+	Context authorization.Context
 }
 
 type Grant struct {
@@ -159,6 +162,9 @@ type Assignment struct {
 	Revision   uint64
 	AssignedBy int64
 	CreatedAt  time.Time
+	// Context is the tenant the assignment was issued in; it never applies to
+	// another context.
+	Context authorization.Context
 }
 
 func (a Assignment) Active(now time.Time) bool {
@@ -268,6 +274,8 @@ type AuditEvent struct {
 	RequestID      string
 	Versions       string
 	OccurredAt     time.Time
+	// OrganizationID scopes the event to one tenant; 0 is platform level.
+	OrganizationID int64
 }
 
 type ExportJob struct {
@@ -411,6 +419,44 @@ const (
 	OrgMemberActive   = "active"
 	OrgMemberRemoved  = "removed"
 )
+
+// Organization-scoped IAM. Membership roles are the coarse projection; the
+// built-in roles below are materialized per organization so grants, custom
+// roles and assignments stay inside one tenant.
+const (
+	OrgRoleCodeOwner  = "org_owner"
+	OrgRoleCodeAdmin  = "org_admin"
+	OrgRoleCodeMember = "org_member"
+
+	PermOrgMemberRead        = "organization.member.read"
+	PermOrgMemberManage      = "organization.member.manage"
+	PermOrgDepartmentRead    = "organization.department.read"
+	PermOrgDepartmentManage  = "organization.department.manage"
+	PermOrgRoleRead          = "organization.iam.role.read"
+	PermOrgRoleManage        = "organization.iam.role.manage"
+	PermOrgAssignmentRead    = "organization.iam.assignment.read"
+	PermOrgAssignmentManage  = "organization.iam.assignment.manage"
+	PermOrgAuditRead         = "organization.audit.read"
+	PermOrgSettingsUpdate    = "organization.settings.update"
+	PermOrgArchive           = "organization.archive"
+	PermOrgAdminRead         = "organization.admin.read"
+	PermOrgAdminUpdate       = "organization.admin.update"
+)
+
+func OrgRoleCode(membershipRole string) string {
+	switch membershipRole {
+	case OrgRoleOwner:
+		return OrgRoleCodeOwner
+	case OrgRoleAdmin:
+		return OrgRoleCodeAdmin
+	default:
+		return OrgRoleCodeMember
+	}
+}
+
+func OrgRoleCodes() []string {
+	return []string{OrgRoleCodeOwner, OrgRoleCodeAdmin, OrgRoleCodeMember}
+}
 
 type Organization struct {
 	ID          int64

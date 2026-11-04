@@ -153,7 +153,7 @@ func (permissionPO) TableName() string { return "iam_permissions" }
 
 type rolePO struct {
 	ID                   int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	Code                 string `gorm:"column:code;size:64;not null;uniqueIndex"`
+	Code                 string `gorm:"column:code;size:64;not null;uniqueIndex:uk_iam_roles_context_code,priority:3"`
 	Name                 string `gorm:"column:name;size:128;not null"`
 	Description          string `gorm:"column:description;size:512"`
 	Builtin              bool   `gorm:"column:builtin;not null;default:false"`
@@ -161,6 +161,10 @@ type rolePO struct {
 	MaxMembers           *int64 `gorm:"column:max_members"`
 	Revision             uint64 `gorm:"column:revision;not null;default:1"`
 	CreationDelegationID int64  `gorm:"column:creation_delegation_id;not null;default:0"`
+	// ContextType/ContextID scope the role to the platform or one organization.
+	// Rows written before V2.3 are platform policy by definition.
+	ContextType string `gorm:"column:context_type;size:16;not null;default:platform;uniqueIndex:uk_iam_roles_context_code,priority:1;index:idx_iam_roles_context,priority:1"`
+	ContextID   int64  `gorm:"column:context_id;not null;default:0;uniqueIndex:uk_iam_roles_context_code,priority:2;index:idx_iam_roles_context,priority:2"`
 }
 
 func (rolePO) TableName() string { return "iam_roles" }
@@ -193,6 +197,9 @@ type assignmentPO struct {
 	Revision   uint64     `gorm:"column:revision;not null;default:1"`
 	AssignedBy int64      `gorm:"column:assigned_by;not null;default:0"`
 	CreatedAt  time.Time  `gorm:"column:created_at;not null"`
+	// The assignment is only valid inside its own context.
+	ContextType string `gorm:"column:context_type;size:16;not null;default:platform;index:idx_iam_user_roles_context,priority:1"`
+	ContextID   int64  `gorm:"column:context_id;not null;default:0;index:idx_iam_user_roles_context,priority:2"`
 }
 
 func (assignmentPO) TableName() string { return "iam_user_roles" }
@@ -258,6 +265,8 @@ type auditEventPO struct {
 	RequestID      string    `gorm:"column:request_id;size:64"`
 	Versions       string    `gorm:"column:authorization_versions;type:text"`
 	OccurredAt     time.Time `gorm:"column:occurred_at;not null;index"`
+	// OrganizationID scopes tenant audit: 0 means a platform-level event.
+	OrganizationID int64 `gorm:"column:organization_id;not null;default:0;index:idx_iam_audit_org,priority:1"`
 }
 
 func (auditEventPO) TableName() string { return "iam_audit_events" }

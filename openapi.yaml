@@ -2166,6 +2166,46 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.Organization'
+    /api/v1/orgs/{id}/audits:
+        get:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ListOrgAudits
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: action
+                  in: query
+                  schema:
+                    type: string
+                - name: from
+                  in: query
+                  schema:
+                    type: string
+                - name: to
+                  in: query
+                  schema:
+                    type: string
+                - name: offset
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: page_size
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgAuditsReply'
     /api/v1/orgs/{id}/departments:
         get:
             tags:
@@ -2265,6 +2305,221 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.Department'
+    /api/v1/orgs/{id}/iam/assignments:
+        get:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ListOrgAssignments
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgAssignmentsReply'
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_CreateOrgAssignment
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateOrgAssignmentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgAssignment'
+    /api/v1/orgs/{id}/iam/assignments/{assignment_id}:
+        delete:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_RevokeOrgAssignment
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: assignment_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: expected_revision
+                  in: query
+                  schema:
+                    type: string
+                - name: reason
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/orgs/{id}/iam/permissions:
+        get:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ListOrgPermissions
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgPermissionsReply'
+    /api/v1/orgs/{id}/iam/roles:
+        get:
+            tags:
+                - OrganizationService
+            description: |-
+                Organization-scoped IAM (V2.3). Every request is evaluated in the
+                 organization:{id} context; identifiers of another tenant are not found.
+            operationId: OrganizationService_ListOrgRoles
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgRolesReply'
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_CreateOrgRole
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateOrgRoleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgRole'
+    /api/v1/orgs/{id}/iam/roles/{role_id}:
+        patch:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_UpdateOrgRole
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: role_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateOrgRoleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgRole'
+    /api/v1/orgs/{id}/iam/roles/{role_id}/permissions:
+        put:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_PutOrgRolePermissions
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: role_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.PutOrgRolePermissionsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgRole'
+    /api/v1/orgs/{id}/iam/roles/{role_id}:archive:
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_ArchiveOrgRole
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: role_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ArchiveOrgRoleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
     /api/v1/orgs/{id}/members:
         get:
             tags:
@@ -2454,6 +2709,17 @@ components:
                 reason:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.ArchiveOrgRoleRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                role_id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.ArchiveOrganizationRequest:
             type: object
@@ -2971,6 +3237,36 @@ components:
                 reason:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.CreateOrgAssignmentRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                role_id:
+                    type: string
+                expires_at:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.CreateOrgRoleRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Grant'
+                reason:
                     type: string
         api.usercenter.v1.CreateOrganizationRequest:
             type: object
@@ -3567,6 +3863,105 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.OIDCClient'
+        api.usercenter.v1.OrgAssignment:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                username:
+                    type: string
+                display_name:
+                    type: string
+                role_id:
+                    type: string
+                role_code:
+                    type: string
+                role_name:
+                    type: string
+                boundary:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                status:
+                    type: string
+                    description: active | revoked
+                revision:
+                    type: string
+                origin:
+                    type: string
+                expires_at:
+                    type: string
+                created_at:
+                    type: string
+        api.usercenter.v1.OrgAssignmentsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.OrgAssignment'
+        api.usercenter.v1.OrgAuditEvent:
+            type: object
+            properties:
+                event_id:
+                    type: string
+                actor_user_id:
+                    type: string
+                action:
+                    type: string
+                target:
+                    type: string
+                result:
+                    type: string
+                reason:
+                    type: string
+                occurred_at:
+                    type: string
+        api.usercenter.v1.OrgAuditsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.OrgAuditEvent'
+                total:
+                    type: string
+        api.usercenter.v1.OrgPermissionsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Permission'
+        api.usercenter.v1.OrgRole:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                builtin:
+                    type: boolean
+                status:
+                    type: string
+                    description: active | archived
+                revision:
+                    type: string
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Grant'
+        api.usercenter.v1.OrgRolesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.OrgRole'
         api.usercenter.v1.Organization:
             type: object
             properties:
@@ -3753,6 +4148,21 @@ components:
                     type: array
                     items:
                         type: string
+        api.usercenter.v1.PutOrgRolePermissionsRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                role_id:
+                    type: string
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.Grant'
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.PutRoleInheritanceRequest:
             type: object
             properties:
@@ -4450,6 +4860,21 @@ components:
                 reason:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.UpdateOrgRoleRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                role_id:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.UpdateOrganizationMemberRequest:
             type: object

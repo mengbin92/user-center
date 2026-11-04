@@ -107,7 +107,7 @@ func newHarness(t *testing.T) *harness {
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
 		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
 		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), oidcSigner,
-		data.NewOrganizationRepo(d), d,
+		data.NewOrganizationRepo(d), data.NewOrgIAMRepo(d), d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
 		map[string]biz.OAuthProvider{"mock": &mockOAuthProvider{}},
 		runtime,
@@ -122,7 +122,7 @@ func newHarness(t *testing.T) *harness {
 	integration := biz.NewIntegrationUsecase(svc)
 	integrationAdmin := biz.NewIntegrationAdminUsecase(svc)
 	oidcAdmin := service.NewOIDCAdminService(biz.NewOIDCUsecase(svc))
-	organizations := service.NewOrganizationService(biz.NewOrganizationUsecase(svc))
+	organizations := service.NewOrganizationService(biz.NewOrganizationUsecase(svc), biz.NewOrgIAMUsecase(svc))
 
 	_, err = svc.BootstrapRoot(context.Background(), "root", "root@example.com", "ChangeMe-12345")
 	require.NoError(t, err)

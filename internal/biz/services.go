@@ -30,6 +30,7 @@ type Services struct {
 	OIDCAccessTTL      time.Duration
 	OIDCRefreshTTL     time.Duration
 	Organizations      OrganizationRepo
+	OrgIAM             OrgIAMRepo
 	Settings           SettingsRepo
 	Exports            ExportRepo
 	Tx                 TxManager
@@ -60,6 +61,7 @@ type SettingsUsecase struct{ *Services }
 type IntegrationUsecase struct{ *Services }
 type IntegrationAdminUsecase struct{ *Services }
 type OrganizationUsecase struct{ *Services }
+type OrgIAMUsecase struct{ *Services }
 
 func NewAuthUsecase(s *Services) *AuthUsecase               { return &AuthUsecase{Services: s} }
 func NewUserUsecase(s *Services) *UserUsecase               { return &UserUsecase{Services: s} }
@@ -76,6 +78,8 @@ func NewIntegrationAdminUsecase(s *Services) *IntegrationAdminUsecase {
 func NewOrganizationUsecase(s *Services) *OrganizationUsecase {
 	return &OrganizationUsecase{Services: s}
 }
+
+func NewOrgIAMUsecase(s *Services) *OrgIAMUsecase { return &OrgIAMUsecase{Services: s} }
 
 type RuntimeConfig struct {
 	OIDCIssuer       string
@@ -102,7 +106,7 @@ func NewServices(
 	audit AuditRepo, policy PolicyRepo, iam IAMRepo, outbox OutboxRepo,
 	settings SettingsRepo, exports ExportRepo, integrationClients IntegrationClientRepo,
 	oidcClients OIDCClientRepo, oidcCodes OIDCCodeRepo, oidcSigner OIDCSigner,
-	organizations OrganizationRepo, tx TxManager, clock Clock, ids IDGenerator, secrets SecretBox,
+	organizations OrganizationRepo, orgIAM OrgIAMRepo, tx TxManager, clock Clock, ids IDGenerator, secrets SecretBox,
 	oauth map[string]OAuthProvider, cfg *RuntimeConfig,
 ) *Services {
 	s := &Services{
@@ -111,7 +115,8 @@ func NewServices(
 		Limiter: limiter, StepUp: stepUp, Mail: mail, Audit: audit, Policy: policy,
 		IAM: iam, Outbox: outbox, Settings: settings, Exports: exports,
 		IntegrationClients: integrationClients, OIDCClients: oidcClients,
-		OIDCCodes: oidcCodes, OIDCSigner: oidcSigner, Organizations: organizations, Tx: tx,
+		OIDCCodes: oidcCodes, OIDCSigner: oidcSigner, Organizations: organizations,
+		OrgIAM: orgIAM, Tx: tx,
 		Clock: clock, IDs: ids, Secrets: secrets, OAuth: oauth,
 		SessionTTL: 12 * time.Hour, IdleTimeout: time.Hour, StepUpTTL: 5 * time.Minute,
 		ChallengeTTL: 10 * time.Minute, ResetTTL: 30 * time.Minute,

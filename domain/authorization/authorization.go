@@ -9,6 +9,7 @@ package authorization
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 )
@@ -20,22 +21,63 @@ var (
 	ErrGraph    = errors.New("invalid role inheritance graph")
 )
 
-// Context is the authorization domain. V1 only enables the platform domain;
-// organization support is intentionally rejected until V2.
+const (
+	ContextTypePlatform     = "platform"
+	ContextTypeOrganization = "organization"
+)
+
+// Context is the authorization domain. A grant only ever applies inside the
+// context it was issued for: platform roles never leak into an organization
+// and organization roles never apply to platform administration.
 type Context struct {
 	Type           string `json:"type"`
 	OrganizationID int64  `json:"organization_id,omitempty"`
 	Key            string `json:"key"`
 }
 
-func Platform() Context { return Context{Type: "platform", Key: "platform"} }
+func Platform() Context { return Context{Type: ContextTypePlatform, Key: ContextTypePlatform} }
+
+// Organization builds the tenant-scoped context organization:{id}. The key is
+// the canonical wire/audit representation and must match the id.
+func Organization(id int64) Context {
+	return Context{Type: ContextTypeOrganization, OrganizationID: id, Key: OrganizationKey(id)}
+}
+
+func OrganizationKey(id int64) string { return fmt.Sprintf("organization:%d", id) }
+
+// Normalize maps the zero value to the platform context. Stored rows written
+// before V2.3 have no context columns and are platform policy by definition.
+func (c Context) Normalize() Context {
+	if c.Type == "" && c.OrganizationID == 0 && c.Key == "" {
+		return Platform()
+	}
+	return c
+}
+
+func (c Context) IsOrganization() bool { return c.Type == ContextTypeOrganization }
 
 func (c Context) Validate() error {
-	if c == Platform() {
-		return nil
+	c = c.Normalize()
+	switch c.Type {
+	case ContextTypePlatform:
+		if c.OrganizationID == 0 && c.Key == ContextTypePlatform {
+			return nil
+		}
+	case ContextTypeOrganization:
+		if c.OrganizationID > 0 && c.Key == OrganizationKey(c.OrganizationID) {
+			return nil
+		}
 	}
 	return ErrContext
 }
+
+// Equal compares the identity of two contexts, ignoring the redundant key.
+func (c Context) Equal(other Context) bool {
+	a, b := c.Normalize(), other.Normalize()
+	return a.Type == b.Type && a.OrganizationID == b.OrganizationID
+}
+
+func (c Context) String() string { return c.Normalize().Key }
 
 type Actor struct {
 	UserID    int64
@@ -57,7 +99,9 @@ const (
 )
 
 // Scope is a finite union. An empty scope matches nothing and is never
-// interpreted as "all".
+// interpreted as "all". All is always bounded by the evaluation context: in
+// the platform context it covers every account, in an organization context it
+// covers that tenant only.
 type Scope struct {
 	All     bool    `json:"all,omitempty"`
 	Self    bool    `json:"self,omitempty"`
@@ -222,6 +266,8 @@ type GrantSource struct {
 	Inheritance  []int64
 	Validity     Interval
 	Active       bool
+	// Context is the context the role and assignment were issued in.
+	Context Context
 }
 
 type Decision struct {
@@ -242,6 +288,8 @@ type Input struct {
 	OperationEnabled  bool
 	OperationBound    bool
 	SupportedScopes   []ScopeKind
+	AllowedContexts   []string
+	Context           Context
 	WholeObject       bool
 	TargetUserID      int64
 	Sources           []GrantSource
@@ -249,10 +297,25 @@ type Input struct {
 	BusinessRulesPass bool
 }
 
-// Evaluate applies identity, operation, scope, constraint and business gates.
+// Evaluate applies identity, operation, context, scope, constraint and
+// business gates. Sources issued in another context are ignored, and a
+// permission that does not declare the requested context type is refused.
 func Evaluate(in Input) Decision {
 	d := Decision{Reason: "IDENTITY_INVALID", Operation: in.Operation}
 	if !in.IdentityValid || !in.SessionValid || !in.Actor.Valid(in.Now) {
+		return d
+	}
+	d.Reason = "CONTEXT_INVALID"
+	authCtx := in.Context.Normalize()
+	if authCtx.Validate() != nil {
+		return d
+	}
+	d.Reason = "CONTEXT_UNSUPPORTED"
+	allowed := in.AllowedContexts
+	if len(allowed) == 0 {
+		allowed = []string{ContextTypePlatform}
+	}
+	if !slices.Contains(allowed, authCtx.Type) {
 		return d
 	}
 	d.Reason = "OPERATION_UNBOUND"
@@ -275,6 +338,9 @@ func Evaluate(in Input) Decision {
 	var allows, denies []Scope
 	for _, s := range in.Sources {
 		if s.Operation != in.Operation || s.Effect != Allow && s.Effect != Deny {
+			continue
+		}
+		if !s.Context.Normalize().Equal(authCtx) {
 			continue
 		}
 		if s.Validity.Validate() != nil || s.RoleScope.Validate(in.SupportedScopes) != nil || s.Boundary.Validate(in.SupportedScopes) != nil {

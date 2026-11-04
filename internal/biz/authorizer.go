@@ -11,10 +11,11 @@ import (
 	"github.com/mengbin92/user-center/domain/authorization"
 )
 
-// AuthzFacts is the resolved policy snapshot for one actor.
+// AuthzFacts is the resolved policy snapshot for one actor in one context.
 type AuthzFacts struct {
 	PolicyRevision  uint64
 	UserRevision    uint64
+	Context         authorization.Context
 	Roles           map[int64]*Role
 	Assignments     []*Assignment
 	ActiveRoleIDs   []int64
@@ -32,6 +33,17 @@ func (f *AuthzFacts) role(id int64) *Role {
 }
 
 func (s *Services) LoadAuthzFacts(ctx context.Context, userID int64, activeRoleIDs []int64) (*AuthzFacts, error) {
+	return s.LoadAuthzFactsIn(ctx, authorization.Platform(), userID, activeRoleIDs)
+}
+
+// LoadAuthzFactsIn resolves policy facts for one context. Organization facts
+// come exclusively from that tenant's roles and assignments, so neither side
+// can widen the other's authority.
+func (s *Services) LoadAuthzFactsIn(ctx context.Context, authCtx authorization.Context, userID int64, activeRoleIDs []int64) (*AuthzFacts, error) {
+	authCtx = authCtx.Normalize()
+	if err := authCtx.Validate(); err != nil {
+		return nil, ErrAuthorizationDown
+	}
 	policyRev, err := s.Policy.PolicyRevision(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("policy revision: %w", err)
@@ -40,13 +52,43 @@ func (s *Services) LoadAuthzFacts(ctx context.Context, userID int64, activeRoleI
 	if err != nil {
 		return nil, fmt.Errorf("user revision: %w", err)
 	}
-	roles, err := s.IAM.ListAllRolesWithGrants(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("roles: %w", err)
-	}
-	assignments, err := s.IAM.ListAssignmentsForUser(ctx, nil, userID)
-	if err != nil {
-		return nil, fmt.Errorf("assignments: %w", err)
+	var roles []*Role
+	var assignments []*Assignment
+	if authCtx.IsOrganization() {
+		if s.OrgIAM == nil {
+			return nil, ErrAuthorizationDown
+		}
+		roles, err = s.OrgIAM.ListRoles(ctx, nil, authCtx)
+		if err != nil {
+			return nil, fmt.Errorf("roles: %w", err)
+		}
+		items, err := s.OrgIAM.ListAssignments(ctx, nil, authCtx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("assignments: %w", err)
+		}
+		for _, item := range items {
+			if item.Assignment != nil {
+				assignments = append(assignments, item.Assignment)
+			}
+		}
+		// Organization assignments are active on their own: membership is the
+		// tenant gate, and session role activation only applies to platform
+		// roles, so the caller's platform role IDs must not be reused here.
+		activeRoleIDs = []int64{}
+		for _, a := range assignments {
+			if !a.Revoked {
+				activeRoleIDs = append(activeRoleIDs, a.RoleID)
+			}
+		}
+	} else {
+		roles, err = s.IAM.ListAllRolesWithGrants(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("roles: %w", err)
+		}
+		assignments, err = s.IAM.ListAssignmentsForUser(ctx, nil, userID)
+		if err != nil {
+			return nil, fmt.Errorf("assignments: %w", err)
+		}
 	}
 	constraints, err := s.IAM.ListConstraints(ctx, nil)
 	if err != nil {
@@ -55,6 +97,7 @@ func (s *Services) LoadAuthzFacts(ctx context.Context, userID int64, activeRoleI
 	f := &AuthzFacts{
 		PolicyRevision: policyRev,
 		UserRevision:   userRev,
+		Context:        authCtx,
 		Roles:          make(map[int64]*Role, len(roles)),
 		Assignments:    assignments,
 		ActiveRoleIDs:  activeRoleIDs,
@@ -123,7 +166,8 @@ func (f *AuthzFacts) resolveSources(now time.Time) error {
 						StartsAt:  a.StartsAt,
 						ExpiresAt: a.ExpiresAt,
 					},
-					Active: active[a.RoleID],
+					Active:  active[a.RoleID],
+					Context: f.Context,
 				})
 			}
 		}
@@ -139,10 +183,16 @@ func (s *Services) permission(ctx context.Context, operation string) (*Permissio
 	return p, nil
 }
 
-// Decide evaluates one operation for a verified actor. targetUserID is the
-// account being read/changed; wholeObject covers tenant-wide queries.
+// Decide evaluates one platform operation for a verified actor. targetUserID
+// is the account being read/changed; wholeObject covers tenant-wide queries.
 func (s *Services) Decide(ctx context.Context, actor ActorContext, operation string, targetUserID int64, wholeObject bool) (authorization.Decision, error) {
-	facts, err := s.LoadAuthzFacts(ctx, actor.User.ID, actor.Session.ActiveRoleIDs)
+	return s.DecideIn(ctx, actor, authorization.Platform(), operation, targetUserID, wholeObject)
+}
+
+// DecideIn evaluates one operation inside an authorization context. The same
+// operation evaluated for a different context yields an independent decision.
+func (s *Services) DecideIn(ctx context.Context, actor ActorContext, authCtx authorization.Context, operation string, targetUserID int64, wholeObject bool) (authorization.Decision, error) {
+	facts, err := s.LoadAuthzFactsIn(ctx, authCtx, actor.User.ID, actor.Session.ActiveRoleIDs)
 	if err != nil {
 		return authorization.Decision{}, err
 	}
@@ -158,7 +208,7 @@ func (s *Services) decideWithFacts(ctx context.Context, facts *AuthzFacts, actor
 		return authorization.Decision{}, err
 	}
 	now := s.Clock.Now()
-	constraintsOK := CheckConstraints(actor.Session.ActiveRoleIDs, facts.Constraints) == nil
+	constraintsOK := CheckConstraints(facts.ActiveRoleIDs, facts.Constraints) == nil
 	return authorization.Evaluate(authorization.Input{
 		Actor:             actor.Actor,
 		Now:               now,
@@ -168,6 +218,8 @@ func (s *Services) decideWithFacts(ctx context.Context, facts *AuthzFacts, actor
 		OperationEnabled:  p.Status == PermissionStatusActive,
 		OperationBound:    p.Binding == BindingBound,
 		SupportedScopes:   p.ScopeKinds(),
+		AllowedContexts:   p.ContextTypes,
+		Context:           facts.Context,
 		WholeObject:       wholeObject,
 		TargetUserID:      targetUserID,
 		Sources:           facts.Sources,
@@ -179,15 +231,24 @@ func (s *Services) decideWithFacts(ctx context.Context, facts *AuthzFacts, actor
 // Authorize is the usecase guard for management writes. It returns the fresh
 // decision so callers can echo versions and valid_until.
 func (s *Services) Authorize(ctx context.Context, actor ActorContext, operation string, targetUserID int64, wholeObject bool) (authorization.Decision, error) {
-	d, err := s.Decide(ctx, actor, operation, targetUserID, wholeObject)
+	return s.AuthorizeIn(ctx, actor, authorization.Platform(), operation, targetUserID, wholeObject)
+}
+
+// AuthorizeIn is the context-scoped guard. Platform MFA policy is enforced on
+// the platform path only; organization operations are gated by tenant
+// membership, the tenant policy and step-up at the call site.
+func (s *Services) AuthorizeIn(ctx context.Context, actor ActorContext, authCtx authorization.Context, operation string, targetUserID int64, wholeObject bool) (authorization.Decision, error) {
+	d, err := s.DecideIn(ctx, actor, authCtx, operation, targetUserID, wholeObject)
 	if err != nil {
 		return d, ErrAuthorizationDown
 	}
 	if !d.Allowed {
 		return d, ErrPermissionDenied
 	}
-	if err := s.requireAdminMFA(ctx, actor); err != nil {
-		return d, err
+	if !authCtx.Normalize().IsOrganization() {
+		if err := s.requireAdminMFA(ctx, actor); err != nil {
+			return d, err
+		}
 	}
 	return d, nil
 }
@@ -248,7 +309,11 @@ func (s *Services) stepUpUntil(ctx context.Context, actor ActorContext) time.Tim
 // the coarse filter into SQL. Deny scopes and self predicates are still
 // evaluated per item by Decide.
 func (s *Services) ScopeFor(ctx context.Context, actor ActorContext, operation string) (authorization.Scope, error) {
-	facts, err := s.LoadAuthzFacts(ctx, actor.User.ID, actor.Session.ActiveRoleIDs)
+	return s.ScopeForIn(ctx, actor, authorization.Platform(), operation)
+}
+
+func (s *Services) ScopeForIn(ctx context.Context, actor ActorContext, authCtx authorization.Context, operation string) (authorization.Scope, error) {
+	facts, err := s.LoadAuthzFactsIn(ctx, authCtx, actor.User.ID, actor.Session.ActiveRoleIDs)
 	if err != nil {
 		return authorization.Scope{}, err
 	}
