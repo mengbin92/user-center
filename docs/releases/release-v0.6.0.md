@@ -28,9 +28,9 @@
 
 ## 验证
 
-`go vet ./...`、`go test ./...`、`cd web && npm test && npm run build` 全部通过；新增 HTTP 级用例覆盖同意首次/复用/拒绝/扩权/撤销/prompt、登出白名单与幂等、邀请过期/撤销/配额/跨租户、explain 允许/拒绝/过期分配、租户导出隔离/403/CSV 注入/policy revision、组织事件 PII/回滚/去重/订阅过滤。MySQL 迁移真跑与本地 compose 全流程冒烟仍需在部署环境执行（见下方「未执行」）。
+`go vet ./...`、`go test ./...`、`cd web && npm test && npm run build` 全部通过；新增 HTTP 级用例覆盖同意首次/复用/拒绝/扩权/撤销/prompt、登出白名单与幂等、邀请过期/撤销/配额/跨租户、explain 允许/拒绝/过期分配、租户导出隔离/403/CSV 注入/policy revision、组织事件 PII/回滚/去重/订阅过滤。MySQL 迁移真跑已在临时 `mysql:8.4` 容器执行（001–009 两次幂等应用通过）；本地 compose 全流程冒烟仍需在部署环境执行。
 
 ## 未执行 / 已知限制
 
-- 未在真实 MySQL + docker compose 环境执行 `USER_CENTER_MYSQL_TEST_DSN` 迁移测试与端到端冒烟；本次验证基于 SQLite 集成测试与生成物一致性检查。
+- 迁移已在真实 MySQL 8.4 容器验证（`USER_CENTER_MYSQL_TEST_DSN`）；但**本地 compose 全流程冒烟未执行**，HTTP 级验证基于 SQLite 集成测试与生成物一致性检查。
 - v0.5.1 的 Docker E2E 脚本尚未收进 `scripts/e2e/`（路线图 §6 工程前置，本波次未做）。

@@ -404,7 +404,7 @@
 - [x] `go vet ./...`
 - [x] `go test ./...`；涉及并发或授权上下文时加 `go test -race ./domain/... ./internal/biz/ ./internal/data/`
 - [x] `cd web && npm test && npm run build`
-- [ ] 迁移真跑：`USER_CENTER_MYSQL_TEST_DSN=... go test ./cmd/migrate/`
+- [x] 迁移真跑：`USER_CENTER_MYSQL_TEST_DSN=... go test ./cmd/migrate/`（2026-11-05 在临时 `mysql:8.4` 容器执行，两次幂等应用 001–009 全部通过，并断言新增表/列）
 - [ ] 本地 compose 全流程冒烟（含未登录 401、跨租户拒绝、Step-up、租户审计）
 
 工程前置（建议随 W1 一起做）：
@@ -456,6 +456,6 @@
 | 2026-11-05 | W3 合入 | R7–R12 代码、迁移、前端与测试已合入 `develop`；草稿发布说明 `release-v0.7.0.md` 待打标 |
 | 2026-11-05 | 范围说明 | R13（WebAuthn/Passkey）按 §3.3 整体滑动到 V2.5；R14 未排期。两者本次未实现，保留 `[ ]` |
 
-> 说明：R1–R12 的验收项已在本地 SQLite 集成测试、前端组件测试与构建中验证；§6 中「MySQL 迁移真跑」「本地 compose 全流程冒烟」「E2E 脚本收纳」未在本次执行，保留 `[ ]`。R6 的「旧版本不覆盖新状态」属于订阅方投影语义，已在 `docs/architecture.md` §8.1 约定（`aggregate_revision` 判新旧），本仓库不持有下游投影实现。
+> 说明：R1–R12 的验收项已在本地 SQLite 集成测试、前端组件测试与构建中验证；§6 中「本地 compose 全流程冒烟」「E2E 脚本收纳」未在本次执行，保留 `[ ]`；「MySQL 迁移真跑」已在临时 `mysql:8.4` 容器执行并通过。R6 的「旧版本不覆盖新状态」属于订阅方投影语义，已在 `docs/architecture.md` §8.1 约定（`aggregate_revision` 判新旧），本仓库不持有下游投影实现。
 
 维护约定：新差距先补进第 8 节矩阵并标注类型（A/B/C），再决定是否进当前波次；已合并的工作项把 `[ ]` 改成 `[x]` 并在变更记录留一行，不删除历史条目。

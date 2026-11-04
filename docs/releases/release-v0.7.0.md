@@ -30,6 +30,6 @@
 
 ## 未执行 / 已知限制
 
-- 未在真实 MySQL + docker compose 环境执行迁移真跑与端到端冒烟；本次验证基于 SQLite 集成测试。
+- 迁移真跑已在临时 `mysql:8.4` 容器通过；**本地 compose 全流程冒烟未执行**，HTTP 级验证基于 SQLite 集成测试。
 - 路线图 §6 工程前置（把 v0.5.1 Docker E2E 脚本收进 `scripts/e2e/`）本次未做。
 - R13 WebAuthn/Passkey 与 R14 个人信息保留清理按路线图分别滑动到 V2.5 / 未排期，未纳入本版。
