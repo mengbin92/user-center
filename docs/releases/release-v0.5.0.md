@@ -58,7 +58,6 @@
 - Go 全量测试：域层上下文隔离、数据层跨上下文不可读写、HTTP 层跨租户拒绝、
   自定义角色授权生效、内置角色不可变、成员角色同步、租户审计过滤、存量组织回填、
   平台视图不含组织角色。
-- 独立代码审查记录：[code-review-v23-2026-11-04](../code-review-v23-2026-11-04.md)。
 - `go vet ./...`、`go test ./...`、前端 `npm test`（57 项）与 `npm run build`。
 - MySQL 迁移测试（`USER_CENTER_MYSQL_TEST_DSN`）覆盖 006 的列与索引；本地 SQLite
   AutoMigrate 与迁移脚本保持一致。

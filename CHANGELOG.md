@@ -148,8 +148,8 @@ Security-review and verification follow-up to 0.2.0.
 - Recover Outbox leases and historical backlog; fix Docker command overrides.
 - Save the first email settings row with a deterministic revision instead of a
   false `REVISION_CONFLICT`.
-- Record findings, compatibility changes and validation in
-  [the review report](docs/code-review-2026-11-03.md).
+- Record findings, compatibility changes and validation in the review report
+  (archived outside the repository).
 
 ### Added
 
