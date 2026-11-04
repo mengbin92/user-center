@@ -294,8 +294,8 @@ func (uc *IntegrationAdminUsecase) Dispatch(ctx context.Context) error {
 	if len(subscribers) == 0 {
 		return nil
 	}
-	if os.Getenv("OUTBOX_SIGNING_SECRET") == "" {
-		return Validation("OUTBOX_SIGNING_SECRET 未配置")
+	if len(strings.TrimSpace(os.Getenv("OUTBOX_SIGNING_SECRET"))) < 32 {
+		return Validation("OUTBOX_SIGNING_SECRET 必须至少为 32 字节")
 	}
 	now := uc.Clock.Now().UTC()
 	for _, c := range subscribers {
@@ -366,8 +366,8 @@ func (uc *IntegrationAdminUsecase) deliver(ctx context.Context, d *Delivery) err
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-UserCenter-Event", d.EventType)
 	secret := os.Getenv("OUTBOX_SIGNING_SECRET")
-	if secret == "" {
-		return errors.New("outbox signing secret is not configured")
+	if len(strings.TrimSpace(secret)) < 32 {
+		return errors.New("outbox signing secret must be at least 32 bytes")
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)

@@ -85,7 +85,7 @@ func NewHTTPServer(
 	})
 
 	mountOAuthRoutes(srv, mw, auth, publicBase)
-	mountOIDCRoutes(srv, mw, oidcAdmin.Usecase(), publicBase)
+	mountOIDCRoutes(srv, mw, oidcAdmin.Usecase())
 
 	// CSV artifact download is a raw stream; it re-verifies the actor, job
 	// ownership and expiry on every request.
@@ -147,7 +147,7 @@ func mountOAuthRoutes(srv *khttp.Server, mw *Middleware, auth *service.AuthServi
 		if a, ok := biz.ActorFromContext(r.Context()); ok {
 			actor = &a
 		}
-		url, state, expires, err := authUC.StartOAuth(r.Context(), provider, mode, actor)
+		url, state, expires, err := authUC.StartOAuth(r.Context(), provider, mode, r.URL.Query().Get("next"), actor)
 		if err != nil {
 			target := "/login?oauth_error=oauth_failed"
 			if actor != nil {

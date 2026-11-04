@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/pkg/jsonx"
@@ -42,7 +43,11 @@ func (r *oidcRepo) ListOIDCClients(ctx context.Context, tx biz.Tx) ([]*biz.OIDCC
 
 func (r *oidcRepo) GetOIDCClient(ctx context.Context, tx biz.Tx, id int64) (*biz.OIDCClient, error) {
 	var p oidcClientPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).First(&p).Error
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if tx != nil {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := db.Where("id = ?", id).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrOIDCClientNotFound
 	}
@@ -54,12 +59,19 @@ func (r *oidcRepo) GetOIDCClient(ctx context.Context, tx biz.Tx, id int64) (*biz
 
 func (r *oidcRepo) GetOIDCClientByClientID(ctx context.Context, tx biz.Tx, clientID string) (*biz.OIDCClient, error) {
 	var p oidcClientPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("client_id = ?", clientID).First(&p).Error
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if tx != nil {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := db.Where("client_id = ?", clientID).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrOIDCClientNotFound
 	}
 	if err != nil {
 		return nil, err
+	}
+	if p.ClientID != clientID {
+		return nil, biz.ErrOIDCClientNotFound
 	}
 	return oidcClientToBiz(&p), nil
 }
@@ -104,28 +116,28 @@ func (r *oidcRepo) UpdateOIDCClient(ctx context.Context, tx biz.Tx, c *biz.OIDCC
 	return r.GetOIDCClient(ctx, tx, c.ID)
 }
 
-func (r *oidcRepo) RotateOIDCClientSecret(ctx context.Context, tx biz.Tx, id int64, hash string) (*biz.OIDCClient, error) {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&oidcClientPO{}).Where("id = ?", id).Updates(map[string]any{
-		"secret_hash": hash, "revision": gorm.Expr("revision + 1"), "updated_at": time.Now().UTC(),
+func (r *oidcRepo) RotateOIDCClientSecret(ctx context.Context, tx biz.Tx, id int64, hash string, expected uint64) (*biz.OIDCClient, error) {
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&oidcClientPO{}).Where("id = ? AND revision = ?", id, expected).Updates(map[string]any{
+		"secret_hash": hash, "revision": expected + 1, "updated_at": time.Now().UTC(),
 	})
 	if res.Error != nil {
 		return nil, res.Error
 	}
 	if res.RowsAffected == 0 {
-		return nil, biz.ErrOIDCClientNotFound
+		return nil, biz.ConflictRevision(expected)
 	}
 	return r.GetOIDCClient(ctx, tx, id)
 }
 
-func (r *oidcRepo) DisableOIDCClient(ctx context.Context, tx biz.Tx, id int64) error {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&oidcClientPO{}).Where("id = ?", id).Updates(map[string]any{
-		"status": "disabled", "revision": gorm.Expr("revision + 1"), "updated_at": time.Now().UTC(),
+func (r *oidcRepo) DisableOIDCClient(ctx context.Context, tx biz.Tx, id int64, expected uint64) error {
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&oidcClientPO{}).Where("id = ? AND revision = ?", id, expected).Updates(map[string]any{
+		"status": "disabled", "revision": expected + 1, "updated_at": time.Now().UTC(),
 	})
 	if res.Error != nil {
 		return res.Error
 	}
 	if res.RowsAffected == 0 {
-		return biz.ErrOIDCClientNotFound
+		return biz.ConflictRevision(expected)
 	}
 	return nil
 }
@@ -133,7 +145,7 @@ func (r *oidcRepo) DisableOIDCClient(ctx context.Context, tx biz.Tx, id int64) e
 func (r *oidcRepo) CreateOIDCCode(ctx context.Context, tx biz.Tx, c *biz.OIDCCode) error {
 	now := time.Now().UTC()
 	p := &oidcCodePO{
-		CodeHash: c.CodeHash, ClientID: c.ClientID, UserID: c.UserID,
+		CodeHash: c.CodeHash, ClientID: c.ClientID, UserID: c.UserID, IdentityVersion: c.IdentityVersion,
 		RedirectURI: c.RedirectURI, Scope: c.Scope, Nonce: c.Nonce,
 		CodeChallenge: c.CodeChallenge, CodeChallengeMethod: c.CodeChallengeMethod,
 		AuthTime: c.AuthTime, ExpiresAt: c.ExpiresAt, CreatedAt: now,
@@ -152,6 +164,10 @@ func (r *oidcRepo) ConsumeOIDCCode(ctx context.Context, tx biz.Tx, hash, clientI
 	if err != nil {
 		return nil, err
 	}
+	// MySQL's default collation is case insensitive; redirect matching is not.
+	if p.ClientID != clientID || p.RedirectURI != redirectURI {
+		return nil, biz.ErrOIDCInvalidGrant
+	}
 	res := db.Model(&oidcCodePO{}).Where("code_hash = ? AND consumed_at IS NULL", hash).Update("consumed_at", now)
 	if res.Error != nil {
 		return nil, res.Error
@@ -160,7 +176,7 @@ func (r *oidcRepo) ConsumeOIDCCode(ctx context.Context, tx biz.Tx, hash, clientI
 		return nil, biz.ErrOIDCInvalidGrant
 	}
 	return &biz.OIDCCode{
-		CodeHash: p.CodeHash, ClientID: p.ClientID, UserID: p.UserID,
+		CodeHash: p.CodeHash, ClientID: p.ClientID, UserID: p.UserID, IdentityVersion: p.IdentityVersion,
 		RedirectURI: p.RedirectURI, Scope: p.Scope, Nonce: p.Nonce,
 		CodeChallenge: p.CodeChallenge, CodeChallengeMethod: p.CodeChallengeMethod,
 		AuthTime: p.AuthTime.UTC(), ExpiresAt: p.ExpiresAt.UTC(),
@@ -169,7 +185,7 @@ func (r *oidcRepo) ConsumeOIDCCode(ctx context.Context, tx biz.Tx, hash, clientI
 
 func (r *oidcRepo) CreateOIDCRefreshToken(ctx context.Context, tx biz.Tx, t *biz.OIDCRefreshToken) error {
 	p := &oidcRefreshPO{
-		TokenHash: t.TokenHash, ClientID: t.ClientID, UserID: t.UserID,
+		TokenHash: t.TokenHash, FamilyID: t.FamilyID, ClientID: t.ClientID, UserID: t.UserID, IdentityVersion: t.IdentityVersion,
 		Scope: t.Scope, AuthTime: t.AuthTime, ExpiresAt: t.ExpiresAt,
 		CreatedAt: time.Now().UTC(),
 	}
@@ -179,12 +195,29 @@ func (r *oidcRepo) CreateOIDCRefreshToken(ctx context.Context, tx biz.Tx, t *biz
 func (r *oidcRepo) ConsumeOIDCRefreshToken(ctx context.Context, tx biz.Tx, hash, clientID string, now time.Time) (*biz.OIDCRefreshToken, error) {
 	db := r.d.dbOr(tx).WithContext(ctx)
 	var p oidcRefreshPO
-	err := db.Where("token_hash = ? AND client_id = ? AND revoked_at IS NULL AND expires_at > ?", hash, clientID, now).First(&p).Error
+	err := db.Clauses(clause.Locking{Strength: "UPDATE"}).Where("token_hash = ? AND client_id = ?", hash, clientID).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrOIDCInvalidGrant
 	}
 	if err != nil {
 		return nil, err
+	}
+	if p.ClientID != clientID {
+		return nil, biz.ErrOIDCInvalidGrant
+	}
+	refresh := &biz.OIDCRefreshToken{
+		TokenHash: p.TokenHash, FamilyID: p.FamilyID, ClientID: p.ClientID, UserID: p.UserID, IdentityVersion: p.IdentityVersion,
+		Scope: p.Scope, AuthTime: p.AuthTime.UTC(), ExpiresAt: p.ExpiresAt.UTC(),
+	}
+	if p.RevokedAt != nil && p.FamilyID != "" {
+		if err := db.Model(&oidcRefreshPO{}).Where("client_id = ? AND family_id = ? AND revoked_at IS NULL", p.ClientID, p.FamilyID).Update("revoked_at", now).Error; err != nil {
+			return nil, err
+		}
+		// The caller commits this denial so a detected replay revokes descendants.
+		return refresh, biz.ErrOIDCInvalidGrant
+	}
+	if p.RevokedAt != nil || !p.ExpiresAt.After(now) || p.FamilyID == "" {
+		return nil, biz.ErrOIDCInvalidGrant
 	}
 	res := db.Model(&oidcRefreshPO{}).Where("token_hash = ? AND revoked_at IS NULL", hash).Update("revoked_at", now)
 	if res.Error != nil {
@@ -193,8 +226,5 @@ func (r *oidcRepo) ConsumeOIDCRefreshToken(ctx context.Context, tx biz.Tx, hash,
 	if res.RowsAffected == 0 {
 		return nil, biz.ErrOIDCInvalidGrant
 	}
-	return &biz.OIDCRefreshToken{
-		TokenHash: p.TokenHash, ClientID: p.ClientID, UserID: p.UserID,
-		Scope: p.Scope, AuthTime: p.AuthTime.UTC(), ExpiresAt: p.ExpiresAt.UTC(),
-	}, nil
+	return refresh, nil
 }

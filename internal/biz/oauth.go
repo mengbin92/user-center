@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ type oauthState struct {
 	SessionID       string `json:"session_id"`
 	IdentityVersion uint64 `json:"identity_version"`
 	RedirectURI     string `json:"redirect_uri"`
+	Next            string `json:"next,omitempty"`
 }
 
 type OAuthResult struct {
@@ -70,7 +72,7 @@ func (uc *AuthUsecase) oauthRedirectURI(provider string) string {
 // StartOAuth creates a single-use state and returns the provider redirect.
 // Binding mode requires an authenticated session; the state carries the user
 // so the callback cannot be replayed for another account.
-func (uc *AuthUsecase) StartOAuth(ctx context.Context, provider, mode string, actor *ActorContext) (string, string, time.Time, error) {
+func (uc *AuthUsecase) StartOAuth(ctx context.Context, provider, mode, next string, actor *ActorContext) (string, string, time.Time, error) {
 	p, err := uc.oauthProvider(provider)
 	if err != nil {
 		return "", "", time.Time{}, err
@@ -82,6 +84,13 @@ func (uc *AuthUsecase) StartOAuth(ctx context.Context, provider, mode string, ac
 		return "", "", time.Time{}, Validation("不支持的第三方登录模式")
 	}
 	state := oauthState{Provider: provider, Mode: mode, RedirectURI: uc.oauthRedirectURI(provider)}
+	if mode == "login" && next != "" {
+		u, err := url.ParseRequestURI(next)
+		if err != nil || len(next) > 8192 || !strings.HasPrefix(next, "/") || u.IsAbs() || u.Host != "" || u.Path != "/oidc/authorize" {
+			return "", "", time.Time{}, Validation("第三方登录回跳仅支持本机 OIDC 授权入口")
+		}
+		state.Next = next
+	}
 	if mode == "bind" || mode == "verify" {
 		if actor == nil || actor.User == nil || actor.Session == nil {
 			return "", "", time.Time{}, ErrUnauthenticated
@@ -211,7 +220,11 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
 			return nil, ErrDependency
 		}
-		return &OAuthResult{Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires, Redirect: "/login?mfa_challenge=" + challengeID}, nil
+		target := "/login?mfa_challenge=" + challengeID
+		if st.Next != "" {
+			target += "&next=" + url.QueryEscape(st.Next)
+		}
+		return &OAuthResult{Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires, Redirect: target}, nil
 	}
 	cred, err := uc.Credentials.Get(ctx, nil, user.ID)
 	if err != nil && !errors.Is(err, ErrResourceNotFound) {
@@ -225,8 +238,14 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 		Session: session, RawToken: raw, User: uc.publicUser(ctx, user),
 		Redirect: "/auth/callback/" + provider + "?status=success",
 	}
+	if st.Next != "" {
+		result.Redirect = st.Next
+	}
 	if cred != nil && cred.MustChangePassword {
 		result.Redirect = "/account/security?password_change_required=1"
+		if st.Next != "" {
+			result.Redirect += "&next=" + url.QueryEscape(st.Next)
+		}
 	}
 	return result, nil
 }

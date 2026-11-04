@@ -13,6 +13,7 @@ import { InlineAlert } from '../../components/card'
 import { AuthShell } from './auth-shell'
 import { useAuth } from '../../lib/auth'
 import { oauthErrorMessage, providerLabel } from '../../lib/oauth'
+import { oidcAuthorizationPath } from '../../lib/paths'
 
 export function AuthCallbackPage() {
   const { provider = '' } = useParams()
@@ -23,6 +24,7 @@ export function AuthCallbackPage() {
   const resultStatus = searchParams.get('status')
   const oauthError = searchParams.get('oauth_error')
   const bound = searchParams.get('bound')
+  const next = oidcAuthorizationPath(searchParams.get('next'))
   const [settled, setSettled] = useState(false)
   const attemptedSession = useRef(false)
 
@@ -57,15 +59,16 @@ export function AuthCallbackPage() {
     : bound
       ? `/account/security?bound=${encodeURIComponent(bound)}`
       : resultStatus === 'success'
-        ? hasAdmin
+        ? next ?? (hasAdmin
           ? '/admin'
-          : '/account'
+          : '/account')
         : null
 
   useEffect(() => {
     if (!settled || !target || status !== 'authenticated') return
     const timer = window.setTimeout(() => {
-      navigate(target, { replace: true })
+      if (oidcAuthorizationPath(target)) window.location.replace(target)
+      else navigate(target, { replace: true })
     }, 1500)
     return () => window.clearTimeout(timer)
   }, [settled, target, status, navigate])
@@ -125,6 +128,7 @@ export function AuthCallbackPage() {
         )}
         <Link
           to={status === 'authenticated' ? target ?? '/account' : '/login'}
+          reloadDocument={Boolean(next)}
           className="flex w-full items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500"
         >
           {status === 'authenticated'

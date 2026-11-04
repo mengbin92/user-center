@@ -39,6 +39,7 @@ import { errorMessage } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import { useApiMutation } from '../../lib/mutations'
 import { oauthErrorMessage, providerLabel } from '../../lib/oauth'
+import { oidcAuthorizationPath } from '../../lib/paths'
 import { useSecurityStatus } from '../../lib/security'
 import type { SetupMFAReply } from '../../lib/types'
 import { PasswordChangeNotice } from './password-change-notice'
@@ -70,6 +71,7 @@ export function SecurityPage() {
   const boundProvider = searchParams.get('bound')
   const oauthError = searchParams.get('oauth_error')
   const verifiedProvider = searchParams.get('verified')
+  const oidcNext = oidcAuthorizationPath(searchParams.get('next'))
   const passwordChangeParam =
     searchParams.get('password_change_required') === '1'
 
@@ -346,6 +348,14 @@ export function SecurityPage() {
       </div>
 
       <PasswordChangeNotice required={passwordChangeRequired} />
+
+      {oidcNext ? (
+        <InlineAlert tone="info" title="应用授权待继续">
+          {!passwordChangeRequired && security && (!security.mfa_required || mfaEnabled) ? (
+            <a href={oidcNext} className="font-medium text-indigo-700 underline">继续应用授权</a>
+          ) : '请先完成密码更新和多因素认证设置，再继续应用授权。'}
+        </InlineAlert>
+      ) : null}
 
       {!passwordAvailable ? (
         <SectionCard title="重新验证绑定身份" description="当前账号使用第三方身份登录。设置密码或启用 MFA 前，请先重新验证已经绑定的身份；证明仅对当前会话短期有效。">

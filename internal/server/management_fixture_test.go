@@ -19,7 +19,7 @@ func (h *harness) management(method, path string, body any, token string, csrf b
 	if values, ok := body.(map[string]any); ok {
 		policy, err := h.svc.Policy.PolicyRevision(context.Background(), nil)
 		require.NoError(h.t, err)
-		if _, has := values["expected_policy_revision"]; !has && (strings.HasPrefix(path, "/api/v1/admin/iam/") || path == "/api/v1/admin/users" || strings.HasPrefix(path, "/api/v1/admin/users/")) {
+		if _, has := values["expected_policy_revision"]; !has && (strings.HasPrefix(path, "/api/v1/admin/iam/") || strings.HasPrefix(path, "/api/v1/admin/oidc-clients") || path == "/api/v1/admin/users" || strings.HasPrefix(path, "/api/v1/admin/users/")) {
 			values["expected_policy_revision"] = strconv.FormatUint(policy, 10)
 		}
 		if strings.HasPrefix(path, "/api/v1/admin/users/") {

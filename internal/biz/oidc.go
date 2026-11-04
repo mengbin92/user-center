@@ -6,13 +6,12 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mengbin92/user-center/pkg/jsonx"
+	"unicode/utf8"
 )
 
 // OIDCError is translated to an OAuth2 JSON error by the HTTP transport. When
@@ -47,12 +46,6 @@ type OIDCClientInput struct {
 	RefreshTTL   int
 }
 
-type OIDCConfig struct {
-	Issuer     string
-	AccessTTL  time.Duration
-	RefreshTTL time.Duration
-}
-
 type OIDCAuthorizeRequest struct {
 	ClientID            string
 	RedirectURI         string
@@ -63,6 +56,7 @@ type OIDCAuthorizeRequest struct {
 	CodeChallenge       string
 	CodeChallengeMethod string
 	Prompt              string
+	MaxAge              string
 }
 
 type OIDCTokenRequest struct {
@@ -73,6 +67,7 @@ type OIDCTokenRequest struct {
 	ClientSecret string
 	CodeVerifier string
 	RefreshToken string
+	Scope        string
 }
 
 type OIDCUsecase struct {
@@ -125,10 +120,10 @@ func (uc *OIDCUsecase) JWKS() map[string]any {
 
 func validRedirectURI(raw string) bool {
 	u, err := url.Parse(raw)
-	if err != nil || u.Fragment != "" || u.Host == "" {
+	if err != nil || strings.Contains(raw, "#") || u.Host == "" || u.User != nil || len(raw) > 512 {
 		return false
 	}
-	return u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))
+	return u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"))
 }
 
 func normalizeScopes(scopes []string) ([]string, error) {
@@ -150,37 +145,67 @@ func normalizeScopes(scopes []string) ([]string, error) {
 	return out, nil
 }
 
-func validateOIDCClient(in OIDCClientInput) ([]string, []string, error) {
+func (uc *OIDCUsecase) validateClient(in *OIDCClientInput) ([]string, error) {
 	in.Name = strings.TrimSpace(in.Name)
 	in.ServiceOwner = strings.TrimSpace(in.ServiceOwner)
-	if in.Name == "" || in.ServiceOwner == "" {
-		return nil, nil, Validation("名称和 service_owner 不能为空")
+	if in.Name == "" || in.ServiceOwner == "" || utf8.RuneCountInString(in.Name) > 128 || utf8.RuneCountInString(in.ServiceOwner) > 64 {
+		return nil, Validation("名称和 service_owner 不能为空，且不能超过 128/64 个字符")
 	}
 	if len(in.RedirectURIs) == 0 {
-		return nil, nil, Validation("至少需要一个 redirect_uri")
+		return nil, Validation("至少需要一个 redirect_uri")
 	}
 	for _, u := range in.RedirectURIs {
 		if !validRedirectURI(u) {
-			return nil, nil, Validation("redirect_uri 必须是 HTTPS（localhost 可用 HTTP）且不能含 fragment")
+			return nil, Validation("redirect_uri 必须是 HTTPS（localhost 可用 HTTP），不能含用户信息/fragment，最长 512 字节")
 		}
 	}
 	scopes, err := normalizeScopes(in.Scopes)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	if in.AccessTTL <= 0 {
-		in.AccessTTL = 900
+	if in.AccessTTL < 0 || in.RefreshTTL < 0 {
+		return nil, Validation("token 有效期不能为负数")
 	}
-	if in.RefreshTTL <= 0 {
-		in.RefreshTTL = 86400
+	if in.AccessTTL == 0 {
+		in.AccessTTL = int(uc.accessTTL.Seconds())
+	}
+	if in.RefreshTTL == 0 {
+		in.RefreshTTL = int(uc.refreshTTL.Seconds())
 	}
 	if in.AccessTTL < 60 || in.AccessTTL > 86400 || in.RefreshTTL < 300 || in.RefreshTTL > 2592000 {
-		return nil, nil, Validation("token 有效期超出允许范围")
+		return nil, Validation("token 有效期超出允许范围")
 	}
 	if in.Public {
 		in.RequirePKCE = true
 	}
-	return nil, scopes, nil
+	return scopes, nil
+}
+
+func (uc *OIDCUsecase) managementGuard(ctx context.Context, tx Tx, actor ActorContext, reason string) error {
+	if strings.TrimSpace(reason) == "" {
+		return Validation("reason 不能为空")
+	}
+	if actor.ExpectedPolicyRevision == 0 {
+		return Validation("expected_policy_revision 不能为空")
+	}
+	policy, err := uc.Policy.PolicyRevision(ctx, tx)
+	if err != nil {
+		return ErrDependency
+	}
+	if policy != actor.ExpectedPolicyRevision {
+		return ConflictPolicy(policy)
+	}
+	current, err := uc.currentIAMActor(ctx, actor)
+	if err != nil {
+		return err
+	}
+	if err := uc.authenticationRestrictions(ctx, tx, current.User); err != nil {
+		return err
+	}
+	if _, err := uc.Authorize(ctx, current, "oidc.client.update", 0, true); err != nil {
+		return err
+	}
+	return uc.RequireStepUp(ctx, current)
 }
 
 func (uc *OIDCUsecase) Clients(ctx context.Context, actor ActorContext) ([]*OIDCClient, error) {
@@ -197,18 +222,9 @@ func (uc *OIDCUsecase) CreateClient(ctx context.Context, actor ActorContext, in 
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return nil, err
 	}
-	_, scopes, err := validateOIDCClient(in)
+	scopes, err := uc.validateClient(&in)
 	if err != nil {
 		return nil, err
-	}
-	if in.Public {
-		in.RequirePKCE = true
-	}
-	if in.AccessTTL <= 0 {
-		in.AccessTTL = 900
-	}
-	if in.RefreshTTL <= 0 {
-		in.RefreshTTL = 86400
 	}
 	rawID, err := newToken(16)
 	if err != nil {
@@ -229,6 +245,9 @@ func (uc *OIDCUsecase) CreateClient(ctx context.Context, actor ActorContext, in 
 	}
 	var created *OIDCClient
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.managementGuard(ctx, tx, actor, reason); err != nil {
+			return err
+		}
 		row, err := uc.OIDCClients.CreateOIDCClient(ctx, tx, client)
 		if err != nil {
 			return err
@@ -251,21 +270,15 @@ func (uc *OIDCUsecase) UpdateClient(ctx context.Context, actor ActorContext, id 
 	}
 	existing, err := uc.OIDCClients.GetOIDCClient(ctx, nil, id)
 	if err != nil {
-		return nil, ErrOIDCClientNotFound
+		return nil, err
 	}
-	in.Name, in.ServiceOwner = existing.Name, existing.ServiceOwner
-	_, scopes, err := validateOIDCClient(in)
+	in.ServiceOwner = existing.ServiceOwner
+	scopes, err := uc.validateClient(&in)
 	if err != nil {
 		return nil, err
 	}
 	if in.Public != existing.Public {
 		return nil, Validation("public 属性不可修改，请新建客户端")
-	}
-	if in.AccessTTL <= 0 {
-		in.AccessTTL = 900
-	}
-	if in.RefreshTTL <= 0 {
-		in.RefreshTTL = 86400
 	}
 	existing.Name, existing.RedirectURIs, existing.Scopes = in.Name, in.RedirectURIs, scopes
 	existing.Public, existing.RequirePKCE = in.Public, in.RequirePKCE
@@ -275,6 +288,9 @@ func (uc *OIDCUsecase) UpdateClient(ctx context.Context, actor ActorContext, id 
 	existing.AccessTTL, existing.RefreshTTL = in.AccessTTL, in.RefreshTTL
 	var updated *OIDCClient
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.managementGuard(ctx, tx, actor, reason); err != nil {
+			return err
+		}
 		row, err := uc.OIDCClients.UpdateOIDCClient(ctx, tx, existing, expected)
 		if err != nil {
 			return err
@@ -296,7 +312,10 @@ func (uc *OIDCUsecase) RotateSecret(ctx context.Context, actor ActorContext, id 
 		return nil, err
 	}
 	existing, err := uc.OIDCClients.GetOIDCClient(ctx, nil, id)
-	if err != nil || existing.Public {
+	if err != nil {
+		return nil, err
+	}
+	if existing.Public {
 		return nil, ErrOIDCClientNotFound
 	}
 	secret, err := newToken(32)
@@ -305,7 +324,13 @@ func (uc *OIDCUsecase) RotateSecret(ctx context.Context, actor ActorContext, id 
 	}
 	var updated *OIDCClient
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		row, err := uc.OIDCClients.RotateOIDCClientSecret(ctx, tx, id, HashToken(secret))
+		if err := uc.managementGuard(ctx, tx, actor, reason); err != nil {
+			return err
+		}
+		if actor.ExpectedTargetRevision == 0 {
+			return Validation("expected_revision 不能为空")
+		}
+		row, err := uc.OIDCClients.RotateOIDCClientSecret(ctx, tx, id, HashToken(secret), actor.ExpectedTargetRevision)
 		if err != nil {
 			return err
 		}
@@ -327,10 +352,16 @@ func (uc *OIDCUsecase) DisableClient(ctx context.Context, actor ActorContext, id
 	}
 	existing, err := uc.OIDCClients.GetOIDCClient(ctx, nil, id)
 	if err != nil {
-		return nil, ErrOIDCClientNotFound
+		return nil, err
 	}
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		if err := uc.OIDCClients.DisableOIDCClient(ctx, tx, id); err != nil {
+		if err := uc.managementGuard(ctx, tx, actor, reason); err != nil {
+			return err
+		}
+		if actor.ExpectedTargetRevision == 0 {
+			return Validation("expected_revision 不能为空")
+		}
+		if err := uc.OIDCClients.DisableOIDCClient(ctx, tx, id, actor.ExpectedTargetRevision); err != nil {
 			return err
 		}
 		return uc.audit(ctx, tx, actor, "oidc.client.disable", existing.ClientID, "{}", "{}", "{}", reason, "success")
@@ -344,10 +375,10 @@ func (uc *OIDCUsecase) DisableClient(ctx context.Context, actor ActorContext, id
 }
 
 func (uc *OIDCUsecase) AuthorizeRequest(ctx context.Context, actor ActorContext, req OIDCAuthorizeRequest) (string, error) {
-	if actor.User == nil || actor.Session == nil {
-		return "", oidcErr("access_denied", "user session is required", 401)
-	}
 	client, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, nil, req.ClientID)
+	if err != nil && !errors.Is(err, ErrOIDCClientNotFound) {
+		return "", ErrDependency
+	}
 	if err != nil || client.Status != "active" {
 		return "", oidcErr("invalid_request", "unknown or disabled client", 400)
 	}
@@ -362,12 +393,18 @@ func (uc *OIDCUsecase) AuthorizeRequest(ctx context.Context, actor ActorContext,
 		return "", oidcErr("invalid_request", "redirect_uri is not registered", 400)
 	}
 	state := req.State
+	reject := func(code, description string) (string, error) {
+		return "", &OIDCError{Code: code, Description: description, Status: 400, RedirectURI: redirect, State: state}
+	}
 	if req.ResponseType != "code" {
-		return "", &OIDCError{Code: "unsupported_response_type", Description: "only code is supported", Status: 400, RedirectURI: redirect, State: state}
+		return reject("unsupported_response_type", "only code is supported")
 	}
 	scopes, serr := normalizeScopes([]string{req.Scope})
 	if serr != nil {
-		return "", &OIDCError{Code: "invalid_scope", Description: serr.Error(), Status: 400, RedirectURI: redirect, State: state}
+		return reject("invalid_scope", "requested scope is not supported")
+	}
+	if !oidcScopesAllowed(scopes, client.Scopes) {
+		return reject("invalid_scope", "requested scope is not registered for this client")
 	}
 	scope := strings.Join(scopes, " ")
 	challenge := req.CodeChallenge
@@ -376,11 +413,73 @@ func (uc *OIDCUsecase) AuthorizeRequest(ctx context.Context, actor ActorContext,
 		if method == "" {
 			method = "plain"
 		}
-		if method != "S256" {
-			return "", &OIDCError{Code: "invalid_request", Description: "only S256 PKCE is supported", Status: 400, RedirectURI: redirect, State: state}
+		decoded, err := base64.RawURLEncoding.DecodeString(challenge)
+		if method != "S256" || len(challenge) != 43 || err != nil || len(decoded) != sha256.Size {
+			return reject("invalid_request", "a valid S256 PKCE code_challenge is required")
 		}
 	} else if client.Public || client.RequirePKCE {
-		return "", &OIDCError{Code: "invalid_request", Description: "PKCE code_challenge is required", Status: 400, RedirectURI: redirect, State: state}
+		return reject("invalid_request", "PKCE code_challenge is required")
+	} else if method != "" {
+		return reject("invalid_request", "code_challenge_method requires code_challenge")
+	}
+	if len(req.Nonce) > 255 {
+		return reject("invalid_request", "nonce is too long")
+	}
+	prompts := strings.Fields(req.Prompt)
+	if slices.Contains(prompts, "none") && len(prompts) != 1 {
+		return reject("invalid_request", "prompt none cannot be combined with other values")
+	}
+	for _, prompt := range prompts {
+		switch prompt {
+		case "none":
+		case "login":
+			return reject("login_required", "fresh authentication is required")
+		case "consent":
+			return reject("consent_required", "interactive consent is not available")
+		case "select_account":
+			return reject("account_selection_required", "account selection is not available")
+		default:
+			return reject("invalid_request", "unsupported prompt")
+		}
+	}
+	var maxAge int64
+	if req.MaxAge != "" {
+		var err error
+		maxAge, err = strconv.ParseInt(req.MaxAge, 10, 64)
+		if err != nil || maxAge < 0 {
+			return reject("invalid_request", "max_age must be a non-negative integer")
+		}
+	}
+	if actor.User == nil || actor.Session == nil {
+		if slices.Contains(prompts, "none") {
+			return reject("login_required", "user session is required")
+		}
+		return "", oidcErr("login_required", "user session is required", 401)
+	}
+	current, err := uc.currentIAMActor(ctx, actor)
+	if err != nil {
+		if errors.Is(err, ErrDependency) {
+			return "", err
+		}
+		return reject("login_required", "user session is no longer valid")
+	}
+	actor = current
+	if err := uc.authenticationRestrictions(ctx, nil, actor.User); err != nil {
+		if !errors.Is(err, ErrPasswordChange) && !errors.Is(err, ErrMFAEnrollmentReq) {
+			return "", err
+		}
+		if slices.Contains(prompts, "none") {
+			return reject("interaction_required", "account security requirements must be completed")
+		}
+		if errors.Is(err, ErrPasswordChange) {
+			return "/account/security?password_change_required=1", nil
+		}
+		if errors.Is(err, ErrMFAEnrollmentReq) {
+			return "/account/security?mfa_enrollment_required=1", nil
+		}
+	}
+	if req.MaxAge != "" && (maxAge == 0 || uc.Clock.Now().Unix()-actor.Session.IssuedAt.Unix() > maxAge) {
+		return reject("login_required", "authentication is older than max_age")
 	}
 	rawCode, err := newToken(32)
 	if err != nil {
@@ -392,7 +491,8 @@ func (uc *OIDCUsecase) AuthorizeRequest(ctx context.Context, actor ActorContext,
 	}
 	code := &OIDCCode{
 		CodeHash: HashToken(rawCode), ClientID: client.ClientID, UserID: actor.User.ID,
-		RedirectURI: redirect, Scope: scope, Nonce: req.Nonce,
+		IdentityVersion: actor.User.IdentityVersion,
+		RedirectURI:     redirect, Scope: scope, Nonce: req.Nonce,
 		CodeChallenge: challenge, CodeChallengeMethod: method,
 		AuthTime: authTime.UTC(), ExpiresAt: uc.Clock.Now().Add(5 * time.Minute).UTC(),
 	}
@@ -418,45 +518,81 @@ func appendQuery(raw string, values map[string]string) string {
 }
 
 func (uc *OIDCUsecase) Token(ctx context.Context, req OIDCTokenRequest) (map[string]any, error) {
-	client, err := uc.authenticateClient(ctx, req.ClientID, req.ClientSecret)
-	if err != nil {
-		return nil, err
-	}
-	now := uc.Clock.Now().UTC()
-	switch req.GrantType {
-	case "authorization_code":
-		if req.Code == "" || req.RedirectURI == "" {
-			return nil, oidcErr("invalid_request", "code and redirect_uri are required", 400)
-		}
-		code, err := uc.OIDCCodes.ConsumeOIDCCode(ctx, nil, HashToken(req.Code), client.ClientID, req.RedirectURI, now)
+	var response map[string]any
+	var committedError error
+	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		client, err := uc.authenticateClient(ctx, tx, req.ClientID, req.ClientSecret)
 		if err != nil {
-			return nil, oidcErr("invalid_grant", "authorization code is invalid, used or expired", 400)
+			return err
 		}
-		if code.CodeChallenge != "" {
-			if req.CodeVerifier == "" || !verifyPKCE(code.CodeChallenge, req.CodeVerifier) {
-				return nil, oidcErr("invalid_grant", "PKCE verification failed", 400)
+		now := uc.Clock.Now().UTC()
+		switch req.GrantType {
+		case "authorization_code":
+			if req.Code == "" || req.RedirectURI == "" {
+				return oidcErr("invalid_request", "code and redirect_uri are required", 400)
 			}
+			code, err := uc.OIDCCodes.ConsumeOIDCCode(ctx, tx, HashToken(req.Code), client.ClientID, req.RedirectURI, now)
+			if err != nil {
+				if !errors.Is(err, ErrOIDCInvalidGrant) {
+					return ErrDependency
+				}
+				return oidcErr("invalid_grant", "authorization code is invalid, used or expired", 400)
+			}
+			if !slices.Contains(client.RedirectURIs, code.RedirectURI) {
+				return oidcErr("invalid_grant", "redirect_uri is no longer registered", 400)
+			}
+			if code.CodeChallenge != "" {
+				if !verifyPKCE(code.CodeChallenge, req.CodeVerifier) {
+					return oidcErr("invalid_grant", "PKCE verification failed", 400)
+				}
+			} else if req.CodeVerifier != "" || client.Public || client.RequirePKCE {
+				return oidcErr("invalid_grant", "PKCE verification failed", 400)
+			}
+			response, err = uc.issueTokens(ctx, tx, client, code.UserID, code.IdentityVersion, code.Scope, code.Nonce, code.AuthTime, "", time.Time{})
+			return err
+		case "refresh_token":
+			if req.RefreshToken == "" {
+				return oidcErr("invalid_request", "refresh_token is required", 400)
+			}
+			refresh, err := uc.OIDCCodes.ConsumeOIDCRefreshToken(ctx, tx, HashToken(req.RefreshToken), client.ClientID, now)
+			if err != nil {
+				if refresh != nil && errors.Is(err, ErrOIDCInvalidGrant) {
+					committedError = oidcErr("invalid_grant", "refresh token reuse detected", 400)
+					return nil // Persist the repository's revocation of the entire token family.
+				}
+				if !errors.Is(err, ErrOIDCInvalidGrant) {
+					return ErrDependency
+				}
+				return oidcErr("invalid_grant", "refresh token is invalid, used or expired", 400)
+			}
+			scope := refresh.Scope
+			if req.Scope != "" {
+				scopes, err := normalizeScopes([]string{req.Scope})
+				if err != nil || !oidcScopesAllowed(scopes, strings.Fields(refresh.Scope)) {
+					return oidcErr("invalid_scope", "refresh scope must be a subset of the original scope", 400)
+				}
+				scope = strings.Join(scopes, " ")
+			}
+			response, err = uc.issueTokens(ctx, tx, client, refresh.UserID, refresh.IdentityVersion, scope, "", refresh.AuthTime, refresh.FamilyID, refresh.ExpiresAt)
+			return err
+		default:
+			return oidcErr("unsupported_grant_type", "only authorization_code and refresh_token are supported", 400)
 		}
-		return uc.issueTokens(ctx, client, code.UserID, code.Scope, code.Nonce, code.AuthTime)
-	case "refresh_token":
-		if req.RefreshToken == "" {
-			return nil, oidcErr("invalid_request", "refresh_token is required", 400)
-		}
-		refresh, err := uc.OIDCCodes.ConsumeOIDCRefreshToken(ctx, nil, HashToken(req.RefreshToken), client.ClientID, now)
-		if err != nil {
-			return nil, oidcErr("invalid_grant", "refresh token is invalid, used or expired", 400)
-		}
-		return uc.issueTokens(ctx, client, refresh.UserID, refresh.Scope, "", refresh.AuthTime)
-	default:
-		return nil, oidcErr("unsupported_grant_type", "only authorization_code and refresh_token are supported", 400)
+	})
+	if err == nil && committedError != nil {
+		err = committedError
 	}
+	return response, err
 }
 
-func (uc *OIDCUsecase) authenticateClient(ctx context.Context, clientID, secret string) (*OIDCClient, error) {
+func (uc *OIDCUsecase) authenticateClient(ctx context.Context, tx Tx, clientID, secret string) (*OIDCClient, error) {
 	if clientID == "" {
 		return nil, oidcErr("invalid_client", "client_id is required", 401)
 	}
-	client, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, nil, clientID)
+	client, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, tx, clientID)
+	if err != nil && !errors.Is(err, ErrOIDCClientNotFound) {
+		return nil, ErrDependency
+	}
 	if err != nil || client.Status != "active" {
 		return nil, oidcErr("invalid_client", "unknown or disabled client", 401)
 	}
@@ -470,15 +606,60 @@ func (uc *OIDCUsecase) authenticateClient(ctx context.Context, clientID, secret 
 }
 
 func verifyPKCE(challenge, verifier string) bool {
+	if len(verifier) < 43 || len(verifier) > 128 {
+		return false
+	}
+	for _, c := range verifier {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("-._~", c)) {
+			return false
+		}
+	}
 	sum := sha256.Sum256([]byte(verifier))
 	computed := base64.RawURLEncoding.EncodeToString(sum[:])
 	return subtle.ConstantTimeCompare([]byte(computed), []byte(challenge)) == 1
 }
 
-func (uc *OIDCUsecase) issueTokens(ctx context.Context, client *OIDCClient, userID int64, scope, nonce string, authTime time.Time) (map[string]any, error) {
-	user, err := uc.Users.Get(ctx, nil, userID)
-	if err != nil || user.Status != UserStatusEnabled {
+func oidcScopesAllowed(scopes, registered []string) bool {
+	for _, scope := range scopes {
+		if !slices.Contains(registered, scope) {
+			return false
+		}
+	}
+	return true
+}
+
+func (uc *OIDCUsecase) authenticationRestrictions(ctx context.Context, tx Tx, user *User) error {
+	credential, err := uc.Credentials.Get(ctx, tx, user.ID)
+	if err == nil && credential.MustChangePassword {
+		return ErrPasswordChange
+	}
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
+		return ErrDependency
+	}
+	roles, err := uc.Users.RolesForUser(ctx, tx, user.ID)
+	if err != nil {
+		return ErrDependency
+	}
+	user.Roles = roles
+	return uc.requireAdminMFA(ctx, ActorContext{User: user})
+}
+
+func (uc *OIDCUsecase) issueTokens(ctx context.Context, tx Tx, client *OIDCClient, userID int64, identityVersion uint64, scope, nonce string, authTime time.Time, familyID string, refreshExpiry time.Time) (map[string]any, error) {
+	user, err := uc.Users.Get(ctx, tx, userID)
+	if err != nil && !errors.Is(err, ErrUserNotFound) {
+		return nil, ErrDependency
+	}
+	if err != nil || user.Status != UserStatusEnabled || identityVersion == 0 || user.IdentityVersion != identityVersion {
 		return nil, oidcErr("invalid_grant", "user is unavailable", 400)
+	}
+	if err := uc.authenticationRestrictions(ctx, tx, user); err != nil {
+		if errors.Is(err, ErrPasswordChange) || errors.Is(err, ErrMFAEnrollmentReq) {
+			return nil, oidcErr("invalid_grant", "account security requirements must be completed", 400)
+		}
+		return nil, err
+	}
+	if !oidcScopesAllowed(strings.Fields(scope), client.Scopes) {
+		return nil, oidcErr("invalid_scope", "scope is no longer registered for this client", 400)
 	}
 	now := uc.Clock.Now().UTC()
 	accessTTL := time.Duration(client.AccessTTL) * time.Second
@@ -488,6 +669,7 @@ func (uc *OIDCUsecase) issueTokens(ctx context.Context, client *OIDCClient, user
 		"iss": uc.issuer, "sub": itoa(user.ID), "aud": client.ClientID,
 		"exp": exp.Unix(), "iat": now.Unix(), "jti": uc.IDs.NewID(),
 		"scope": scope, "client_id": client.ClientID, "token_type": "access",
+		"identity_version": uitoa(identityVersion),
 	}
 	access, err := uc.OIDCSigner.Sign(accessClaims)
 	if err != nil {
@@ -522,11 +704,19 @@ func (uc *OIDCUsecase) issueTokens(ctx context.Context, client *OIDCClient, user
 		if err != nil {
 			return nil, ErrDependency
 		}
+		if familyID == "" {
+			familyID = uc.IDs.NewID()
+		}
+		if refreshExpiry.IsZero() || now.Add(refreshTTL).Before(refreshExpiry) {
+			refreshExpiry = now.Add(refreshTTL).UTC()
+		}
 		refresh := &OIDCRefreshToken{
 			TokenHash: HashToken(raw), ClientID: client.ClientID, UserID: user.ID,
-			Scope: scope, AuthTime: authTime.UTC(), ExpiresAt: now.Add(refreshTTL).UTC(),
+			IdentityVersion: identityVersion,
+			FamilyID:        familyID,
+			Scope:           scope, AuthTime: authTime.UTC(), ExpiresAt: refreshExpiry,
 		}
-		if err := uc.OIDCCodes.CreateOIDCRefreshToken(ctx, nil, refresh); err != nil {
+		if err := uc.OIDCCodes.CreateOIDCRefreshToken(ctx, tx, refresh); err != nil {
 			return nil, ErrDependency
 		}
 		resp["refresh_token"] = raw
@@ -542,17 +732,37 @@ func (uc *OIDCUsecase) UserInfo(ctx context.Context, raw string) (map[string]any
 	if claims["iss"] != uc.issuer || claims["token_type"] != "access" {
 		return nil, oidcErr("invalid_token", "access token is invalid", 401)
 	}
+	clientID, _ := claims["client_id"].(string)
+	client, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, nil, clientID)
+	if err != nil && !errors.Is(err, ErrOIDCClientNotFound) {
+		return nil, ErrDependency
+	}
+	if err != nil || client.Status != "active" || claims["aud"] != clientID {
+		return nil, oidcErr("invalid_token", "access token client is unavailable", 401)
+	}
 	sub, _ := claims["sub"].(string)
 	userID, err := ParseID(sub, "sub")
 	if err != nil {
 		return nil, oidcErr("invalid_token", "access token subject is invalid", 401)
 	}
 	user, err := uc.Users.Get(ctx, nil, userID)
-	if err != nil || user.Status != UserStatusEnabled {
+	if err != nil && !errors.Is(err, ErrUserNotFound) {
+		return nil, ErrDependency
+	}
+	if err != nil || user.Status != UserStatusEnabled || claims["identity_version"] != uitoa(user.IdentityVersion) {
 		return nil, oidcErr("invalid_token", "user is unavailable", 401)
+	}
+	if err := uc.authenticationRestrictions(ctx, nil, user); err != nil {
+		if !errors.Is(err, ErrPasswordChange) && !errors.Is(err, ErrMFAEnrollmentReq) {
+			return nil, err
+		}
+		return nil, oidcErr("invalid_token", "account security requirements are not satisfied", 401)
 	}
 	out := map[string]any{"sub": sub}
 	scope, _ := claims["scope"].(string)
+	if !oidcScopesAllowed(strings.Fields(scope), client.Scopes) {
+		return nil, oidcErr("invalid_token", "access token scope is no longer available", 401)
+	}
 	if slices.Contains(strings.Fields(scope), "profile") {
 		out["name"] = user.DisplayName
 		out["preferred_username"] = user.Username
@@ -574,6 +784,3 @@ func (uc *OIDCUsecase) ErrorRedirect(err error) (redirect, state string, ok bool
 	}
 	return "", "", false
 }
-
-var _ = fmt.Sprintf
-var _ = jsonx.Marshal

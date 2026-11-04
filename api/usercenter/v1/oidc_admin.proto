@@ -64,6 +64,7 @@ message CreateOIDCClientRequest {
   int32 access_token_ttl_seconds = 7;
   int32 refresh_token_ttl_seconds = 8;
   string reason = 9;
+  string expected_policy_revision = 10;
 }
 
 message UpdateOIDCClientRequest {
@@ -77,14 +78,19 @@ message UpdateOIDCClientRequest {
   int32 refresh_token_ttl_seconds = 8;
   string expected_revision = 9;
   string reason = 10;
+  string expected_policy_revision = 11;
 }
 
 message RotateOIDCClientSecretRequest {
   string id = 1;
   string reason = 2;
+  string expected_revision = 3;
+  string expected_policy_revision = 4;
 }
 
 message DisableOIDCClientRequest {
   string id = 1;
   string reason = 2;
+  string expected_revision = 3;
+  string expected_policy_revision = 4;
 }
