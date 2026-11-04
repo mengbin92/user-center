@@ -1445,6 +1445,22 @@ export interface paths {
         patch: operations["OrganizationService_UpdateOrganization"];
         trace?: never;
     };
+    "/api/v1/orgs/{id}/audits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_ListOrgAudits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{id}/departments": {
         parameters: {
             query?: never;
@@ -1487,6 +1503,122 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["OrganizationService_ArchiveDepartment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_ListOrgAssignments"];
+        put?: never;
+        post: operations["OrganizationService_CreateOrgAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["OrganizationService_RevokeOrgAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationService_ListOrgPermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Organization-scoped IAM (V2.3). Every request is evaluated in the
+         *      organization:{id} context; identifiers of another tenant are not found.
+         */
+        get: operations["OrganizationService_ListOrgRoles"];
+        put?: never;
+        post: operations["OrganizationService_CreateOrgRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OrganizationService_UpdateOrgRole"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/roles/{role_id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["OrganizationService_PutOrgRolePermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/roles/{role_id}:archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrganizationService_ArchiveOrgRole"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1586,6 +1718,12 @@ export interface components {
             expected_revision?: string;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.ArchiveOrgRoleRequest": {
+            id?: string;
+            role_id?: string;
+            expected_revision?: string;
+            reason?: string;
         };
         "api.usercenter.v1.ArchiveOrganizationRequest": {
             id?: string;
@@ -1843,6 +1981,21 @@ export interface components {
             refresh_token_ttl_seconds?: number;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.CreateOrgAssignmentRequest": {
+            id?: string;
+            user_id?: string;
+            role_id?: string;
+            expires_at?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.CreateOrgRoleRequest": {
+            id?: string;
+            code?: string;
+            name?: string;
+            description?: string;
+            grants?: components["schemas"]["api.usercenter.v1.Grant"][];
+            reason?: string;
         };
         "api.usercenter.v1.CreateOrganizationRequest": {
             code?: string;
@@ -2143,6 +2296,55 @@ export interface components {
         "api.usercenter.v1.OIDCClientsReply": {
             items?: components["schemas"]["api.usercenter.v1.OIDCClient"][];
         };
+        "api.usercenter.v1.OrgAssignment": {
+            id?: string;
+            user_id?: string;
+            username?: string;
+            display_name?: string;
+            role_id?: string;
+            role_code?: string;
+            role_name?: string;
+            boundary?: components["schemas"]["api.usercenter.v1.Scope"];
+            /** @description active | revoked */
+            status?: string;
+            revision?: string;
+            origin?: string;
+            expires_at?: string;
+            created_at?: string;
+        };
+        "api.usercenter.v1.OrgAssignmentsReply": {
+            items?: components["schemas"]["api.usercenter.v1.OrgAssignment"][];
+        };
+        "api.usercenter.v1.OrgAuditEvent": {
+            event_id?: string;
+            actor_user_id?: string;
+            action?: string;
+            target?: string;
+            result?: string;
+            reason?: string;
+            occurred_at?: string;
+        };
+        "api.usercenter.v1.OrgAuditsReply": {
+            items?: components["schemas"]["api.usercenter.v1.OrgAuditEvent"][];
+            total?: string;
+        };
+        "api.usercenter.v1.OrgPermissionsReply": {
+            items?: components["schemas"]["api.usercenter.v1.Permission"][];
+        };
+        "api.usercenter.v1.OrgRole": {
+            id?: string;
+            code?: string;
+            name?: string;
+            description?: string;
+            builtin?: boolean;
+            /** @description active | archived */
+            status?: string;
+            revision?: string;
+            grants?: components["schemas"]["api.usercenter.v1.Grant"][];
+        };
+        "api.usercenter.v1.OrgRolesReply": {
+            items?: components["schemas"]["api.usercenter.v1.OrgRole"][];
+        };
         "api.usercenter.v1.Organization": {
             id?: string;
             code?: string;
@@ -2233,6 +2435,13 @@ export interface components {
             id?: string;
             grants?: components["schemas"]["api.usercenter.v1.Grant"][];
             inherits?: string[];
+        };
+        "api.usercenter.v1.PutOrgRolePermissionsRequest": {
+            id?: string;
+            role_id?: string;
+            grants?: components["schemas"]["api.usercenter.v1.Grant"][];
+            expected_revision?: string;
+            reason?: string;
         };
         "api.usercenter.v1.PutRoleInheritanceRequest": {
             id?: string;
@@ -2579,6 +2788,14 @@ export interface components {
             expected_revision?: string;
             reason?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.UpdateOrgRoleRequest": {
+            id?: string;
+            role_id?: string;
+            name?: string;
+            description?: string;
+            expected_revision?: string;
+            reason?: string;
         };
         "api.usercenter.v1.UpdateOrganizationMemberRequest": {
             id?: string;
@@ -5289,6 +5506,34 @@ export interface operations {
             };
         };
     };
+    OrganizationService_ListOrgAudits: {
+        parameters: {
+            query?: {
+                action?: string;
+                from?: string;
+                to?: string;
+                offset?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgAuditsReply"];
+                };
+            };
+        };
+    };
     OrganizationService_ListDepartments: {
         parameters: {
             query?: never;
@@ -5388,6 +5633,227 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.Department"];
                 };
+            };
+        };
+    };
+    OrganizationService_ListOrgAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgAssignmentsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_CreateOrgAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateOrgAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgAssignment"];
+                };
+            };
+        };
+    };
+    OrganizationService_RevokeOrgAssignment: {
+        parameters: {
+            query?: {
+                expected_revision?: string;
+                reason?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrganizationService_ListOrgPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgPermissionsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_ListOrgRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgRolesReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_CreateOrgRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateOrgRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgRole"];
+                };
+            };
+        };
+    };
+    OrganizationService_UpdateOrgRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateOrgRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgRole"];
+                };
+            };
+        };
+    };
+    OrganizationService_PutOrgRolePermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.PutOrgRolePermissionsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgRole"];
+                };
+            };
+        };
+    };
+    OrganizationService_ArchiveOrgRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.ArchiveOrgRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

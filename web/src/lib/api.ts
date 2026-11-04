@@ -124,17 +124,28 @@ import type {
   AdminArchiveOrganizationRequest,
   ArchiveDepartmentRequest,
   ArchiveOrganizationRequest,
+  ArchiveOrgRoleRequest,
   CreateDepartmentRequest,
   CreateOrganizationRequest,
+  CreateOrgAssignmentRequest,
+  CreateOrgRoleRequest,
   Department,
   DepartmentsReply,
+  OrgAssignment,
+  OrgAssignmentsReply,
+  OrgAuditsReply,
+  OrgPermissionsReply,
+  OrgRole,
+  OrgRolesReply,
   Organization,
   OrganizationMember,
   OrganizationMembersReply,
   OrganizationsReply,
+  PutOrgRolePermissionsRequest,
   UpdateDepartmentRequest,
   UpdateOrganizationMemberRequest,
   UpdateOrganizationRequest,
+  UpdateOrgRoleRequest,
 } from './types'
 
 type QueryValue = string | number | boolean | null | undefined
@@ -365,6 +376,54 @@ export const api = {
         `/api/v1/orgs/${enc(id)}/departments/${enc(departmentId)}:archive`,
         body,
       ),
+
+    // Organization-scoped IAM (V2.3). The organization id in the path is the
+    // only tenant selector; the server never trusts a body-level tenant.
+    listRoles: (id: string) =>
+      get<OrgRolesReply>(`/api/v1/orgs/${enc(id)}/iam/roles`),
+    listRolePermissions: (id: string) =>
+      get<OrgPermissionsReply>(`/api/v1/orgs/${enc(id)}/iam/permissions`),
+    createRole: (id: string, body: CreateOrgRoleRequest) =>
+      post<OrgRole>(`/api/v1/orgs/${enc(id)}/iam/roles`, body),
+    updateRole: (id: string, roleId: string, body: UpdateOrgRoleRequest) =>
+      patch<OrgRole>(
+        `/api/v1/orgs/${enc(id)}/iam/roles/${enc(roleId)}`,
+        body,
+      ),
+    putRolePermissions: (
+      id: string,
+      roleId: string,
+      body: PutOrgRolePermissionsRequest,
+    ) =>
+      put<OrgRole>(
+        `/api/v1/orgs/${enc(id)}/iam/roles/${enc(roleId)}/permissions`,
+        body,
+      ),
+    archiveRole: (
+      id: string,
+      roleId: string,
+      body: ArchiveOrgRoleRequest,
+    ) =>
+      post<void>(
+        `/api/v1/orgs/${enc(id)}/iam/roles/${enc(roleId)}:archive`,
+        body,
+      ),
+    listAssignments: (id: string) =>
+      get<OrgAssignmentsReply>(`/api/v1/orgs/${enc(id)}/iam/assignments`),
+    assignRole: (id: string, body: CreateOrgAssignmentRequest) =>
+      post<OrgAssignment>(`/api/v1/orgs/${enc(id)}/iam/assignments`, body),
+    revokeAssignment: (
+      id: string,
+      assignmentId: string,
+      reason: string,
+      expectedRevision: string,
+    ) =>
+      del(`/api/v1/orgs/${enc(id)}/iam/assignments/${enc(assignmentId)}`, {
+        reason,
+        expected_revision: expectedRevision,
+      }),
+    listAudits: (id: string, params?: { action?: string; offset?: number; page_size?: number }) =>
+      get<OrgAuditsReply>(`/api/v1/orgs/${enc(id)}/audits`, params),
   },
 
   admin: {

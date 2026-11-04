@@ -13,7 +13,9 @@ import { QueryBoundary } from '../../components/query-state'
 import { Tabs } from '../../components/tabs'
 import { formatDateTime, formatNumber } from '../../lib/format'
 import type { Organization } from '../../lib/types'
+import { OrganizationAuditsTab } from './audits-tab'
 import { OrganizationDepartmentsTab } from './departments-tab'
+import { OrganizationIAMTab } from './iam-tab'
 import { OrganizationMembersTab } from './members-tab'
 import { OrganizationSettingsTab } from './settings-tab'
 import {
@@ -24,7 +26,14 @@ import {
   useOrganization,
 } from './org-shared'
 
-const TAB_KEYS = ['overview', 'members', 'departments', 'settings'] as const
+const TAB_KEYS = [
+  'overview',
+  'members',
+  'departments',
+  'roles',
+  'audits',
+  'settings',
+] as const
 type TabKey = (typeof TAB_KEYS)[number]
 
 function readTab(raw: string | null): TabKey {
@@ -94,6 +103,8 @@ export function OrganizationDetailPage() {
                   count: Number(org.member_count ?? 0),
                 },
                 { key: 'departments', label: '部门' },
+                { key: 'roles', label: '角色与授权' },
+                { key: 'audits', label: '审计' },
                 { key: 'settings', label: '设置' },
               ]}
               value={tab}
@@ -108,6 +119,15 @@ export function OrganizationDetailPage() {
             ) : null}
             {tab === 'departments' ? (
               <OrganizationDepartmentsTab org={org} orgId={orgId} />
+            ) : null}
+            {tab === 'roles' ? (
+              <OrganizationIAMTab org={org} orgId={orgId} />
+            ) : null}
+            {tab === 'audits' ? (
+              <OrganizationAuditsTab
+                orgId={orgId}
+                active={org.status === 'active'}
+              />
             ) : null}
             {tab === 'settings' ? (
               <OrganizationSettingsTab org={org} orgId={orgId} />

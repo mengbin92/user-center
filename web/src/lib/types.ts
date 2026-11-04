@@ -87,10 +87,16 @@ export type ArchiveDepartmentRequest =
   Schemas['api.usercenter.v1.ArchiveDepartmentRequest']
 export type ArchiveOrganizationRequest =
   Schemas['api.usercenter.v1.ArchiveOrganizationRequest']
+export type ArchiveOrgRoleRequest =
+  Schemas['api.usercenter.v1.ArchiveOrgRoleRequest']
 export type CreateDepartmentRequest =
   Schemas['api.usercenter.v1.CreateDepartmentRequest']
 export type CreateOrganizationRequest =
   Schemas['api.usercenter.v1.CreateOrganizationRequest']
+export type CreateOrgAssignmentRequest =
+  Schemas['api.usercenter.v1.CreateOrgAssignmentRequest']
+export type CreateOrgRoleRequest =
+  Schemas['api.usercenter.v1.CreateOrgRoleRequest']
 export type Department = Schemas['api.usercenter.v1.Department']
 export type DepartmentsReply = Schemas['api.usercenter.v1.DepartmentsReply']
 export type LeaveOrganizationRequest =
@@ -100,14 +106,27 @@ export type OrganizationMember =
   Schemas['api.usercenter.v1.OrganizationMember']
 export type OrganizationMembersReply =
   Schemas['api.usercenter.v1.OrganizationMembersReply']
+export type OrgAssignment = Schemas['api.usercenter.v1.OrgAssignment']
+export type OrgAssignmentsReply =
+  Schemas['api.usercenter.v1.OrgAssignmentsReply']
+export type OrgAuditEvent = Schemas['api.usercenter.v1.OrgAuditEvent']
+export type OrgAuditsReply = Schemas['api.usercenter.v1.OrgAuditsReply']
+export type OrgPermissionsReply =
+  Schemas['api.usercenter.v1.OrgPermissionsReply']
+export type OrgRole = Schemas['api.usercenter.v1.OrgRole']
+export type OrgRolesReply = Schemas['api.usercenter.v1.OrgRolesReply']
 export type OrganizationsReply =
   Schemas['api.usercenter.v1.OrganizationsReply']
+export type PutOrgRolePermissionsRequest =
+  Schemas['api.usercenter.v1.PutOrgRolePermissionsRequest']
 export type UpdateDepartmentRequest =
   Schemas['api.usercenter.v1.UpdateDepartmentRequest']
 export type UpdateOrganizationMemberRequest =
   Schemas['api.usercenter.v1.UpdateOrganizationMemberRequest']
 export type UpdateOrganizationRequest =
   Schemas['api.usercenter.v1.UpdateOrganizationRequest']
+export type UpdateOrgRoleRequest =
+  Schemas['api.usercenter.v1.UpdateOrgRoleRequest']
 export type OverviewReply = Schemas['api.usercenter.v1.OverviewReply']
 export type PasswordResetTaskReply =
   Schemas['api.usercenter.v1.PasswordResetTaskReply']

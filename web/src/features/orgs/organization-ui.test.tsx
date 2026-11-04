@@ -27,7 +27,16 @@ vi.mock('../../lib/api', () => ({
   api: {
     me: { security: vi.fn() },
     admin: { listOrganizations: vi.fn() },
-    orgs: { listMine: vi.fn() },
+    orgs: {
+      listMine: vi.fn(),
+      get: vi.fn(),
+      listMembers: vi.fn(),
+      listDepartments: vi.fn(),
+      listRoles: vi.fn(),
+      listRolePermissions: vi.fn(),
+      listAssignments: vi.fn(),
+      listAudits: vi.fn(),
+    },
   },
 }))
 
@@ -85,6 +94,21 @@ beforeEach(() => {
   vi.mocked(api.me.security).mockResolvedValue({})
   vi.mocked(api.admin.listOrganizations).mockResolvedValue({ items: [] })
   vi.mocked(api.orgs.listMine).mockResolvedValue({ items: [] })
+  vi.mocked(api.orgs.get).mockResolvedValue({
+    id: '7',
+    code: 'acme',
+    name: 'Acme',
+    status: 'active',
+    role: 'owner',
+    member_count: '2',
+    revision: '1',
+  })
+  vi.mocked(api.orgs.listMembers).mockResolvedValue({ items: [] })
+  vi.mocked(api.orgs.listDepartments).mockResolvedValue({ items: [] })
+  vi.mocked(api.orgs.listRoles).mockResolvedValue({ items: [] })
+  vi.mocked(api.orgs.listRolePermissions).mockResolvedValue({ items: [] })
+  vi.mocked(api.orgs.listAssignments).mockResolvedValue({ items: [] })
+  vi.mocked(api.orgs.listAudits).mockResolvedValue({ items: [], total: '0' })
 })
 
 describe('organization route and permission gating', () => {
@@ -175,5 +199,65 @@ describe('organization member role UI rules', () => {
     expect(canArchiveOrganization('platform')).toBe(true)
     expect(canArchiveOrganization('admin')).toBe(false)
     expect(canArchiveOrganization('member')).toBe(false)
+  })
+})
+
+describe('organization IAM and tenant audit tabs', () => {
+  it('renders built-in and custom roles with their grants count', async () => {
+    vi.mocked(api.orgs.listRoles).mockResolvedValue({
+      items: [
+        {
+          id: '11',
+          code: 'org_owner',
+          name: '组织所有者',
+          builtin: true,
+          status: 'active',
+          revision: '2',
+          grants: [{ operation: 'organization.member.manage' }],
+        },
+        {
+          id: '12',
+          code: 'auditor',
+          name: '审计员',
+          builtin: false,
+          status: 'active',
+          revision: '1',
+          grants: [{ operation: 'organization.audit.read' }],
+        },
+      ],
+    })
+    renderRoute(authValue([]), '/orgs/7?tab=roles')
+
+    expect(await screen.findByText('组织角色')).toBeInTheDocument()
+    expect(await screen.findByText('审计员')).toBeInTheDocument()
+    expect(screen.getByText('org_owner')).toBeInTheDocument()
+    expect(screen.getByText('内置')).toBeInTheDocument()
+    expect(screen.getByText('自定义')).toBeInTheDocument()
+    expect(api.orgs.listRoles).toHaveBeenCalledWith('7')
+  })
+
+  it('shows tenant audit events only from the organization endpoint', async () => {
+    vi.mocked(api.orgs.listAudits).mockResolvedValue({
+      items: [
+        {
+          event_id: 'evt-1',
+          actor_user_id: '1',
+          action: 'organization.member.add',
+          target: '7',
+          result: 'success',
+          reason: 'add member',
+          occurred_at: '2026-11-04T10:00:00Z',
+        },
+      ],
+      total: '1',
+    })
+    renderRoute(authValue([]), '/orgs/7?tab=audits')
+
+    expect(await screen.findByText('organization.member.add')).toBeInTheDocument()
+    expect(api.orgs.listAudits).toHaveBeenCalledWith('7', {
+      action: undefined,
+      page_size: 50,
+    })
+    expect(api.orgs.listRoles).not.toHaveBeenCalled()
   })
 })
