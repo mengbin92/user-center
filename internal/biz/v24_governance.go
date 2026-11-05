@@ -209,28 +209,26 @@ func (uc *SettingsUsecase) UpdateOrganizationSettings(ctx context.Context, actor
 
 // organizationQuotaGuard runs inside the create transaction. Platform
 // administrators are exempt by design.
-func (uc *OrganizationUsecase) organizationQuotaGuard(ctx context.Context, tx Tx, actor ActorContext) error {
+func (uc *OrganizationUsecase) organizationQuotaGuard(ctx context.Context, tx Tx, actor ActorContext) (map[string]any, error) {
 	if isPlatformAdmin(actor) {
-		return nil
+		return nil, nil
 	}
 	settings, err := uc.Settings.GetOrganization(ctx, tx)
 	if err != nil {
-		return ErrDependency
+		return nil, ErrDependency
 	}
 	if !settings.QuotaEnabled {
-		return nil
+		return nil, nil
 	}
 	count, err := uc.Organizations.CountOwnedOrganizations(ctx, tx, actor.User.ID, settings.CountArchived)
 	if err != nil {
-		return ErrDependency
+		return nil, ErrDependency
 	}
 	if int64(settings.MaxOwnedPerUser) <= count {
-		_ = uc.audit(ctx, tx, actor, "organization.create.denied", "quota", "{}", "{}",
-			string(mustJSON(map[string]any{"count": count, "limit": settings.MaxOwnedPerUser})),
-			"organization quota exceeded", "denied")
-		return ConflictCode("ORGANIZATION_QUOTA_EXCEEDED", "已达到每用户组织数量上限")
+		return map[string]any{"count": count, "limit": settings.MaxOwnedPerUser},
+			ConflictCode("ORGANIZATION_QUOTA_EXCEEDED", "已达到每用户组织数量上限")
 	}
-	return nil
+	return nil, nil
 }
 
 // --- identity provider configuration view (R9) ---
@@ -272,15 +270,9 @@ func (uc *SettingsUsecase) AuthProviders(ctx context.Context, actor ActorContext
 	out := &ProviderViewReply{Revision: settings.Revision}
 	for _, def := range defs {
 		configured := uc.OAuth[def.code] != nil
-		enabled := configured
-		for _, p := range settings.Providers {
-			if p == def.code {
-				enabled = configured && enabled
-			}
-		}
-		if !containsProvider(settings.Providers, def.code) {
-			enabled = false
-		}
+		explicitlyListed := containsProvider(settings.Providers, def.code)
+		enabled := configured && !containsProvider(settings.Providers, ProvidersDisabledAll) &&
+			(len(settings.Providers) == 0 || explicitlyListed)
 		out.Items = append(out.Items, &ProviderView{
 			Code: def.code, Name: def.name, Enabled: enabled,
 			CredentialSource: "env", CredentialConfigured: configured,

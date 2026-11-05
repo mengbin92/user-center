@@ -242,7 +242,7 @@ func (s *Services) auditIn(ctx context.Context, tx Tx, actor ActorContext, orgID
 		Target:         target,
 		Reason:         reason,
 		Result:         "success",
-		RequestID:      RequestID(ctx),
+		RequestID:      auditRequestID(ctx, actor),
 		OccurredAt:     s.Clock.Now().UTC(),
 		OrganizationID: orgID,
 		Before:         "{}", After: "{}", Diff: "{}",
@@ -256,6 +256,15 @@ func (s *Services) auditIn(ctx context.Context, tx Tx, actor ActorContext, orgID
 	return s.Audit.Append(ctx, tx, e)
 }
 
+// auditRequestID prefers the transport request id and falls back to the actor
+// metadata supplied by internal gRPC callers.
+func auditRequestID(ctx context.Context, actor ActorContext) string {
+	if id := RequestID(ctx); id != "" {
+		return id
+	}
+	return actor.RequestID
+}
+
 func (s *Services) audit(ctx context.Context, tx Tx, actor ActorContext, action, target, before, after, diff, reason string, result string) error {
 	e := &AuditEvent{
 		EventID:    s.IDs.NewID(),
@@ -266,7 +275,7 @@ func (s *Services) audit(ctx context.Context, tx Tx, actor ActorContext, action,
 		Diff:       diff,
 		Result:     result,
 		Reason:     reason,
-		RequestID:  RequestID(ctx),
+		RequestID:  auditRequestID(ctx, actor),
 		OccurredAt: s.Clock.Now().UTC(),
 	}
 	if actor.User != nil {

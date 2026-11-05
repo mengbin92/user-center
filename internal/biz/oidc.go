@@ -169,7 +169,7 @@ func (uc *OIDCUsecase) validateClient(in *OIDCClientInput) ([]string, error) {
 			return nil, Validation("post_logout_redirect_uri 必须是 HTTPS（localhost 可用 HTTP），不能含用户信息/fragment")
 		}
 	}
-	in.PostLogoutRedirectURIs = slices.Compact(in.PostLogoutRedirectURIs)
+	in.PostLogoutRedirectURIs = dedupeStrings(in.PostLogoutRedirectURIs)
 	scopes, err := normalizeScopes(in.Scopes)
 	if err != nil {
 		return nil, err
@@ -190,6 +190,19 @@ func (uc *OIDCUsecase) validateClient(in *OIDCClientInput) ([]string, error) {
 		in.RequirePKCE = true
 	}
 	return scopes, nil
+}
+
+func dedupeStrings(in []string) []string {
+	out := make([]string, 0, len(in))
+	seen := map[string]bool{}
+	for _, value := range in {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func (uc *OIDCUsecase) managementGuard(ctx context.Context, tx Tx, actor ActorContext, reason string) error {
@@ -434,8 +447,11 @@ func (uc *OIDCUsecase) AuthorizeRequest(ctx context.Context, actor ActorContext,
 	} else if method != "" {
 		return reject("invalid_request", "code_challenge_method requires code_challenge")
 	}
-	if len(req.Nonce) > 255 {
+	if utf8.RuneCountInString(req.Nonce) > 255 {
 		return reject("invalid_request", "nonce is too long")
+	}
+	if utf8.RuneCountInString(req.State) > 512 {
+		return reject("invalid_request", "state is too long")
 	}
 	prompts := strings.Fields(req.Prompt)
 	if slices.Contains(prompts, "none") && len(prompts) != 1 {

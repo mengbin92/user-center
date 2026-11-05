@@ -96,6 +96,9 @@ func (uc *SettingsUsecase) UpdateAuth(ctx context.Context, actor ActorContext, i
 		return nil, Validation("闲置超时不能大于会话有效期")
 	}
 	for _, provider := range in.Providers {
+		if provider == ProvidersDisabledAll {
+			continue
+		}
 		if uc.OAuth[provider] == nil {
 			return nil, Validation("登录提供方尚未配置: " + provider)
 		}

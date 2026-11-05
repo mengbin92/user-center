@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -53,6 +54,9 @@ func (uc *AuthUsecase) OAuthProviders() []string {
 	// actually change the login entry points. An empty list keeps the legacy
 	// behavior of exposing every configured provider.
 	if settings, err := uc.Settings.GetAuth(context.Background(), nil); err == nil && len(settings.Providers) > 0 {
+		if slices.Contains(settings.Providers, ProvidersDisabledAll) {
+			return []string{}
+		}
 		for _, name := range settings.Providers {
 			if p := uc.OAuth[name]; p != nil {
 				out = append(out, name)

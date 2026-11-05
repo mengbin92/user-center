@@ -506,9 +506,32 @@ func (r *organizationRepo) UpdateInvitation(ctx context.Context, tx biz.Tx, inv 
 }
 
 func (r *organizationRepo) CountPendingInvitations(ctx context.Context, tx biz.Tx, orgID int64, now time.Time) (int64, error) {
+	db := r.d.dbOr(tx).WithContext(ctx)
+	// MySQL: lock every pending invitation of this organization so two
+	// concurrent invites cannot both pass the quota check or leave two live
+	// tokens for the same address. SQLite (tests/dev) falls back to a count.
+	if db.Dialector.Name() == "mysql" {
+		var rows []organizationInvitationPO
+		if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("organization_id = ? AND status = ? AND expires_at > ?", orgID, biz.OrgInvitationPending, now).
+			Find(&rows).Error; err != nil {
+			return 0, err
+		}
+		return int64(len(rows)), nil
+	}
 	var n int64
-	err := r.d.dbOr(tx).WithContext(ctx).Model(&organizationInvitationPO{}).
+	err := db.Model(&organizationInvitationPO{}).
 		Where("organization_id = ? AND status = ? AND expires_at > ?", orgID, biz.OrgInvitationPending, now).
 		Count(&n).Error
 	return n, err
+}
+
+func (r *organizationRepo) RevokePendingInvitationsForEmail(ctx context.Context, tx biz.Tx, orgID int64, email string) error {
+	return r.d.dbOr(tx).WithContext(ctx).Model(&organizationInvitationPO{}).
+		Where("organization_id = ? AND email_normalized = ? AND status = ?", orgID, email, biz.OrgInvitationPending).
+		Update("status", biz.OrgInvitationRevoked).Error
+}
+
+func (r *organizationRepo) DeleteInvitation(ctx context.Context, tx biz.Tx, id int64) error {
+	return r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).Delete(&organizationInvitationPO{}).Error
 }

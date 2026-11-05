@@ -55,7 +55,7 @@ func (uc *OIDCUsecase) parkConsentRequest(ctx context.Context, actor ActorContex
 		RedirectURI: redirect, Scope: scope, State: req.State, Nonce: req.Nonce,
 		CodeChallenge: challenge, CodeChallengeMethod: method,
 		AuthTime: authTime.UTC(), IdentityVersion: actor.User.IdentityVersion,
-		ExpiresAt: uc.Clock.Now().Add(10 * time.Minute).UTC(),
+		CreatedAt: uc.Clock.Now().UTC(), ExpiresAt: uc.Clock.Now().Add(10 * time.Minute).UTC(),
 	}
 	if err := uc.OIDCConsents.CreateConsentRequest(ctx, nil, parked); err != nil {
 		return "", ErrDependency
@@ -69,7 +69,7 @@ func (uc *OIDCUsecase) ConsentPrompt(ctx context.Context, actor ActorContext, ha
 	if strings.TrimSpace(handle) == "" {
 		return nil, ErrResourceNotFound
 	}
-	parked, err := uc.OIDCConsents.GetConsentRequest(ctx, nil, HashToken(handle), actor.User.ID)
+	parked, err := uc.OIDCConsents.GetConsentRequest(ctx, nil, HashToken(handle), actor.User.ID, uc.Clock.Now().UTC())
 	if err != nil {
 		if errors.Is(err, ErrResourceNotFound) {
 			return nil, ErrResourceNotFound
@@ -95,7 +95,7 @@ func (uc *OIDCUsecase) ConsentPrompt(ctx context.Context, actor ActorContext, ha
 	}
 	return &OIDCConsentPrompt{
 		Client: client, Scopes: strings.Fields(parked.Scope), Granted: granted,
-		RedirectHost: host, RequestedAt: parked.AuthTime, ExpiresAt: parked.ExpiresAt,
+		RedirectHost: host, RequestedAt: parked.CreatedAt, ExpiresAt: parked.ExpiresAt,
 	}, nil
 }
 
@@ -202,7 +202,7 @@ func (uc *OIDCUsecase) RevokeConsent(ctx context.Context, actor ActorContext, cl
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		if err := uc.OIDCConsents.DeleteConsent(ctx, tx, clientID, actor.User.ID); err != nil {
-			return ErrDependency
+			return err // ErrResourceNotFound: no row, therefore no audit
 		}
 		return uc.audit(ctx, tx, actor, "oidc.consent.revoke", clientID, "{}", "{}", "{}", "user revoked consent", "success")
 	})
@@ -233,10 +233,9 @@ func (uc *OIDCUsecase) Logout(ctx context.Context, actor ActorContext, req OIDCL
 	if clientID == "" {
 		clientID = hintClientID
 	}
-	// A hint for another client is not authoritative for the requested client.
-	if hintClientID != "" && strings.TrimSpace(req.ClientID) != "" && hintClientID != strings.TrimSpace(req.ClientID) {
-		clientID = strings.TrimSpace(req.ClientID)
-	}
+	// A hint for another client is not authoritative: when client_id was
+	// supplied explicitly it wins, which is the same outcome as ignoring an
+	// invalid hint. Either way the whitelist is still enforced below.
 	target := strings.TrimSpace(req.PostLogoutRedirectURI)
 	redirect := ""
 	if target != "" {

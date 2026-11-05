@@ -119,8 +119,10 @@ func (uc *OrganizationUsecase) Create(ctx context.Context, actor ActorContext, i
 	}
 	now := uc.Clock.Now().UTC()
 	var created *Organization
+	var quotaDenial map[string]any
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		if err := uc.organizationQuotaGuard(ctx, tx, actor); err != nil {
+		if details, err := uc.organizationQuotaGuard(ctx, tx, actor); err != nil {
+			quotaDenial = details
 			return err
 		}
 		org, err := uc.Organizations.CreateOrganization(ctx, tx, &Organization{Code: in.Code, Name: in.Name, CreatedBy: actor.User.ID})
@@ -146,6 +148,14 @@ func (uc *OrganizationUsecase) Create(ctx context.Context, actor ActorContext, i
 		return uc.emit(ctx, tx, "organization", org.ID, org.Revision, "organization.created", string(payload))
 	})
 	if err != nil {
+		// The create transaction rolled back, so the denial audit must be
+		// written in its own transaction to survive.
+		if quotaDenial != nil {
+			_ = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+				return uc.audit(ctx, tx, actor, "organization.create.denied", "quota", "{}", "{}",
+					string(mustJSON(quotaDenial)), "organization quota exceeded", "denied")
+			})
+		}
 		return nil, err
 	}
 	created.Role = OrgRoleOwner

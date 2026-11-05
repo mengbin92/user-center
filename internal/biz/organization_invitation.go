@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
@@ -72,8 +73,10 @@ func (uc *OrganizationUsecase) CreateInvitation(ctx context.Context, actor Actor
 	if !validOrgRole(in.Role) {
 		return nil, "", Validation("组织角色只能是 owner/admin/member")
 	}
-	// Only an owner (or the platform administrator) may invite another admin/owner.
-	if (in.Role == OrgRoleAdmin || in.Role == OrgRoleOwner) && role != "platform" && role != OrgRoleOwner {
+	// Only an owner (or the platform administrator) may invite another owner.
+	// Inviting an admin follows the same rule as AddMember: anyone holding
+	// organization.member.manage (owner or org admin) may do it.
+	if in.Role == OrgRoleOwner && role != "platform" && role != OrgRoleOwner {
 		return nil, "", ErrPermissionDenied
 	}
 	if in.DepartmentID != nil {
@@ -96,14 +99,9 @@ func (uc *OrganizationUsecase) CreateInvitation(ctx context.Context, actor Actor
 		if n >= MaxPendingInvitationsPerOrg {
 			return ConflictCode(InvitationErrQuota, "本组织待接受邀请已达上限")
 		}
-		if existing, err := uc.Organizations.GetInvitationByEmail(ctx, tx, orgID, in.Email); err == nil {
-			// Re-inviting the same address rotates the token instead of piling up
-			// pending invitations; the old token stops working.
-			existing.Status = OrgInvitationRevoked
-			if _, err := uc.Organizations.UpdateInvitation(ctx, tx, existing, existing.Revision); err != nil {
-				return err
-			}
-		} else if !errors.Is(err, ErrResourceNotFound) {
+		// Re-inviting an address revokes *all* of its pending invitations so
+		// only one token can ever be live, even under concurrent requests.
+		if err := uc.Organizations.RevokePendingInvitationsForEmail(ctx, tx, orgID, in.Email); err != nil {
 			return ErrDependency
 		}
 		row, err := uc.Organizations.CreateInvitation(ctx, tx, &OrganizationInvitation{
@@ -128,6 +126,12 @@ func (uc *OrganizationUsecase) CreateInvitation(ctx context.Context, actor Actor
 	body := fmt.Sprintf("你被邀请加入组织「%s」，角色为 %s。\n请在 %d 小时内登录用户中心并打开以下链接接受邀请：\n%s\n\n如果还没有账号，请先注册与收件邮箱一致的账号，再打开链接。\n如非本人操作请忽略此邮件。",
 		org.Name, in.Role, int(uc.OrgInvitationTTL.Hours()), link)
 	if err := uc.Mail.Send(ctx, in.Email, "用户中心组织邀请", body); err != nil {
+		// A pending row whose mail never left would occupy the quota forever
+		// and its token can never be used. Remove it and record the failure.
+		_ = uc.Organizations.DeleteInvitation(ctx, nil, created.ID)
+		_ = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+			return uc.auditIn(ctx, tx, actor, orgID, "organization.invitation.delivery_failed", itoa(created.ID), reason)
+		})
 		return nil, "", ErrDependency
 	}
 	return created, raw, nil
@@ -137,17 +141,34 @@ func (uc *OrganizationUsecase) ListInvitations(ctx context.Context, actor ActorC
 	if _, err := uc.invitationGuard(ctx, actor, orgID, false); err != nil {
 		return nil, err
 	}
-	items, err := uc.Organizations.ListInvitations(ctx, nil, orgID, status)
+	queryStatus := status
+	if status == OrgInvitationExpired {
+		queryStatus = "" // expiry is derived, not persisted
+	}
+	items, err := uc.Organizations.ListInvitations(ctx, nil, orgID, queryStatus)
 	if err != nil {
 		return nil, ErrDependency
 	}
 	now := uc.Clock.Now()
+	out := make([]*OrganizationInvitation, 0, len(items))
 	for _, item := range items {
-		if item.Status == OrgInvitationPending && !now.Before(item.ExpiresAt) {
-			item.Status = OrgInvitationExpired
+		effective := invitationStatus(item, now)
+		if status != "" && effective != status {
+			continue
 		}
+		item.Status = effective
+		out = append(out, item)
 	}
-	return items, nil
+	return out, nil
+}
+
+// invitationStatus is the single source of truth for expiry across listing,
+// revocation and acceptance.
+func invitationStatus(inv *OrganizationInvitation, now time.Time) string {
+	if inv.Status == OrgInvitationPending && !now.Before(inv.ExpiresAt) {
+		return OrgInvitationExpired
+	}
+	return inv.Status
 }
 
 func (uc *OrganizationUsecase) RevokeInvitation(ctx context.Context, actor ActorContext, orgID, invitationID int64, expected uint64, reason string) error {
@@ -160,6 +181,9 @@ func (uc *OrganizationUsecase) RevokeInvitation(ctx context.Context, actor Actor
 	invitation, err := uc.Organizations.GetInvitation(ctx, nil, invitationID)
 	if err != nil || invitation.OrganizationID != orgID {
 		return ErrResourceNotFound
+	}
+	if invitationStatus(invitation, uc.Clock.Now()) == OrgInvitationExpired {
+		return ConflictCode(InvitationErrExpired, "邀请已过期")
 	}
 	if invitation.Status != OrgInvitationPending {
 		return ConflictCode(InvitationErrUsed, "邀请已不可撤销")
@@ -190,7 +214,7 @@ func (uc *OrganizationUsecase) AcceptInvitation(ctx context.Context, actor Actor
 	}
 	// The account e-mail must match exactly; the response is deliberately the
 	// same as for a token that does not exist.
-	if NormalizeEmail(actor.User.Email) != invitation.EmailNormalized {
+	if NormalizeEmail(actor.User.Email) != invitation.EmailNormalized || !actor.User.EmailVerified {
 		return nil, ErrResourceNotFound
 	}
 	switch invitation.Status {
@@ -231,6 +255,9 @@ func (uc *OrganizationUsecase) AcceptInvitation(ctx context.Context, actor Actor
 				InvitedBy: invitation.InvitedBy,
 			})
 		default:
+			if lookupErr != nil && !errors.Is(lookupErr, ErrResourceNotFound) {
+				return ErrDependency
+			}
 			return ConflictCode(InvitationErrAlreadyMember, "你已经是该组织成员")
 		}
 		if err != nil {

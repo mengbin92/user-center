@@ -37,11 +37,15 @@ export function AdminProvidersPage() {
   const update = useApiMutation({
     mutationFn: ({ reason }: { reason: string }) => {
       const current = auth.data as AuthSettings | undefined
-      const list = current?.providers ?? []
+      // "none" is the explicit all-disabled sentinel; an empty list means
+      // "every configured provider enabled" and must never be written by a
+      // toggle, otherwise disabling the last one would silently re-enable all.
+      const list = (current?.providers ?? []).filter((item) => item !== 'none')
       const code = pending?.code ?? ''
-      const next = pending?.enable
+      const selection = pending?.enable
         ? Array.from(new Set([...list, code]))
         : list.filter((item) => item !== code)
+      const next = selection.length === 0 ? ['none'] : selection
       return api.settings.updateAuth({
         providers: next,
         update_mask: 'providers',
@@ -58,7 +62,13 @@ export function AdminProvidersPage() {
   })
 
   const items = providers.data?.items ?? []
-  const enabled = new Set(auth.data?.providers ?? [])
+  const configuredList = (auth.data?.providers ?? []).filter(
+    (item) => item !== 'none',
+  )
+  const allDisabled = (auth.data?.providers ?? []).includes('none')
+  const enabled = new Set(
+    allDisabled ? [] : configuredList.length ? configuredList : items.map((i) => i.code ?? ''),
+  )
 
   return (
     <div className="space-y-4">
@@ -69,7 +79,7 @@ export function AdminProvidersPage() {
             外部身份提供方
           </h1>
           <p className="mt-0.5 text-xs text-slate-500">
-            凭据仅从环境变量读取，本页面不回显任何密钥；启停沿用认证配置接口并写入审计。
+            凭据仅从环境变量读取，本页面不回显任何密钥；启停沿用认证配置接口并写入审计。清空启用项会写入显式「全部停用」标记，不会退回默认放行。
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={() => void providers.refetch()}>

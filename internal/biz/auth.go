@@ -278,7 +278,11 @@ func (uc *AuthUsecase) login(ctx context.Context, in LoginInput, appID string) (
 	if mfa != nil && mfa.Enabled() {
 		challengeID := uc.IDs.NewID()
 		expires := uc.Clock.Now().Add(5 * time.Minute)
-		payload, _ := jsonx.Marshal(map[string]any{"identity_version": user.IdentityVersion, "ip": in.IP, "ua": SummizeAgent(in.UserAgent), "remember": in.Remember, "app_id": appID})
+		challengeApp := ""
+		if appID != ApplicationCode {
+			challengeApp = appID
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"identity_version": user.IdentityVersion, "ip": in.IP, "ua": SummizeAgent(in.UserAgent), "remember": in.Remember, "app_id": challengeApp})
 		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
 			return nil, ErrDependency
 		}
@@ -337,6 +341,9 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 		return nil, ErrChallengeInvalid
 	}
 	if !requireApp {
+		if payload.AppID != "" {
+			return nil, ErrChallengeInvalid // an integration challenge is not redeemable over HTTP
+		}
 		appID = ApplicationCode
 	} else {
 		appID = payload.AppID

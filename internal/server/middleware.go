@@ -130,6 +130,11 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 
 	if c, err := r.Cookie(service.SessionCookie); err == nil && c.Value != "" {
 		actor, err := m.sessions.ValidateSession(ctx, c.Value)
+		if err == nil && actor.Session != nil && actor.Session.ApplicationCode != biz.ApplicationCode {
+			// Sessions issued by the internal gRPC login are scoped to their
+			// calling application and must not be replayed as browser cookies.
+			err = biz.ErrUnauthenticated
+		}
 		if err == nil {
 			actor.RequestID = requestID
 			actor.IP = info.IP

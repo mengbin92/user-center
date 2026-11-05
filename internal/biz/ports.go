@@ -310,7 +310,7 @@ type OIDCConsentRepo interface {
 	DeleteConsent(context.Context, Tx, string, int64) error
 
 	CreateConsentRequest(context.Context, Tx, *OIDCConsentRequest) error
-	GetConsentRequest(context.Context, Tx, string, int64) (*OIDCConsentRequest, error)
+	GetConsentRequest(context.Context, Tx, string, int64, time.Time) (*OIDCConsentRequest, error)
 	// ConsumeConsentRequest marks the handle used and returns the snapshot. A
 	// second attempt, an expired handle or another user's handle is not found.
 	ConsumeConsentRequest(context.Context, Tx, string, int64, time.Time) (*OIDCConsentRequest, error)
@@ -360,4 +360,6 @@ type OrganizationRepo interface {
 	ListInvitations(context.Context, Tx, int64, string) ([]*OrganizationInvitation, error)
 	UpdateInvitation(context.Context, Tx, *OrganizationInvitation, uint64) (*OrganizationInvitation, error)
 	CountPendingInvitations(context.Context, Tx, int64, time.Time) (int64, error)
+	RevokePendingInvitationsForEmail(context.Context, Tx, int64, string) error
+	DeleteInvitation(context.Context, Tx, int64) error
 }

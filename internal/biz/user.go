@@ -1170,6 +1170,11 @@ func (uc *UserUsecase) GetExport(ctx context.Context, actor ActorContext, id int
 	if job.ActorUserID != actor.User.ID || job.ActorSessionID != actor.Session.ID {
 		return nil, ErrResourceNotFound
 	}
+	if job.Kind == "org_audits" {
+		// Tenant exports must pass the same membership + permission + snapshot
+		// re-check as the tenant download route, even via the platform path.
+		return (&OrganizationUsecase{Services: uc.Services}).GetAuditExport(ctx, actor, job.OrganizationID, id)
+	}
 	if err := uc.authorizeExport(ctx, actor, job); err != nil {
 		return nil, err
 	}

@@ -291,7 +291,14 @@ func (r *oidcRepo) UpsertConsent(ctx context.Context, tx biz.Tx, c *biz.OIDCCons
 }
 
 func (r *oidcRepo) DeleteConsent(ctx context.Context, tx biz.Tx, clientID string, userID int64) error {
-	return r.d.dbOr(tx).WithContext(ctx).Where("client_id = ? AND user_id = ?", clientID, userID).Delete(&oidcConsentPO{}).Error
+	res := r.d.dbOr(tx).WithContext(ctx).Where("client_id = ? AND user_id = ?", clientID, userID).Delete(&oidcConsentPO{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return biz.ErrResourceNotFound
+	}
+	return nil
 }
 
 func (r *oidcRepo) CreateConsentRequest(ctx context.Context, tx biz.Tx, q *biz.OIDCConsentRequest) error {
@@ -305,10 +312,10 @@ func (r *oidcRepo) CreateConsentRequest(ctx context.Context, tx biz.Tx, q *biz.O
 	return r.d.dbOr(tx).WithContext(ctx).Create(p).Error
 }
 
-func (r *oidcRepo) GetConsentRequest(ctx context.Context, tx biz.Tx, hash string, userID int64) (*biz.OIDCConsentRequest, error) {
+func (r *oidcRepo) GetConsentRequest(ctx context.Context, tx biz.Tx, hash string, userID int64, now time.Time) (*biz.OIDCConsentRequest, error) {
 	var p oidcConsentRequestPO
 	err := r.d.dbOr(tx).WithContext(ctx).
-		Where("handle_hash = ? AND user_id = ? AND consumed_at IS NULL AND expires_at > ?", hash, userID, time.Now().UTC()).
+		Where("handle_hash = ? AND user_id = ? AND consumed_at IS NULL AND expires_at > ?", hash, userID, now).
 		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
@@ -348,6 +355,6 @@ func oidcConsentRequestToBiz(p *oidcConsentRequestPO) *biz.OIDCConsentRequest {
 		RedirectURI: p.RedirectURI, Scope: p.Scope, State: p.State, Nonce: p.Nonce,
 		CodeChallenge: p.CodeChallenge, CodeChallengeMethod: p.CodeChallengeMethod,
 		AuthTime: p.AuthTime.UTC(), IdentityVersion: p.IdentityVersion,
-		ExpiresAt: p.ExpiresAt.UTC(),
+		CreatedAt: p.CreatedAt.UTC(), ExpiresAt: p.ExpiresAt.UTC(),
 	}
 }

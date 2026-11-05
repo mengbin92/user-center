@@ -6,6 +6,12 @@ import (
 	"github.com/mengbin92/user-center/domain/authorization"
 )
 
+// ProvidersDisabledAll is the explicit "no external provider" entry in
+// AuthSettings.Providers. An empty list keeps the legacy meaning of "every
+// configured provider is enabled"; this sentinel makes "disable all"
+// distinguishable without adding a new settings column.
+const ProvidersDisabledAll = "none"
+
 const (
 	UserStatusEnabled  = "enabled"
 	UserStatusDisabled = "disabled"
@@ -412,6 +418,7 @@ type OIDCConsentRequest struct {
 	CodeChallengeMethod string
 	AuthTime            time.Time
 	IdentityVersion     uint64
+	CreatedAt           time.Time
 	ExpiresAt           time.Time
 }
 
