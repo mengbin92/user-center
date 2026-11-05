@@ -274,3 +274,22 @@ GET  /oidc/userinfo                      Bearer access token
 - **用户名只能自助修改**：`UpdateUsername` 只暴露在 `/api/v1/me`，管理端没有改名 RPC，避免审计主体歧义。规则（格式、归一化、保留字）与注册路径共用同一函数。
 - **组织配额默认关闭**：开启后每用户默认 5 个（可配 1–1000），平台管理员（root/admin）豁免；归档组织默认不计入。
 - **不纳入**：`ExchangeLegacySession`、SCIM、企业目录同步、租户物理隔离、组织级 SoD（理由见路线图 §3.2）。WebAuthn/Passkey（R13）与个人信息清理（R14）按路线图分别滑动到 V2.5 / 未排期，当前未实现。
+
+## V2.4 W4/W5 契约
+
+### R13 WebAuthn / Passkey（第二因素）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/me/webauthn/credentials:challenge` | 注册挑战，需当前密码；返回 challenge/rp_id/已存在凭据 ID |
+| POST | `/api/v1/me/webauthn/credentials:confirm` | 校验 attestation none、clientDataJSON（type/origin/challenge）、rpIdHash、COSE 公钥 |
+| GET | `/api/v1/me/webauthn/credentials` | 凭据列表（不含公钥） |
+| POST | `/api/v1/me/webauthn/credentials/{id}:delete` | 删除；无 TOTP 且仅剩一枚凭据时返回 `LAST_SECOND_FACTOR` |
+| POST | `/api/v1/me/webauthn/assertions:challenge` | Step-up 断言挑战 |
+| POST | `/api/v1/me/webauthn/assertions:verify` | 验签 + 计数器单调 + Step-up（与 TOTP 同等效力） |
+
+登录 `LoginReply.webauthn` 在账号绑定 Passkey 时下发挑战；`/api/v1/auth/mfa/complete` 可改用 `credential_id/authenticator_data/client_data_json/signature` 完成登录。`sign_count` 回退返回 `WEBAUTHN_SIGN_COUNT_REGRESSION` 并写告警审计。用户名 + 密码始终是第一因素。
+
+### R14 个人信息保留与清理
+
+无 HTTP 接口，由 `cmd/retention` 执行（见 [运维手册](operations.md)）。默认保留期 365 天，dry-run 默认开启，`legal hold` 例外，审计与事件只保留不可逆 `user_id`。

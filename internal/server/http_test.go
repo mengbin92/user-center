@@ -66,6 +66,7 @@ type harness struct {
 	svc    *biz.Services
 	artDir string
 	mail   *captureMail
+	d      *data.Data
 }
 
 func newHarness(t *testing.T) *harness {
@@ -147,7 +148,7 @@ func newHarness(t *testing.T) *harness {
 	)
 	_ = integration
 	jar, _ := cookiejar.New(nil)
-	h := &harness{t: t, srv: hs.Server, jar: jar, users: users, iam: iam, auth: auth, svc: svc, artDir: runtime.ArtifactDir, mail: mailer}
+	h := &harness{t: t, srv: hs.Server, jar: jar, users: users, iam: iam, auth: auth, svc: svc, artDir: runtime.ArtifactDir, mail: mailer, d: d}
 	h.refreshCSRF()
 	return h
 }

@@ -16,6 +16,7 @@ type userPO struct {
 	CreatedAt          time.Time  `gorm:"column:created_at;not null"`
 	UpdatedAt          time.Time  `gorm:"column:updated_at;not null"`
 	ArchivedAt         *time.Time `gorm:"column:archived_at"`
+	AnonymizedAt       *time.Time `gorm:"column:anonymized_at"`
 }
 
 func (userPO) TableName() string { return "users" }
@@ -412,6 +413,15 @@ type webauthnCredentialPO struct {
 }
 
 func (webauthnCredentialPO) TableName() string { return "webauthn_credentials" }
+
+type legalHoldPO struct {
+	UserID     int64      `gorm:"column:user_id;primaryKey"`
+	Reason     string     `gorm:"column:reason;size:512;not null"`
+	CreatedAt  time.Time  `gorm:"column:created_at;not null"`
+	ReleasedAt *time.Time `gorm:"column:released_at"`
+}
+
+func (legalHoldPO) TableName() string { return "user_legal_holds" }
 
 type oidcCodePO struct {
 	CodeHash            string     `gorm:"column:code_hash;size:64;primaryKey"`

@@ -303,6 +303,21 @@ type OIDCCodeRepo interface {
 }
 
 // OIDCConsentRepo owns granted scopes and the parked authorize requests.
+// RetentionRepo owns the personal-data cleanup primitives. All writes take a
+// transaction so anonymization, purges, audit and event commit atomically.
+type RetentionRepo interface {
+	ListRetentionCandidates(context.Context, Tx, time.Time, int) ([]*User, error)
+	HasLegalHold(context.Context, Tx, int64) (bool, error)
+	AddLegalHold(context.Context, Tx, *LegalHold) error
+	ReleaseLegalHold(context.Context, Tx, int64) error
+	AnonymizeUser(context.Context, Tx, int64, time.Time) error
+	PurgeExternalIdentities(context.Context, Tx, int64) error
+	PurgeSessions(context.Context, Tx, int64) error
+	PurgeMFA(context.Context, Tx, int64) error
+	PurgeCredentials(context.Context, Tx, int64) error
+	PurgeWebAuthn(context.Context, Tx, int64) error
+}
+
 // WebAuthnRepo owns authenticator credentials. Credential IDs are globally
 // unique so one authenticator cannot be bound to two accounts.
 type WebAuthnRepo interface {

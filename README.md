@@ -158,13 +158,14 @@ scripts/                  开发与检查脚本
 - v0.3.0：标准 OIDC Provider（discovery/JWKS/authorization code + PKCE/token/userinfo/refresh）、OIDC 客户端管理与 RSA 签名密钥配置。
 - v0.4.0：组织、部门与成员管理；owner/admin/member 组织角色；最后 owner 保护；平台管理员组织目录与归档；成员邮箱按角色脱敏。
 - v0.5.0：组织域 IAM（`organization:{id}` 上下文、内置/自定义组织角色、组织内授权分配与权限目录）与多租户隔离（上下文查询、租户审计、跨租户拒绝）；存量组织自动回填。
+- v0.8.0（V2.4 W4/W5，待打标）：WebAuthn/Passkey 第二因素与个人信息保留清理 CLI。
 - v0.6.0（V2.4 W1/W2，待打标）：OIDC 交互式同意页与 RP-initiated logout；组织邀请与接受、组织域授权解释、租户审计导出、组织域事件进 Outbox。
 - v0.7.0（V2.4 W3，待打标）：内部 gRPC `Authenticate`/`CompleteMFA`、审计详情页、身份提供方配置页、用户名修改、单条分配预览、组织创建配额。
 - v0.5.2：全项目审查修复——改密门禁覆盖组织路由、用户列表批量授权查询、组织域并发与隔离加固、`reason` 强制、Webhook 回调限制、迁移可恢复。
 
 **仍延后（V2 后续里程碑）**：排期、验收标准与明确不做的项见 [V2.4 路线图](docs/roadmap-v2.4.md)。
 
-- WebAuthn/Passkey（R13，路线图允许整体滑动到 V2.5）、个人信息保留与清理（R14，未排期）、SCIM、企业目录同步；
+- SCIM、企业目录同步、租户物理隔离与组织级 SoD；R13/R14 已实现，见下；
 - OAuth 真实提供方沙箱验收：代码与本地 fake provider 测试已就绪，需配置真实凭据后执行；QQ 邮箱 SMTP 已完成真实发信与 IMAP 送达验收（[记录](docs/acceptance-smtp-2026-11-03.md)）；
 - 委派目前约束“分配/撤销角色”的目标角色、用户范围与动作；角色 Grant/继承的变更仍要求直接权限，不允许通过委派修改策略本身；
 - 原 `micro-one-api` 的 BFF 兼容层与适配器不在本仓库内，接入契约见 `docs/migration.md`；
@@ -207,6 +208,7 @@ docker compose up -d --build
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
+- [v0.8.0 发布说明（待发版）](docs/releases/release-v0.8.0.md)
 - [v0.6.0 发布说明（待发版）](docs/releases/release-v0.6.0.md)
 - [v0.7.0 发布说明（待发版）](docs/releases/release-v0.7.0.md)
 - [v0.5.2 发布说明](docs/releases/release-v0.5.2.md)

@@ -23,6 +23,13 @@ V2.4 W1–W3 已合入 `develop`；按路线图建议分别发 `v0.6.0`（W1/W2�
 - 审计详情页 `/admin/audits/:id`（before/after/diff 折叠、返回保留筛选）、身份提供方配置页 `/admin/settings/providers`、组织策略页 `/admin/settings/organization`。
 - 用户名自助修改（Step-up + 当前密码 + revision CAS，管理端不可改）、单条分配预览、组织创建配额。
 
+### Added (W4/W5, 建议 v0.8.0)
+
+- WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
+- 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
+- E2E 冒烟脚本正式收纳到 `scripts/e2e/smoke.sh`（`--base-url`、自动清理、失败快照）。
+- 迁移 `010_webauthn.sql`、`011_retention.sql`；新增 `github.com/fxamacker/cbor/v2` 依赖。
+
 ### Changed
 
 - 认证配置变更（`settings.auth.update`）现在推进 policy revision。
@@ -30,7 +37,8 @@ V2.4 W1–W3 已合入 `develop`；按路线图建议分别发 `v0.6.0`（W1/W2�
 
 ### Notes
 
-- R13 WebAuthn/Passkey（可整体滑动到 V2.5）与 R14 个人信息保留清理（未排期）按路线图未纳入本次交付。
+- 本地 compose 全流程冒烟因本机 Docker Desktop 端口转发/内部 DNS 异常未通过；MySQL 8.4 容器迁移真跑（001–011）与本地 dev 实例 E2E 冒烟均通过。
+- 范围决策：R13/R14 原分别标注「可滑动到 V2.5」与「未排期」，本次按用户要求一并交付（W4/W5，建议 v0.8.0）。
 
 ## [0.5.2] - 2026-11-04
 
@@ -72,6 +80,13 @@ Full-project review follow-up. No schema change.
   recorded per statement.
 - `GetRole` loaded every role and scanned linearly; it now reads one role plus
   its grants and inheritance.
+
+### Added (W4/W5, 建议 v0.8.0)
+
+- WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
+- 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
+- E2E 冒烟脚本正式收纳到 `scripts/e2e/smoke.sh`（`--base-url`、自动清理、失败快照）。
+- 迁移 `010_webauthn.sql`、`011_retention.sql`；新增 `github.com/fxamacker/cbor/v2` 依赖。
 
 ### Changed
 
@@ -116,6 +131,13 @@ V2.3 delivers organization-scoped IAM and tenant isolation.
   provisioning on first access).
 - SPA: organization "角色与授权" and "审计" tabs (custom roles, grants,
   assignments, tenant audit with action filter).
+
+### Added (W4/W5, 建议 v0.8.0)
+
+- WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
+- 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
+- E2E 冒烟脚本正式收纳到 `scripts/e2e/smoke.sh`（`--base-url`、自动清理、失败快照）。
+- 迁移 `010_webauthn.sql`、`011_retention.sql`；新增 `github.com/fxamacker/cbor/v2` 依赖。
 
 ### Changed
 
@@ -216,6 +238,13 @@ Security-review and verification follow-up to 0.2.0.
 - Isolate frontend sessions and cached authorization; keep legacy governance
   roles pending until explicitly reassigned with a verified boundary.
 - Refuse unsigned Outbox webhook delivery when `OUTBOX_SIGNING_SECRET` is absent.
+
+### Added (W4/W5, 建议 v0.8.0)
+
+- WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
+- 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
+- E2E 冒烟脚本正式收纳到 `scripts/e2e/smoke.sh`（`--base-url`、自动清理、失败快照）。
+- 迁移 `010_webauthn.sql`、`011_retention.sql`；新增 `github.com/fxamacker/cbor/v2` 依赖。
 
 ### Changed
 

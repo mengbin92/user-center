@@ -162,3 +162,31 @@ docker compose run --rm user-center /app/admin-rescue \
 - 授权事实每次请求实时读取 DB；用户/角色规模增大后应加入带版本失效的缓存，缓存键必须包含 policy/user/session revision。
 - 导出为同步生成，大表导出应迁移到异步 worker（当前限制 100000 行）。
 - 审计表增长快，建议按月分区或归档到只读存储；不要删除普通管理员可见的审计证据。
+
+## 个人信息保留与清理（V2.4 R14）
+
+`cmd/retention` 对**已归档**且超过保留期的账号做不可逆匿名化。默认保留期 **365 天**（按 `users.archived_at` 计算），可用 `RETENTION_DAYS` 环境变量或 `-retention-days` 覆盖。
+
+清理范围：`users.username / username_normalized / display_name / email / email_normalized / email_verified_at`、`user_credentials`、`identity_mfa`（含恢复码）、`iam_sessions`、`iam_session_roles`、`user_oauth_identities`、`webauthn_credentials`。审计事件与 Outbox 事件**不删除**，只保留不可逆的 `user_id`；`users.anonymized_at` 作为幂等标记，已清理账号不会再次入选。
+
+### ⚠️ 执行前必须完成的流程
+
+1. **备份**：对 MySQL 做一次完整逻辑备份（`mysqldump --single-transaction`），并确认备份可恢复。清理不可逆。
+2. **双人确认**：由数据 owner 与运维各自复核 dry-run 报告；实际写入需要同时传 `-apply` 与 `-acknowledge=I_HAVE_BACKED_UP`。
+3. **先 dry-run**：默认即为 dry-run，输出 JSON 报告（scanned / eligible / cleaned / skipped_legal_hold / failed 与候选 user_id）。
+4. **执行**：仅限窗口期执行，保留结构化日志与审计事件。
+5. **复核**：确认 `identity.retention.cleanup` 审计条数等于 `cleaned`，且候选账号的审计仍可按 user_id 追溯。
+
+```bash
+# 1. 预览（默认 dry-run，不写库）
+go run ./cmd/retention -config configs/config.yaml -retention-days 365 -limit 100
+
+# 2. 加/解 legal hold（命中则跳过清理）
+go run ./cmd/retention -config configs/config.yaml -hold-user 42 -hold-reason '诉讼保全 2026-xx'
+go run ./cmd/retention -config configs/config.yaml -release-user 42 -release-reason '保全解除'
+
+# 3. 实际执行（需备份 + 双人确认）
+go run ./cmd/retention -config configs/config.yaml -apply -acknowledge=I_HAVE_BACKED_UP
+```
+
+> 该命令不随服务常驻，也不由容器自动执行；是否纳入定时任务由部署方按合规要求决定。所有写入与审计在同一事务提交，失败不会留下半匿名化账号。

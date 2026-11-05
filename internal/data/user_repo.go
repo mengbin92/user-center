@@ -39,7 +39,7 @@ func (p userPO) toBiz() *biz.User {
 		ID: p.ID, Username: p.Username, UsernameNormalized: p.UsernameNormalized,
 		DisplayName: p.DisplayName, Status: p.Status, Revision: p.Revision,
 		IdentityVersion: p.IdentityVersion, CreatedAt: p.CreatedAt.UTC(),
-		UpdatedAt: p.UpdatedAt.UTC(), ArchivedAt: p.ArchivedAt,
+		UpdatedAt: p.UpdatedAt.UTC(), ArchivedAt: p.ArchivedAt, AnonymizedAt: p.AnonymizedAt,
 	}
 	if p.Email != nil {
 		u.Email = *p.Email

@@ -55,6 +55,7 @@ type User struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	ArchivedAt         *time.Time
+	AnonymizedAt       *time.Time
 	Roles              []RoleRef
 }
 
@@ -570,6 +571,14 @@ func (i OrganizationInvitation) Pending(now time.Time) bool {
 
 // OrganizationSettings is the platform-level organization policy. Quota is off
 // by default: enabling it is an operator decision, not a silent restriction.
+// LegalHold exempts an archived account from the retention cleanup job.
+type LegalHold struct {
+	UserID     int64
+	Reason     string
+	CreatedAt  time.Time
+	ReleasedAt *time.Time
+}
+
 // WebAuthnCredential is a registered platform/passkey authenticator. The
 // public key is the raw COSE_Key CBOR blob; no attestation chain is retained.
 type WebAuthnCredential struct {
