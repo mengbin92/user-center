@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.5.2 — V2.3 交付组织域 IAM 与多租户隔离：`organization:{id}` 授权上下文、组织自定义角色/授权、租户审计与上下文隔离查询；WebAuthn、SCIM、目录同步继续按 V2 里程碑推进。** 设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
+> **状态：v0.6.1 — V2.4 已交付 OIDC 交互式同意与 RP-initiated logout、组织邀请/租户审计/组织事件、内部 gRPC 登录、WebAuthn 与个人信息保留清理；v0.6.1 修复第二轮 review 发现的组织提权、登出会话残留与邀请竞态等问题。** SCIM、目录同步继续按 V2 后续里程碑推进。设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
 
 ## 目录
 
@@ -158,6 +158,7 @@ scripts/                  开发与检查脚本
 - v0.3.0：标准 OIDC Provider（discovery/JWKS/authorization code + PKCE/token/userinfo/refresh）、OIDC 客户端管理与 RSA 签名密钥配置。
 - v0.4.0：组织、部门与成员管理；owner/admin/member 组织角色；最后 owner 保护；平台管理员组织目录与归档；成员邮箱按角色脱敏。
 - v0.5.0：组织域 IAM（`organization:{id}` 上下文、内置/自定义组织角色、组织内授权分配与权限目录）与多租户隔离（上下文查询、租户审计、跨租户拒绝）；存量组织自动回填。
+- v0.6.1：第二轮完整 code review 修复——组织提权、登出会话残留、邀请竞态与 PII、OIDC 应用白名单误清空、consent revision、并发改名 500；无迁移。
 - v0.6.0 W4/W5：WebAuthn/Passkey 第二因素与个人信息保留清理 CLI；V2.4 全量统一发 `v0.6.0`（MINOR），分波次明细见发布说明与波次附记。
 - v0.6.0 W1/W2：OIDC 交互式同意页与 RP-initiated logout；组织邀请与接受、组织域授权解释、租户审计导出、组织域事件进 Outbox。
 - v0.6.0 W3：内部 gRPC `Authenticate`/`CompleteMFA`、审计详情页、身份提供方配置页、用户名修改、单条分配预览、组织创建配额。
@@ -220,6 +221,7 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
+- [v0.6.1 发布说明](docs/releases/release-v0.6.1.md)
 - [v0.6.0 发布说明](docs/releases/release-v0.6.0.md)
 - [W3 波次附记](docs/releases/release-v0.7.0.md)
 - [W4/W5 波次附记](docs/releases/release-v0.8.0.md)
