@@ -4,11 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0] - 2026-11-05
 
-V2.4 W1–W3 已合入 `develop`；按路线图建议分别发 `v0.6.0`（W1/W2）与 `v0.7.0`（W3），tag 尚未创建。
+**版本判定：MINOR**（v0.5.2 → v0.6.0）。V2.4 R1–R14、code review 修复与工程前置一次性连续交付；分波次 tag 会让 v0.6.0/v0.7.0 缺少后续 P1 安全修复，故统一发版，决策已同步至 [路线图 §5](roadmap-v2.4.md) 与 [发布说明](releases/release-v0.6.0.md)。
 
-### Added (W1/W2, 建议 v0.6.0)
+### Added (W1/W2)
 
 - OIDC 交互式授权同意页：一次性服务端 handle、按 client+user 持久化已授予 scope、scope 扩张与 `prompt=consent` 重新征询、`prompt=none` 返回 `interaction_required`、`/me/oidc-consents` 列出与撤销。
 - RP-initiated logout：discovery `end_session_endpoint`、`/oidc/logout`、客户端 `post_logout_redirect_uris` 精确白名单、会话撤销与 Cookie 清理、幂等重复调用。
@@ -17,13 +17,13 @@ V2.4 W1–W3 已合入 `develop`；按路线图建议分别发 `v0.6.0`（W1/W2�
 - 租户审计导出 `POST /orgs/{id}/audits:export` + 租户下载通道，复用平台 CSV/签名与版本校验。
 - 组织域事件进 Outbox（成员/部门/角色/分配/归档，最小无 PII 载荷），文档新增事件表。
 
-### Added (W3, 建议 v0.7.0)
+### Added (W3)
 
 - 内部 gRPC `Authenticate` / `CompleteMFA`，复用 HTTP 登录限流与失败计数、会话绑定应用、审计 `actor_service_id`。
 - 审计详情页 `/admin/audits/:id`（before/after/diff 折叠、返回保留筛选）、身份提供方配置页 `/admin/settings/providers`、组织策略页 `/admin/settings/organization`。
 - 用户名自助修改（Step-up + 当前密码 + revision CAS，管理端不可改）、单条分配预览、组织创建配额。
 
-### Added (W4/W5, 建议 v0.8.0)
+### Added (W4/W5)
 
 - WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
 - 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
@@ -38,7 +38,7 @@ V2.4 W1–W3 已合入 `develop`；按路线图建议分别发 `v0.6.0`（W1/W2�
 ### Notes
 
 - 本地 compose 全流程冒烟因本机 Docker Desktop 端口转发/内部 DNS 异常未通过；MySQL 8.4 容器迁移真跑（001–011）与本地 dev 实例 E2E 冒烟均通过。
-- 范围决策：R13/R14 原分别标注「可滑动到 V2.5」与「未排期」，本次按用户要求一并交付（W4/W5，建议 v0.8.0）。
+- 范围决策：R13/R14 原分别标注「可滑动到 V2.5」与「未排期」，本次按用户要求一并交付（统一发 `v0.6.0`）。
 
 ## [0.5.2] - 2026-11-04
 
@@ -81,7 +81,7 @@ Full-project review follow-up. No schema change.
 - `GetRole` loaded every role and scanned linearly; it now reads one role plus
   its grants and inheritance.
 
-### Added (W4/W5, 建议 v0.8.0)
+### Added (W4/W5)
 
 - WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
 - 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
@@ -132,7 +132,7 @@ V2.3 delivers organization-scoped IAM and tenant isolation.
 - SPA: organization "角色与授权" and "审计" tabs (custom roles, grants,
   assignments, tenant audit with action filter).
 
-### Added (W4/W5, 建议 v0.8.0)
+### Added (W4/W5)
 
 - WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
 - 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
@@ -239,7 +239,7 @@ Security-review and verification follow-up to 0.2.0.
   roles pending until explicitly reassigned with a verified boundary.
 - Refuse unsigned Outbox webhook delivery when `OUTBOX_SIGNING_SECRET` is absent.
 
-### Added (W4/W5, 建议 v0.8.0)
+### Added (W4/W5)
 
 - WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
 - 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。

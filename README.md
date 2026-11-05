@@ -158,9 +158,9 @@ scripts/                  开发与检查脚本
 - v0.3.0：标准 OIDC Provider（discovery/JWKS/authorization code + PKCE/token/userinfo/refresh）、OIDC 客户端管理与 RSA 签名密钥配置。
 - v0.4.0：组织、部门与成员管理；owner/admin/member 组织角色；最后 owner 保护；平台管理员组织目录与归档；成员邮箱按角色脱敏。
 - v0.5.0：组织域 IAM（`organization:{id}` 上下文、内置/自定义组织角色、组织内授权分配与权限目录）与多租户隔离（上下文查询、租户审计、跨租户拒绝）；存量组织自动回填。
-- v0.8.0（V2.4 W4/W5，待打标）：WebAuthn/Passkey 第二因素与个人信息保留清理 CLI。
-- v0.6.0（V2.4 W1/W2，待打标）：OIDC 交互式同意页与 RP-initiated logout；组织邀请与接受、组织域授权解释、租户审计导出、组织域事件进 Outbox。
-- v0.7.0（V2.4 W3，待打标）：内部 gRPC `Authenticate`/`CompleteMFA`、审计详情页、身份提供方配置页、用户名修改、单条分配预览、组织创建配额。
+- v0.6.0 W4/W5：WebAuthn/Passkey 第二因素与个人信息保留清理 CLI；V2.4 全量统一发 `v0.6.0`（MINOR），分波次明细见发布说明与波次附记。
+- v0.6.0 W1/W2：OIDC 交互式同意页与 RP-initiated logout；组织邀请与接受、组织域授权解释、租户审计导出、组织域事件进 Outbox。
+- v0.6.0 W3：内部 gRPC `Authenticate`/`CompleteMFA`、审计详情页、身份提供方配置页、用户名修改、单条分配预览、组织创建配额。
 - v0.5.2：全项目审查修复——改密门禁覆盖组织路由、用户列表批量授权查询、组织域并发与隔离加固、`reason` 强制、Webhook 回调限制、迁移可恢复。
 
 **仍延后（V2 后续里程碑）**：排期、验收标准与明确不做的项见 [V2.4 路线图](docs/roadmap-v2.4.md)。
@@ -208,9 +208,9 @@ docker compose up -d --build
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
-- [v0.8.0 发布说明（待发版）](docs/releases/release-v0.8.0.md)
-- [v0.6.0 发布说明（待发版）](docs/releases/release-v0.6.0.md)
-- [v0.7.0 发布说明（待发版）](docs/releases/release-v0.7.0.md)
+- [v0.6.0 发布说明](docs/releases/release-v0.6.0.md)
+- [W3 波次附记](docs/releases/release-v0.7.0.md)
+- [W4/W5 波次附记](docs/releases/release-v0.8.0.md)
 - [v0.5.2 发布说明](docs/releases/release-v0.5.2.md)
 - [v0.5.1 发布说明](docs/releases/release-v0.5.1.md)
 - [v0.5.0 发布说明](docs/releases/release-v0.5.0.md)
