@@ -75,6 +75,12 @@ func (s *AuthService) Login(ctx context.Context, req *usercv1.LoginRequest) (*us
 		Status: result.Status, PasswordChangeRequired: result.PasswordChangeRequired,
 		MfaEnrollmentRequired: s.uc.MFAEnrollmentRequired(ctx, result.User),
 	}
+	if result.WebAuthnChallenge != "" {
+		reply.Webauthn = &usercv1.WebAuthnChallenge{
+			Challenge: result.WebAuthnChallenge, RpId: result.WebAuthnRPID,
+			AllowCredentialIds: result.WebAuthnCredentialIDs,
+		}
+	}
 	if result.User != nil {
 		reply.User = userProto(result.User)
 	}
@@ -89,6 +95,9 @@ func (s *AuthService) Login(ctx context.Context, req *usercv1.LoginRequest) (*us
 }
 
 func (s *AuthService) CompleteMFA(ctx context.Context, req *usercv1.CompleteMFARequest) (*usercv1.LoginReply, error) {
+	if req.GetCredentialId() != "" {
+		return s.CompleteMFAWithWebAuthn(ctx, req)
+	}
 	meta := requestMeta(ctx)
 	result, err := s.uc.CompleteMFA(ctx, req.GetChallengeId(), req.GetCode(), meta.IP, meta.UserAgent)
 	if err != nil {

@@ -20,31 +20,37 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MeService_GetMe_FullMethodName                  = "/api.usercenter.v1.MeService/GetMe"
-	MeService_UpdateMe_FullMethodName               = "/api.usercenter.v1.MeService/UpdateMe"
-	MeService_UpdateUsername_FullMethodName         = "/api.usercenter.v1.MeService/UpdateUsername"
-	MeService_ChangePassword_FullMethodName         = "/api.usercenter.v1.MeService/ChangePassword"
-	MeService_CreateEmailChallenge_FullMethodName   = "/api.usercenter.v1.MeService/CreateEmailChallenge"
-	MeService_ConfirmEmail_FullMethodName           = "/api.usercenter.v1.MeService/ConfirmEmail"
-	MeService_ListExternalIdentities_FullMethodName = "/api.usercenter.v1.MeService/ListExternalIdentities"
-	MeService_DeleteExternalIdentity_FullMethodName = "/api.usercenter.v1.MeService/DeleteExternalIdentity"
-	MeService_GetSecurity_FullMethodName            = "/api.usercenter.v1.MeService/GetSecurity"
-	MeService_SetupMFA_FullMethodName               = "/api.usercenter.v1.MeService/SetupMFA"
-	MeService_ConfirmMFA_FullMethodName             = "/api.usercenter.v1.MeService/ConfirmMFA"
-	MeService_DisableMFA_FullMethodName             = "/api.usercenter.v1.MeService/DisableMFA"
-	MeService_RotateRecoveryCodes_FullMethodName    = "/api.usercenter.v1.MeService/RotateRecoveryCodes"
-	MeService_VerifySecurity_FullMethodName         = "/api.usercenter.v1.MeService/VerifySecurity"
-	MeService_ListSessions_FullMethodName           = "/api.usercenter.v1.MeService/ListSessions"
-	MeService_RevokeSession_FullMethodName          = "/api.usercenter.v1.MeService/RevokeSession"
-	MeService_RevokeOtherSessions_FullMethodName    = "/api.usercenter.v1.MeService/RevokeOtherSessions"
-	MeService_GetSessionRoles_FullMethodName        = "/api.usercenter.v1.MeService/GetSessionRoles"
-	MeService_PutSessionRoles_FullMethodName        = "/api.usercenter.v1.MeService/PutSessionRoles"
-	MeService_GetAuthorization_FullMethodName       = "/api.usercenter.v1.MeService/GetAuthorization"
-	MeService_ListSecurityEvents_FullMethodName     = "/api.usercenter.v1.MeService/ListSecurityEvents"
-	MeService_GetOIDCConsentRequest_FullMethodName  = "/api.usercenter.v1.MeService/GetOIDCConsentRequest"
-	MeService_DecideOIDCConsent_FullMethodName      = "/api.usercenter.v1.MeService/DecideOIDCConsent"
-	MeService_ListOIDCConsents_FullMethodName       = "/api.usercenter.v1.MeService/ListOIDCConsents"
-	MeService_RevokeOIDCConsent_FullMethodName      = "/api.usercenter.v1.MeService/RevokeOIDCConsent"
+	MeService_GetMe_FullMethodName                               = "/api.usercenter.v1.MeService/GetMe"
+	MeService_UpdateMe_FullMethodName                            = "/api.usercenter.v1.MeService/UpdateMe"
+	MeService_UpdateUsername_FullMethodName                      = "/api.usercenter.v1.MeService/UpdateUsername"
+	MeService_ChangePassword_FullMethodName                      = "/api.usercenter.v1.MeService/ChangePassword"
+	MeService_CreateEmailChallenge_FullMethodName                = "/api.usercenter.v1.MeService/CreateEmailChallenge"
+	MeService_ConfirmEmail_FullMethodName                        = "/api.usercenter.v1.MeService/ConfirmEmail"
+	MeService_ListExternalIdentities_FullMethodName              = "/api.usercenter.v1.MeService/ListExternalIdentities"
+	MeService_DeleteExternalIdentity_FullMethodName              = "/api.usercenter.v1.MeService/DeleteExternalIdentity"
+	MeService_GetSecurity_FullMethodName                         = "/api.usercenter.v1.MeService/GetSecurity"
+	MeService_SetupMFA_FullMethodName                            = "/api.usercenter.v1.MeService/SetupMFA"
+	MeService_ConfirmMFA_FullMethodName                          = "/api.usercenter.v1.MeService/ConfirmMFA"
+	MeService_DisableMFA_FullMethodName                          = "/api.usercenter.v1.MeService/DisableMFA"
+	MeService_RotateRecoveryCodes_FullMethodName                 = "/api.usercenter.v1.MeService/RotateRecoveryCodes"
+	MeService_VerifySecurity_FullMethodName                      = "/api.usercenter.v1.MeService/VerifySecurity"
+	MeService_ListSessions_FullMethodName                        = "/api.usercenter.v1.MeService/ListSessions"
+	MeService_RevokeSession_FullMethodName                       = "/api.usercenter.v1.MeService/RevokeSession"
+	MeService_RevokeOtherSessions_FullMethodName                 = "/api.usercenter.v1.MeService/RevokeOtherSessions"
+	MeService_GetSessionRoles_FullMethodName                     = "/api.usercenter.v1.MeService/GetSessionRoles"
+	MeService_PutSessionRoles_FullMethodName                     = "/api.usercenter.v1.MeService/PutSessionRoles"
+	MeService_GetAuthorization_FullMethodName                    = "/api.usercenter.v1.MeService/GetAuthorization"
+	MeService_ListSecurityEvents_FullMethodName                  = "/api.usercenter.v1.MeService/ListSecurityEvents"
+	MeService_CreateWebAuthnRegistrationChallenge_FullMethodName = "/api.usercenter.v1.MeService/CreateWebAuthnRegistrationChallenge"
+	MeService_ConfirmWebAuthnRegistration_FullMethodName         = "/api.usercenter.v1.MeService/ConfirmWebAuthnRegistration"
+	MeService_ListWebAuthnCredentials_FullMethodName             = "/api.usercenter.v1.MeService/ListWebAuthnCredentials"
+	MeService_DeleteWebAuthnCredential_FullMethodName            = "/api.usercenter.v1.MeService/DeleteWebAuthnCredential"
+	MeService_CreateWebAuthnAssertionChallenge_FullMethodName    = "/api.usercenter.v1.MeService/CreateWebAuthnAssertionChallenge"
+	MeService_VerifyWebAuthnAssertion_FullMethodName             = "/api.usercenter.v1.MeService/VerifyWebAuthnAssertion"
+	MeService_GetOIDCConsentRequest_FullMethodName               = "/api.usercenter.v1.MeService/GetOIDCConsentRequest"
+	MeService_DecideOIDCConsent_FullMethodName                   = "/api.usercenter.v1.MeService/DecideOIDCConsent"
+	MeService_ListOIDCConsents_FullMethodName                    = "/api.usercenter.v1.MeService/ListOIDCConsents"
+	MeService_RevokeOIDCConsent_FullMethodName                   = "/api.usercenter.v1.MeService/RevokeOIDCConsent"
 )
 
 // MeServiceClient is the client API for MeService service.
@@ -74,6 +80,14 @@ type MeServiceClient interface {
 	PutSessionRoles(ctx context.Context, in *PutSessionRolesRequest, opts ...grpc.CallOption) (*SessionRolesReply, error)
 	GetAuthorization(ctx context.Context, in *GetAuthorizationRequest, opts ...grpc.CallOption) (*AuthorizationReply, error)
 	ListSecurityEvents(ctx context.Context, in *ListSecurityEventsRequest, opts ...grpc.CallOption) (*SecurityEventsReply, error)
+	// WebAuthn / Passkey as a second factor (V2.4 R13). Credentials are never a
+	// primary login method: username + password always remains the first factor.
+	CreateWebAuthnRegistrationChallenge(ctx context.Context, in *CreateWebAuthnRegistrationChallengeRequest, opts ...grpc.CallOption) (*WebAuthnRegistrationChallengeReply, error)
+	ConfirmWebAuthnRegistration(ctx context.Context, in *ConfirmWebAuthnRegistrationRequest, opts ...grpc.CallOption) (*WebAuthnCredential, error)
+	ListWebAuthnCredentials(ctx context.Context, in *ListWebAuthnCredentialsRequest, opts ...grpc.CallOption) (*WebAuthnCredentialsReply, error)
+	DeleteWebAuthnCredential(ctx context.Context, in *DeleteWebAuthnCredentialRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CreateWebAuthnAssertionChallenge(ctx context.Context, in *CreateWebAuthnAssertionChallengeRequest, opts ...grpc.CallOption) (*WebAuthnAssertionChallengeReply, error)
+	VerifyWebAuthnAssertion(ctx context.Context, in *VerifyWebAuthnAssertionRequest, opts ...grpc.CallOption) (*VerifySecurityReply, error)
 	// OIDC consent (V2.4). The authorize endpoint redirects the browser here with
 	// an opaque one-time handle; the client never sees the handle contents.
 	GetOIDCConsentRequest(ctx context.Context, in *GetOIDCConsentRequestRequest, opts ...grpc.CallOption) (*OIDCConsentRequestView, error)
@@ -300,6 +314,66 @@ func (c *meServiceClient) ListSecurityEvents(ctx context.Context, in *ListSecuri
 	return out, nil
 }
 
+func (c *meServiceClient) CreateWebAuthnRegistrationChallenge(ctx context.Context, in *CreateWebAuthnRegistrationChallengeRequest, opts ...grpc.CallOption) (*WebAuthnRegistrationChallengeReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WebAuthnRegistrationChallengeReply)
+	err := c.cc.Invoke(ctx, MeService_CreateWebAuthnRegistrationChallenge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) ConfirmWebAuthnRegistration(ctx context.Context, in *ConfirmWebAuthnRegistrationRequest, opts ...grpc.CallOption) (*WebAuthnCredential, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WebAuthnCredential)
+	err := c.cc.Invoke(ctx, MeService_ConfirmWebAuthnRegistration_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) ListWebAuthnCredentials(ctx context.Context, in *ListWebAuthnCredentialsRequest, opts ...grpc.CallOption) (*WebAuthnCredentialsReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WebAuthnCredentialsReply)
+	err := c.cc.Invoke(ctx, MeService_ListWebAuthnCredentials_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) DeleteWebAuthnCredential(ctx context.Context, in *DeleteWebAuthnCredentialRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, MeService_DeleteWebAuthnCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) CreateWebAuthnAssertionChallenge(ctx context.Context, in *CreateWebAuthnAssertionChallengeRequest, opts ...grpc.CallOption) (*WebAuthnAssertionChallengeReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WebAuthnAssertionChallengeReply)
+	err := c.cc.Invoke(ctx, MeService_CreateWebAuthnAssertionChallenge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *meServiceClient) VerifyWebAuthnAssertion(ctx context.Context, in *VerifyWebAuthnAssertionRequest, opts ...grpc.CallOption) (*VerifySecurityReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifySecurityReply)
+	err := c.cc.Invoke(ctx, MeService_VerifyWebAuthnAssertion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *meServiceClient) GetOIDCConsentRequest(ctx context.Context, in *GetOIDCConsentRequestRequest, opts ...grpc.CallOption) (*OIDCConsentRequestView, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(OIDCConsentRequestView)
@@ -367,6 +441,14 @@ type MeServiceServer interface {
 	PutSessionRoles(context.Context, *PutSessionRolesRequest) (*SessionRolesReply, error)
 	GetAuthorization(context.Context, *GetAuthorizationRequest) (*AuthorizationReply, error)
 	ListSecurityEvents(context.Context, *ListSecurityEventsRequest) (*SecurityEventsReply, error)
+	// WebAuthn / Passkey as a second factor (V2.4 R13). Credentials are never a
+	// primary login method: username + password always remains the first factor.
+	CreateWebAuthnRegistrationChallenge(context.Context, *CreateWebAuthnRegistrationChallengeRequest) (*WebAuthnRegistrationChallengeReply, error)
+	ConfirmWebAuthnRegistration(context.Context, *ConfirmWebAuthnRegistrationRequest) (*WebAuthnCredential, error)
+	ListWebAuthnCredentials(context.Context, *ListWebAuthnCredentialsRequest) (*WebAuthnCredentialsReply, error)
+	DeleteWebAuthnCredential(context.Context, *DeleteWebAuthnCredentialRequest) (*emptypb.Empty, error)
+	CreateWebAuthnAssertionChallenge(context.Context, *CreateWebAuthnAssertionChallengeRequest) (*WebAuthnAssertionChallengeReply, error)
+	VerifyWebAuthnAssertion(context.Context, *VerifyWebAuthnAssertionRequest) (*VerifySecurityReply, error)
 	// OIDC consent (V2.4). The authorize endpoint redirects the browser here with
 	// an opaque one-time handle; the client never sees the handle contents.
 	GetOIDCConsentRequest(context.Context, *GetOIDCConsentRequestRequest) (*OIDCConsentRequestView, error)
@@ -445,6 +527,24 @@ func (UnimplementedMeServiceServer) GetAuthorization(context.Context, *GetAuthor
 }
 func (UnimplementedMeServiceServer) ListSecurityEvents(context.Context, *ListSecurityEventsRequest) (*SecurityEventsReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSecurityEvents not implemented")
+}
+func (UnimplementedMeServiceServer) CreateWebAuthnRegistrationChallenge(context.Context, *CreateWebAuthnRegistrationChallengeRequest) (*WebAuthnRegistrationChallengeReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateWebAuthnRegistrationChallenge not implemented")
+}
+func (UnimplementedMeServiceServer) ConfirmWebAuthnRegistration(context.Context, *ConfirmWebAuthnRegistrationRequest) (*WebAuthnCredential, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmWebAuthnRegistration not implemented")
+}
+func (UnimplementedMeServiceServer) ListWebAuthnCredentials(context.Context, *ListWebAuthnCredentialsRequest) (*WebAuthnCredentialsReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListWebAuthnCredentials not implemented")
+}
+func (UnimplementedMeServiceServer) DeleteWebAuthnCredential(context.Context, *DeleteWebAuthnCredentialRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteWebAuthnCredential not implemented")
+}
+func (UnimplementedMeServiceServer) CreateWebAuthnAssertionChallenge(context.Context, *CreateWebAuthnAssertionChallengeRequest) (*WebAuthnAssertionChallengeReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateWebAuthnAssertionChallenge not implemented")
+}
+func (UnimplementedMeServiceServer) VerifyWebAuthnAssertion(context.Context, *VerifyWebAuthnAssertionRequest) (*VerifySecurityReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyWebAuthnAssertion not implemented")
 }
 func (UnimplementedMeServiceServer) GetOIDCConsentRequest(context.Context, *GetOIDCConsentRequestRequest) (*OIDCConsentRequestView, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetOIDCConsentRequest not implemented")
@@ -857,6 +957,114 @@ func _MeService_ListSecurityEvents_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MeService_CreateWebAuthnRegistrationChallenge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateWebAuthnRegistrationChallengeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).CreateWebAuthnRegistrationChallenge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_CreateWebAuthnRegistrationChallenge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).CreateWebAuthnRegistrationChallenge(ctx, req.(*CreateWebAuthnRegistrationChallengeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_ConfirmWebAuthnRegistration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfirmWebAuthnRegistrationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).ConfirmWebAuthnRegistration(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_ConfirmWebAuthnRegistration_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).ConfirmWebAuthnRegistration(ctx, req.(*ConfirmWebAuthnRegistrationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_ListWebAuthnCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWebAuthnCredentialsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).ListWebAuthnCredentials(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_ListWebAuthnCredentials_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).ListWebAuthnCredentials(ctx, req.(*ListWebAuthnCredentialsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_DeleteWebAuthnCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteWebAuthnCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).DeleteWebAuthnCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_DeleteWebAuthnCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).DeleteWebAuthnCredential(ctx, req.(*DeleteWebAuthnCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_CreateWebAuthnAssertionChallenge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateWebAuthnAssertionChallengeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).CreateWebAuthnAssertionChallenge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_CreateWebAuthnAssertionChallenge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).CreateWebAuthnAssertionChallenge(ctx, req.(*CreateWebAuthnAssertionChallengeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MeService_VerifyWebAuthnAssertion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyWebAuthnAssertionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MeServiceServer).VerifyWebAuthnAssertion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MeService_VerifyWebAuthnAssertion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MeServiceServer).VerifyWebAuthnAssertion(ctx, req.(*VerifyWebAuthnAssertionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MeService_GetOIDCConsentRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetOIDCConsentRequestRequest)
 	if err := dec(in); err != nil {
@@ -1019,6 +1227,30 @@ var MeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListSecurityEvents",
 			Handler:    _MeService_ListSecurityEvents_Handler,
+		},
+		{
+			MethodName: "CreateWebAuthnRegistrationChallenge",
+			Handler:    _MeService_CreateWebAuthnRegistrationChallenge_Handler,
+		},
+		{
+			MethodName: "ConfirmWebAuthnRegistration",
+			Handler:    _MeService_ConfirmWebAuthnRegistration_Handler,
+		},
+		{
+			MethodName: "ListWebAuthnCredentials",
+			Handler:    _MeService_ListWebAuthnCredentials_Handler,
+		},
+		{
+			MethodName: "DeleteWebAuthnCredential",
+			Handler:    _MeService_DeleteWebAuthnCredential_Handler,
+		},
+		{
+			MethodName: "CreateWebAuthnAssertionChallenge",
+			Handler:    _MeService_CreateWebAuthnAssertionChallenge_Handler,
+		},
+		{
+			MethodName: "VerifyWebAuthnAssertion",
+			Handler:    _MeService_VerifyWebAuthnAssertion_Handler,
 		},
 		{
 			MethodName: "GetOIDCConsentRequest",

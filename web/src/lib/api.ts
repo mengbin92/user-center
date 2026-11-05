@@ -104,7 +104,13 @@ import type {
   User,
   UsersReply,
   VerifySecurityReply,
+  ConfirmWebAuthnRegistrationRequest,
   VerifySecurityRequest,
+  VerifyWebAuthnAssertionRequest,
+  WebAuthnCredential,
+  WebAuthnCredentialsReply,
+  WebAuthnRegistrationChallengeReply,
+  WebAuthnAssertionChallengeReply,
   AssignmentListReply,
   ConfirmEmailChangeRequest,
   CreateDelegationRequest,
@@ -340,6 +346,27 @@ export const api = {
         `/api/v1/me/oidc-requests/${enc(handle)}:decide`,
         body,
       ),
+    webAuthnRegistrationChallenge: (currentPassword: string) =>
+      post<WebAuthnRegistrationChallengeReply>(
+        '/api/v1/me/webauthn/credentials:challenge',
+        { current_password: currentPassword },
+      ),
+    confirmWebAuthnRegistration: (body: ConfirmWebAuthnRegistrationRequest) =>
+      post<WebAuthnCredential>('/api/v1/me/webauthn/credentials:confirm', body),
+    webAuthnCredentials: () =>
+      get<WebAuthnCredentialsReply>('/api/v1/me/webauthn/credentials'),
+    deleteWebAuthnCredential: (id: string, currentPassword: string) =>
+      post<void>(`/api/v1/me/webauthn/credentials/${enc(id)}:delete`, {
+        id,
+        current_password: currentPassword,
+      }),
+    webAuthnAssertionChallenge: (currentPassword: string) =>
+      post<WebAuthnAssertionChallengeReply>(
+        '/api/v1/me/webauthn/assertions:challenge',
+        { current_password: currentPassword },
+      ),
+    verifyWebAuthnAssertion: (body: VerifyWebAuthnAssertionRequest) =>
+      post<VerifySecurityReply>('/api/v1/me/webauthn/assertions:verify', body),
     updateUsername: (body: UpdateUsernameRequest) =>
       post<User>('/api/v1/me/username:update', body),
     oidcConsents: () => get<OIDCConsentsReply>('/api/v1/me/oidc-consents'),

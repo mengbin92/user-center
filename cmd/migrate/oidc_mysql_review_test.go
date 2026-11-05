@@ -28,7 +28,7 @@ func TestOIDCMySQLMigrations(t *testing.T) {
 	}
 	require.True(t, d.DB().Migrator().HasColumn("oidc_refresh_tokens", "family_id"))
 	// V2.4: consent, logout whitelist, invitations and tenant exports.
-	for _, table := range []string{"oidc_consents", "oidc_consent_requests", "organization_invitations"} {
+	for _, table := range []string{"oidc_consents", "oidc_consent_requests", "organization_invitations", "webauthn_credentials"} {
 		require.True(t, d.DB().Migrator().HasTable(table), "%s", table)
 	}
 	for _, column := range []struct{ table, name string }{

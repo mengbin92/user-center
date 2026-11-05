@@ -15,11 +15,12 @@ type MeService struct {
 	security *biz.SecurityUsecase
 	sessions *biz.SessionUsecase
 	oidc     *biz.OIDCUsecase
+	webauthn *biz.WebAuthnUsecase
 	deps     Deps
 }
 
-func NewMeService(users *biz.UserUsecase, security *biz.SecurityUsecase, sessions *biz.SessionUsecase, oidc *biz.OIDCUsecase, deps Deps) *MeService {
-	return &MeService{users: users, security: security, sessions: sessions, oidc: oidc, deps: deps}
+func NewMeService(users *biz.UserUsecase, security *biz.SecurityUsecase, sessions *biz.SessionUsecase, oidc *biz.OIDCUsecase, webauthn *biz.WebAuthnUsecase, deps Deps) *MeService {
+	return &MeService{users: users, security: security, sessions: sessions, oidc: oidc, webauthn: webauthn, deps: deps}
 }
 
 func requireActor(ctx context.Context) (biz.ActorContext, error) {

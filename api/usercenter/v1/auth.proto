@@ -81,11 +81,24 @@ message LoginReply {
   string session_expires_at = 5;
   bool password_change_required = 6;
   bool mfa_enrollment_required = 7;
+  // Present when a WebAuthn credential can satisfy the MFA challenge.
+  WebAuthnChallenge webauthn = 8;
+}
+
+message WebAuthnChallenge {
+  string challenge = 1;
+  string rp_id = 2;
+  repeated string allow_credential_ids = 3;
 }
 
 message CompleteMFARequest {
   string challenge_id = 1;
+  // TOTP / recovery code. Ignored when a WebAuthn assertion is supplied.
   string code = 2;
+  string credential_id = 3;
+  string authenticator_data = 4;
+  string client_data_json = 5;
+  string signature = 6;
 }
 
 message LogoutRequest {}

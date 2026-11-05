@@ -36,6 +36,10 @@ type LoginResult struct {
 	Session                *Session
 	RawToken               string
 	PasswordChangeRequired bool
+	// Present when a passkey can satisfy this MFA challenge.
+	WebAuthnChallenge     string
+	WebAuthnRPID          string
+	WebAuthnCredentialIDs []string
 }
 
 func (uc *AuthUsecase) AuthConfig(ctx context.Context) (*AuthSettings, error) {
@@ -275,18 +279,51 @@ func (uc *AuthUsecase) login(ctx context.Context, in LoginInput, appID string) (
 	if err != nil && !errors.Is(err, ErrResourceNotFound) {
 		return nil, ErrDependency
 	}
-	if mfa != nil && mfa.Enabled() {
+	var webAuthnCreds []*WebAuthnCredential
+	if uc.WebAuthn != nil {
+		var werr error
+		webAuthnCreds, werr = uc.WebAuthn.ListByUser(ctx, nil, user.ID)
+		if werr != nil {
+			return nil, ErrDependency
+		}
+	}
+	if (mfa != nil && mfa.Enabled()) || len(webAuthnCreds) > 0 {
 		challengeID := uc.IDs.NewID()
 		expires := uc.Clock.Now().Add(5 * time.Minute)
 		challengeApp := ""
 		if appID != ApplicationCode {
 			challengeApp = appID
 		}
-		payload, _ := jsonx.Marshal(map[string]any{"identity_version": user.IdentityVersion, "ip": in.IP, "ua": SummizeAgent(in.UserAgent), "remember": in.Remember, "app_id": challengeApp})
+		waChallenge := ""
+		rpID := ""
+		allow := []string{}
+		if len(webAuthnCreds) > 0 {
+			var err error
+			waChallenge, err = newToken(32)
+			if err != nil {
+				return nil, ErrDependency
+			}
+			rpID, _, err = uc.webAuthnRP()
+			if err != nil {
+				return nil, err
+			}
+			for _, cred := range webAuthnCreds {
+				allow = append(allow, cred.CredentialID)
+			}
+		}
+		payload, _ := jsonx.Marshal(map[string]any{
+			"identity_version": user.IdentityVersion, "ip": in.IP,
+			"ua": SummizeAgent(in.UserAgent), "remember": in.Remember,
+			"app_id": challengeApp, "webauthn_challenge": waChallenge,
+		})
 		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
 			return nil, ErrDependency
 		}
-		return &LoginResult{Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires, User: uc.publicUser(ctx, user)}, nil
+		return &LoginResult{
+			Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires,
+			User: uc.publicUser(ctx, user), WebAuthnChallenge: waChallenge,
+			WebAuthnRPID: rpID, WebAuthnCredentialIDs: allow,
+		}, nil
 	}
 
 	session, raw, err := uc.issueSessionFor(ctx, user, in.UserAgent, in.IP, appID)
@@ -300,17 +337,23 @@ func (uc *AuthUsecase) login(ctx context.Context, in LoginInput, appID string) (
 }
 
 func (uc *AuthUsecase) CompleteMFA(ctx context.Context, challengeID, code, ip, ua string) (*LoginResult, error) {
-	return uc.completeMFA(ctx, challengeID, code, ip, ua, ApplicationCode, false)
+	return uc.completeMFA(ctx, challengeID, code, ip, ua, ApplicationCode, false, nil)
+}
+
+// CompleteMFAWithWebAuthn satisfies a login MFA challenge with a passkey
+// assertion instead of a TOTP/recovery code.
+func (uc *AuthUsecase) CompleteMFAWithWebAuthn(ctx context.Context, assertion WebAuthnAssertion, ip, ua string) (*LoginResult, error) {
+	return uc.completeMFA(ctx, assertion.ChallengeID, "", ip, ua, ApplicationCode, false, &assertion)
 }
 
 // CompleteMFAForApplication consumes a gRPC-issued MFA challenge. The challenge
 // must have been created for the same application; an HTTP challenge (app_id
 // empty) is rejected so the two surfaces cannot be mixed.
 func (uc *AuthUsecase) CompleteMFAForApplication(ctx context.Context, challengeID, code, ip, ua, appID string) (*LoginResult, error) {
-	return uc.completeMFA(ctx, challengeID, code, ip, ua, appID, true)
+	return uc.completeMFA(ctx, challengeID, code, ip, ua, appID, true, nil)
 }
 
-func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, ua, appID string, requireApp bool) (*LoginResult, error) {
+func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, ua, appID string, requireApp bool, assertion *WebAuthnAssertion) (*LoginResult, error) {
 	if ok, err := uc.Limiter.Allow(ctx, "mfa:"+ip, 20, 5*time.Minute); err != nil {
 		return nil, ErrDependency
 	} else if !ok {
@@ -328,11 +371,12 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 		return nil, ErrUnauthenticated
 	}
 	var payload struct {
-		IdentityVersion uint64 `json:"identity_version"`
-		IP              string `json:"ip"`
-		UA              string `json:"ua"`
-		Remember        bool   `json:"remember"`
-		AppID           string `json:"app_id"`
+		IdentityVersion   uint64 `json:"identity_version"`
+		IP                string `json:"ip"`
+		UA                string `json:"ua"`
+		Remember          bool   `json:"remember"`
+		AppID             string `json:"app_id"`
+		WebAuthnChallenge string `json:"webauthn_challenge"`
 	}
 	if err := jsonx.Unmarshal([]byte(c.Payload), &payload); err != nil || payload.IdentityVersion != user.IdentityVersion {
 		return nil, ErrChallengeInvalid
@@ -348,9 +392,14 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 	} else {
 		appID = payload.AppID
 	}
-	if err := uc.verifyMFA(ctx, user.ID, code); err != nil {
-		uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
-		return nil, err
+	if assertion != nil && (requireApp || payload.WebAuthnChallenge == "") {
+		return nil, ErrChallengeInvalid
+	}
+	if assertion == nil {
+		if err := uc.verifyMFA(ctx, user.ID, code); err != nil {
+			uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
+			return nil, err
+		}
 	}
 	if payload.IP == "" {
 		payload.IP = ip
@@ -367,6 +416,13 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		if err := uc.Flows.Complete(ctx, tx, challengeID, "mfa", user.ID, "session"); err != nil {
 			return err
+		}
+		if assertion != nil {
+			factorActor := ActorContext{User: user, Session: &Session{ID: "login", UserID: user.ID}}
+			if err := uc.verifyWebAuthnAssertion(ctx, tx, factorActor, payload.WebAuthnChallenge, *assertion, uc.Clock.Now().UTC()); err != nil {
+				uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
+				return err
+			}
 		}
 		var err error
 		session, raw, err = uc.issueSessionTxFor(ctx, tx, user, payload.UA, payload.IP, appID)
@@ -626,8 +682,5 @@ func (uc *AuthUsecase) MFAEnrollmentRequired(ctx context.Context, user *User) bo
 	if err != nil || !settings.MFARequiredForAdmins {
 		return false
 	}
-	if state, merr := uc.MFA.Get(ctx, nil, user.ID); merr == nil && state.Enabled() {
-		return false
-	}
-	return true
+	return !uc.HasSecondFactor(ctx, user.ID)
 }

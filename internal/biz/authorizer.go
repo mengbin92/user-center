@@ -277,7 +277,7 @@ func (s *Services) requireAdminMFA(ctx context.Context, actor ActorContext) erro
 	if !settings.MFARequiredForAdmins {
 		return nil
 	}
-	if state, merr := s.MFA.Get(ctx, nil, actor.User.ID); merr == nil && state.Enabled() {
+	if s.HasSecondFactor(ctx, actor.User.ID) {
 		return nil
 	}
 	return ErrMFAEnrollmentReq

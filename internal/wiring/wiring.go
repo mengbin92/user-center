@@ -199,7 +199,7 @@ func BuildServices(d *data.Data, b *conf.Bootstrap) *biz.Services {
 		data.NewStepUpStore(d), data.NewMailSender(d, zap.NewNop(), ProvideMail(b)),
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
 		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
-		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), data.NewOIDCConsentRepo(d), nil,
+		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), data.NewOIDCConsentRepo(d), nil, data.NewWebAuthnRepo(d),
 		data.NewOrganizationRepo(d), data.NewOrgIAMRepo(d), d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
 		map[string]biz.OAuthProvider{}, nil,

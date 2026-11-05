@@ -303,6 +303,17 @@ type OIDCCodeRepo interface {
 }
 
 // OIDCConsentRepo owns granted scopes and the parked authorize requests.
+// WebAuthnRepo owns authenticator credentials. Credential IDs are globally
+// unique so one authenticator cannot be bound to two accounts.
+type WebAuthnRepo interface {
+	ListByUser(context.Context, Tx, int64) ([]*WebAuthnCredential, error)
+	Get(context.Context, Tx, int64, int64) (*WebAuthnCredential, error)
+	GetByCredentialID(context.Context, Tx, string) (*WebAuthnCredential, error)
+	Create(context.Context, Tx, *WebAuthnCredential) (*WebAuthnCredential, error)
+	UpdateSignCount(context.Context, Tx, int64, uint32, *time.Time, uint64) error
+	Delete(context.Context, Tx, int64, int64) error
+}
+
 type OIDCConsentRepo interface {
 	GetConsent(context.Context, Tx, string, int64) (*OIDCConsent, error)
 	ListConsentsByUser(context.Context, Tx, int64) ([]*OIDCConsent, error)

@@ -43,6 +43,7 @@ import { oidcAuthorizationPath } from '../../lib/paths'
 import { useSecurityStatus } from '../../lib/security'
 import type { SetupMFAReply } from '../../lib/types'
 import { PasswordChangeNotice } from './password-change-notice'
+import { PasskeyPanel } from './passkey-panel'
 import { ProviderButtons } from '../auth/provider-buttons'
 
 function SectionCard({
@@ -1127,6 +1128,8 @@ export function SecurityPage() {
         tone="danger"
         loading={deleteIdentity.isPending}
       />
+
+      <PasskeyPanel />
 
       {securityQuery.isSuccess && user?.status === 'archived' ? (
         <div className="text-center text-xs text-slate-500">

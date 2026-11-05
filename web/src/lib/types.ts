@@ -303,3 +303,19 @@ export type PreviewAssignmentRequest =
   Schemas['api.usercenter.v1.PreviewAssignmentRequest']
 export type PreviewAssignmentReply =
   Schemas['api.usercenter.v1.PreviewAssignmentReply']
+
+// V2.4 R13 WebAuthn
+export type WebAuthnCredential =
+  Schemas['api.usercenter.v1.WebAuthnCredential']
+export type WebAuthnCredentialsReply =
+  Schemas['api.usercenter.v1.WebAuthnCredentialsReply']
+export type WebAuthnRegistrationChallengeReply =
+  Schemas['api.usercenter.v1.WebAuthnRegistrationChallengeReply']
+export type WebAuthnAssertionChallengeReply =
+  Schemas['api.usercenter.v1.WebAuthnAssertionChallengeReply']
+export type ConfirmWebAuthnRegistrationRequest =
+  Schemas['api.usercenter.v1.ConfirmWebAuthnRegistrationRequest']
+export type VerifyWebAuthnAssertionRequest =
+  Schemas['api.usercenter.v1.VerifyWebAuthnAssertionRequest']
+export type WebAuthnChallenge =
+  Schemas['api.usercenter.v1.WebAuthnChallenge']

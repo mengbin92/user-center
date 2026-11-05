@@ -1545,6 +1545,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/webauthn/assertions:challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeService_CreateWebAuthnAssertionChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/webauthn/assertions:verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeService_VerifyWebAuthnAssertion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/webauthn/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MeService_ListWebAuthnCredentials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/webauthn/credentials/{id}:delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeService_DeleteWebAuthnCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/webauthn/credentials:challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description WebAuthn / Passkey as a second factor (V2.4 R13). Credentials are never a
+         *      primary login method: username + password always remains the first factor.
+         */
+        post: operations["MeService_CreateWebAuthnRegistrationChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/webauthn/credentials:confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeService_ConfirmWebAuthnRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs": {
         parameters: {
             query?: never;
@@ -2092,7 +2192,12 @@ export interface components {
         };
         "api.usercenter.v1.CompleteMFARequest": {
             challenge_id?: string;
+            /** @description TOTP / recovery code. Ignored when a WebAuthn assertion is supplied. */
             code?: string;
+            credential_id?: string;
+            authenticator_data?: string;
+            client_data_json?: string;
+            signature?: string;
         };
         "api.usercenter.v1.ConfirmEmailChangeRequest": {
             id?: string;
@@ -2108,6 +2213,15 @@ export interface components {
         };
         "api.usercenter.v1.ConfirmMFARequest": {
             code?: string;
+        };
+        "api.usercenter.v1.ConfirmWebAuthnRegistrationRequest": {
+            challenge_id?: string;
+            credential_id?: string;
+            /** @description base64url encoded attestationObject / clientDataJSON */
+            attestation_object?: string;
+            client_data_json?: string;
+            transports?: string[];
+            name?: string;
         };
         "api.usercenter.v1.Constraint": {
             id?: string;
@@ -2287,6 +2401,12 @@ export interface components {
             reason?: string;
             expected_policy_revision?: string;
         };
+        "api.usercenter.v1.CreateWebAuthnAssertionChallengeRequest": {
+            current_password?: string;
+        };
+        "api.usercenter.v1.CreateWebAuthnRegistrationChallengeRequest": {
+            current_password?: string;
+        };
         "api.usercenter.v1.DecideOIDCConsentReply": {
             /** @description Absolute or path-relative redirect the browser must follow. */
             redirect_url?: string;
@@ -2319,6 +2439,10 @@ export interface components {
         };
         "api.usercenter.v1.DelegationsReply": {
             items?: components["schemas"]["api.usercenter.v1.Delegation"][];
+        };
+        "api.usercenter.v1.DeleteWebAuthnCredentialRequest": {
+            id?: string;
+            current_password?: string;
         };
         "api.usercenter.v1.Department": {
             id?: string;
@@ -2517,6 +2641,8 @@ export interface components {
             session_expires_at?: string;
             password_change_required?: boolean;
             mfa_enrollment_required?: boolean;
+            /** @description Present when a WebAuthn credential can satisfy the MFA challenge. */
+            webauthn?: components["schemas"]["api.usercenter.v1.WebAuthnChallenge"];
         };
         "api.usercenter.v1.LoginRequest": {
             username?: string;
@@ -3224,6 +3350,50 @@ export interface components {
         "api.usercenter.v1.VerifySecurityRequest": {
             current_password?: string;
             code?: string;
+        };
+        "api.usercenter.v1.VerifyWebAuthnAssertionRequest": {
+            challenge_id?: string;
+            credential_id?: string;
+            authenticator_data?: string;
+            client_data_json?: string;
+            signature?: string;
+            current_password?: string;
+        };
+        "api.usercenter.v1.WebAuthnAssertionChallengeReply": {
+            challenge_id?: string;
+            challenge?: string;
+            rp_id?: string;
+            allow_credential_ids?: string[];
+            expires_at?: string;
+        };
+        "api.usercenter.v1.WebAuthnChallenge": {
+            challenge?: string;
+            rp_id?: string;
+            allow_credential_ids?: string[];
+        };
+        "api.usercenter.v1.WebAuthnCredential": {
+            id?: string;
+            credential_id?: string;
+            name?: string;
+            aaguid?: string;
+            transports?: string[];
+            sign_count?: string;
+            created_at?: string;
+            last_used_at?: string;
+            revision?: string;
+        };
+        "api.usercenter.v1.WebAuthnCredentialsReply": {
+            items?: components["schemas"]["api.usercenter.v1.WebAuthnCredential"][];
+        };
+        "api.usercenter.v1.WebAuthnRegistrationChallengeReply": {
+            challenge_id?: string;
+            challenge?: string;
+            rp_id?: string;
+            rp_name?: string;
+            user_id?: string;
+            user_name?: string;
+            expires_at?: string;
+            existing_credential_ids?: string[];
         };
     };
     responses: never;
@@ -5962,6 +6132,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.User"];
+                };
+            };
+        };
+    };
+    MeService_CreateWebAuthnAssertionChallenge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateWebAuthnAssertionChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.WebAuthnAssertionChallengeReply"];
+                };
+            };
+        };
+    };
+    MeService_VerifyWebAuthnAssertion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.VerifyWebAuthnAssertionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.VerifySecurityReply"];
+                };
+            };
+        };
+    };
+    MeService_ListWebAuthnCredentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.WebAuthnCredentialsReply"];
+                };
+            };
+        };
+    };
+    MeService_DeleteWebAuthnCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.DeleteWebAuthnCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeService_CreateWebAuthnRegistrationChallenge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateWebAuthnRegistrationChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.WebAuthnRegistrationChallengeReply"];
+                };
+            };
+        };
+    };
+    MeService_ConfirmWebAuthnRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.ConfirmWebAuthnRegistrationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.WebAuthnCredential"];
                 };
             };
         };

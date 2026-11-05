@@ -21,9 +21,13 @@ const _ = http.SupportPackageIsVersion3
 const OperationMeServiceChangePassword = "/api.usercenter.v1.MeService/ChangePassword"
 const OperationMeServiceConfirmEmail = "/api.usercenter.v1.MeService/ConfirmEmail"
 const OperationMeServiceConfirmMFA = "/api.usercenter.v1.MeService/ConfirmMFA"
+const OperationMeServiceConfirmWebAuthnRegistration = "/api.usercenter.v1.MeService/ConfirmWebAuthnRegistration"
 const OperationMeServiceCreateEmailChallenge = "/api.usercenter.v1.MeService/CreateEmailChallenge"
+const OperationMeServiceCreateWebAuthnAssertionChallenge = "/api.usercenter.v1.MeService/CreateWebAuthnAssertionChallenge"
+const OperationMeServiceCreateWebAuthnRegistrationChallenge = "/api.usercenter.v1.MeService/CreateWebAuthnRegistrationChallenge"
 const OperationMeServiceDecideOIDCConsent = "/api.usercenter.v1.MeService/DecideOIDCConsent"
 const OperationMeServiceDeleteExternalIdentity = "/api.usercenter.v1.MeService/DeleteExternalIdentity"
+const OperationMeServiceDeleteWebAuthnCredential = "/api.usercenter.v1.MeService/DeleteWebAuthnCredential"
 const OperationMeServiceDisableMFA = "/api.usercenter.v1.MeService/DisableMFA"
 const OperationMeServiceGetAuthorization = "/api.usercenter.v1.MeService/GetAuthorization"
 const OperationMeServiceGetMe = "/api.usercenter.v1.MeService/GetMe"
@@ -34,6 +38,7 @@ const OperationMeServiceListExternalIdentities = "/api.usercenter.v1.MeService/L
 const OperationMeServiceListOIDCConsents = "/api.usercenter.v1.MeService/ListOIDCConsents"
 const OperationMeServiceListSecurityEvents = "/api.usercenter.v1.MeService/ListSecurityEvents"
 const OperationMeServiceListSessions = "/api.usercenter.v1.MeService/ListSessions"
+const OperationMeServiceListWebAuthnCredentials = "/api.usercenter.v1.MeService/ListWebAuthnCredentials"
 const OperationMeServicePutSessionRoles = "/api.usercenter.v1.MeService/PutSessionRoles"
 const OperationMeServiceRevokeOIDCConsent = "/api.usercenter.v1.MeService/RevokeOIDCConsent"
 const OperationMeServiceRevokeOtherSessions = "/api.usercenter.v1.MeService/RevokeOtherSessions"
@@ -43,14 +48,21 @@ const OperationMeServiceSetupMFA = "/api.usercenter.v1.MeService/SetupMFA"
 const OperationMeServiceUpdateMe = "/api.usercenter.v1.MeService/UpdateMe"
 const OperationMeServiceUpdateUsername = "/api.usercenter.v1.MeService/UpdateUsername"
 const OperationMeServiceVerifySecurity = "/api.usercenter.v1.MeService/VerifySecurity"
+const OperationMeServiceVerifyWebAuthnAssertion = "/api.usercenter.v1.MeService/VerifyWebAuthnAssertion"
 
 type MeServiceHTTPServer interface {
 	ChangePassword(context.Context, *ChangePasswordRequest) (*emptypb.Empty, error)
 	ConfirmEmail(context.Context, *ConfirmEmailRequest) (*User, error)
 	ConfirmMFA(context.Context, *ConfirmMFARequest) (*RecoveryCodesReply, error)
+	ConfirmWebAuthnRegistration(context.Context, *ConfirmWebAuthnRegistrationRequest) (*WebAuthnCredential, error)
 	CreateEmailChallenge(context.Context, *CreateEmailChallengeRequest) (*ChallengeReply, error)
+	CreateWebAuthnAssertionChallenge(context.Context, *CreateWebAuthnAssertionChallengeRequest) (*WebAuthnAssertionChallengeReply, error)
+	// CreateWebAuthnRegistrationChallenge WebAuthn / Passkey as a second factor (V2.4 R13). Credentials are never a
+	// primary login method: username + password always remains the first factor.
+	CreateWebAuthnRegistrationChallenge(context.Context, *CreateWebAuthnRegistrationChallengeRequest) (*WebAuthnRegistrationChallengeReply, error)
 	DecideOIDCConsent(context.Context, *DecideOIDCConsentRequest) (*DecideOIDCConsentReply, error)
 	DeleteExternalIdentity(context.Context, *DeleteExternalIdentityRequest) (*emptypb.Empty, error)
+	DeleteWebAuthnCredential(context.Context, *DeleteWebAuthnCredentialRequest) (*emptypb.Empty, error)
 	DisableMFA(context.Context, *DisableMFARequest) (*emptypb.Empty, error)
 	GetAuthorization(context.Context, *GetAuthorizationRequest) (*AuthorizationReply, error)
 	GetMe(context.Context, *GetMeRequest) (*User, error)
@@ -63,6 +75,7 @@ type MeServiceHTTPServer interface {
 	ListOIDCConsents(context.Context, *ListOIDCConsentsRequest) (*OIDCConsentsReply, error)
 	ListSecurityEvents(context.Context, *ListSecurityEventsRequest) (*SecurityEventsReply, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*SessionsReply, error)
+	ListWebAuthnCredentials(context.Context, *ListWebAuthnCredentialsRequest) (*WebAuthnCredentialsReply, error)
 	PutSessionRoles(context.Context, *PutSessionRolesRequest) (*SessionRolesReply, error)
 	RevokeOIDCConsent(context.Context, *RevokeOIDCConsentRequest) (*emptypb.Empty, error)
 	RevokeOtherSessions(context.Context, *RevokeOtherSessionsRequest) (*emptypb.Empty, error)
@@ -72,6 +85,7 @@ type MeServiceHTTPServer interface {
 	UpdateMe(context.Context, *UpdateMeRequest) (*User, error)
 	UpdateUsername(context.Context, *UpdateUsernameRequest) (*User, error)
 	VerifySecurity(context.Context, *VerifySecurityRequest) (*VerifySecurityReply, error)
+	VerifyWebAuthnAssertion(context.Context, *VerifyWebAuthnAssertionRequest) (*VerifySecurityReply, error)
 }
 
 func RegisterMeServiceHTTPServer(s *http.Server, srv MeServiceHTTPServer) {
@@ -97,6 +111,12 @@ func RegisterMeServiceHTTPServer(s *http.Server, srv MeServiceHTTPServer) {
 	r.Handle("PUT", "/api/v1/me/session-roles", _MeService_PutSessionRoles0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/me/authorization", _MeService_GetAuthorization0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/me/security-events", _MeService_ListSecurityEvents0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/me/webauthn/credentials:challenge", _MeService_CreateWebAuthnRegistrationChallenge0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/me/webauthn/credentials:confirm", _MeService_ConfirmWebAuthnRegistration0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/me/webauthn/credentials", _MeService_ListWebAuthnCredentials0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/me/webauthn/credentials/{id}:delete", _MeService_DeleteWebAuthnCredential0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/me/webauthn/assertions:challenge", _MeService_CreateWebAuthnAssertionChallenge0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/me/webauthn/assertions:verify", _MeService_VerifyWebAuthnAssertion0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/me/oidc-requests/{handle}", _MeService_GetOIDCConsentRequest0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/me/oidc-requests/{handle}:decide", _MeService_DecideOIDCConsent0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/me/oidc-consents", _MeService_ListOIDCConsents0_HTTP_Handler(srv))
@@ -508,6 +528,123 @@ func _MeService_ListSecurityEvents0_HTTP_Handler(srv MeServiceHTTPServer) func(c
 	}
 }
 
+func _MeService_CreateWebAuthnRegistrationChallenge0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CreateWebAuthnRegistrationChallengeRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceCreateWebAuthnRegistrationChallenge)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CreateWebAuthnRegistrationChallenge(ctx, req.(*CreateWebAuthnRegistrationChallengeRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*WebAuthnRegistrationChallengeReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_ConfirmWebAuthnRegistration0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ConfirmWebAuthnRegistrationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceConfirmWebAuthnRegistration)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ConfirmWebAuthnRegistration(ctx, req.(*ConfirmWebAuthnRegistrationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*WebAuthnCredential)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_ListWebAuthnCredentials0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ListWebAuthnCredentialsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceListWebAuthnCredentials)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListWebAuthnCredentials(ctx, req.(*ListWebAuthnCredentialsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*WebAuthnCredentialsReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_DeleteWebAuthnCredential0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in DeleteWebAuthnCredentialRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceDeleteWebAuthnCredential)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.DeleteWebAuthnCredential(ctx, req.(*DeleteWebAuthnCredentialRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*emptypb.Empty)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_CreateWebAuthnAssertionChallenge0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CreateWebAuthnAssertionChallengeRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceCreateWebAuthnAssertionChallenge)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CreateWebAuthnAssertionChallenge(ctx, req.(*CreateWebAuthnAssertionChallengeRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*WebAuthnAssertionChallengeReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _MeService_VerifyWebAuthnAssertion0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in VerifyWebAuthnAssertionRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationMeServiceVerifyWebAuthnAssertion)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.VerifyWebAuthnAssertion(ctx, req.(*VerifyWebAuthnAssertionRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*VerifySecurityReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _MeService_GetOIDCConsentRequest0_HTTP_Handler(srv MeServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in GetOIDCConsentRequestRequest
@@ -597,9 +734,15 @@ type MeServiceHTTPClient interface {
 	ChangePassword(ctx context.Context, req *ChangePasswordRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	ConfirmEmail(ctx context.Context, req *ConfirmEmailRequest, opts ...http.CallOption) (rsp *User, err error)
 	ConfirmMFA(ctx context.Context, req *ConfirmMFARequest, opts ...http.CallOption) (rsp *RecoveryCodesReply, err error)
+	ConfirmWebAuthnRegistration(ctx context.Context, req *ConfirmWebAuthnRegistrationRequest, opts ...http.CallOption) (rsp *WebAuthnCredential, err error)
 	CreateEmailChallenge(ctx context.Context, req *CreateEmailChallengeRequest, opts ...http.CallOption) (rsp *ChallengeReply, err error)
+	CreateWebAuthnAssertionChallenge(ctx context.Context, req *CreateWebAuthnAssertionChallengeRequest, opts ...http.CallOption) (rsp *WebAuthnAssertionChallengeReply, err error)
+	// CreateWebAuthnRegistrationChallenge WebAuthn / Passkey as a second factor (V2.4 R13). Credentials are never a
+	// primary login method: username + password always remains the first factor.
+	CreateWebAuthnRegistrationChallenge(ctx context.Context, req *CreateWebAuthnRegistrationChallengeRequest, opts ...http.CallOption) (rsp *WebAuthnRegistrationChallengeReply, err error)
 	DecideOIDCConsent(ctx context.Context, req *DecideOIDCConsentRequest, opts ...http.CallOption) (rsp *DecideOIDCConsentReply, err error)
 	DeleteExternalIdentity(ctx context.Context, req *DeleteExternalIdentityRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
+	DeleteWebAuthnCredential(ctx context.Context, req *DeleteWebAuthnCredentialRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	DisableMFA(ctx context.Context, req *DisableMFARequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	GetAuthorization(ctx context.Context, req *GetAuthorizationRequest, opts ...http.CallOption) (rsp *AuthorizationReply, err error)
 	GetMe(ctx context.Context, req *GetMeRequest, opts ...http.CallOption) (rsp *User, err error)
@@ -612,6 +755,7 @@ type MeServiceHTTPClient interface {
 	ListOIDCConsents(ctx context.Context, req *ListOIDCConsentsRequest, opts ...http.CallOption) (rsp *OIDCConsentsReply, err error)
 	ListSecurityEvents(ctx context.Context, req *ListSecurityEventsRequest, opts ...http.CallOption) (rsp *SecurityEventsReply, err error)
 	ListSessions(ctx context.Context, req *ListSessionsRequest, opts ...http.CallOption) (rsp *SessionsReply, err error)
+	ListWebAuthnCredentials(ctx context.Context, req *ListWebAuthnCredentialsRequest, opts ...http.CallOption) (rsp *WebAuthnCredentialsReply, err error)
 	PutSessionRoles(ctx context.Context, req *PutSessionRolesRequest, opts ...http.CallOption) (rsp *SessionRolesReply, err error)
 	RevokeOIDCConsent(ctx context.Context, req *RevokeOIDCConsentRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	RevokeOtherSessions(ctx context.Context, req *RevokeOtherSessionsRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
@@ -621,6 +765,7 @@ type MeServiceHTTPClient interface {
 	UpdateMe(ctx context.Context, req *UpdateMeRequest, opts ...http.CallOption) (rsp *User, err error)
 	UpdateUsername(ctx context.Context, req *UpdateUsernameRequest, opts ...http.CallOption) (rsp *User, err error)
 	VerifySecurity(ctx context.Context, req *VerifySecurityRequest, opts ...http.CallOption) (rsp *VerifySecurityReply, err error)
+	VerifyWebAuthnAssertion(ctx context.Context, req *VerifyWebAuthnAssertionRequest, opts ...http.CallOption) (rsp *VerifySecurityReply, err error)
 }
 
 type MeServiceHTTPClientImpl struct {
@@ -682,6 +827,23 @@ func (c *MeServiceHTTPClientImpl) ConfirmMFA(ctx context.Context, in *ConfirmMFA
 	return &out, nil
 }
 
+func (c *MeServiceHTTPClientImpl) ConfirmWebAuthnRegistration(ctx context.Context, in *ConfirmWebAuthnRegistrationRequest, opts ...http.CallOption) (*WebAuthnCredential, error) {
+	var out WebAuthnCredential
+	pattern := "/api/v1/me/webauthn/credentials:confirm"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationMeServiceConfirmWebAuthnRegistration),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *MeServiceHTTPClientImpl) CreateEmailChallenge(ctx context.Context, in *CreateEmailChallengeRequest, opts ...http.CallOption) (*ChallengeReply, error) {
 	var out ChallengeReply
 	pattern := "/api/v1/me/email-challenges"
@@ -690,6 +852,42 @@ func (c *MeServiceHTTPClientImpl) CreateEmailChallenge(ctx context.Context, in *
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationMeServiceCreateEmailChallenge),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *MeServiceHTTPClientImpl) CreateWebAuthnAssertionChallenge(ctx context.Context, in *CreateWebAuthnAssertionChallengeRequest, opts ...http.CallOption) (*WebAuthnAssertionChallengeReply, error) {
+	var out WebAuthnAssertionChallengeReply
+	pattern := "/api/v1/me/webauthn/assertions:challenge"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationMeServiceCreateWebAuthnAssertionChallenge),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateWebAuthnRegistrationChallenge WebAuthn / Passkey as a second factor (V2.4 R13). Credentials are never a
+// primary login method: username + password always remains the first factor.
+func (c *MeServiceHTTPClientImpl) CreateWebAuthnRegistrationChallenge(ctx context.Context, in *CreateWebAuthnRegistrationChallengeRequest, opts ...http.CallOption) (*WebAuthnRegistrationChallengeReply, error) {
+	var out WebAuthnRegistrationChallengeReply
+	pattern := "/api/v1/me/webauthn/credentials:challenge"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationMeServiceCreateWebAuthnRegistrationChallenge),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
@@ -726,6 +924,23 @@ func (c *MeServiceHTTPClientImpl) DeleteExternalIdentity(ctx context.Context, in
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *MeServiceHTTPClientImpl) DeleteWebAuthnCredential(ctx context.Context, in *DeleteWebAuthnCredentialRequest, opts ...http.CallOption) (*emptypb.Empty, error) {
+	var out emptypb.Empty
+	pattern := "/api/v1/me/webauthn/credentials/{id}:delete"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationMeServiceDeleteWebAuthnCredential),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -895,6 +1110,22 @@ func (c *MeServiceHTTPClientImpl) ListSessions(ctx context.Context, in *ListSess
 	return &out, nil
 }
 
+func (c *MeServiceHTTPClientImpl) ListWebAuthnCredentials(ctx context.Context, in *ListWebAuthnCredentialsRequest, opts ...http.CallOption) (*WebAuthnCredentialsReply, error) {
+	var out WebAuthnCredentialsReply
+	pattern := "/api/v1/me/webauthn/credentials"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationMeServiceListWebAuthnCredentials),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *MeServiceHTTPClientImpl) PutSessionRoles(ctx context.Context, in *PutSessionRolesRequest, opts ...http.CallOption) (*SessionRolesReply, error) {
 	var out SessionRolesReply
 	pattern := "/api/v1/me/session-roles"
@@ -1037,6 +1268,23 @@ func (c *MeServiceHTTPClientImpl) VerifySecurity(ctx context.Context, in *Verify
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationMeServiceVerifySecurity),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *MeServiceHTTPClientImpl) VerifyWebAuthnAssertion(ctx context.Context, in *VerifyWebAuthnAssertionRequest, opts ...http.CallOption) (*VerifySecurityReply, error) {
+	var out VerifySecurityReply
+	pattern := "/api/v1/me/webauthn/assertions:verify"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationMeServiceVerifyWebAuthnAssertion),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)

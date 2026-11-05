@@ -385,8 +385,10 @@ type LoginReply struct {
 	SessionExpiresAt       string `protobuf:"bytes,5,opt,name=session_expires_at,json=sessionExpiresAt,proto3" json:"session_expires_at,omitempty"`
 	PasswordChangeRequired bool   `protobuf:"varint,6,opt,name=password_change_required,json=passwordChangeRequired,proto3" json:"password_change_required,omitempty"`
 	MfaEnrollmentRequired  bool   `protobuf:"varint,7,opt,name=mfa_enrollment_required,json=mfaEnrollmentRequired,proto3" json:"mfa_enrollment_required,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Present when a WebAuthn credential can satisfy the MFA challenge.
+	Webauthn      *WebAuthnChallenge `protobuf:"bytes,8,opt,name=webauthn,proto3" json:"webauthn,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LoginReply) Reset() {
@@ -468,17 +470,89 @@ func (x *LoginReply) GetMfaEnrollmentRequired() bool {
 	return false
 }
 
+func (x *LoginReply) GetWebauthn() *WebAuthnChallenge {
+	if x != nil {
+		return x.Webauthn
+	}
+	return nil
+}
+
+type WebAuthnChallenge struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Challenge          string                 `protobuf:"bytes,1,opt,name=challenge,proto3" json:"challenge,omitempty"`
+	RpId               string                 `protobuf:"bytes,2,opt,name=rp_id,json=rpId,proto3" json:"rp_id,omitempty"`
+	AllowCredentialIds []string               `protobuf:"bytes,3,rep,name=allow_credential_ids,json=allowCredentialIds,proto3" json:"allow_credential_ids,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *WebAuthnChallenge) Reset() {
+	*x = WebAuthnChallenge{}
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebAuthnChallenge) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebAuthnChallenge) ProtoMessage() {}
+
+func (x *WebAuthnChallenge) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebAuthnChallenge.ProtoReflect.Descriptor instead.
+func (*WebAuthnChallenge) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *WebAuthnChallenge) GetChallenge() string {
+	if x != nil {
+		return x.Challenge
+	}
+	return ""
+}
+
+func (x *WebAuthnChallenge) GetRpId() string {
+	if x != nil {
+		return x.RpId
+	}
+	return ""
+}
+
+func (x *WebAuthnChallenge) GetAllowCredentialIds() []string {
+	if x != nil {
+		return x.AllowCredentialIds
+	}
+	return nil
+}
+
 type CompleteMFARequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChallengeId   string                 `protobuf:"bytes,1,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
-	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ChallengeId string                 `protobuf:"bytes,1,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	// TOTP / recovery code. Ignored when a WebAuthn assertion is supplied.
+	Code              string `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	CredentialId      string `protobuf:"bytes,3,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
+	AuthenticatorData string `protobuf:"bytes,4,opt,name=authenticator_data,json=authenticatorData,proto3" json:"authenticator_data,omitempty"`
+	ClientDataJson    string `protobuf:"bytes,5,opt,name=client_data_json,json=clientDataJson,proto3" json:"client_data_json,omitempty"`
+	Signature         string `protobuf:"bytes,6,opt,name=signature,proto3" json:"signature,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CompleteMFARequest) Reset() {
 	*x = CompleteMFARequest{}
-	mi := &file_api_usercenter_v1_auth_proto_msgTypes[7]
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -490,7 +564,7 @@ func (x *CompleteMFARequest) String() string {
 func (*CompleteMFARequest) ProtoMessage() {}
 
 func (x *CompleteMFARequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_auth_proto_msgTypes[7]
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -503,7 +577,7 @@ func (x *CompleteMFARequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteMFARequest.ProtoReflect.Descriptor instead.
 func (*CompleteMFARequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{7}
+	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CompleteMFARequest) GetChallengeId() string {
@@ -520,6 +594,34 @@ func (x *CompleteMFARequest) GetCode() string {
 	return ""
 }
 
+func (x *CompleteMFARequest) GetCredentialId() string {
+	if x != nil {
+		return x.CredentialId
+	}
+	return ""
+}
+
+func (x *CompleteMFARequest) GetAuthenticatorData() string {
+	if x != nil {
+		return x.AuthenticatorData
+	}
+	return ""
+}
+
+func (x *CompleteMFARequest) GetClientDataJson() string {
+	if x != nil {
+		return x.ClientDataJson
+	}
+	return ""
+}
+
+func (x *CompleteMFARequest) GetSignature() string {
+	if x != nil {
+		return x.Signature
+	}
+	return ""
+}
+
 type LogoutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -528,7 +630,7 @@ type LogoutRequest struct {
 
 func (x *LogoutRequest) Reset() {
 	*x = LogoutRequest{}
-	mi := &file_api_usercenter_v1_auth_proto_msgTypes[8]
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -540,7 +642,7 @@ func (x *LogoutRequest) String() string {
 func (*LogoutRequest) ProtoMessage() {}
 
 func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_auth_proto_msgTypes[8]
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -553,7 +655,7 @@ func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutRequest.ProtoReflect.Descriptor instead.
 func (*LogoutRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{8}
+	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{9}
 }
 
 type CreatePasswordResetChallengeRequest struct {
@@ -566,7 +668,7 @@ type CreatePasswordResetChallengeRequest struct {
 
 func (x *CreatePasswordResetChallengeRequest) Reset() {
 	*x = CreatePasswordResetChallengeRequest{}
-	mi := &file_api_usercenter_v1_auth_proto_msgTypes[9]
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -578,7 +680,7 @@ func (x *CreatePasswordResetChallengeRequest) String() string {
 func (*CreatePasswordResetChallengeRequest) ProtoMessage() {}
 
 func (x *CreatePasswordResetChallengeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_auth_proto_msgTypes[9]
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -591,7 +693,7 @@ func (x *CreatePasswordResetChallengeRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CreatePasswordResetChallengeRequest.ProtoReflect.Descriptor instead.
 func (*CreatePasswordResetChallengeRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{9}
+	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreatePasswordResetChallengeRequest) GetIdentifier() string {
@@ -612,7 +714,7 @@ type ResetPasswordRequest struct {
 
 func (x *ResetPasswordRequest) Reset() {
 	*x = ResetPasswordRequest{}
-	mi := &file_api_usercenter_v1_auth_proto_msgTypes[10]
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -624,7 +726,7 @@ func (x *ResetPasswordRequest) String() string {
 func (*ResetPasswordRequest) ProtoMessage() {}
 
 func (x *ResetPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_usercenter_v1_auth_proto_msgTypes[10]
+	mi := &file_api_usercenter_v1_auth_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -637,7 +739,7 @@ func (x *ResetPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetPasswordRequest.ProtoReflect.Descriptor instead.
 func (*ResetPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{10}
+	return file_api_usercenter_v1_auth_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ResetPasswordRequest) GetChallengeId() string {
@@ -689,7 +791,7 @@ const file_api_usercenter_v1_auth_proto_rawDesc = "" +
 	"\fLoginRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1a\n" +
-	"\bremember\x18\x03 \x01(\bR\bremember\"\xc6\x02\n" +
+	"\bremember\x18\x03 \x01(\bR\bremember\"\x88\x03\n" +
 	"\n" +
 	"LoginReply\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12!\n" +
@@ -698,10 +800,19 @@ const file_api_usercenter_v1_auth_proto_rawDesc = "" +
 	"\x04user\x18\x04 \x01(\v2\x17.api.usercenter.v1.UserR\x04user\x12,\n" +
 	"\x12session_expires_at\x18\x05 \x01(\tR\x10sessionExpiresAt\x128\n" +
 	"\x18password_change_required\x18\x06 \x01(\bR\x16passwordChangeRequired\x126\n" +
-	"\x17mfa_enrollment_required\x18\a \x01(\bR\x15mfaEnrollmentRequired\"K\n" +
+	"\x17mfa_enrollment_required\x18\a \x01(\bR\x15mfaEnrollmentRequired\x12@\n" +
+	"\bwebauthn\x18\b \x01(\v2$.api.usercenter.v1.WebAuthnChallengeR\bwebauthn\"x\n" +
+	"\x11WebAuthnChallenge\x12\x1c\n" +
+	"\tchallenge\x18\x01 \x01(\tR\tchallenge\x12\x13\n" +
+	"\x05rp_id\x18\x02 \x01(\tR\x04rpId\x120\n" +
+	"\x14allow_credential_ids\x18\x03 \x03(\tR\x12allowCredentialIds\"\xe7\x01\n" +
 	"\x12CompleteMFARequest\x12!\n" +
 	"\fchallenge_id\x18\x01 \x01(\tR\vchallengeId\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\tR\x04code\"\x0f\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12#\n" +
+	"\rcredential_id\x18\x03 \x01(\tR\fcredentialId\x12-\n" +
+	"\x12authenticator_data\x18\x04 \x01(\tR\x11authenticatorData\x12(\n" +
+	"\x10client_data_json\x18\x05 \x01(\tR\x0eclientDataJson\x12\x1c\n" +
+	"\tsignature\x18\x06 \x01(\tR\tsignature\"\x0f\n" +
 	"\rLogoutRequest\"E\n" +
 	"#CreatePasswordResetChallengeRequest\x12\x1e\n" +
 	"\n" +
@@ -733,7 +844,7 @@ func file_api_usercenter_v1_auth_proto_rawDescGZIP() []byte {
 	return file_api_usercenter_v1_auth_proto_rawDescData
 }
 
-var file_api_usercenter_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_api_usercenter_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_api_usercenter_v1_auth_proto_goTypes = []any{
 	(*GetAuthContextRequest)(nil),               // 0: api.usercenter.v1.GetAuthContextRequest
 	(*AuthContext)(nil),                         // 1: api.usercenter.v1.AuthContext
@@ -742,38 +853,40 @@ var file_api_usercenter_v1_auth_proto_goTypes = []any{
 	(*RegisterReply)(nil),                       // 4: api.usercenter.v1.RegisterReply
 	(*LoginRequest)(nil),                        // 5: api.usercenter.v1.LoginRequest
 	(*LoginReply)(nil),                          // 6: api.usercenter.v1.LoginReply
-	(*CompleteMFARequest)(nil),                  // 7: api.usercenter.v1.CompleteMFARequest
-	(*LogoutRequest)(nil),                       // 8: api.usercenter.v1.LogoutRequest
-	(*CreatePasswordResetChallengeRequest)(nil), // 9: api.usercenter.v1.CreatePasswordResetChallengeRequest
-	(*ResetPasswordRequest)(nil),                // 10: api.usercenter.v1.ResetPasswordRequest
-	(*User)(nil),                                // 11: api.usercenter.v1.User
-	(*ChallengeReply)(nil),                      // 12: api.usercenter.v1.ChallengeReply
-	(*emptypb.Empty)(nil),                       // 13: google.protobuf.Empty
+	(*WebAuthnChallenge)(nil),                   // 7: api.usercenter.v1.WebAuthnChallenge
+	(*CompleteMFARequest)(nil),                  // 8: api.usercenter.v1.CompleteMFARequest
+	(*LogoutRequest)(nil),                       // 9: api.usercenter.v1.LogoutRequest
+	(*CreatePasswordResetChallengeRequest)(nil), // 10: api.usercenter.v1.CreatePasswordResetChallengeRequest
+	(*ResetPasswordRequest)(nil),                // 11: api.usercenter.v1.ResetPasswordRequest
+	(*User)(nil),                                // 12: api.usercenter.v1.User
+	(*ChallengeReply)(nil),                      // 13: api.usercenter.v1.ChallengeReply
+	(*emptypb.Empty)(nil),                       // 14: google.protobuf.Empty
 }
 var file_api_usercenter_v1_auth_proto_depIdxs = []int32{
-	11, // 0: api.usercenter.v1.RegisterReply.user:type_name -> api.usercenter.v1.User
-	11, // 1: api.usercenter.v1.LoginReply.user:type_name -> api.usercenter.v1.User
-	0,  // 2: api.usercenter.v1.AuthService.GetAuthContext:input_type -> api.usercenter.v1.GetAuthContextRequest
-	2,  // 3: api.usercenter.v1.AuthService.CreateRegistrationChallenge:input_type -> api.usercenter.v1.CreateRegistrationChallengeRequest
-	3,  // 4: api.usercenter.v1.AuthService.Register:input_type -> api.usercenter.v1.RegisterRequest
-	5,  // 5: api.usercenter.v1.AuthService.Login:input_type -> api.usercenter.v1.LoginRequest
-	7,  // 6: api.usercenter.v1.AuthService.CompleteMFA:input_type -> api.usercenter.v1.CompleteMFARequest
-	8,  // 7: api.usercenter.v1.AuthService.Logout:input_type -> api.usercenter.v1.LogoutRequest
-	9,  // 8: api.usercenter.v1.AuthService.CreatePasswordResetChallenge:input_type -> api.usercenter.v1.CreatePasswordResetChallengeRequest
-	10, // 9: api.usercenter.v1.AuthService.ResetPassword:input_type -> api.usercenter.v1.ResetPasswordRequest
-	1,  // 10: api.usercenter.v1.AuthService.GetAuthContext:output_type -> api.usercenter.v1.AuthContext
-	12, // 11: api.usercenter.v1.AuthService.CreateRegistrationChallenge:output_type -> api.usercenter.v1.ChallengeReply
-	4,  // 12: api.usercenter.v1.AuthService.Register:output_type -> api.usercenter.v1.RegisterReply
-	6,  // 13: api.usercenter.v1.AuthService.Login:output_type -> api.usercenter.v1.LoginReply
-	6,  // 14: api.usercenter.v1.AuthService.CompleteMFA:output_type -> api.usercenter.v1.LoginReply
-	13, // 15: api.usercenter.v1.AuthService.Logout:output_type -> google.protobuf.Empty
-	12, // 16: api.usercenter.v1.AuthService.CreatePasswordResetChallenge:output_type -> api.usercenter.v1.ChallengeReply
-	13, // 17: api.usercenter.v1.AuthService.ResetPassword:output_type -> google.protobuf.Empty
-	10, // [10:18] is the sub-list for method output_type
-	2,  // [2:10] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	12, // 0: api.usercenter.v1.RegisterReply.user:type_name -> api.usercenter.v1.User
+	12, // 1: api.usercenter.v1.LoginReply.user:type_name -> api.usercenter.v1.User
+	7,  // 2: api.usercenter.v1.LoginReply.webauthn:type_name -> api.usercenter.v1.WebAuthnChallenge
+	0,  // 3: api.usercenter.v1.AuthService.GetAuthContext:input_type -> api.usercenter.v1.GetAuthContextRequest
+	2,  // 4: api.usercenter.v1.AuthService.CreateRegistrationChallenge:input_type -> api.usercenter.v1.CreateRegistrationChallengeRequest
+	3,  // 5: api.usercenter.v1.AuthService.Register:input_type -> api.usercenter.v1.RegisterRequest
+	5,  // 6: api.usercenter.v1.AuthService.Login:input_type -> api.usercenter.v1.LoginRequest
+	8,  // 7: api.usercenter.v1.AuthService.CompleteMFA:input_type -> api.usercenter.v1.CompleteMFARequest
+	9,  // 8: api.usercenter.v1.AuthService.Logout:input_type -> api.usercenter.v1.LogoutRequest
+	10, // 9: api.usercenter.v1.AuthService.CreatePasswordResetChallenge:input_type -> api.usercenter.v1.CreatePasswordResetChallengeRequest
+	11, // 10: api.usercenter.v1.AuthService.ResetPassword:input_type -> api.usercenter.v1.ResetPasswordRequest
+	1,  // 11: api.usercenter.v1.AuthService.GetAuthContext:output_type -> api.usercenter.v1.AuthContext
+	13, // 12: api.usercenter.v1.AuthService.CreateRegistrationChallenge:output_type -> api.usercenter.v1.ChallengeReply
+	4,  // 13: api.usercenter.v1.AuthService.Register:output_type -> api.usercenter.v1.RegisterReply
+	6,  // 14: api.usercenter.v1.AuthService.Login:output_type -> api.usercenter.v1.LoginReply
+	6,  // 15: api.usercenter.v1.AuthService.CompleteMFA:output_type -> api.usercenter.v1.LoginReply
+	14, // 16: api.usercenter.v1.AuthService.Logout:output_type -> google.protobuf.Empty
+	13, // 17: api.usercenter.v1.AuthService.CreatePasswordResetChallenge:output_type -> api.usercenter.v1.ChallengeReply
+	14, // 18: api.usercenter.v1.AuthService.ResetPassword:output_type -> google.protobuf.Empty
+	11, // [11:19] is the sub-list for method output_type
+	3,  // [3:11] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_api_usercenter_v1_auth_proto_init() }
@@ -788,7 +901,7 @@ func file_api_usercenter_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_usercenter_v1_auth_proto_rawDesc), len(file_api_usercenter_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -16,6 +16,8 @@ import { errorMessage, isApiError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import { oauthErrorMessage } from '../../lib/oauth'
 import { oidcAuthorizationPath, safeNext } from '../../lib/paths'
+import { getLoginAssertion } from '../../lib/webauthn'
+import type { WebAuthnChallenge } from '../../lib/types'
 
 function describeAuthError(error: unknown): string {
   if (isApiError(error)) {
@@ -53,6 +55,7 @@ export function LoginPage() {
   const [challengeId, setChallengeId] = useState(oauthMfaChallenge ?? '')
   const [challengeExpiresAt, setChallengeExpiresAt] = useState('')
   const [code, setCode] = useState('')
+  const [webAuthn, setWebAuthn] = useState<WebAuthnChallenge | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const destination = postLoginPath ?? next ?? (hasAdmin ? '/admin' : '/account')
@@ -105,6 +108,7 @@ export function LoginPage() {
         }
         setChallengeId(reply.challenge_id)
         setChallengeExpiresAt(reply.challenge_expires_at ?? '')
+        setWebAuthn(reply.webauthn ?? null)
         setCode('')
         setPhase('mfa')
         return
@@ -145,11 +149,35 @@ export function LoginPage() {
     }
   }
 
+  const submitPasskey = async () => {
+    if (busy || !webAuthn?.challenge || !challengeId) return
+    setBusy(true)
+    setError(null)
+    try {
+      const assertion = await getLoginAssertion(
+        webAuthn.challenge,
+        webAuthn.rp_id ?? '',
+        webAuthn.allow_credential_ids ?? [],
+        challengeId,
+      )
+      const reply = await api.auth.completeMfa(assertion)
+      if (reply.password_change_required) {
+        setPostLoginPath(`/account/security?password_change_required=1${oidcNext ? `&next=${encodeURIComponent(oidcNext)}` : ''}`)
+      }
+      await signIn()
+    } catch (passkeyError) {
+      setError(describeAuthError(passkeyError))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const resetMfa = () => {
     setPhase('password')
     setChallengeId('')
     setChallengeExpiresAt('')
     setCode('')
+    setWebAuthn(null)
     setError(null)
   }
 
@@ -305,6 +333,18 @@ export function LoginPage() {
           >
             验证并登录
           </Button>
+          {webAuthn ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={busy}
+              icon={<KeyRound className="h-4 w-4" />}
+              onClick={() => void submitPasskey()}
+            >
+              使用 Passkey / 安全密钥
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"

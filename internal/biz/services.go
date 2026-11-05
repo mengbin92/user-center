@@ -27,6 +27,7 @@ type Services struct {
 	OIDCCodes          OIDCCodeRepo
 	OIDCConsents       OIDCConsentRepo
 	OIDCSigner         OIDCSigner
+	WebAuthn           WebAuthnRepo
 	OIDCIssuer         string
 	OIDCAccessTTL      time.Duration
 	OIDCRefreshTTL     time.Duration
@@ -65,6 +66,7 @@ type IntegrationUsecase struct{ *Services }
 type IntegrationAdminUsecase struct{ *Services }
 type OrganizationUsecase struct{ *Services }
 type OrgIAMUsecase struct{ *Services }
+type WebAuthnUsecase struct{ *Services }
 
 func NewAuthUsecase(s *Services) *AuthUsecase               { return &AuthUsecase{Services: s} }
 func NewUserUsecase(s *Services) *UserUsecase               { return &UserUsecase{Services: s} }
@@ -83,6 +85,9 @@ func NewOrganizationUsecase(s *Services) *OrganizationUsecase {
 }
 
 func NewOrgIAMUsecase(s *Services) *OrgIAMUsecase { return &OrgIAMUsecase{Services: s} }
+func NewWebAuthnUsecase(s *Services) *WebAuthnUsecase {
+	return &WebAuthnUsecase{Services: s}
+}
 
 type RuntimeConfig struct {
 	OIDCIssuer       string
@@ -111,6 +116,7 @@ func NewServices(
 	audit AuditRepo, policy PolicyRepo, iam IAMRepo, outbox OutboxRepo,
 	settings SettingsRepo, exports ExportRepo, integrationClients IntegrationClientRepo,
 	oidcClients OIDCClientRepo, oidcCodes OIDCCodeRepo, oidcConsents OIDCConsentRepo, oidcSigner OIDCSigner,
+	webAuthn WebAuthnRepo,
 	organizations OrganizationRepo, orgIAM OrgIAMRepo, tx TxManager, clock Clock, ids IDGenerator, secrets SecretBox,
 	oauth map[string]OAuthProvider, cfg *RuntimeConfig,
 ) *Services {
@@ -120,7 +126,8 @@ func NewServices(
 		Limiter: limiter, StepUp: stepUp, Mail: mail, Audit: audit, Policy: policy,
 		IAM: iam, Outbox: outbox, Settings: settings, Exports: exports,
 		IntegrationClients: integrationClients, OIDCClients: oidcClients,
-		OIDCCodes: oidcCodes, OIDCConsents: oidcConsents, OIDCSigner: oidcSigner, Organizations: organizations,
+		OIDCCodes: oidcCodes, OIDCConsents: oidcConsents, OIDCSigner: oidcSigner,
+		WebAuthn: webAuthn, Organizations: organizations,
 		OrgIAM: orgIAM, Tx: tx,
 		Clock: clock, IDs: ids, Secrets: secrets, OAuth: oauth,
 		SessionTTL: 12 * time.Hour, IdleTimeout: time.Hour, StepUpTTL: 5 * time.Minute,

@@ -107,6 +107,7 @@ func newHarness(t *testing.T) *harness {
 		data.NewAuditRepo(d), data.NewPolicyRepo(d), data.NewIAMRepo(d), data.NewOutboxRepo(d),
 		data.NewSettingsRepo(d), data.NewExportRepo(d), data.NewIntegrationClientRepo(d),
 		data.NewOIDCClientRepo(d), data.NewOIDCCodeRepo(d), data.NewOIDCConsentRepo(d), oidcSigner,
+		data.NewWebAuthnRepo(d),
 		data.NewOrganizationRepo(d), data.NewOrgIAMRepo(d), d,
 		data.Clock{}, data.IDs{}, data.NewSecretBox(sec),
 		map[string]biz.OAuthProvider{"mock": &mockOAuthProvider{}},
@@ -133,7 +134,7 @@ func newHarness(t *testing.T) *harness {
 	hs := server.NewHTTPServer(
 		srvCfg, sec, mw, zap.NewNop(),
 		service.NewAuthService(auth, deps),
-		service.NewMeService(users, security, sessions, biz.NewOIDCUsecase(svc), deps),
+		service.NewMeService(users, security, sessions, biz.NewOIDCUsecase(svc), biz.NewWebAuthnUsecase(svc), deps),
 		service.NewAdminUserService(users, sessions),
 		service.NewIAMService(iam),
 		service.NewAuditService(audit),

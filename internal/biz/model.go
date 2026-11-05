@@ -570,6 +570,22 @@ func (i OrganizationInvitation) Pending(now time.Time) bool {
 
 // OrganizationSettings is the platform-level organization policy. Quota is off
 // by default: enabling it is an operator decision, not a silent restriction.
+// WebAuthnCredential is a registered platform/passkey authenticator. The
+// public key is the raw COSE_Key CBOR blob; no attestation chain is retained.
+type WebAuthnCredential struct {
+	ID           int64
+	UserID       int64
+	CredentialID string
+	Name         string
+	PublicKey    []byte
+	SignCount    uint32
+	AAGUID       string
+	Transports   []string
+	CreatedAt    time.Time
+	LastUsedAt   *time.Time
+	Revision     uint64
+}
+
 type OrganizationSettings struct {
 	QuotaEnabled    bool
 	MaxOwnedPerUser int

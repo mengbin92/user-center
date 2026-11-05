@@ -27,10 +27,11 @@ func (uc *SecurityUsecase) Status(ctx context.Context, actor ActorContext) (mfaE
 	}
 	passwordAvailable = cerr == nil && cred.PasswordHash != ""
 	until := uc.stepUpUntil(ctx, actor)
+	enabled := state != nil && state.Enabled() || uc.HasSecondFactor(ctx, actor.User.ID)
 	if state == nil {
-		return false, passwordAvailable, 0, until, nil
+		return enabled, passwordAvailable, 0, until, nil
 	}
-	return state.Enabled(), passwordAvailable, len(state.RecoveryHashes), until, nil
+	return enabled, passwordAvailable, len(state.RecoveryHashes), until, nil
 }
 
 func (uc *SecurityUsecase) Setup(ctx context.Context, actor ActorContext, currentPassword string) (string, string, time.Time, error) {
@@ -143,6 +144,26 @@ func (uc *SecurityUsecase) Disable(ctx context.Context, actor ActorContext, pass
 	if err := uc.verifyMFA(ctx, actor.User.ID, code); err != nil {
 		return err
 	}
+	// Removing TOTP must not strip an administrator of the last second factor
+	// required by the platform policy.
+	var creds []*WebAuthnCredential
+	if uc.WebAuthn != nil {
+		var cerr error
+		creds, cerr = uc.WebAuthn.ListByUser(ctx, nil, actor.User.ID)
+		if cerr != nil {
+			return ErrDependency
+		}
+	}
+	if len(creds) == 0 {
+		settings, serr := uc.Settings.GetAuth(ctx, nil)
+		if serr == nil && settings.MFARequiredForAdmins {
+			for _, role := range actor.User.Roles {
+				if role.Code == "root" || role.Code == "admin" {
+					return ConflictCode("LAST_SECOND_FACTOR", "请先绑定替代第二因素再停用 TOTP")
+				}
+			}
+		}
+	}
 	if err := uc.clearStepUp(ctx, actor.Session); err != nil {
 		return err
 	}
@@ -219,11 +240,18 @@ func (uc *SecurityUsecase) Verify(ctx context.Context, actor ActorContext, passw
 	state, err := uc.MFA.Get(ctx, nil, actor.User.ID)
 	switch {
 	case errors.Is(err, ErrResourceNotFound):
-		// no MFA row: password re-entry is the strongest proof available
+		// No MFA row: password re-entry is the strongest proof available,
+		// unless a passkey is enrolled.
+		if uc.HasSecondFactor(ctx, actor.User.ID) {
+			return time.Time{}, Validation("请使用 WebAuthn 完成安全验证")
+		}
 	case err != nil:
 		return time.Time{}, ErrDependency
 	case !state.Enabled():
-		// MFA row exists but no confirmed secret
+		// MFA row exists but no confirmed secret.
+		if uc.HasSecondFactor(ctx, actor.User.ID) {
+			return time.Time{}, Validation("请使用 WebAuthn 完成安全验证")
+		}
 	default:
 		if err := uc.verifyMFA(ctx, actor.User.ID, code); err != nil {
 			return time.Time{}, err

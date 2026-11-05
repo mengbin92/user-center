@@ -37,6 +37,7 @@ var ProviderSet = wire.NewSet(
 	NewOIDCClientRepo,
 	NewOIDCCodeRepo,
 	NewOIDCConsentRepo,
+	NewWebAuthnRepo,
 	NewOIDCSigner,
 	NewOrganizationRepo,
 	NewOrgIAMRepo,

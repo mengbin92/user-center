@@ -53,6 +53,7 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
+	webAuthnRepo := data.NewWebAuthnRepo(dataData)
 	organizationRepo := data.NewOrganizationRepo(dataData)
 	orgIAMRepo := data.NewOrgIAMRepo(dataData)
 	clock := &data.Clock{}
@@ -64,7 +65,7 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	services := biz.NewServices(userRepo, credentialRepo, externalIdentityRepo, mfaRepo, sessionRepo, securityEventRepo, flowCompletionRepo, challengeStore, rateLimiter, stepUpStore, mailSender, auditRepo, policyRepo, iamRepo, outboxRepo, settingsRepo, exportRepo, integrationClientRepo, oidcClientRepo, oidcCodeRepo, oidcConsentRepo, oidcSigner, organizationRepo, orgIAMRepo, dataData, clock, iDs, secretBox, v, runtimeConfig)
+	services := biz.NewServices(userRepo, credentialRepo, externalIdentityRepo, mfaRepo, sessionRepo, securityEventRepo, flowCompletionRepo, challengeStore, rateLimiter, stepUpStore, mailSender, auditRepo, policyRepo, iamRepo, outboxRepo, settingsRepo, exportRepo, integrationClientRepo, oidcClientRepo, oidcCodeRepo, oidcConsentRepo, oidcSigner, webAuthnRepo, organizationRepo, orgIAMRepo, dataData, clock, iDs, secretBox, v, runtimeConfig)
 	sessionUsecase := biz.NewSessionUsecase(services)
 	middleware := server.NewMiddleware(sessionUsecase, security, logger)
 	authUsecase := biz.NewAuthUsecase(services)
@@ -73,7 +74,8 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	userUsecase := biz.NewUserUsecase(services)
 	securityUsecase := biz.NewSecurityUsecase(services)
 	oidcUsecase := biz.NewOIDCUsecase(services)
-	meService := service.NewMeService(userUsecase, securityUsecase, sessionUsecase, oidcUsecase, deps)
+	webAuthnUsecase := biz.NewWebAuthnUsecase(services)
+	meService := service.NewMeService(userUsecase, securityUsecase, sessionUsecase, oidcUsecase, webAuthnUsecase, deps)
 	adminUserService := service.NewAdminUserService(userUsecase, sessionUsecase)
 	iamUsecase := biz.NewIAMUsecase(services)
 	iamService := service.NewIAMService(iamUsecase)

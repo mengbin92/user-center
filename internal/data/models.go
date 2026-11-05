@@ -396,6 +396,23 @@ type oidcConsentRequestPO struct {
 
 func (oidcConsentRequestPO) TableName() string { return "oidc_consent_requests" }
 
+// webauthnCredentialPO stores only the public COSE key and counters.
+type webauthnCredentialPO struct {
+	ID           int64      `gorm:"column:id;primaryKey;autoIncrement"`
+	UserID       int64      `gorm:"column:user_id;not null;index:idx_webauthn_user"`
+	CredentialID string     `gorm:"column:credential_id;size:512;not null;uniqueIndex:uk_webauthn_credential"`
+	Name         string     `gorm:"column:name;size:128;not null"`
+	PublicKey    string     `gorm:"column:public_key;type:text;not null"`
+	SignCount    uint32     `gorm:"column:sign_count;not null;default:0"`
+	AAGUID       string     `gorm:"column:aaguid;size:64;not null"`
+	Transports   string     `gorm:"column:transports;size:255;not null"`
+	CreatedAt    time.Time  `gorm:"column:created_at;not null"`
+	LastUsedAt   *time.Time `gorm:"column:last_used_at"`
+	Revision     uint64     `gorm:"column:revision;not null;default:1"`
+}
+
+func (webauthnCredentialPO) TableName() string { return "webauthn_credentials" }
+
 type oidcCodePO struct {
 	CodeHash            string     `gorm:"column:code_hash;size:64;primaryKey"`
 	ClientID            string     `gorm:"column:client_id;size:64;not null;index"`

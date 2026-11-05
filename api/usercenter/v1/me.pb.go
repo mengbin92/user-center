@@ -2139,6 +2139,679 @@ func (x *SecurityEventsReply) GetMeta() *ListMeta {
 	return nil
 }
 
+type CreateWebAuthnRegistrationChallengeRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CurrentPassword string                 `protobuf:"bytes,1,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CreateWebAuthnRegistrationChallengeRequest) Reset() {
+	*x = CreateWebAuthnRegistrationChallengeRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateWebAuthnRegistrationChallengeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateWebAuthnRegistrationChallengeRequest) ProtoMessage() {}
+
+func (x *CreateWebAuthnRegistrationChallengeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateWebAuthnRegistrationChallengeRequest.ProtoReflect.Descriptor instead.
+func (*CreateWebAuthnRegistrationChallengeRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *CreateWebAuthnRegistrationChallengeRequest) GetCurrentPassword() string {
+	if x != nil {
+		return x.CurrentPassword
+	}
+	return ""
+}
+
+type WebAuthnRegistrationChallengeReply struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	ChallengeId           string                 `protobuf:"bytes,1,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	Challenge             string                 `protobuf:"bytes,2,opt,name=challenge,proto3" json:"challenge,omitempty"`
+	RpId                  string                 `protobuf:"bytes,3,opt,name=rp_id,json=rpId,proto3" json:"rp_id,omitempty"`
+	RpName                string                 `protobuf:"bytes,4,opt,name=rp_name,json=rpName,proto3" json:"rp_name,omitempty"`
+	UserId                string                 `protobuf:"bytes,5,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserName              string                 `protobuf:"bytes,6,opt,name=user_name,json=userName,proto3" json:"user_name,omitempty"`
+	ExpiresAt             string                 `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	ExistingCredentialIds []string               `protobuf:"bytes,8,rep,name=existing_credential_ids,json=existingCredentialIds,proto3" json:"existing_credential_ids,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *WebAuthnRegistrationChallengeReply) Reset() {
+	*x = WebAuthnRegistrationChallengeReply{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebAuthnRegistrationChallengeReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebAuthnRegistrationChallengeReply) ProtoMessage() {}
+
+func (x *WebAuthnRegistrationChallengeReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebAuthnRegistrationChallengeReply.ProtoReflect.Descriptor instead.
+func (*WebAuthnRegistrationChallengeReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *WebAuthnRegistrationChallengeReply) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *WebAuthnRegistrationChallengeReply) GetChallenge() string {
+	if x != nil {
+		return x.Challenge
+	}
+	return ""
+}
+
+func (x *WebAuthnRegistrationChallengeReply) GetRpId() string {
+	if x != nil {
+		return x.RpId
+	}
+	return ""
+}
+
+func (x *WebAuthnRegistrationChallengeReply) GetRpName() string {
+	if x != nil {
+		return x.RpName
+	}
+	return ""
+}
+
+func (x *WebAuthnRegistrationChallengeReply) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *WebAuthnRegistrationChallengeReply) GetUserName() string {
+	if x != nil {
+		return x.UserName
+	}
+	return ""
+}
+
+func (x *WebAuthnRegistrationChallengeReply) GetExpiresAt() string {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return ""
+}
+
+func (x *WebAuthnRegistrationChallengeReply) GetExistingCredentialIds() []string {
+	if x != nil {
+		return x.ExistingCredentialIds
+	}
+	return nil
+}
+
+type ConfirmWebAuthnRegistrationRequest struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	ChallengeId  string                 `protobuf:"bytes,1,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	CredentialId string                 `protobuf:"bytes,2,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
+	// base64url encoded attestationObject / clientDataJSON
+	AttestationObject string   `protobuf:"bytes,3,opt,name=attestation_object,json=attestationObject,proto3" json:"attestation_object,omitempty"`
+	ClientDataJson    string   `protobuf:"bytes,4,opt,name=client_data_json,json=clientDataJson,proto3" json:"client_data_json,omitempty"`
+	Transports        []string `protobuf:"bytes,5,rep,name=transports,proto3" json:"transports,omitempty"`
+	Name              string   `protobuf:"bytes,6,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConfirmWebAuthnRegistrationRequest) Reset() {
+	*x = ConfirmWebAuthnRegistrationRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmWebAuthnRegistrationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmWebAuthnRegistrationRequest) ProtoMessage() {}
+
+func (x *ConfirmWebAuthnRegistrationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmWebAuthnRegistrationRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmWebAuthnRegistrationRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ConfirmWebAuthnRegistrationRequest) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *ConfirmWebAuthnRegistrationRequest) GetCredentialId() string {
+	if x != nil {
+		return x.CredentialId
+	}
+	return ""
+}
+
+func (x *ConfirmWebAuthnRegistrationRequest) GetAttestationObject() string {
+	if x != nil {
+		return x.AttestationObject
+	}
+	return ""
+}
+
+func (x *ConfirmWebAuthnRegistrationRequest) GetClientDataJson() string {
+	if x != nil {
+		return x.ClientDataJson
+	}
+	return ""
+}
+
+func (x *ConfirmWebAuthnRegistrationRequest) GetTransports() []string {
+	if x != nil {
+		return x.Transports
+	}
+	return nil
+}
+
+func (x *ConfirmWebAuthnRegistrationRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type WebAuthnCredential struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CredentialId  string                 `protobuf:"bytes,2,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Aaguid        string                 `protobuf:"bytes,4,opt,name=aaguid,proto3" json:"aaguid,omitempty"`
+	Transports    []string               `protobuf:"bytes,5,rep,name=transports,proto3" json:"transports,omitempty"`
+	SignCount     string                 `protobuf:"bytes,6,opt,name=sign_count,json=signCount,proto3" json:"sign_count,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	LastUsedAt    string                 `protobuf:"bytes,8,opt,name=last_used_at,json=lastUsedAt,proto3" json:"last_used_at,omitempty"`
+	Revision      string                 `protobuf:"bytes,9,opt,name=revision,proto3" json:"revision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WebAuthnCredential) Reset() {
+	*x = WebAuthnCredential{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebAuthnCredential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebAuthnCredential) ProtoMessage() {}
+
+func (x *WebAuthnCredential) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebAuthnCredential.ProtoReflect.Descriptor instead.
+func (*WebAuthnCredential) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *WebAuthnCredential) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *WebAuthnCredential) GetCredentialId() string {
+	if x != nil {
+		return x.CredentialId
+	}
+	return ""
+}
+
+func (x *WebAuthnCredential) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WebAuthnCredential) GetAaguid() string {
+	if x != nil {
+		return x.Aaguid
+	}
+	return ""
+}
+
+func (x *WebAuthnCredential) GetTransports() []string {
+	if x != nil {
+		return x.Transports
+	}
+	return nil
+}
+
+func (x *WebAuthnCredential) GetSignCount() string {
+	if x != nil {
+		return x.SignCount
+	}
+	return ""
+}
+
+func (x *WebAuthnCredential) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *WebAuthnCredential) GetLastUsedAt() string {
+	if x != nil {
+		return x.LastUsedAt
+	}
+	return ""
+}
+
+func (x *WebAuthnCredential) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+type WebAuthnCredentialsReply struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*WebAuthnCredential  `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WebAuthnCredentialsReply) Reset() {
+	*x = WebAuthnCredentialsReply{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebAuthnCredentialsReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebAuthnCredentialsReply) ProtoMessage() {}
+
+func (x *WebAuthnCredentialsReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebAuthnCredentialsReply.ProtoReflect.Descriptor instead.
+func (*WebAuthnCredentialsReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *WebAuthnCredentialsReply) GetItems() []*WebAuthnCredential {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type ListWebAuthnCredentialsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWebAuthnCredentialsRequest) Reset() {
+	*x = ListWebAuthnCredentialsRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWebAuthnCredentialsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWebAuthnCredentialsRequest) ProtoMessage() {}
+
+func (x *ListWebAuthnCredentialsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWebAuthnCredentialsRequest.ProtoReflect.Descriptor instead.
+func (*ListWebAuthnCredentialsRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{45}
+}
+
+type DeleteWebAuthnCredentialRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CurrentPassword string                 `protobuf:"bytes,2,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DeleteWebAuthnCredentialRequest) Reset() {
+	*x = DeleteWebAuthnCredentialRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteWebAuthnCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteWebAuthnCredentialRequest) ProtoMessage() {}
+
+func (x *DeleteWebAuthnCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteWebAuthnCredentialRequest.ProtoReflect.Descriptor instead.
+func (*DeleteWebAuthnCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *DeleteWebAuthnCredentialRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DeleteWebAuthnCredentialRequest) GetCurrentPassword() string {
+	if x != nil {
+		return x.CurrentPassword
+	}
+	return ""
+}
+
+type CreateWebAuthnAssertionChallengeRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CurrentPassword string                 `protobuf:"bytes,1,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CreateWebAuthnAssertionChallengeRequest) Reset() {
+	*x = CreateWebAuthnAssertionChallengeRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateWebAuthnAssertionChallengeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateWebAuthnAssertionChallengeRequest) ProtoMessage() {}
+
+func (x *CreateWebAuthnAssertionChallengeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateWebAuthnAssertionChallengeRequest.ProtoReflect.Descriptor instead.
+func (*CreateWebAuthnAssertionChallengeRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *CreateWebAuthnAssertionChallengeRequest) GetCurrentPassword() string {
+	if x != nil {
+		return x.CurrentPassword
+	}
+	return ""
+}
+
+type WebAuthnAssertionChallengeReply struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	ChallengeId        string                 `protobuf:"bytes,1,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	Challenge          string                 `protobuf:"bytes,2,opt,name=challenge,proto3" json:"challenge,omitempty"`
+	RpId               string                 `protobuf:"bytes,3,opt,name=rp_id,json=rpId,proto3" json:"rp_id,omitempty"`
+	AllowCredentialIds []string               `protobuf:"bytes,4,rep,name=allow_credential_ids,json=allowCredentialIds,proto3" json:"allow_credential_ids,omitempty"`
+	ExpiresAt          string                 `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *WebAuthnAssertionChallengeReply) Reset() {
+	*x = WebAuthnAssertionChallengeReply{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebAuthnAssertionChallengeReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebAuthnAssertionChallengeReply) ProtoMessage() {}
+
+func (x *WebAuthnAssertionChallengeReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebAuthnAssertionChallengeReply.ProtoReflect.Descriptor instead.
+func (*WebAuthnAssertionChallengeReply) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *WebAuthnAssertionChallengeReply) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *WebAuthnAssertionChallengeReply) GetChallenge() string {
+	if x != nil {
+		return x.Challenge
+	}
+	return ""
+}
+
+func (x *WebAuthnAssertionChallengeReply) GetRpId() string {
+	if x != nil {
+		return x.RpId
+	}
+	return ""
+}
+
+func (x *WebAuthnAssertionChallengeReply) GetAllowCredentialIds() []string {
+	if x != nil {
+		return x.AllowCredentialIds
+	}
+	return nil
+}
+
+func (x *WebAuthnAssertionChallengeReply) GetExpiresAt() string {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return ""
+}
+
+type VerifyWebAuthnAssertionRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ChallengeId       string                 `protobuf:"bytes,1,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	CredentialId      string                 `protobuf:"bytes,2,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
+	AuthenticatorData string                 `protobuf:"bytes,3,opt,name=authenticator_data,json=authenticatorData,proto3" json:"authenticator_data,omitempty"`
+	ClientDataJson    string                 `protobuf:"bytes,4,opt,name=client_data_json,json=clientDataJson,proto3" json:"client_data_json,omitempty"`
+	Signature         string                 `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
+	CurrentPassword   string                 `protobuf:"bytes,6,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *VerifyWebAuthnAssertionRequest) Reset() {
+	*x = VerifyWebAuthnAssertionRequest{}
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyWebAuthnAssertionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyWebAuthnAssertionRequest) ProtoMessage() {}
+
+func (x *VerifyWebAuthnAssertionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_usercenter_v1_me_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyWebAuthnAssertionRequest.ProtoReflect.Descriptor instead.
+func (*VerifyWebAuthnAssertionRequest) Descriptor() ([]byte, []int) {
+	return file_api_usercenter_v1_me_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *VerifyWebAuthnAssertionRequest) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *VerifyWebAuthnAssertionRequest) GetCredentialId() string {
+	if x != nil {
+		return x.CredentialId
+	}
+	return ""
+}
+
+func (x *VerifyWebAuthnAssertionRequest) GetAuthenticatorData() string {
+	if x != nil {
+		return x.AuthenticatorData
+	}
+	return ""
+}
+
+func (x *VerifyWebAuthnAssertionRequest) GetClientDataJson() string {
+	if x != nil {
+		return x.ClientDataJson
+	}
+	return ""
+}
+
+func (x *VerifyWebAuthnAssertionRequest) GetSignature() string {
+	if x != nil {
+		return x.Signature
+	}
+	return ""
+}
+
+func (x *VerifyWebAuthnAssertionRequest) GetCurrentPassword() string {
+	if x != nil {
+		return x.CurrentPassword
+	}
+	return ""
+}
+
 var File_api_usercenter_v1_me_proto protoreflect.FileDescriptor
 
 const file_api_usercenter_v1_me_proto_rawDesc = "" +
@@ -2279,7 +2952,65 @@ const file_api_usercenter_v1_me_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"~\n" +
 	"\x13SecurityEventsReply\x126\n" +
 	"\x05items\x18\x01 \x03(\v2 .api.usercenter.v1.SecurityEventR\x05items\x12/\n" +
-	"\x04meta\x18\x02 \x01(\v2\x1b.api.usercenter.v1.ListMetaR\x04meta2\xf1\x19\n" +
+	"\x04meta\x18\x02 \x01(\v2\x1b.api.usercenter.v1.ListMetaR\x04meta\"W\n" +
+	"*CreateWebAuthnRegistrationChallengeRequest\x12)\n" +
+	"\x10current_password\x18\x01 \x01(\tR\x0fcurrentPassword\"\xa0\x02\n" +
+	"\"WebAuthnRegistrationChallengeReply\x12!\n" +
+	"\fchallenge_id\x18\x01 \x01(\tR\vchallengeId\x12\x1c\n" +
+	"\tchallenge\x18\x02 \x01(\tR\tchallenge\x12\x13\n" +
+	"\x05rp_id\x18\x03 \x01(\tR\x04rpId\x12\x17\n" +
+	"\arp_name\x18\x04 \x01(\tR\x06rpName\x12\x17\n" +
+	"\auser_id\x18\x05 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tuser_name\x18\x06 \x01(\tR\buserName\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\a \x01(\tR\texpiresAt\x126\n" +
+	"\x17existing_credential_ids\x18\b \x03(\tR\x15existingCredentialIds\"\xf9\x01\n" +
+	"\"ConfirmWebAuthnRegistrationRequest\x12!\n" +
+	"\fchallenge_id\x18\x01 \x01(\tR\vchallengeId\x12#\n" +
+	"\rcredential_id\x18\x02 \x01(\tR\fcredentialId\x12-\n" +
+	"\x12attestation_object\x18\x03 \x01(\tR\x11attestationObject\x12(\n" +
+	"\x10client_data_json\x18\x04 \x01(\tR\x0eclientDataJson\x12\x1e\n" +
+	"\n" +
+	"transports\x18\x05 \x03(\tR\n" +
+	"transports\x12\x12\n" +
+	"\x04name\x18\x06 \x01(\tR\x04name\"\x91\x02\n" +
+	"\x12WebAuthnCredential\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rcredential_id\x18\x02 \x01(\tR\fcredentialId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
+	"\x06aaguid\x18\x04 \x01(\tR\x06aaguid\x12\x1e\n" +
+	"\n" +
+	"transports\x18\x05 \x03(\tR\n" +
+	"transports\x12\x1d\n" +
+	"\n" +
+	"sign_count\x18\x06 \x01(\tR\tsignCount\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\a \x01(\tR\tcreatedAt\x12 \n" +
+	"\flast_used_at\x18\b \x01(\tR\n" +
+	"lastUsedAt\x12\x1a\n" +
+	"\brevision\x18\t \x01(\tR\brevision\"W\n" +
+	"\x18WebAuthnCredentialsReply\x12;\n" +
+	"\x05items\x18\x01 \x03(\v2%.api.usercenter.v1.WebAuthnCredentialR\x05items\" \n" +
+	"\x1eListWebAuthnCredentialsRequest\"\\\n" +
+	"\x1fDeleteWebAuthnCredentialRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12)\n" +
+	"\x10current_password\x18\x02 \x01(\tR\x0fcurrentPassword\"T\n" +
+	"'CreateWebAuthnAssertionChallengeRequest\x12)\n" +
+	"\x10current_password\x18\x01 \x01(\tR\x0fcurrentPassword\"\xc8\x01\n" +
+	"\x1fWebAuthnAssertionChallengeReply\x12!\n" +
+	"\fchallenge_id\x18\x01 \x01(\tR\vchallengeId\x12\x1c\n" +
+	"\tchallenge\x18\x02 \x01(\tR\tchallenge\x12\x13\n" +
+	"\x05rp_id\x18\x03 \x01(\tR\x04rpId\x120\n" +
+	"\x14allow_credential_ids\x18\x04 \x03(\tR\x12allowCredentialIds\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x05 \x01(\tR\texpiresAt\"\x8a\x02\n" +
+	"\x1eVerifyWebAuthnAssertionRequest\x12!\n" +
+	"\fchallenge_id\x18\x01 \x01(\tR\vchallengeId\x12#\n" +
+	"\rcredential_id\x18\x02 \x01(\tR\fcredentialId\x12-\n" +
+	"\x12authenticator_data\x18\x03 \x01(\tR\x11authenticatorData\x12(\n" +
+	"\x10client_data_json\x18\x04 \x01(\tR\x0eclientDataJson\x12\x1c\n" +
+	"\tsignature\x18\x05 \x01(\tR\tsignature\x12)\n" +
+	"\x10current_password\x18\x06 \x01(\tR\x0fcurrentPassword2\xb0\"\n" +
 	"\tMeService\x12U\n" +
 	"\x05GetMe\x12\x1f.api.usercenter.v1.GetMeRequest\x1a\x17.api.usercenter.v1.User\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
 	"/api/v1/me\x12^\n" +
@@ -2305,7 +3036,13 @@ const file_api_usercenter_v1_me_proto_rawDesc = "" +
 	"\x0fGetSessionRoles\x12).api.usercenter.v1.GetSessionRolesRequest\x1a$.api.usercenter.v1.SessionRolesReply\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/me/session-roles\x12\x87\x01\n" +
 	"\x0fPutSessionRoles\x12).api.usercenter.v1.PutSessionRolesRequest\x1a$.api.usercenter.v1.SessionRolesReply\"#\x82\xd3\xe4\x93\x02\x1d:\x01*\x1a\x18/api/v1/me/session-roles\x12\x87\x01\n" +
 	"\x10GetAuthorization\x12*.api.usercenter.v1.GetAuthorizationRequest\x1a%.api.usercenter.v1.AuthorizationReply\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/me/authorization\x12\x8e\x01\n" +
-	"\x12ListSecurityEvents\x12,.api.usercenter.v1.ListSecurityEventsRequest\x1a&.api.usercenter.v1.SecurityEventsReply\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/me/security-events\x12\x9e\x01\n" +
+	"\x12ListSecurityEvents\x12,.api.usercenter.v1.ListSecurityEventsRequest\x1a&.api.usercenter.v1.SecurityEventsReply\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/me/security-events\x12\xd1\x01\n" +
+	"#CreateWebAuthnRegistrationChallenge\x12=.api.usercenter.v1.CreateWebAuthnRegistrationChallengeRequest\x1a5.api.usercenter.v1.WebAuthnRegistrationChallengeReply\"4\x82\xd3\xe4\x93\x02.:\x01*\")/api/v1/me/webauthn/credentials:challenge\x12\xaf\x01\n" +
+	"\x1bConfirmWebAuthnRegistration\x125.api.usercenter.v1.ConfirmWebAuthnRegistrationRequest\x1a%.api.usercenter.v1.WebAuthnCredential\"2\x82\xd3\xe4\x93\x02,:\x01*\"'/api/v1/me/webauthn/credentials:confirm\x12\xa2\x01\n" +
+	"\x17ListWebAuthnCredentials\x121.api.usercenter.v1.ListWebAuthnCredentialsRequest\x1a+.api.usercenter.v1.WebAuthnCredentialsReply\"'\x82\xd3\xe4\x93\x02!\x12\x1f/api/v1/me/webauthn/credentials\x12\x9e\x01\n" +
+	"\x18DeleteWebAuthnCredential\x122.api.usercenter.v1.DeleteWebAuthnCredentialRequest\x1a\x16.google.protobuf.Empty\"6\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1/me/webauthn/credentials/{id}:delete\x12\xc7\x01\n" +
+	" CreateWebAuthnAssertionChallenge\x12:.api.usercenter.v1.CreateWebAuthnAssertionChallengeRequest\x1a2.api.usercenter.v1.WebAuthnAssertionChallengeReply\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/api/v1/me/webauthn/assertions:challenge\x12\xa6\x01\n" +
+	"\x17VerifyWebAuthnAssertion\x121.api.usercenter.v1.VerifyWebAuthnAssertionRequest\x1a&.api.usercenter.v1.VerifySecurityReply\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/me/webauthn/assertions:verify\x12\x9e\x01\n" +
 	"\x15GetOIDCConsentRequest\x12/.api.usercenter.v1.GetOIDCConsentRequestRequest\x1a).api.usercenter.v1.OIDCConsentRequestView\")\x82\xd3\xe4\x93\x02#\x12!/api/v1/me/oidc-requests/{handle}\x12\xa0\x01\n" +
 	"\x11DecideOIDCConsent\x12+.api.usercenter.v1.DecideOIDCConsentRequest\x1a).api.usercenter.v1.DecideOIDCConsentReply\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/api/v1/me/oidc-requests/{handle}:decide\x12\x86\x01\n" +
 	"\x10ListOIDCConsents\x12*.api.usercenter.v1.ListOIDCConsentsRequest\x1a$.api.usercenter.v1.OIDCConsentsReply\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/me/oidc-consents\x12\x86\x01\n" +
@@ -2323,118 +3060,141 @@ func file_api_usercenter_v1_me_proto_rawDescGZIP() []byte {
 	return file_api_usercenter_v1_me_proto_rawDescData
 }
 
-var file_api_usercenter_v1_me_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_api_usercenter_v1_me_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_api_usercenter_v1_me_proto_goTypes = []any{
-	(*OIDCConsentRequestView)(nil),        // 0: api.usercenter.v1.OIDCConsentRequestView
-	(*GetOIDCConsentRequestRequest)(nil),  // 1: api.usercenter.v1.GetOIDCConsentRequestRequest
-	(*DecideOIDCConsentRequest)(nil),      // 2: api.usercenter.v1.DecideOIDCConsentRequest
-	(*DecideOIDCConsentReply)(nil),        // 3: api.usercenter.v1.DecideOIDCConsentReply
-	(*OIDCConsent)(nil),                   // 4: api.usercenter.v1.OIDCConsent
-	(*OIDCConsentsReply)(nil),             // 5: api.usercenter.v1.OIDCConsentsReply
-	(*ListOIDCConsentsRequest)(nil),       // 6: api.usercenter.v1.ListOIDCConsentsRequest
-	(*RevokeOIDCConsentRequest)(nil),      // 7: api.usercenter.v1.RevokeOIDCConsentRequest
-	(*GetMeRequest)(nil),                  // 8: api.usercenter.v1.GetMeRequest
-	(*UpdateMeRequest)(nil),               // 9: api.usercenter.v1.UpdateMeRequest
-	(*UpdateUsernameRequest)(nil),         // 10: api.usercenter.v1.UpdateUsernameRequest
-	(*ChangePasswordRequest)(nil),         // 11: api.usercenter.v1.ChangePasswordRequest
-	(*CreateEmailChallengeRequest)(nil),   // 12: api.usercenter.v1.CreateEmailChallengeRequest
-	(*ConfirmEmailRequest)(nil),           // 13: api.usercenter.v1.ConfirmEmailRequest
-	(*ExternalIdentity)(nil),              // 14: api.usercenter.v1.ExternalIdentity
-	(*ExternalIdentitiesReply)(nil),       // 15: api.usercenter.v1.ExternalIdentitiesReply
-	(*ListExternalIdentitiesRequest)(nil), // 16: api.usercenter.v1.ListExternalIdentitiesRequest
-	(*DeleteExternalIdentityRequest)(nil), // 17: api.usercenter.v1.DeleteExternalIdentityRequest
-	(*GetSecurityRequest)(nil),            // 18: api.usercenter.v1.GetSecurityRequest
-	(*SecurityStatus)(nil),                // 19: api.usercenter.v1.SecurityStatus
-	(*SetupMFARequest)(nil),               // 20: api.usercenter.v1.SetupMFARequest
-	(*SetupMFAReply)(nil),                 // 21: api.usercenter.v1.SetupMFAReply
-	(*ConfirmMFARequest)(nil),             // 22: api.usercenter.v1.ConfirmMFARequest
-	(*RecoveryCodesReply)(nil),            // 23: api.usercenter.v1.RecoveryCodesReply
-	(*DisableMFARequest)(nil),             // 24: api.usercenter.v1.DisableMFARequest
-	(*RotateRecoveryCodesRequest)(nil),    // 25: api.usercenter.v1.RotateRecoveryCodesRequest
-	(*VerifySecurityRequest)(nil),         // 26: api.usercenter.v1.VerifySecurityRequest
-	(*VerifySecurityReply)(nil),           // 27: api.usercenter.v1.VerifySecurityReply
-	(*ListSessionsRequest)(nil),           // 28: api.usercenter.v1.ListSessionsRequest
-	(*RevokeSessionRequest)(nil),          // 29: api.usercenter.v1.RevokeSessionRequest
-	(*RevokeOtherSessionsRequest)(nil),    // 30: api.usercenter.v1.RevokeOtherSessionsRequest
-	(*SessionRole)(nil),                   // 31: api.usercenter.v1.SessionRole
-	(*GetSessionRolesRequest)(nil),        // 32: api.usercenter.v1.GetSessionRolesRequest
-	(*SessionRolesReply)(nil),             // 33: api.usercenter.v1.SessionRolesReply
-	(*PutSessionRolesRequest)(nil),        // 34: api.usercenter.v1.PutSessionRolesRequest
-	(*AuthorizationGrant)(nil),            // 35: api.usercenter.v1.AuthorizationGrant
-	(*AuthorizationReply)(nil),            // 36: api.usercenter.v1.AuthorizationReply
-	(*GetAuthorizationRequest)(nil),       // 37: api.usercenter.v1.GetAuthorizationRequest
-	(*ListSecurityEventsRequest)(nil),     // 38: api.usercenter.v1.ListSecurityEventsRequest
-	(*SecurityEventsReply)(nil),           // 39: api.usercenter.v1.SecurityEventsReply
-	(*PermissionSummary)(nil),             // 40: api.usercenter.v1.PermissionSummary
-	(*SecurityEvent)(nil),                 // 41: api.usercenter.v1.SecurityEvent
-	(*ListMeta)(nil),                      // 42: api.usercenter.v1.ListMeta
-	(*User)(nil),                          // 43: api.usercenter.v1.User
-	(*emptypb.Empty)(nil),                 // 44: google.protobuf.Empty
-	(*ChallengeReply)(nil),                // 45: api.usercenter.v1.ChallengeReply
-	(*SessionsReply)(nil),                 // 46: api.usercenter.v1.SessionsReply
+	(*OIDCConsentRequestView)(nil),                     // 0: api.usercenter.v1.OIDCConsentRequestView
+	(*GetOIDCConsentRequestRequest)(nil),               // 1: api.usercenter.v1.GetOIDCConsentRequestRequest
+	(*DecideOIDCConsentRequest)(nil),                   // 2: api.usercenter.v1.DecideOIDCConsentRequest
+	(*DecideOIDCConsentReply)(nil),                     // 3: api.usercenter.v1.DecideOIDCConsentReply
+	(*OIDCConsent)(nil),                                // 4: api.usercenter.v1.OIDCConsent
+	(*OIDCConsentsReply)(nil),                          // 5: api.usercenter.v1.OIDCConsentsReply
+	(*ListOIDCConsentsRequest)(nil),                    // 6: api.usercenter.v1.ListOIDCConsentsRequest
+	(*RevokeOIDCConsentRequest)(nil),                   // 7: api.usercenter.v1.RevokeOIDCConsentRequest
+	(*GetMeRequest)(nil),                               // 8: api.usercenter.v1.GetMeRequest
+	(*UpdateMeRequest)(nil),                            // 9: api.usercenter.v1.UpdateMeRequest
+	(*UpdateUsernameRequest)(nil),                      // 10: api.usercenter.v1.UpdateUsernameRequest
+	(*ChangePasswordRequest)(nil),                      // 11: api.usercenter.v1.ChangePasswordRequest
+	(*CreateEmailChallengeRequest)(nil),                // 12: api.usercenter.v1.CreateEmailChallengeRequest
+	(*ConfirmEmailRequest)(nil),                        // 13: api.usercenter.v1.ConfirmEmailRequest
+	(*ExternalIdentity)(nil),                           // 14: api.usercenter.v1.ExternalIdentity
+	(*ExternalIdentitiesReply)(nil),                    // 15: api.usercenter.v1.ExternalIdentitiesReply
+	(*ListExternalIdentitiesRequest)(nil),              // 16: api.usercenter.v1.ListExternalIdentitiesRequest
+	(*DeleteExternalIdentityRequest)(nil),              // 17: api.usercenter.v1.DeleteExternalIdentityRequest
+	(*GetSecurityRequest)(nil),                         // 18: api.usercenter.v1.GetSecurityRequest
+	(*SecurityStatus)(nil),                             // 19: api.usercenter.v1.SecurityStatus
+	(*SetupMFARequest)(nil),                            // 20: api.usercenter.v1.SetupMFARequest
+	(*SetupMFAReply)(nil),                              // 21: api.usercenter.v1.SetupMFAReply
+	(*ConfirmMFARequest)(nil),                          // 22: api.usercenter.v1.ConfirmMFARequest
+	(*RecoveryCodesReply)(nil),                         // 23: api.usercenter.v1.RecoveryCodesReply
+	(*DisableMFARequest)(nil),                          // 24: api.usercenter.v1.DisableMFARequest
+	(*RotateRecoveryCodesRequest)(nil),                 // 25: api.usercenter.v1.RotateRecoveryCodesRequest
+	(*VerifySecurityRequest)(nil),                      // 26: api.usercenter.v1.VerifySecurityRequest
+	(*VerifySecurityReply)(nil),                        // 27: api.usercenter.v1.VerifySecurityReply
+	(*ListSessionsRequest)(nil),                        // 28: api.usercenter.v1.ListSessionsRequest
+	(*RevokeSessionRequest)(nil),                       // 29: api.usercenter.v1.RevokeSessionRequest
+	(*RevokeOtherSessionsRequest)(nil),                 // 30: api.usercenter.v1.RevokeOtherSessionsRequest
+	(*SessionRole)(nil),                                // 31: api.usercenter.v1.SessionRole
+	(*GetSessionRolesRequest)(nil),                     // 32: api.usercenter.v1.GetSessionRolesRequest
+	(*SessionRolesReply)(nil),                          // 33: api.usercenter.v1.SessionRolesReply
+	(*PutSessionRolesRequest)(nil),                     // 34: api.usercenter.v1.PutSessionRolesRequest
+	(*AuthorizationGrant)(nil),                         // 35: api.usercenter.v1.AuthorizationGrant
+	(*AuthorizationReply)(nil),                         // 36: api.usercenter.v1.AuthorizationReply
+	(*GetAuthorizationRequest)(nil),                    // 37: api.usercenter.v1.GetAuthorizationRequest
+	(*ListSecurityEventsRequest)(nil),                  // 38: api.usercenter.v1.ListSecurityEventsRequest
+	(*SecurityEventsReply)(nil),                        // 39: api.usercenter.v1.SecurityEventsReply
+	(*CreateWebAuthnRegistrationChallengeRequest)(nil), // 40: api.usercenter.v1.CreateWebAuthnRegistrationChallengeRequest
+	(*WebAuthnRegistrationChallengeReply)(nil),         // 41: api.usercenter.v1.WebAuthnRegistrationChallengeReply
+	(*ConfirmWebAuthnRegistrationRequest)(nil),         // 42: api.usercenter.v1.ConfirmWebAuthnRegistrationRequest
+	(*WebAuthnCredential)(nil),                         // 43: api.usercenter.v1.WebAuthnCredential
+	(*WebAuthnCredentialsReply)(nil),                   // 44: api.usercenter.v1.WebAuthnCredentialsReply
+	(*ListWebAuthnCredentialsRequest)(nil),             // 45: api.usercenter.v1.ListWebAuthnCredentialsRequest
+	(*DeleteWebAuthnCredentialRequest)(nil),            // 46: api.usercenter.v1.DeleteWebAuthnCredentialRequest
+	(*CreateWebAuthnAssertionChallengeRequest)(nil),    // 47: api.usercenter.v1.CreateWebAuthnAssertionChallengeRequest
+	(*WebAuthnAssertionChallengeReply)(nil),            // 48: api.usercenter.v1.WebAuthnAssertionChallengeReply
+	(*VerifyWebAuthnAssertionRequest)(nil),             // 49: api.usercenter.v1.VerifyWebAuthnAssertionRequest
+	(*PermissionSummary)(nil),                          // 50: api.usercenter.v1.PermissionSummary
+	(*SecurityEvent)(nil),                              // 51: api.usercenter.v1.SecurityEvent
+	(*ListMeta)(nil),                                   // 52: api.usercenter.v1.ListMeta
+	(*User)(nil),                                       // 53: api.usercenter.v1.User
+	(*emptypb.Empty)(nil),                              // 54: google.protobuf.Empty
+	(*ChallengeReply)(nil),                             // 55: api.usercenter.v1.ChallengeReply
+	(*SessionsReply)(nil),                              // 56: api.usercenter.v1.SessionsReply
 }
 var file_api_usercenter_v1_me_proto_depIdxs = []int32{
 	4,  // 0: api.usercenter.v1.OIDCConsentsReply.items:type_name -> api.usercenter.v1.OIDCConsent
 	14, // 1: api.usercenter.v1.ExternalIdentitiesReply.items:type_name -> api.usercenter.v1.ExternalIdentity
 	31, // 2: api.usercenter.v1.SessionRolesReply.items:type_name -> api.usercenter.v1.SessionRole
-	40, // 3: api.usercenter.v1.AuthorizationReply.permissions:type_name -> api.usercenter.v1.PermissionSummary
-	41, // 4: api.usercenter.v1.SecurityEventsReply.items:type_name -> api.usercenter.v1.SecurityEvent
-	42, // 5: api.usercenter.v1.SecurityEventsReply.meta:type_name -> api.usercenter.v1.ListMeta
-	8,  // 6: api.usercenter.v1.MeService.GetMe:input_type -> api.usercenter.v1.GetMeRequest
-	9,  // 7: api.usercenter.v1.MeService.UpdateMe:input_type -> api.usercenter.v1.UpdateMeRequest
-	10, // 8: api.usercenter.v1.MeService.UpdateUsername:input_type -> api.usercenter.v1.UpdateUsernameRequest
-	11, // 9: api.usercenter.v1.MeService.ChangePassword:input_type -> api.usercenter.v1.ChangePasswordRequest
-	12, // 10: api.usercenter.v1.MeService.CreateEmailChallenge:input_type -> api.usercenter.v1.CreateEmailChallengeRequest
-	13, // 11: api.usercenter.v1.MeService.ConfirmEmail:input_type -> api.usercenter.v1.ConfirmEmailRequest
-	16, // 12: api.usercenter.v1.MeService.ListExternalIdentities:input_type -> api.usercenter.v1.ListExternalIdentitiesRequest
-	17, // 13: api.usercenter.v1.MeService.DeleteExternalIdentity:input_type -> api.usercenter.v1.DeleteExternalIdentityRequest
-	18, // 14: api.usercenter.v1.MeService.GetSecurity:input_type -> api.usercenter.v1.GetSecurityRequest
-	20, // 15: api.usercenter.v1.MeService.SetupMFA:input_type -> api.usercenter.v1.SetupMFARequest
-	22, // 16: api.usercenter.v1.MeService.ConfirmMFA:input_type -> api.usercenter.v1.ConfirmMFARequest
-	24, // 17: api.usercenter.v1.MeService.DisableMFA:input_type -> api.usercenter.v1.DisableMFARequest
-	25, // 18: api.usercenter.v1.MeService.RotateRecoveryCodes:input_type -> api.usercenter.v1.RotateRecoveryCodesRequest
-	26, // 19: api.usercenter.v1.MeService.VerifySecurity:input_type -> api.usercenter.v1.VerifySecurityRequest
-	28, // 20: api.usercenter.v1.MeService.ListSessions:input_type -> api.usercenter.v1.ListSessionsRequest
-	29, // 21: api.usercenter.v1.MeService.RevokeSession:input_type -> api.usercenter.v1.RevokeSessionRequest
-	30, // 22: api.usercenter.v1.MeService.RevokeOtherSessions:input_type -> api.usercenter.v1.RevokeOtherSessionsRequest
-	32, // 23: api.usercenter.v1.MeService.GetSessionRoles:input_type -> api.usercenter.v1.GetSessionRolesRequest
-	34, // 24: api.usercenter.v1.MeService.PutSessionRoles:input_type -> api.usercenter.v1.PutSessionRolesRequest
-	37, // 25: api.usercenter.v1.MeService.GetAuthorization:input_type -> api.usercenter.v1.GetAuthorizationRequest
-	38, // 26: api.usercenter.v1.MeService.ListSecurityEvents:input_type -> api.usercenter.v1.ListSecurityEventsRequest
-	1,  // 27: api.usercenter.v1.MeService.GetOIDCConsentRequest:input_type -> api.usercenter.v1.GetOIDCConsentRequestRequest
-	2,  // 28: api.usercenter.v1.MeService.DecideOIDCConsent:input_type -> api.usercenter.v1.DecideOIDCConsentRequest
-	6,  // 29: api.usercenter.v1.MeService.ListOIDCConsents:input_type -> api.usercenter.v1.ListOIDCConsentsRequest
-	7,  // 30: api.usercenter.v1.MeService.RevokeOIDCConsent:input_type -> api.usercenter.v1.RevokeOIDCConsentRequest
-	43, // 31: api.usercenter.v1.MeService.GetMe:output_type -> api.usercenter.v1.User
-	43, // 32: api.usercenter.v1.MeService.UpdateMe:output_type -> api.usercenter.v1.User
-	43, // 33: api.usercenter.v1.MeService.UpdateUsername:output_type -> api.usercenter.v1.User
-	44, // 34: api.usercenter.v1.MeService.ChangePassword:output_type -> google.protobuf.Empty
-	45, // 35: api.usercenter.v1.MeService.CreateEmailChallenge:output_type -> api.usercenter.v1.ChallengeReply
-	43, // 36: api.usercenter.v1.MeService.ConfirmEmail:output_type -> api.usercenter.v1.User
-	15, // 37: api.usercenter.v1.MeService.ListExternalIdentities:output_type -> api.usercenter.v1.ExternalIdentitiesReply
-	44, // 38: api.usercenter.v1.MeService.DeleteExternalIdentity:output_type -> google.protobuf.Empty
-	19, // 39: api.usercenter.v1.MeService.GetSecurity:output_type -> api.usercenter.v1.SecurityStatus
-	21, // 40: api.usercenter.v1.MeService.SetupMFA:output_type -> api.usercenter.v1.SetupMFAReply
-	23, // 41: api.usercenter.v1.MeService.ConfirmMFA:output_type -> api.usercenter.v1.RecoveryCodesReply
-	44, // 42: api.usercenter.v1.MeService.DisableMFA:output_type -> google.protobuf.Empty
-	23, // 43: api.usercenter.v1.MeService.RotateRecoveryCodes:output_type -> api.usercenter.v1.RecoveryCodesReply
-	27, // 44: api.usercenter.v1.MeService.VerifySecurity:output_type -> api.usercenter.v1.VerifySecurityReply
-	46, // 45: api.usercenter.v1.MeService.ListSessions:output_type -> api.usercenter.v1.SessionsReply
-	44, // 46: api.usercenter.v1.MeService.RevokeSession:output_type -> google.protobuf.Empty
-	44, // 47: api.usercenter.v1.MeService.RevokeOtherSessions:output_type -> google.protobuf.Empty
-	33, // 48: api.usercenter.v1.MeService.GetSessionRoles:output_type -> api.usercenter.v1.SessionRolesReply
-	33, // 49: api.usercenter.v1.MeService.PutSessionRoles:output_type -> api.usercenter.v1.SessionRolesReply
-	36, // 50: api.usercenter.v1.MeService.GetAuthorization:output_type -> api.usercenter.v1.AuthorizationReply
-	39, // 51: api.usercenter.v1.MeService.ListSecurityEvents:output_type -> api.usercenter.v1.SecurityEventsReply
-	0,  // 52: api.usercenter.v1.MeService.GetOIDCConsentRequest:output_type -> api.usercenter.v1.OIDCConsentRequestView
-	3,  // 53: api.usercenter.v1.MeService.DecideOIDCConsent:output_type -> api.usercenter.v1.DecideOIDCConsentReply
-	5,  // 54: api.usercenter.v1.MeService.ListOIDCConsents:output_type -> api.usercenter.v1.OIDCConsentsReply
-	44, // 55: api.usercenter.v1.MeService.RevokeOIDCConsent:output_type -> google.protobuf.Empty
-	31, // [31:56] is the sub-list for method output_type
-	6,  // [6:31] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	50, // 3: api.usercenter.v1.AuthorizationReply.permissions:type_name -> api.usercenter.v1.PermissionSummary
+	51, // 4: api.usercenter.v1.SecurityEventsReply.items:type_name -> api.usercenter.v1.SecurityEvent
+	52, // 5: api.usercenter.v1.SecurityEventsReply.meta:type_name -> api.usercenter.v1.ListMeta
+	43, // 6: api.usercenter.v1.WebAuthnCredentialsReply.items:type_name -> api.usercenter.v1.WebAuthnCredential
+	8,  // 7: api.usercenter.v1.MeService.GetMe:input_type -> api.usercenter.v1.GetMeRequest
+	9,  // 8: api.usercenter.v1.MeService.UpdateMe:input_type -> api.usercenter.v1.UpdateMeRequest
+	10, // 9: api.usercenter.v1.MeService.UpdateUsername:input_type -> api.usercenter.v1.UpdateUsernameRequest
+	11, // 10: api.usercenter.v1.MeService.ChangePassword:input_type -> api.usercenter.v1.ChangePasswordRequest
+	12, // 11: api.usercenter.v1.MeService.CreateEmailChallenge:input_type -> api.usercenter.v1.CreateEmailChallengeRequest
+	13, // 12: api.usercenter.v1.MeService.ConfirmEmail:input_type -> api.usercenter.v1.ConfirmEmailRequest
+	16, // 13: api.usercenter.v1.MeService.ListExternalIdentities:input_type -> api.usercenter.v1.ListExternalIdentitiesRequest
+	17, // 14: api.usercenter.v1.MeService.DeleteExternalIdentity:input_type -> api.usercenter.v1.DeleteExternalIdentityRequest
+	18, // 15: api.usercenter.v1.MeService.GetSecurity:input_type -> api.usercenter.v1.GetSecurityRequest
+	20, // 16: api.usercenter.v1.MeService.SetupMFA:input_type -> api.usercenter.v1.SetupMFARequest
+	22, // 17: api.usercenter.v1.MeService.ConfirmMFA:input_type -> api.usercenter.v1.ConfirmMFARequest
+	24, // 18: api.usercenter.v1.MeService.DisableMFA:input_type -> api.usercenter.v1.DisableMFARequest
+	25, // 19: api.usercenter.v1.MeService.RotateRecoveryCodes:input_type -> api.usercenter.v1.RotateRecoveryCodesRequest
+	26, // 20: api.usercenter.v1.MeService.VerifySecurity:input_type -> api.usercenter.v1.VerifySecurityRequest
+	28, // 21: api.usercenter.v1.MeService.ListSessions:input_type -> api.usercenter.v1.ListSessionsRequest
+	29, // 22: api.usercenter.v1.MeService.RevokeSession:input_type -> api.usercenter.v1.RevokeSessionRequest
+	30, // 23: api.usercenter.v1.MeService.RevokeOtherSessions:input_type -> api.usercenter.v1.RevokeOtherSessionsRequest
+	32, // 24: api.usercenter.v1.MeService.GetSessionRoles:input_type -> api.usercenter.v1.GetSessionRolesRequest
+	34, // 25: api.usercenter.v1.MeService.PutSessionRoles:input_type -> api.usercenter.v1.PutSessionRolesRequest
+	37, // 26: api.usercenter.v1.MeService.GetAuthorization:input_type -> api.usercenter.v1.GetAuthorizationRequest
+	38, // 27: api.usercenter.v1.MeService.ListSecurityEvents:input_type -> api.usercenter.v1.ListSecurityEventsRequest
+	40, // 28: api.usercenter.v1.MeService.CreateWebAuthnRegistrationChallenge:input_type -> api.usercenter.v1.CreateWebAuthnRegistrationChallengeRequest
+	42, // 29: api.usercenter.v1.MeService.ConfirmWebAuthnRegistration:input_type -> api.usercenter.v1.ConfirmWebAuthnRegistrationRequest
+	45, // 30: api.usercenter.v1.MeService.ListWebAuthnCredentials:input_type -> api.usercenter.v1.ListWebAuthnCredentialsRequest
+	46, // 31: api.usercenter.v1.MeService.DeleteWebAuthnCredential:input_type -> api.usercenter.v1.DeleteWebAuthnCredentialRequest
+	47, // 32: api.usercenter.v1.MeService.CreateWebAuthnAssertionChallenge:input_type -> api.usercenter.v1.CreateWebAuthnAssertionChallengeRequest
+	49, // 33: api.usercenter.v1.MeService.VerifyWebAuthnAssertion:input_type -> api.usercenter.v1.VerifyWebAuthnAssertionRequest
+	1,  // 34: api.usercenter.v1.MeService.GetOIDCConsentRequest:input_type -> api.usercenter.v1.GetOIDCConsentRequestRequest
+	2,  // 35: api.usercenter.v1.MeService.DecideOIDCConsent:input_type -> api.usercenter.v1.DecideOIDCConsentRequest
+	6,  // 36: api.usercenter.v1.MeService.ListOIDCConsents:input_type -> api.usercenter.v1.ListOIDCConsentsRequest
+	7,  // 37: api.usercenter.v1.MeService.RevokeOIDCConsent:input_type -> api.usercenter.v1.RevokeOIDCConsentRequest
+	53, // 38: api.usercenter.v1.MeService.GetMe:output_type -> api.usercenter.v1.User
+	53, // 39: api.usercenter.v1.MeService.UpdateMe:output_type -> api.usercenter.v1.User
+	53, // 40: api.usercenter.v1.MeService.UpdateUsername:output_type -> api.usercenter.v1.User
+	54, // 41: api.usercenter.v1.MeService.ChangePassword:output_type -> google.protobuf.Empty
+	55, // 42: api.usercenter.v1.MeService.CreateEmailChallenge:output_type -> api.usercenter.v1.ChallengeReply
+	53, // 43: api.usercenter.v1.MeService.ConfirmEmail:output_type -> api.usercenter.v1.User
+	15, // 44: api.usercenter.v1.MeService.ListExternalIdentities:output_type -> api.usercenter.v1.ExternalIdentitiesReply
+	54, // 45: api.usercenter.v1.MeService.DeleteExternalIdentity:output_type -> google.protobuf.Empty
+	19, // 46: api.usercenter.v1.MeService.GetSecurity:output_type -> api.usercenter.v1.SecurityStatus
+	21, // 47: api.usercenter.v1.MeService.SetupMFA:output_type -> api.usercenter.v1.SetupMFAReply
+	23, // 48: api.usercenter.v1.MeService.ConfirmMFA:output_type -> api.usercenter.v1.RecoveryCodesReply
+	54, // 49: api.usercenter.v1.MeService.DisableMFA:output_type -> google.protobuf.Empty
+	23, // 50: api.usercenter.v1.MeService.RotateRecoveryCodes:output_type -> api.usercenter.v1.RecoveryCodesReply
+	27, // 51: api.usercenter.v1.MeService.VerifySecurity:output_type -> api.usercenter.v1.VerifySecurityReply
+	56, // 52: api.usercenter.v1.MeService.ListSessions:output_type -> api.usercenter.v1.SessionsReply
+	54, // 53: api.usercenter.v1.MeService.RevokeSession:output_type -> google.protobuf.Empty
+	54, // 54: api.usercenter.v1.MeService.RevokeOtherSessions:output_type -> google.protobuf.Empty
+	33, // 55: api.usercenter.v1.MeService.GetSessionRoles:output_type -> api.usercenter.v1.SessionRolesReply
+	33, // 56: api.usercenter.v1.MeService.PutSessionRoles:output_type -> api.usercenter.v1.SessionRolesReply
+	36, // 57: api.usercenter.v1.MeService.GetAuthorization:output_type -> api.usercenter.v1.AuthorizationReply
+	39, // 58: api.usercenter.v1.MeService.ListSecurityEvents:output_type -> api.usercenter.v1.SecurityEventsReply
+	41, // 59: api.usercenter.v1.MeService.CreateWebAuthnRegistrationChallenge:output_type -> api.usercenter.v1.WebAuthnRegistrationChallengeReply
+	43, // 60: api.usercenter.v1.MeService.ConfirmWebAuthnRegistration:output_type -> api.usercenter.v1.WebAuthnCredential
+	44, // 61: api.usercenter.v1.MeService.ListWebAuthnCredentials:output_type -> api.usercenter.v1.WebAuthnCredentialsReply
+	54, // 62: api.usercenter.v1.MeService.DeleteWebAuthnCredential:output_type -> google.protobuf.Empty
+	48, // 63: api.usercenter.v1.MeService.CreateWebAuthnAssertionChallenge:output_type -> api.usercenter.v1.WebAuthnAssertionChallengeReply
+	27, // 64: api.usercenter.v1.MeService.VerifyWebAuthnAssertion:output_type -> api.usercenter.v1.VerifySecurityReply
+	0,  // 65: api.usercenter.v1.MeService.GetOIDCConsentRequest:output_type -> api.usercenter.v1.OIDCConsentRequestView
+	3,  // 66: api.usercenter.v1.MeService.DecideOIDCConsent:output_type -> api.usercenter.v1.DecideOIDCConsentReply
+	5,  // 67: api.usercenter.v1.MeService.ListOIDCConsents:output_type -> api.usercenter.v1.OIDCConsentsReply
+	54, // 68: api.usercenter.v1.MeService.RevokeOIDCConsent:output_type -> google.protobuf.Empty
+	38, // [38:69] is the sub-list for method output_type
+	7,  // [7:38] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_api_usercenter_v1_me_proto_init() }
@@ -2449,7 +3209,7 @@ func file_api_usercenter_v1_me_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_usercenter_v1_me_proto_rawDesc), len(file_api_usercenter_v1_me_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   40,
+			NumMessages:   50,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

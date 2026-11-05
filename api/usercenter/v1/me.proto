@@ -74,6 +74,28 @@ service MeService {
     option (google.api.http) = {get: "/api/v1/me/security-events"};
   }
 
+  // WebAuthn / Passkey as a second factor (V2.4 R13). Credentials are never a
+  // primary login method: username + password always remains the first factor.
+  rpc CreateWebAuthnRegistrationChallenge(CreateWebAuthnRegistrationChallengeRequest) returns (WebAuthnRegistrationChallengeReply) {
+    option (google.api.http) = {post: "/api/v1/me/webauthn/credentials:challenge" body: "*"};
+  }
+  rpc ConfirmWebAuthnRegistration(ConfirmWebAuthnRegistrationRequest) returns (WebAuthnCredential) {
+    option (google.api.http) = {post: "/api/v1/me/webauthn/credentials:confirm" body: "*"};
+  }
+  rpc ListWebAuthnCredentials(ListWebAuthnCredentialsRequest) returns (WebAuthnCredentialsReply) {
+    option (google.api.http) = {get: "/api/v1/me/webauthn/credentials"};
+  }
+  rpc DeleteWebAuthnCredential(DeleteWebAuthnCredentialRequest) returns (google.protobuf.Empty) {
+    // POST keeps the primary credential out of the URL/query string.
+    option (google.api.http) = {post: "/api/v1/me/webauthn/credentials/{id}:delete" body: "*"};
+  }
+  rpc CreateWebAuthnAssertionChallenge(CreateWebAuthnAssertionChallengeRequest) returns (WebAuthnAssertionChallengeReply) {
+    option (google.api.http) = {post: "/api/v1/me/webauthn/assertions:challenge" body: "*"};
+  }
+  rpc VerifyWebAuthnAssertion(VerifyWebAuthnAssertionRequest) returns (VerifySecurityReply) {
+    option (google.api.http) = {post: "/api/v1/me/webauthn/assertions:verify" body: "*"};
+  }
+
   // OIDC consent (V2.4). The authorize endpoint redirects the browser here with
   // an opaque one-time handle; the client never sees the handle contents.
   rpc GetOIDCConsentRequest(GetOIDCConsentRequestRequest) returns (OIDCConsentRequestView) {
@@ -288,4 +310,73 @@ message ListSecurityEventsRequest {
 message SecurityEventsReply {
   repeated SecurityEvent items = 1;
   ListMeta meta = 2;
+}
+
+message CreateWebAuthnRegistrationChallengeRequest {
+  string current_password = 1;
+}
+
+message WebAuthnRegistrationChallengeReply {
+  string challenge_id = 1;
+  string challenge = 2;
+  string rp_id = 3;
+  string rp_name = 4;
+  string user_id = 5;
+  string user_name = 6;
+  string expires_at = 7;
+  repeated string existing_credential_ids = 8;
+}
+
+message ConfirmWebAuthnRegistrationRequest {
+  string challenge_id = 1;
+  string credential_id = 2;
+  // base64url encoded attestationObject / clientDataJSON
+  string attestation_object = 3;
+  string client_data_json = 4;
+  repeated string transports = 5;
+  string name = 6;
+}
+
+message WebAuthnCredential {
+  string id = 1;
+  string credential_id = 2;
+  string name = 3;
+  string aaguid = 4;
+  repeated string transports = 5;
+  string sign_count = 6;
+  string created_at = 7;
+  string last_used_at = 8;
+  string revision = 9;
+}
+
+message WebAuthnCredentialsReply {
+  repeated WebAuthnCredential items = 1;
+}
+
+message ListWebAuthnCredentialsRequest {}
+
+message DeleteWebAuthnCredentialRequest {
+  string id = 1;
+  string current_password = 2;
+}
+
+message CreateWebAuthnAssertionChallengeRequest {
+  string current_password = 1;
+}
+
+message WebAuthnAssertionChallengeReply {
+  string challenge_id = 1;
+  string challenge = 2;
+  string rp_id = 3;
+  repeated string allow_credential_ids = 4;
+  string expires_at = 5;
+}
+
+message VerifyWebAuthnAssertionRequest {
+  string challenge_id = 1;
+  string credential_id = 2;
+  string authenticator_data = 3;
+  string client_data_json = 4;
+  string signature = 5;
+  string current_password = 6;
 }

@@ -23,7 +23,7 @@ func oidcClientProto(c *biz.OIDCClient) *usercv1.OIDCClient {
 		Id: id(c.ID), ClientId: c.ClientID, Name: c.Name, ServiceOwner: c.ServiceOwner,
 		Status: c.Status, RedirectUris: c.RedirectURIs, Scopes: c.Scopes,
 		PostLogoutRedirectUris: c.PostLogoutRedirectURIs,
-		Public: c.Public, RequirePkce: c.RequirePKCE,
+		Public:                 c.Public, RequirePkce: c.RequirePKCE,
 		AccessTokenTtlSeconds: int32(c.AccessTTL), RefreshTokenTtlSeconds: int32(c.RefreshTTL),
 		Revision: rev(c.Revision), CreatedAt: ts(c.CreatedAt),
 	}

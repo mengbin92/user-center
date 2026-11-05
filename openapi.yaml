@@ -2245,6 +2245,114 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.User'
+    /api/v1/me/webauthn/assertions:challenge:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_CreateWebAuthnAssertionChallenge
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateWebAuthnAssertionChallengeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.WebAuthnAssertionChallengeReply'
+    /api/v1/me/webauthn/assertions:verify:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_VerifyWebAuthnAssertion
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.VerifyWebAuthnAssertionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.VerifySecurityReply'
+    /api/v1/me/webauthn/credentials:
+        get:
+            tags:
+                - MeService
+            operationId: MeService_ListWebAuthnCredentials
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.WebAuthnCredentialsReply'
+    /api/v1/me/webauthn/credentials/{id}:delete:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_DeleteWebAuthnCredential
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.DeleteWebAuthnCredentialRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v1/me/webauthn/credentials:challenge:
+        post:
+            tags:
+                - MeService
+            description: |-
+                WebAuthn / Passkey as a second factor (V2.4 R13). Credentials are never a
+                 primary login method: username + password always remains the first factor.
+            operationId: MeService_CreateWebAuthnRegistrationChallenge
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateWebAuthnRegistrationChallengeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.WebAuthnRegistrationChallengeReply'
+    /api/v1/me/webauthn/credentials:confirm:
+        post:
+            tags:
+                - MeService
+            operationId: MeService_ConfirmWebAuthnRegistration
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.ConfirmWebAuthnRegistrationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.WebAuthnCredential'
     /api/v1/orgs:
         get:
             tags:
@@ -3324,6 +3432,15 @@ components:
                     type: string
                 code:
                     type: string
+                    description: TOTP / recovery code. Ignored when a WebAuthn assertion is supplied.
+                credential_id:
+                    type: string
+                authenticator_data:
+                    type: string
+                client_data_json:
+                    type: string
+                signature:
+                    type: string
         api.usercenter.v1.ConfirmEmailChangeRequest:
             type: object
             properties:
@@ -3350,6 +3467,24 @@ components:
             type: object
             properties:
                 code:
+                    type: string
+        api.usercenter.v1.ConfirmWebAuthnRegistrationRequest:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                credential_id:
+                    type: string
+                attestation_object:
+                    type: string
+                    description: base64url encoded attestationObject / clientDataJSON
+                client_data_json:
+                    type: string
+                transports:
+                    type: array
+                    items:
+                        type: string
+                name:
                     type: string
         api.usercenter.v1.Constraint:
             type: object
@@ -3715,6 +3850,16 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.CreateWebAuthnAssertionChallengeRequest:
+            type: object
+            properties:
+                current_password:
+                    type: string
+        api.usercenter.v1.CreateWebAuthnRegistrationChallengeRequest:
+            type: object
+            properties:
+                current_password:
+                    type: string
         api.usercenter.v1.DecideOIDCConsentReply:
             type: object
             properties:
@@ -3780,6 +3925,13 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Delegation'
+        api.usercenter.v1.DeleteWebAuthnCredentialRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                current_password:
+                    type: string
         api.usercenter.v1.Department:
             type: object
             properties:
@@ -4169,6 +4321,10 @@ components:
                     type: boolean
                 mfa_enrollment_required:
                     type: boolean
+                webauthn:
+                    allOf:
+                        - $ref: '#/components/schemas/api.usercenter.v1.WebAuthnChallenge'
+                    description: Present when a WebAuthn credential can satisfy the MFA challenge.
         api.usercenter.v1.LoginRequest:
             type: object
             properties:
@@ -5588,6 +5744,98 @@ components:
                     type: string
                 code:
                     type: string
+        api.usercenter.v1.VerifyWebAuthnAssertionRequest:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                credential_id:
+                    type: string
+                authenticator_data:
+                    type: string
+                client_data_json:
+                    type: string
+                signature:
+                    type: string
+                current_password:
+                    type: string
+        api.usercenter.v1.WebAuthnAssertionChallengeReply:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                challenge:
+                    type: string
+                rp_id:
+                    type: string
+                allow_credential_ids:
+                    type: array
+                    items:
+                        type: string
+                expires_at:
+                    type: string
+        api.usercenter.v1.WebAuthnChallenge:
+            type: object
+            properties:
+                challenge:
+                    type: string
+                rp_id:
+                    type: string
+                allow_credential_ids:
+                    type: array
+                    items:
+                        type: string
+        api.usercenter.v1.WebAuthnCredential:
+            type: object
+            properties:
+                id:
+                    type: string
+                credential_id:
+                    type: string
+                name:
+                    type: string
+                aaguid:
+                    type: string
+                transports:
+                    type: array
+                    items:
+                        type: string
+                sign_count:
+                    type: string
+                created_at:
+                    type: string
+                last_used_at:
+                    type: string
+                revision:
+                    type: string
+        api.usercenter.v1.WebAuthnCredentialsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.WebAuthnCredential'
+        api.usercenter.v1.WebAuthnRegistrationChallengeReply:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                challenge:
+                    type: string
+                rp_id:
+                    type: string
+                rp_name:
+                    type: string
+                user_id:
+                    type: string
+                user_name:
+                    type: string
+                expires_at:
+                    type: string
+                existing_credential_ids:
+                    type: array
+                    items:
+                        type: string
 tags:
     - name: AdminUserService
       description: AdminUserService is the administrator account lifecycle surface.
