@@ -70,6 +70,7 @@ const client: OIDCClient = {
   id: '42', client_id: 'oidc_abc', name: '计费控制台', service_owner: 'billing',
   revision: '9007199254740995', status: 'active', public: false, require_pkce: true,
   redirect_uris: ['https://app.example.com/callback?values=a,b'], scopes: ['openid'],
+  post_logout_redirect_uris: ['https://app.example.com/logged-out'],
   access_token_ttl_seconds: 900, refresh_token_ttl_seconds: 86400,
 }
 const permissions: PermissionSummary[] = [
@@ -110,11 +111,13 @@ describe('OIDC management preconditions and secret lifetime', () => {
     fireEvent.change(within(dialog).getByLabelText(/名称/), { target: { value: '新应用' } })
     fireEvent.change(within(dialog).getByLabelText(/服务归属/), { target: { value: 'billing' } })
     fireEvent.change(within(dialog).getByLabelText(/重定向 URI/), { target: { value: 'https://app.example.com/callback?values=a,b' } })
+    fireEvent.change(within(dialog).getByLabelText(/登出回调 URI/), { target: { value: 'https://app.example.com/logged-out' } })
     fireEvent.change(within(dialog).getByLabelText(/操作原因/), { target: { value: '按工单接入' } })
     fireEvent.click(within(dialog).getByRole('button', { name: '创建应用' }))
     await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({
       expected_policy_revision: '9007199254740993',
       redirect_uris: ['https://app.example.com/callback?values=a,b'],
+      post_logout_redirect_uris: ['https://app.example.com/logged-out'],
     })))
   })
 
@@ -134,6 +137,7 @@ describe('OIDC management preconditions and secret lifetime', () => {
       name: '新名称', expected_revision: '9007199254740995',
       expected_policy_revision: '9007199254740993',
       redirect_uris: ['https://app.example.com/callback?values=a,b'],
+      post_logout_redirect_uris: ['https://app.example.com/logged-out'],
     })))
   })
 

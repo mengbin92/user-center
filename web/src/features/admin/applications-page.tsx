@@ -331,6 +331,7 @@ export function AdminApplicationsPage() {
   const [createName, setCreateName] = useState('')
   const [serviceOwner, setServiceOwner] = useState('')
   const [redirectURIs, setRedirectURIs] = useState('')
+  const [postLogoutURIs, setPostLogoutURIs] = useState('')
   const [createScopes, setCreateScopes] = useState<Set<string>>(
     new Set(['openid']),
   )
@@ -344,6 +345,7 @@ export function AdminApplicationsPage() {
     setCreateName('')
     setServiceOwner('')
     setRedirectURIs('')
+    setPostLogoutURIs('')
     setCreateScopes(new Set(['openid']))
     setIsPublic(false)
     setRequirePKCE(true)
@@ -379,6 +381,7 @@ export function AdminApplicationsPage() {
         name: createName.trim(),
         service_owner: serviceOwner.trim(),
         redirect_uris: createRedirects,
+        post_logout_redirect_uris: redirectList(postLogoutURIs),
         scopes: [...createScopes],
         public: isPublic,
         require_pkce: isPublic ? true : requirePKCE,
@@ -403,6 +406,7 @@ export function AdminApplicationsPage() {
   const [editTarget, setEditTarget] = useState<OIDCClient | null>(null)
   const [editName, setEditName] = useState('')
   const [editRedirectURIs, setEditRedirectURIs] = useState('')
+  const [editPostLogoutURIs, setEditPostLogoutURIs] = useState('')
   const [editScopes, setEditScopes] = useState<Set<string>>(new Set())
   const editPublic = Boolean(editTarget?.public)
   const [editPKCE, setEditPKCE] = useState(true)
@@ -414,6 +418,7 @@ export function AdminApplicationsPage() {
     setEditTarget(client)
     setEditName(client.name ?? '')
     setEditRedirectURIs((client.redirect_uris ?? []).join('\n'))
+    setEditPostLogoutURIs((client.post_logout_redirect_uris ?? []).join('\n'))
     setEditScopes(scopeSet(client.scopes))
     setEditPKCE(client.require_pkce ?? Boolean(client.public))
     setEditAccessTTL(
@@ -451,6 +456,9 @@ export function AdminApplicationsPage() {
         id: editTarget.id,
         name: editName.trim(),
         redirect_uris: editRedirects,
+        // Repeated fields have no presence on the wire; always send the
+        // stored list so an unrelated edit cannot erase the logout whitelist.
+        post_logout_redirect_uris: redirectList(editPostLogoutURIs),
         scopes: [...editScopes],
         public: editPublic,
         require_pkce: editPublic ? true : editPKCE,
@@ -763,6 +771,20 @@ export function AdminApplicationsPage() {
           />
         </Field>
 
+        <Field
+          label="登出回调 URI"
+          htmlFor="oidc-create-post-logout"
+          hint="RP-initiated logout 的返回地址，每行一个，最多 10 个；必须精确匹配。留空表示不向应用回跳。"
+        >
+          <Textarea
+            id="oidc-create-post-logout"
+            value={postLogoutURIs}
+            onChange={(event) => setPostLogoutURIs(event.target.value)}
+            rows={2}
+            placeholder="https://app.example.com/logged-out"
+          />
+        </Field>
+
         <div>
           <div className="mb-1.5 text-xs font-medium text-slate-700">
             Scope <span className="text-rose-500">*</span>
@@ -938,6 +960,19 @@ export function AdminApplicationsPage() {
             value={editRedirectURIs}
             onChange={(event) => setEditRedirectURIs(event.target.value)}
             rows={3}
+          />
+        </Field>
+
+        <Field
+          label="登出回调 URI"
+          htmlFor="oidc-edit-post-logout"
+          hint="RP-initiated logout 的返回地址，每行一个，最多 10 个；必须精确匹配。留空表示不向应用回跳。"
+        >
+          <Textarea
+            id="oidc-edit-post-logout"
+            value={editPostLogoutURIs}
+            onChange={(event) => setEditPostLogoutURIs(event.target.value)}
+            rows={2}
           />
         </Field>
 

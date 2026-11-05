@@ -491,7 +491,7 @@ func (r *organizationRepo) ListInvitations(ctx context.Context, tx biz.Tx, orgID
 
 func (r *organizationRepo) UpdateInvitation(ctx context.Context, tx biz.Tx, inv *biz.OrganizationInvitation, expected uint64) (*biz.OrganizationInvitation, error) {
 	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationInvitationPO{}).
-		Where("id = ? AND revision = ?", inv.ID, expected).
+		Where("id = ? AND revision = ? AND status = ?", inv.ID, expected, biz.OrgInvitationPending).
 		Updates(map[string]any{
 			"status": inv.Status, "accepted_by": inv.AcceptedBy, "accepted_at": inv.AcceptedAt,
 			"revision": expected + 1, "updated_at": time.Now().UTC(),
@@ -529,7 +529,10 @@ func (r *organizationRepo) CountPendingInvitations(ctx context.Context, tx biz.T
 func (r *organizationRepo) RevokePendingInvitationsForEmail(ctx context.Context, tx biz.Tx, orgID int64, email string) error {
 	return r.d.dbOr(tx).WithContext(ctx).Model(&organizationInvitationPO{}).
 		Where("organization_id = ? AND email_normalized = ? AND status = ?", orgID, email, biz.OrgInvitationPending).
-		Update("status", biz.OrgInvitationRevoked).Error
+		Updates(map[string]any{
+			"status": biz.OrgInvitationRevoked, "revision": gorm.Expr("revision + 1"),
+			"updated_at": time.Now().UTC(),
+		}).Error
 }
 
 func (r *organizationRepo) DeleteInvitation(ctx context.Context, tx biz.Tx, id int64) error {

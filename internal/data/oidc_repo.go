@@ -251,7 +251,14 @@ func oidcConsentToBiz(p *oidcConsentPO) *biz.OIDCConsent {
 
 func (r *oidcRepo) GetConsent(ctx context.Context, tx biz.Tx, clientID string, userID int64) (*biz.OIDCConsent, error) {
 	var p oidcConsentPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("client_id = ? AND user_id = ?", clientID, userID).First(&p).Error
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if tx != nil {
+		// The consent decision reads the granted scopes, unions them with the
+		// newly approved ones and writes back. Lock the row for that
+		// read-modify-write so two concurrent approvals cannot drop a scope.
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := db.Where("client_id = ? AND user_id = ?", clientID, userID).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -285,8 +292,14 @@ func (r *oidcRepo) UpsertConsent(ctx context.Context, tx biz.Tx, c *biz.OIDCCons
 		GrantedAt: granted, UpdatedAt: now, Revision: 1,
 	}
 	return r.d.dbOr(tx).WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "client_id"}, {Name: "user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"scopes", "updated_at", "revision"}),
+		Columns: []clause.Column{{Name: "client_id"}, {Name: "user_id"}},
+		// Keep the first grant time, refresh the scope set and advance the
+		// revision. Writing the excluded revision back would pin it at 1.
+		DoUpdates: clause.Assignments(map[string]any{
+			"scopes":     clause.Column{Table: "excluded", Name: "scopes"},
+			"updated_at": clause.Column{Table: "excluded", Name: "updated_at"},
+			"revision":   gorm.Expr("revision + 1"),
+		}),
 	}).Create(row).Error
 }
 

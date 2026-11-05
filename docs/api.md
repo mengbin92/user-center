@@ -172,7 +172,7 @@ GET  /oidc/userinfo                      Bearer access token
 - PKCE 仅支持 `S256`；public client 强制 PKCE。
 - ID/access token 使用 RS256；`kid` 对应 JWKS。生产必须通过 `OIDC_SIGNING_KEY_PATH`/`OIDC_SIGNING_KEY_PEM` 提供稳定 RSA 私钥，否则重启后 token 失效。
 - 客户端管理：`GET/POST /admin/oidc-clients`、`PATCH /{id}`、`{id}:rotate-secret`、`{id}:disable`；密钥只返回一次。
-- 当前 V2.1 对管理员预先注册的客户端自动同意授权，未提供交互式 consent 页面；如需用户逐次同意，在 V2.2 增加 consent UI 与 `prompt=consent` 持久化。
+- 交互式同意（V2.4）：无有效同意时 `/oidc/authorize` 302 到 `/consent?handle=<opaque>`；`prompt=consent` 强制重新征询，`prompt=none` 且缺少同意时返回 `interaction_required`。`/me/oidc-consents` 可列出与撤销。
 
 ## 7. 内部 gRPC
 
@@ -236,7 +236,7 @@ GET  /oidc/userinfo                      Bearer access token
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/.well-known/openid-configuration` | 新增 `end_session_endpoint` |
-| GET/POST | `/oidc/logout` | `id_token_hint`、`client_id`、`post_logout_redirect_uri`、`state`；白名单精确匹配，失败返回 OAuth2 错误页（不回跳） |
+| GET/POST | `/oidc/logout` | `id_token_hint`、`client_id`、`post_logout_redirect_uri`、`state`；白名单精确匹配；无论回跳是否被接受都先撤销本地会话并清 Cookie，失败返回错误页（不回跳） |
 | GET | `/api/v1/me/oidc-requests/{handle}` | 同意页展示：客户端名、请求 scopes、已授予 scopes、回调 host、有效期 |
 | POST | `/api/v1/me/oidc-requests/{handle}:decide` | `{approve, remember}`；返回 `redirect_url`。handle 一次性消费、绑定用户 |
 | GET/DELETE | `/api/v1/me/oidc-consents` / `/{client_id}` | 列出/撤销已记住的同意 |
@@ -247,14 +247,14 @@ GET  /oidc/userinfo                      Bearer access token
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST/GET | `/api/v1/orgs/{id}/invitations` | 发起（需 `organization.member.manage` + Step-up + `reason`）与列出邀请 |
+| POST/GET | `/api/v1/orgs/{id}/invitations` | 发起（需 `organization.member.manage` + Step-up + `reason`）与列出邀请（需 `organization.member.manage`，因为包含被邀请人邮箱） |
 | DELETE | `/api/v1/orgs/{id}/invitations/{invitation_id}` | 撤销；`expected_revision`、`reason` 走 query |
 | POST | `/api/v1/orgs/invitations:accept` | 登录态下凭邮件令牌接受；邮箱不匹配统一 404 |
 | GET | `/api/v1/orgs/{id}/iam/authorization:explain` | `user_id`、`operation`；只用本租户事实，复用 `authorization.Evaluate` |
 | POST | `/api/v1/orgs/{id}/audits:export` | 复用平台导出任务；返回 `ExportJob` |
 | GET | `/api/v1/orgs/{id}/audits/exports/{export_id}/download` | 与平台下载共用同一流式通道，任务行带 `organization_id` |
 
-组织事件类型见 [架构 §8.1](architecture.md)。邀请有效期默认 72 小时，可用 `ORG_INVITATION_TTL_HOURS`（1–720）配置；单组织待接受邀请上限 50。
+组织事件类型见 [架构 §8.1](architecture.md)。邀请有效期默认 72 小时，可用 `ORG_INVITATION_TTL_HOURS`（1–720）配置；单组织待接受邀请上限 50。邀请列表包含被邀请人邮箱，因此与创建/撤销同要求 `organization.member.manage`。接受邀请始终要求账户邮箱已验证；若部署关闭了注册邮箱验证，被邀请人需先走改邮箱验证流程。
 
 ### 集成面与治理
 

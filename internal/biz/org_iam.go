@@ -388,7 +388,7 @@ func (uc *OrgIAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, org
 			return err
 		}
 		return orgEvent(ctx, uc.Services, tx, orgID, updated.Revision, "organization.role.updated", map[string]any{
-			"organization_id": orgID, "role_id": roleID, "revision": updated.Revision,
+			"organization_id": orgID, "role_id": roleID, "role_code": updated.Code, "revision": updated.Revision,
 		})
 	})
 	if err != nil {
@@ -429,7 +429,7 @@ func (uc *OrgIAMUsecase) PutRoleGrants(ctx context.Context, actor ActorContext, 
 			return err
 		}
 		return orgEvent(ctx, uc.Services, tx, orgID, revision, "organization.role.updated", map[string]any{
-			"organization_id": orgID, "role_id": roleID, "revision": revision,
+			"organization_id": orgID, "role_id": roleID, "role_code": role.Code, "revision": revision,
 		})
 	})
 	if err != nil {
@@ -472,7 +472,7 @@ func (uc *OrgIAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, or
 			return err
 		}
 		return orgEvent(ctx, uc.Services, tx, orgID, expected+1, "organization.role.archived", map[string]any{
-			"organization_id": orgID, "role_id": roleID, "revision": expected + 1,
+			"organization_id": orgID, "role_id": roleID, "role_code": role.Code, "revision": expected + 1,
 		})
 	})
 }
@@ -595,7 +595,8 @@ func (uc *OrgIAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContex
 			return err
 		}
 		return orgEvent(ctx, uc.Services, tx, orgID, expected+1, "organization.assignment.revoked", map[string]any{
-			"organization_id": orgID, "assignment_id": assignmentID, "revision": expected + 1,
+			"organization_id": orgID, "assignment_id": assignmentID,
+			"user_id": assignment.UserID, "role_id": assignment.RoleID, "revision": expected + 1,
 		})
 	})
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/internal/service"
 )
 
 const consentRedirect = "https://app.example.com/callback"
@@ -136,6 +137,7 @@ func TestOIDCConsentLifecycle(t *testing.T) {
 func TestOIDCConsentHandleRequiresTheOriginatingSession(t *testing.T) {
 	h := newHarness(t)
 	consentClient(t, h, []string{"openid"})
+	fixtureUserWithEmail(t, h, "intruder", "intruder@example.com")
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	rec := h.do(http.MethodGet, "/oidc/authorize?"+consentQuery("openid", "").Encode(), nil, "", false)
 	loc, err := url.Parse(rec.Header().Get("Location"))
@@ -146,23 +148,48 @@ func TestOIDCConsentHandleRequiresTheOriginatingSession(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, h.do(http.MethodGet, "/api/v1/me/oidc-requests/"+handle, nil, "", false).Code)
 	require.Equal(t, http.StatusUnauthorized, h.do(http.MethodPost,
 		"/api/v1/me/oidc-requests/"+handle+":decide", map[string]any{"handle": handle, "approve": true}, "", true).Code)
+
+	// A different signed-in user cannot see or consume another user's handle;
+	// the response is the same as for an unknown handle.
+	require.Equal(t, http.StatusOK, h.login("intruder", "InvitePass-123").Code)
+	require.Equal(t, http.StatusNotFound, h.do(http.MethodGet, "/api/v1/me/oidc-requests/"+handle, nil, "", false).Code)
+	require.Equal(t, http.StatusNotFound, h.do(http.MethodPost,
+		"/api/v1/me/oidc-requests/"+handle+":decide", map[string]any{"handle": handle, "approve": true}, "", true).Code)
 }
 
 func TestOIDCEndSession(t *testing.T) {
 	h := newHarness(t)
 	consentClient(t, h, []string{"openid", "profile"})
+	_, err := h.svc.OIDCClients.CreateOIDCClient(context.Background(), nil, &biz.OIDCClient{
+		ClientID: "other_client", Name: "Other App", ServiceOwner: "example",
+		Status: "active", RedirectURIs: []string{"https://other.example.com/callback"},
+		PostLogoutRedirectURIs: []string{"https://other.example.com/out"},
+		Scopes:                 []string{"openid"}, Public: true, RequirePKCE: true, AccessTTL: 900, RefreshTTL: 3600,
+	})
+	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	disco := decode[map[string]any](t, h.do(http.MethodGet, "/.well-known/openid-configuration", nil, "", false))
 	require.Contains(t, disco["end_session_endpoint"], "/oidc/logout")
 
-	// An unregistered post_logout_redirect_uri never redirects.
+	// An unregistered post_logout_redirect_uri is never followed, but it must
+	// not leave the server-side session alive behind a cleared browser cookie.
 	bad := h.do(http.MethodGet, "/oidc/logout?"+url.Values{
 		"client_id": {"consent_client"}, "post_logout_redirect_uri": {"https://attacker.example.com/"},
 	}.Encode(), nil, "", false)
 	require.Equal(t, http.StatusBadRequest, bad.Code)
+	require.Contains(t, bad.Body.String(), "已退出")
+	cleared := false
+	for _, cookie := range bad.Result().Cookies() {
+		if cookie.Name == service.SessionCookie && cookie.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	require.True(t, cleared, "a rejected logout must still clear the session cookie")
+	require.Equal(t, http.StatusUnauthorized, h.do(http.MethodGet, "/api/v1/me", nil, "", false).Code)
 
 	// A valid ID token hint identifies the client and permits the registered
 	// post-logout target.
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	loc := h.authorize(t, consentQuery("openid", ""))
 	tokenRec := h.doForm("/oidc/token", url.Values{
 		"grant_type": {"authorization_code"}, "code": {loc.Query().Get("code")},
@@ -175,15 +202,23 @@ func TestOIDCEndSession(t *testing.T) {
 		"id_token_hint": {validHint}, "post_logout_redirect_uri": {"https://app.example.com/logged-out"},
 	}.Encode(), nil, "", false)
 	require.Equal(t, http.StatusFound, withHint.Code, withHint.Body.String())
+	require.Equal(t, "https://app.example.com/logged-out", withHint.Header().Get("Location"))
+	require.Equal(t, http.StatusUnauthorized, h.do(http.MethodGet, "/api/v1/me", nil, "", false).Code)
 
-	// Cross-client hints do not authorize another client's unregistered target.
+	// A hint for another client must not authorize a redirect registered for a
+	// different client, even when that target exists in the other client's
+	// whitelist.
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	cross := h.do(http.MethodGet, "/oidc/logout?"+url.Values{
-		"id_token_hint": {validHint}, "client_id": {"consent_client"},
-		"post_logout_redirect_uri": {"https://attacker.example.com/"},
+		"id_token_hint": {validHint}, "client_id": {"other_client"},
+		"post_logout_redirect_uri": {"https://other.example.com/out"},
 	}.Encode(), nil, "", false)
 	require.Equal(t, http.StatusBadRequest, cross.Code)
+	require.Contains(t, cross.Body.String(), "does not match")
+	require.Equal(t, http.StatusUnauthorized, h.do(http.MethodGet, "/api/v1/me", nil, "", false).Code)
 
 	// client_id alone is accepted, but the target is still whitelisted.
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	q := url.Values{"client_id": {"consent_client"},
 		"post_logout_redirect_uri": {"https://app.example.com/logged-out"}, "state": {"s-9"}}
 	good := h.do(http.MethodGet, "/oidc/logout?"+q.Encode(), nil, "", false)
@@ -210,7 +245,7 @@ func TestOIDCEndSession(t *testing.T) {
 		}.Encode(), nil, "", false)
 		require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 	}
-	// A hint for another client never authorizes an unregistered target.
+	// An unregistered target is still rejected for invalid hints.
 	require.Equal(t, http.StatusBadRequest, h.do(http.MethodGet, "/oidc/logout?"+url.Values{
 		"id_token_hint": {expired}, "client_id": {"consent_client"},
 		"post_logout_redirect_uri": {"https://example.com/other"},

@@ -2,6 +2,8 @@ package server
 
 import (
 	"errors"
+	"fmt"
+	"html"
 	"mime"
 	"net/http"
 	"net/url"
@@ -159,13 +161,20 @@ func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase) {
 			State:                 form.Get("state"),
 		})
 		if err != nil {
+			// A rejected redirect (or a client/hint mismatch) still ends the
+			// local session in the usecase. Clear the cookie here instead of
+			// leaving a browser that believes it logged out holding a live
+			// session token, and render a browser-readable error page.
+			var oe *biz.OIDCError
+			if errors.As(err, &oe) {
+				clearSessionCookie(w, mw)
+				writeOIDCLogoutError(w, oe)
+				return
+			}
 			writeOIDCError(w, err)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{
-			Name: service.SessionCookie, Value: "", Path: "/", HttpOnly: true, MaxAge: -1,
-			Secure: mw.CookieSecure(), SameSite: http.SameSiteLaxMode, Domain: mw.CookieDomain(),
-		})
+		clearSessionCookie(w, mw)
 		if redirect != "" {
 			http.Redirect(w, r, redirect, http.StatusFound)
 			return
@@ -256,4 +265,29 @@ func writeOIDCJSONError(w http.ResponseWriter, status int, code, description str
 	w.WriteHeader(status)
 	body, _ := jsonx.Marshal(map[string]string{"error": code, "error_description": description})
 	_, _ = w.Write(body)
+}
+
+// clearSessionCookie removes the browser session cookie with the same
+// attributes used when it was set, so the deletion actually matches.
+func clearSessionCookie(w http.ResponseWriter, mw *Middleware) {
+	http.SetCookie(w, &http.Cookie{
+		Name: service.SessionCookie, Value: "", Path: "/", HttpOnly: true, MaxAge: -1,
+		Secure: mw.CookieSecure(), SameSite: http.SameSiteLaxMode, Domain: mw.CookieDomain(),
+	})
+}
+
+// writeOIDCLogoutError renders a readable page for a logout request whose
+// redirect could not be honoured. The local session has already been revoked;
+// the page must not imply otherwise.
+func writeOIDCLogoutError(w http.ResponseWriter, oe *biz.OIDCError) {
+	status := oe.Status
+	if status == 0 {
+		status = http.StatusBadRequest
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	w.WriteHeader(status)
+	_, _ = fmt.Fprintf(w, `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>已退出登录</title></head><body style="font-family:system-ui;padding:48px;text-align:center"><p>已退出用户中心登录，但无法返回应用：</p><p><code>%s</code> %s</p><p><a href="/login">重新登录</a></p></body></html>`,
+		html.EscapeString(oe.Code), html.EscapeString(oe.Description))
 }

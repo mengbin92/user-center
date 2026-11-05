@@ -145,7 +145,11 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 				Name: service.SessionCookie, Value: "", Path: "/", HttpOnly: true,
 				Secure: m.secure, SameSite: http.SameSiteLaxMode, Domain: m.domain, MaxAge: -1,
 			})
-		} else if requiresAuth(r.URL.Path) {
+		} else {
+			// A cookie was presented but could not be checked (DB/cache
+			// outage). Fail closed for every route: otherwise public handlers
+			// such as /oidc/logout would clear the cookie and claim success
+			// while the server-side session stays valid.
 			writeError(w, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "依赖服务暂不可用")
 			return ctx, false
 		}

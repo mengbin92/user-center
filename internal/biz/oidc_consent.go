@@ -220,6 +220,12 @@ type OIDCLogoutRequest struct {
 // Logout ends the local session and resolves the validated post-logout target.
 // An invalid or expired hint is treated exactly like a missing hint: it never
 // reveals whether the session or the user still exists.
+//
+// The local session is always revoked before the redirect is validated. A
+// bad or unregistered post_logout_redirect_uri must not turn into "logged out
+// in the browser but still valid on the server"; it only suppresses the
+// redirect and yields an error page the transport renders after clearing the
+// cookie.
 func (uc *OIDCUsecase) Logout(ctx context.Context, actor ActorContext, req OIDCLogoutRequest) (string, error) {
 	hintClientID := ""
 	if strings.TrimSpace(req.IDTokenHint) != "" {
@@ -229,21 +235,14 @@ func (uc *OIDCUsecase) Logout(ctx context.Context, actor ActorContext, req OIDCL
 			}
 		}
 	}
-	clientID := strings.TrimSpace(req.ClientID)
+	explicitClientID := strings.TrimSpace(req.ClientID)
+	// RP-Initiated Logout 1.0: when both are supplied, client_id must match the
+	// hint's aud. A mismatch is rejected below, but the local session is still
+	// ended (fail-safe: a request must never leave a session alive by accident).
+	mismatch := explicitClientID != "" && hintClientID != "" && explicitClientID != hintClientID
+	clientID := explicitClientID
 	if clientID == "" {
 		clientID = hintClientID
-	}
-	// A hint for another client is not authoritative: when client_id was
-	// supplied explicitly it wins, which is the same outcome as ignoring an
-	// invalid hint. Either way the whitelist is still enforced below.
-	target := strings.TrimSpace(req.PostLogoutRedirectURI)
-	redirect := ""
-	if target != "" {
-		client, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, nil, clientID)
-		if err != nil || client.Status != "active" || !slices.Contains(client.PostLogoutRedirectURIs, target) {
-			return "", oidcErr("invalid_request", "post_logout_redirect_uri is not registered", 400)
-		}
-		redirect = appendQuery(target, map[string]string{"state": req.State})
 	}
 	if actor.Session != nil {
 		now := uc.Clock.Now().UTC()
@@ -252,6 +251,18 @@ func (uc *OIDCUsecase) Logout(ctx context.Context, actor ActorContext, req OIDCL
 		}
 		_ = uc.StepUp.Delete(ctx, StepUpKey(actor.Session))
 		_ = uc.audit(ctx, nil, actor, "auth.logout", actor.Session.ID, "{}", "{}", "{}", "RP-initiated logout", "success")
+	}
+	if mismatch {
+		return "", oidcErr("invalid_request", "client_id does not match id_token_hint", 400)
+	}
+	target := strings.TrimSpace(req.PostLogoutRedirectURI)
+	redirect := ""
+	if target != "" {
+		client, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, nil, clientID)
+		if err != nil || client.Status != "active" || !slices.Contains(client.PostLogoutRedirectURIs, target) {
+			return "", oidcErr("invalid_request", "post_logout_redirect_uri is not registered", 400)
+		}
+		redirect = appendQuery(target, map[string]string{"state": req.State})
 	}
 	return redirect, nil
 }

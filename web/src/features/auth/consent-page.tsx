@@ -160,7 +160,7 @@ export function ConsentPage() {
                     </div>
                     <p className="flex items-center gap-1 text-[11px] text-slate-400">
                       <ExternalLink className="h-3 w-3" />
-                      授权完成后将返回应用；本页不会签发授权码。
+                      打开本页不会签发授权码；点击「同意并继续」后才会向应用返回授权码。
                     </p>
                   </CardContent>
                 </Card>

@@ -131,6 +131,21 @@ func TestOrgEventsRollbackAndEventIDDedupe(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, events)
 
+	// Appending inside a transaction that later rolls back must not leave a
+	// row behind; this is the property the business writes rely on.
+	err = h.svc.Tx.InTx(ctx, func(ctx context.Context, tx biz.Tx) error {
+		require.NoError(t, h.svc.Outbox.Append(ctx, tx, &biz.Event{
+			EventID: "rolled-back-event", AggregateType: "organization",
+			AggregateID: parseID(t, orgID), EventType: "organization.member.added",
+			SchemaVersion: 1, Payload: `{}`, OccurredAt: time.Now().UTC(),
+		}))
+		return biz.ErrDependency
+	})
+	require.Error(t, err)
+	events, err = h.svc.Outbox.PendingEventsForClient(ctx, nil, client, 100)
+	require.NoError(t, err)
+	require.Empty(t, events)
+
 	// event_id is the outbox primary key: a duplicate cannot be inserted.
 	require.NoError(t, h.svc.Outbox.Append(ctx, nil, &biz.Event{
 		EventID: "unique-org-event", AggregateType: "organization",
@@ -369,4 +384,114 @@ func TestProviderViewIsReadOnlyAndToggleEnabled(t *testing.T) {
 	require.Greater(t, after, policy, "provider enable must advance the policy revision")
 	afterContext := h.do(http.MethodGet, "/api/v1/auth/context", nil, "", false).Body.String()
 	require.Contains(t, afterContext, "github", "enabling a provider must change the login entry points")
+}
+
+// TestCustomMemberManagerCannotMintAdmins covers the V2.4 R3 rule that only
+// owner/admin (not an arbitrary custom role holding member.manage) may grant
+// or modify the admin role.
+func TestCustomMemberManagerCannotMintAdmins(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	orgID := createTestOrg(t, h, "role-escalation")
+	fixtureStepUp(h)
+	ctx := context.Background()
+	orgIDNum := parseID(t, orgID)
+	authCtx := authorization.Organization(orgIDNum)
+
+	victim := fixtureUserWithEmail(t, h, "custom_manager", "custom_manager@example.com")
+	adminUser := fixtureUserWithEmail(t, h, "real_admin", "real_admin@example.com")
+	for _, in := range []struct {
+		user *biz.User
+		role string
+	}{{victim, biz.OrgRoleMember}, {adminUser, biz.OrgRoleAdmin}} {
+		rec := h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/members", map[string]any{
+			"identifier": in.user.Username, "role": in.role, "reason": "fixture",
+		}, "", true)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	role, err := h.svc.OrgIAM.CreateRole(ctx, nil, authCtx, &biz.Role{
+		Code: "custom_member_manager", Name: "Custom member manager", Status: biz.RoleStatusActive,
+	})
+	require.NoError(t, err)
+	_, err = h.svc.OrgIAM.PutRoleGrants(ctx, nil, authCtx, role.ID, []biz.Grant{{
+		Operation: biz.PermOrgMemberManage, Effect: authorization.Allow, Scope: authorization.Scope{All: true},
+	}}, role.Revision)
+	require.NoError(t, err)
+	_, err = h.svc.OrgIAM.CreateAssignment(ctx, nil, authCtx, &biz.Assignment{
+		UserID: victim.ID, RoleID: role.ID, Boundary: authorization.Scope{All: true},
+		Origin: biz.OriginExplicit, AssignedBy: 1, CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	members := decode[map[string]any](t, h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/members", nil, "", false))
+	revisions := map[string]string{}
+	for _, raw := range members["items"].([]any) {
+		item := raw.(map[string]any)
+		revisions[item["user_id"].(string)] = item["revision"].(string)
+	}
+	victimID := strconv.FormatInt(victim.ID, 10)
+	adminID := strconv.FormatInt(adminUser.ID, 10)
+	require.NotEmpty(t, revisions[victimID])
+	require.NotEmpty(t, revisions[adminID])
+
+	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true).Code)
+	require.Equal(t, http.StatusOK, h.login("custom_manager", "InvitePass-123").Code)
+	fixtureStepUp(h)
+
+	selfPromote := h.do(http.MethodPatch, "/api/v1/orgs/"+orgID+"/members/"+victimID, map[string]any{
+		"role": "admin", "expected_revision": revisions[victimID], "reason": "self promote",
+	}, "", true)
+	require.Equal(t, http.StatusForbidden, selfPromote.Code, selfPromote.Body.String())
+
+	demoteAdmin := h.do(http.MethodPatch, "/api/v1/orgs/"+orgID+"/members/"+adminID, map[string]any{
+		"role": "member", "expected_revision": revisions[adminID], "reason": "demote",
+	}, "", true)
+	require.Equal(t, http.StatusForbidden, demoteAdmin.Code, demoteAdmin.Body.String())
+
+	newcomer := fixtureUserWithEmail(t, h, "minted_admin", "minted_admin@example.com")
+	addAdmin := h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/members", map[string]any{
+		"identifier": newcomer.Username, "role": "admin", "reason": "mint admin",
+	}, "", true)
+	require.Equal(t, http.StatusForbidden, addAdmin.Code, addAdmin.Body.String())
+
+	inviteAdmin := h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/invitations", map[string]any{
+		"email": "minted_admin@example.com", "role": "admin", "reason": "mint admin by invite",
+	}, "", true)
+	require.Equal(t, http.StatusForbidden, inviteAdmin.Code, inviteAdmin.Body.String())
+
+	// The protected roles are unchanged.
+	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true).Code)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	after := decode[map[string]any](t, h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/members", nil, "", false))
+	roles := map[string]string{}
+	for _, raw := range after["items"].([]any) {
+		item := raw.(map[string]any)
+		roles[item["user_id"].(string)] = item["role"].(string)
+	}
+	require.Equal(t, "member", roles[victimID])
+	require.Equal(t, "admin", roles[adminID])
+}
+
+// Invitation listings contain invitee e-mail addresses and must not be visible
+// to plain members.
+func TestInvitationListRequiresMemberManage(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	orgID := createTestOrg(t, h, "invite-pii")
+	fixtureStepUp(h)
+	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/invitations", map[string]any{
+		"email": "pending@example.com", "role": "member", "reason": "fixture",
+	}, "", true).Code)
+
+	member := fixtureUserWithEmail(t, h, "plain_member", "plain_member@example.com")
+	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/members", map[string]any{
+		"identifier": member.Username, "role": "member", "reason": "fixture",
+	}, "", true).Code)
+
+	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true).Code)
+	require.Equal(t, http.StatusOK, h.login("plain_member", "InvitePass-123").Code)
+	rec := h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/invitations", nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	require.NotContains(t, rec.Body.String(), "pending@example.com")
 }
