@@ -104,3 +104,26 @@ func TestOIDCAuthorizationCodeConsumedOnce(t *testing.T) {
 	}
 	require.Equal(t, 1, successes)
 }
+
+func TestConsentUpsertAdvancesRevisionAndKeepsScopes(t *testing.T) {
+	d := testData(t)
+	repo := NewOIDCConsentRepo(d)
+	ctx := context.Background()
+
+	require.NoError(t, repo.UpsertConsent(ctx, nil, &biz.OIDCConsent{
+		ClientID: "client", UserID: 7, Scopes: []string{"openid"},
+	}))
+	first, err := repo.GetConsent(ctx, nil, "client", 7)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), first.Revision)
+
+	// Approving a widened scope set updates the row and advances revision; it
+	// must not stay pinned at 1 (lost-update detection depends on it).
+	require.NoError(t, repo.UpsertConsent(ctx, nil, &biz.OIDCConsent{
+		ClientID: "client", UserID: 7, Scopes: []string{"openid", "profile"},
+	}))
+	second, err := repo.GetConsent(ctx, nil, "client", 7)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), second.Revision)
+	require.ElementsMatch(t, []string{"openid", "profile"}, second.Scopes)
+}

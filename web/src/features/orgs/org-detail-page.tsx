@@ -26,6 +26,7 @@ import {
   OrganizationStatusBadge,
   useOrganization,
 } from './org-shared'
+import { isOrganizationManager } from './org-utils'
 
 const TAB_KEYS = [
   'overview',
@@ -104,7 +105,12 @@ export function OrganizationDetailPage() {
                   label: '成员',
                   count: Number(org.member_count ?? 0),
                 },
-                { key: 'invitations', label: '邀请' },
+                // Invitations expose invitee e-mail addresses; the server
+                // requires organization.member.manage, so only managers see
+                // this tab.
+                ...(isOrganizationManager(org.role)
+                  ? [{ key: 'invitations', label: '邀请' }]
+                  : []),
                 { key: 'departments', label: '部门' },
                 { key: 'roles', label: '角色与授权' },
                 { key: 'audits', label: '审计' },
@@ -120,7 +126,7 @@ export function OrganizationDetailPage() {
             {tab === 'members' ? (
               <OrganizationMembersTab org={org} orgId={orgId} />
             ) : null}
-            {tab === 'invitations' ? (
+            {tab === 'invitations' && isOrganizationManager(org.role) ? (
               <OrganizationInvitationsTab
                 orgId={orgId}
                 active={org.status === 'active'}

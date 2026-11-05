@@ -456,6 +456,9 @@ const (
 	OrgRoleMember     = "member"
 	OrgMemberActive   = "active"
 	OrgMemberRemoved  = "removed"
+
+	DepartmentStatusActive   = "active"
+	DepartmentStatusArchived = "archived"
 )
 
 // Organization-scoped IAM. Membership roles are the coarse projection; the

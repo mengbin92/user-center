@@ -215,6 +215,10 @@ func TestOrgEventsArePIIFreeAndSubscriptionFiltered(t *testing.T) {
 		require.NotContains(t, event.Payload, "@")
 		require.NotContains(t, event.Payload, "email")
 		require.NotContains(t, event.Payload, "event_member")
+		// The documented contract is role_code (org_member), not the coarse
+		// membership role ("member").
+		require.Contains(t, event.Payload, `"role_code":"org_member"`)
+		require.NotContains(t, event.Payload, `"role":`)
 	}
 
 	// A subscriber that did not opt into organization events sees none.

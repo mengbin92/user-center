@@ -35,19 +35,19 @@ type InvitationInput struct {
 	DepartmentID *int64
 }
 
-func (uc *OrganizationUsecase) invitationGuard(ctx context.Context, actor ActorContext, orgID int64, write bool) (string, error) {
+func (uc *OrganizationUsecase) invitationGuard(ctx context.Context, actor ActorContext, orgID int64, manage, stepUp bool) (string, error) {
 	_, role, err := uc.orgAccess(ctx, actor, orgID)
 	if err != nil {
 		return "", err
 	}
 	operation := PermOrgMemberRead
-	if write {
+	if manage {
 		operation = PermOrgMemberManage
 	}
 	if err := uc.orgPermission(ctx, actor, orgID, operation, 0, true); err != nil {
 		return "", err
 	}
-	if write {
+	if stepUp {
 		if err := uc.RequireStepUp(ctx, actor); err != nil {
 			return "", err
 		}
@@ -56,7 +56,7 @@ func (uc *OrganizationUsecase) invitationGuard(ctx context.Context, actor ActorC
 }
 
 func (uc *OrganizationUsecase) CreateInvitation(ctx context.Context, actor ActorContext, orgID int64, in InvitationInput, reason string) (*OrganizationInvitation, string, error) {
-	role, err := uc.invitationGuard(ctx, actor, orgID, true)
+	role, err := uc.invitationGuard(ctx, actor, orgID, true, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -74,13 +74,17 @@ func (uc *OrganizationUsecase) CreateInvitation(ctx context.Context, actor Actor
 		return nil, "", Validation("组织角色只能是 owner/admin/member")
 	}
 	// Only an owner (or the platform administrator) may invite another owner.
-	// Inviting an admin follows the same rule as AddMember: anyone holding
-	// organization.member.manage (owner or org admin) may do it.
+	// Inviting an admin is limited to owner/admin/platform: a custom role that
+	// merely carries organization.member.manage must not mint organization
+	// administrators.
 	if in.Role == OrgRoleOwner && role != "platform" && role != OrgRoleOwner {
 		return nil, "", ErrPermissionDenied
 	}
+	if in.Role == OrgRoleAdmin && role != "platform" && role != OrgRoleOwner && role != OrgRoleAdmin {
+		return nil, "", ErrPermissionDenied
+	}
 	if in.DepartmentID != nil {
-		if _, err := uc.Organizations.GetDepartment(ctx, nil, orgID, *in.DepartmentID); err != nil {
+		if _, err := uc.activeDepartment(ctx, orgID, *in.DepartmentID); err != nil {
 			return nil, "", Validation("部门不存在")
 		}
 	}
@@ -92,17 +96,19 @@ func (uc *OrganizationUsecase) CreateInvitation(ctx context.Context, actor Actor
 	expires := now.Add(uc.OrgInvitationTTL)
 	var created *OrganizationInvitation
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// Re-inviting an address revokes *all* of its pending invitations so
+		// only one token can ever be live, even under concurrent requests.
+		// Revoke first: otherwise a re-invite at the pending-invitation limit
+		// is rejected even though it does not increase the live count.
+		if err := uc.Organizations.RevokePendingInvitationsForEmail(ctx, tx, orgID, in.Email); err != nil {
+			return ErrDependency
+		}
 		n, err := uc.Organizations.CountPendingInvitations(ctx, tx, orgID, now)
 		if err != nil {
 			return ErrDependency
 		}
 		if n >= MaxPendingInvitationsPerOrg {
 			return ConflictCode(InvitationErrQuota, "本组织待接受邀请已达上限")
-		}
-		// Re-inviting an address revokes *all* of its pending invitations so
-		// only one token can ever be live, even under concurrent requests.
-		if err := uc.Organizations.RevokePendingInvitationsForEmail(ctx, tx, orgID, in.Email); err != nil {
-			return ErrDependency
 		}
 		row, err := uc.Organizations.CreateInvitation(ctx, tx, &OrganizationInvitation{
 			OrganizationID: orgID, Email: in.Email, EmailNormalized: in.Email,
@@ -138,7 +144,10 @@ func (uc *OrganizationUsecase) CreateInvitation(ctx context.Context, actor Actor
 }
 
 func (uc *OrganizationUsecase) ListInvitations(ctx context.Context, actor ActorContext, orgID int64, status string) ([]*OrganizationInvitation, error) {
-	if _, err := uc.invitationGuard(ctx, actor, orgID, false); err != nil {
+	// The list contains invitee e-mail addresses, so it follows the same
+	// permission as create/revoke instead of plain member read (which would
+	// expose third-party PII to every organization member).
+	if _, err := uc.invitationGuard(ctx, actor, orgID, true, false); err != nil {
 		return nil, err
 	}
 	queryStatus := status
@@ -172,7 +181,7 @@ func invitationStatus(inv *OrganizationInvitation, now time.Time) string {
 }
 
 func (uc *OrganizationUsecase) RevokeInvitation(ctx context.Context, actor ActorContext, orgID, invitationID int64, expected uint64, reason string) error {
-	if _, err := uc.invitationGuard(ctx, actor, orgID, true); err != nil {
+	if _, err := uc.invitationGuard(ctx, actor, orgID, true, true); err != nil {
 		return err
 	}
 	if strings.TrimSpace(reason) == "" {
@@ -186,6 +195,9 @@ func (uc *OrganizationUsecase) RevokeInvitation(ctx context.Context, actor Actor
 		return ConflictCode(InvitationErrExpired, "邀请已过期")
 	}
 	if invitation.Status != OrgInvitationPending {
+		if invitation.Status == OrgInvitationRevoked {
+			return ConflictCode(InvitationErrRevoked, "邀请已被撤销")
+		}
 		return ConflictCode(InvitationErrUsed, "邀请已不可撤销")
 	}
 	invitation.Status = OrgInvitationRevoked
@@ -271,7 +283,7 @@ func (uc *OrganizationUsecase) AcceptInvitation(ctx context.Context, actor Actor
 		}
 		payload, _ := jsonx.Marshal(map[string]any{
 			"organization_id": invitation.OrganizationID, "user_id": actor.User.ID,
-			"role": invitation.Role, "revision": member.Revision,
+			"role_code": OrgRoleCode(invitation.Role), "revision": member.Revision,
 		})
 		return uc.emit(ctx, tx, "organization", invitation.OrganizationID, member.Revision, "organization.member.added", string(payload))
 	})

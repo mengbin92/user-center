@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.1] - 2026-11-05
+
+**版本判定：PATCH**（v0.6.0 → v0.6.1）。第二轮完整 code review 修复，无新增能力、无迁移、无破坏性契约变更。共修复 1 个 P1、6 个 P2、9 个 P3，详见 [发布说明](releases/release-v0.6.1.md)。
+
+### Fixed
+
+- **P1 组织提权**：持有 `organization.member.manage` 的非管理员自定义角色不能再授予/修改 `admin`，也不能邀请 `admin`；只有 platform/owner/admin 可授予 admin，只有 platform/owner 可修改现有 admin。
+- **P2 邀请竞态**：重新邀请撤销旧 pending 时递增 `revision`，接受/撤销 CAS 增加 `status='pending'`，在途令牌无法覆盖已撤销记录。
+- **P2 登出会话残留**：RP-initiated logout 的回跳被拒绝时仍先撤销本地会话、Step-up 并清 Cookie；`client_id` 与 hint `aud` 不一致返回 400。
+- **P2 邀请列表 PII**：列表要求 `organization.member.manage`，不再向普通成员暴露被邀请人邮箱；前端邀请 Tab 仅对 owner/admin/platform 展示。
+- **P2 OIDC 应用白名单**：编辑应用时提交 `post_logout_redirect_uris`，避免未携带字段导致已登记白名单被清空。
+- **P2 并发改用户名**：唯一索引冲突映射为 `USERNAME_EXISTS`（409）。
+- **P2 consent revision**：`UpsertConsent` 正确递增 `revision` 并更新 scopes。
+- **P3**：会话校验依赖故障时全路径 503 fail-closed；组织事件补齐 `role_code`/`user_id`/`role_id`；租户审计导出写入租户审计流；归档部门不可用于成员/邀请/部门树；部门环检测覆盖完整祖先链；重发邀请先撤销旧记录再查配额；重复撤销返回 `INVITATION_REVOKED`。
+
+### Tests
+
+- 新增 HTTP 级拒绝测试：自定义 `member.manage` 角色自升/降级/添加/邀请 admin 均 403；普通成员读取邀请列表 403；非法登出回跳后会话失效且 Cookie 清除。
+- 新增仓库测试：撤销邀请递增 revision 且旧快照 CAS 失败；consent upsert revision 递增；事务回滚不留下 Outbox 事件。
+
 ## [0.6.0] - 2026-11-05
 
 **版本判定：MINOR**（v0.5.2 → v0.6.0）。V2.4 R1–R14、code review 修复与工程前置一次性连续交付；分波次 tag 会让 v0.6.0/v0.7.0 缺少后续 P1 安全修复，故统一发版，决策已同步至 [路线图 §5](roadmap-v2.4.md) 与 [发布说明](releases/release-v0.6.0.md)。

@@ -106,6 +106,11 @@ func (uc *AuditUsecase) writeAuditExport(ctx context.Context, actor ActorContext
 		if err != nil {
 			return err
 		}
+		if job.OrganizationID != 0 {
+			// Keep the export event in the tenant audit stream; a platform-only
+			// row would hide tenant data egress from the tenant itself.
+			return uc.auditIn(ctx, tx, actor, job.OrganizationID, action, itoa(saved.ID), reason)
+		}
 		return uc.audit(ctx, tx, actor, action, kind, "{}", "{}", string(mustJSON(map[string]any{"fields": fields})), reason, "success")
 	})
 	if err != nil {

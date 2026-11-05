@@ -64,6 +64,12 @@ func (uc *UserUsecase) UpdateUsername(ctx context.Context, actor ActorContext, i
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		row, err := uc.Users.Update(ctx, tx, &user, in.ExpectedRevision)
 		if err != nil {
+			// The uniqueness pre-check runs outside the transaction. A
+			// concurrent rename can still hit the unique index; map that
+			// driver error to the same stable conflict the API documents.
+			if isUniqueViolation(err) {
+				return ErrUsernameExists
+			}
 			return err
 		}
 		updated = row

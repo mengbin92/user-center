@@ -35,9 +35,9 @@
 | 接入客户端 | 凭据只存 SHA-256、一次性展示、按 gRPC 方法白名单校验、可轮换/停用 |
 | Webhook | HMAC-SHA256 原始 body、至少一次投递、重试退避、消费端按 event_id 去重；公网回调必须 https，拒绝链路本地/未指定地址 |
 | OIDC Provider | 授权码一次性消费、PKCE S256、redirect_uri 精确匹配、RS256、短时 access/refresh token、客户端密钥摘要 |
-| OIDC 同意 | 一次性服务端 request handle（仅存哈希、绑定用户与 10 分钟有效期）；同意页不签发授权码；scope 扩张/`prompt=consent` 重新征询；`prompt=none` 返回 `interaction_required`；用户可在 `/me/oidc-consents` 撤销 |
-| RP-initiated logout | `post_logout_redirect_uri` 精确匹配客户端白名单；无效/过期/跨客户端 hint 与缺失 hint 行为一致；登出清理 Cookie 并撤销会话，重复调用幂等 |
-| 组织邀请 | 令牌只在邮件中出现、DB 存哈希、默认 72 小时（`ORG_INVITATION_TTL_HOURS` 可配）；接受要求登录且账号邮箱归一化后完全相等；不匹配/不存在返回同一 404；不自动建号；单组织待接受邀请有上限 |
+| OIDC 同意 | 一次性服务端 request handle（仅存哈希、绑定用户与 10 分钟有效期）；打开同意页不签发授权码，用户决意后才签码；scope 扩张/`prompt=consent` 重新征询；`prompt=none` 返回 `interaction_required`；用户可在 `/me/oidc-consents` 撤销 |
+| RP-initiated logout | `post_logout_redirect_uri` 精确匹配客户端白名单；无效/过期 hint 与缺失 hint 行为一致，`client_id` 与 hint `aud` 不一致时拒绝回跳；无论回跳是否被接受都先撤销本地会话并清理 Cookie，重复调用幂等 |
+| 组织邀请 | 令牌只在邮件中出现、DB 存哈希、默认 72 小时（`ORG_INVITATION_TTL_HOURS` 可配）；接受要求登录且账号邮箱归一化后完全相等；不匹配/不存在返回同一 404；不自动建号；单组织待接受邀请有上限；列表含被邀请人邮箱，因此与创建/撤销同要求 `organization.member.manage` |
 | 租户审计导出 | 复用平台导出任务与下载签名；`organization_id` 固定在过滤条件和任务行上；跨租户/策略版本变化/会话变化均返回 404；CSV 公式前缀转义 |
 | 组织域事件 | 与业务事务同提交；载荷只含 ID/revision/角色码，不含邮箱、昵称；订阅按 `event_type` 过滤，消费端按 `event_id` 去重并按 `aggregate_revision` 判新旧 |
 | 内部 gRPC 登录 | 凭据只在服务端 gRPC 传输；方法白名单 + 接入客户端鉴权；复用 HTTP 登录限流与失败计数；MFA 挑战绑定应用与身份版本且单次消费；会话 audience 绑定调用方应用；审计记录 `actor_service_id` |
@@ -87,8 +87,8 @@
 5. **组织域隔离的边界**：V2.3 已把角色、分配、审计收敛到 `organization:{id}` 上下文，组织查询在 SQL 层强制携带上下文。平台 `root/admin` 仍保留跨租户治理覆盖（这是设计选择，不是绕过）。组织成员列表、成员角色和部门仍以 `organization_id` 逻辑分区，未做独立库/表分区或行级安全（RLS）。
 6. **同步导出**：单次最多 100000 行，生成期间占用请求；超大导出需异步任务。
 7. **管理员邮箱变更依赖新邮箱可达**：验证码发送到新邮箱，管理员权限 + Step-up 防止误操作，但无法证明旧邮箱归属；需要旧邮箱确认的场景应走用户自助流程。
-8. **OIDC consent/end-session 尚未提供**：V2.1 对管理员注册的客户端自动同意，discovery 不宣告 end_session；交互式 consent 与 RP-initiated logout 计划在 V2.2。
-9. **组织创建暂无配额/审批**：任意已登录且状态正常的账号可创建组织；如需企业审批或数量上限，应在后续里程碑增加组织创建策略。
+8. **OIDC 登出的 front-channel 语义**：RP-initiated logout 使用浏览器顶层 GET 跳转，任何持有公开 `client_id` 与已注册登出回调的页面都能让已登录用户登出（logout CSRF），并可向其回调注入任意 `state`。这是协议固有行为，本服务不额外加确认页；依赖登出的应用应把 `state` 当作不可信输入。
+9. **组织创建只有数量配额，没有审批流**：`settings.organization` 默认关闭配额；开启后限制每用户组织数（平台管理员豁免），但不提供企业审批或白名单。需要审批流时应另行设计。
 10. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。
 
 ## 5. 上线检查

@@ -127,6 +127,11 @@ func (uc *OrganizationUsecase) Create(ctx context.Context, actor ActorContext, i
 		}
 		org, err := uc.Organizations.CreateOrganization(ctx, tx, &Organization{Code: in.Code, Name: in.Name, CreatedBy: actor.User.ID})
 		if err != nil {
+			// The uniqueness pre-check is outside the transaction; a concurrent
+			// create can still hit the unique index.
+			if isUniqueViolation(err) {
+				return ConflictCode("ORGANIZATION_CODE_EXISTS", "组织 code 已存在")
+			}
 			return err
 		}
 		created = org
@@ -293,6 +298,11 @@ func (uc *OrganizationUsecase) AddMember(ctx context.Context, actor ActorContext
 	if in.Role == OrgRoleOwner && role != "platform" && role != OrgRoleOwner {
 		return nil, ErrPermissionDenied
 	}
+	// A custom role carrying organization.member.manage is not an organization
+	// administrator and must not grant the admin role.
+	if in.Role == OrgRoleAdmin && role != "platform" && role != OrgRoleOwner && role != OrgRoleAdmin {
+		return nil, ErrPermissionDenied
+	}
 	identifier := strings.TrimSpace(in.Identifier)
 	if identifier == "" {
 		return nil, Validation("成员用户名或邮箱不能为空")
@@ -312,7 +322,7 @@ func (uc *OrganizationUsecase) AddMember(ctx context.Context, actor ActorContext
 		return nil, Validation("无法添加该账号")
 	}
 	if in.DepartmentID != nil {
-		if _, err := uc.Organizations.GetDepartment(ctx, nil, orgID, *in.DepartmentID); err != nil {
+		if _, err := uc.activeDepartment(ctx, orgID, *in.DepartmentID); err != nil {
 			return nil, Validation("部门不存在")
 		}
 	}
@@ -392,12 +402,18 @@ func (uc *OrganizationUsecase) UpdateMember(ctx context.Context, actor ActorCont
 		if member.Role == OrgRoleOwner || role == OrgRoleOwner {
 			return nil, ErrPermissionDenied
 		}
-		if member.Role == OrgRoleAdmin && actorRole == OrgRoleAdmin {
+		// Only an owner (or platform) may touch an existing admin. A custom
+		// role that merely holds organization.member.manage must not demote an
+		// admin, nor promote itself or another member to admin.
+		if member.Role == OrgRoleAdmin {
+			return nil, ErrPermissionDenied
+		}
+		if role == OrgRoleAdmin && actorRole != OrgRoleAdmin {
 			return nil, ErrPermissionDenied
 		}
 	}
 	if departmentID != nil {
-		if _, err := uc.Organizations.GetDepartment(ctx, nil, orgID, *departmentID); err != nil {
+		if _, err := uc.activeDepartment(ctx, orgID, *departmentID); err != nil {
 			return nil, Validation("部门不存在")
 		}
 	}
@@ -509,6 +525,16 @@ func (uc *OrganizationUsecase) Leave(ctx context.Context, actor ActorContext, or
 	})
 }
 
+// activeDepartment resolves a department that callers may use as a parent or
+// assign members to; archived departments are treated as missing.
+func (uc *OrganizationUsecase) activeDepartment(ctx context.Context, orgID, deptID int64) (*Department, error) {
+	dept, err := uc.Organizations.GetDepartment(ctx, nil, orgID, deptID)
+	if err != nil || dept.Status != DepartmentStatusActive {
+		return nil, ErrResourceNotFound
+	}
+	return dept, nil
+}
+
 func (uc *OrganizationUsecase) Departments(ctx context.Context, actor ActorContext, orgID int64) ([]*Department, error) {
 	if _, _, err := uc.orgAccess(ctx, actor, orgID); err != nil {
 		return nil, err
@@ -523,10 +549,6 @@ func (uc *OrganizationUsecase) CreateDepartment(ctx context.Context, actor Actor
 	if _, _, err := uc.orgAccess(ctx, actor, orgID); err != nil {
 		return nil, err
 	}
-	var err error
-	if err != nil {
-		return nil, err
-	}
 	if err := uc.orgPermission(ctx, actor, orgID, PermOrgDepartmentManage, 0, true); err != nil {
 		return nil, err
 	}
@@ -535,11 +557,12 @@ func (uc *OrganizationUsecase) CreateDepartment(ctx context.Context, actor Actor
 		return nil, Validation("部门 code/名称不合法")
 	}
 	if in.ParentID != 0 {
-		if _, err := uc.Organizations.GetDepartment(ctx, nil, orgID, in.ParentID); err != nil {
+		if _, err := uc.activeDepartment(ctx, orgID, in.ParentID); err != nil {
 			return nil, Validation("上级部门不存在")
 		}
 	}
 	var created *Department
+	var err error
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		row, err := uc.Organizations.CreateDepartment(ctx, tx, &Department{
 			OrganizationID: orgID, ParentID: in.ParentID, Code: in.Code, Name: in.Name,
@@ -565,14 +588,10 @@ func (uc *OrganizationUsecase) UpdateDepartment(ctx context.Context, actor Actor
 	if _, _, err := uc.orgAccess(ctx, actor, orgID); err != nil {
 		return nil, err
 	}
-	var err error
-	if err != nil {
-		return nil, err
-	}
 	if err := uc.orgPermission(ctx, actor, orgID, PermOrgDepartmentManage, 0, true); err != nil {
 		return nil, err
 	}
-	dept, err := uc.Organizations.GetDepartment(ctx, nil, orgID, deptID)
+	dept, err := uc.activeDepartment(ctx, orgID, deptID)
 	if err != nil {
 		return nil, ErrResourceNotFound
 	}
@@ -580,17 +599,21 @@ func (uc *OrganizationUsecase) UpdateDepartment(ctx context.Context, actor Actor
 		if in.ParentID == deptID {
 			return nil, Validation("部门不能以自身为上级")
 		}
-		if _, err := uc.Organizations.GetDepartment(ctx, nil, orgID, in.ParentID); err != nil {
+		if _, err := uc.activeDepartment(ctx, orgID, in.ParentID); err != nil {
 			return nil, Validation("上级部门不存在")
 		}
+		// Walk the full ancestor chain (not a fixed depth) and stop if the
+		// stored hierarchy already contains a cycle.
 		parent := in.ParentID
-		for i := 0; i < 32 && parent != 0; i++ {
-			if parent == deptID {
+		seen := map[int64]bool{}
+		for parent != 0 {
+			if parent == deptID || seen[parent] {
 				return nil, Validation("部门层级不能形成环")
 			}
+			seen[parent] = true
 			next, err := uc.Organizations.GetDepartment(ctx, nil, orgID, parent)
 			if err != nil {
-				break
+				return nil, Validation("上级部门不存在")
 			}
 			parent = next.ParentID
 		}
