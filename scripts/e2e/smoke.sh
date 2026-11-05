@@ -8,6 +8,7 @@ set -euo pipefail
 BASE_URL="http://127.0.0.1:8080"
 SNAPSHOT_DIR=""
 COMPOSE_FILE=""
+COMPOSE_ENV=""
 KEEP=0
 SMOKE_USER="${SMOKE_USER:-root}"
 SMOKE_PASSWORD="${SMOKE_PASSWORD:-ChangeMe-12345}"
@@ -18,6 +19,8 @@ Usage: scripts/e2e/smoke.sh [options]
   --base-url URL       target instance (default http://127.0.0.1:8080)
   --snapshot-dir DIR   where to write the failure snapshot
   --compose FILE       docker compose file; capture logs on failure
+  --compose-env FILE   env file for the compose file (required when the
+                       compose file uses :? interpolation, e.g. secrets)
   --keep               keep temporary request artifacts on success
   -h, --help           show this help
 Environment: SMOKE_USER, SMOKE_PASSWORD (password-only account, no MFA).
@@ -29,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     --base-url) BASE_URL="$2"; shift 2 ;;
     --snapshot-dir) SNAPSHOT_DIR="$2"; shift 2 ;;
     --compose) COMPOSE_FILE="$2"; shift 2 ;;
+    --compose-env) COMPOSE_ENV="$2"; shift 2 ;;
     --keep) KEEP=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -58,7 +62,13 @@ cleanup() {
     cp "$HEADERS" "$SNAPSHOT_DIR/last-headers" 2>/dev/null || true
     cp "$JAR" "$SNAPSHOT_DIR/cookies" 2>/dev/null || true
     if [[ -n "$COMPOSE_FILE" ]] && command -v docker >/dev/null 2>&1; then
-      docker compose -f "$COMPOSE_FILE" logs --no-color >"$SNAPSHOT_DIR/compose.log" 2>&1 || true
+      # The compose file interpolates required secrets, so the env file is
+      # needed even for `logs`; without it compose refuses to parse the file.
+      local compose_args=(-f "$COMPOSE_FILE")
+      if [[ -n "$COMPOSE_ENV" ]]; then
+        compose_args=(--env-file "$COMPOSE_ENV" "${compose_args[@]}")
+      fi
+      docker compose "${compose_args[@]}" logs --no-color >"$SNAPSHOT_DIR/compose.log" 2>&1 || true
     fi
     echo "E2E failed at '$step'; snapshot: $SNAPSHOT_DIR" >&2
   fi

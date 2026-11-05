@@ -37,7 +37,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Notes
 
-- 本地 compose 全流程冒烟因本机 Docker Desktop 端口转发/内部 DNS 异常未通过；MySQL 8.4 容器迁移真跑（001–011）与本地 dev 实例 E2E 冒烟均通过。
+- 本地 compose 全栈冒烟通过（MySQL 8.4 + Redis 7 + migrate 001–011 + user-center，连续两次全绿、日志 0 error/5xx）；MySQL 8.4 容器迁移真跑与本地 dev 实例 E2E 冒烟同样通过。首轮失败根因是 `docker compose build | tail` 掩盖构建失败导致复用旧镜像，已改为校验真实退出码与镜像创建时间。
+- `scripts/e2e/smoke.sh` 新增 `--compose-env`，用于带 `:?` 强制校验的 compose 文件抓取失败日志。
 - 范围决策：R13/R14 原分别标注「可滑动到 V2.5」与「未排期」，本次按用户要求一并交付（统一发 `v0.6.0`）。
 
 ## [0.5.2] - 2026-11-04
@@ -80,13 +81,6 @@ Full-project review follow-up. No schema change.
   recorded per statement.
 - `GetRole` loaded every role and scanned linearly; it now reads one role plus
   its grants and inheritance.
-
-### Added (W4/W5)
-
-- WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
-- 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
-- E2E 冒烟脚本正式收纳到 `scripts/e2e/smoke.sh`（`--base-url`、自动清理、失败快照）。
-- 迁移 `010_webauthn.sql`、`011_retention.sql`；新增 `github.com/fxamacker/cbor/v2` 依赖。
 
 ### Changed
 
@@ -131,13 +125,6 @@ V2.3 delivers organization-scoped IAM and tenant isolation.
   provisioning on first access).
 - SPA: organization "角色与授权" and "审计" tabs (custom roles, grants,
   assignments, tenant audit with action filter).
-
-### Added (W4/W5)
-
-- WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
-- 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
-- E2E 冒烟脚本正式收纳到 `scripts/e2e/smoke.sh`（`--base-url`、自动清理、失败快照）。
-- 迁移 `010_webauthn.sql`、`011_retention.sql`；新增 `github.com/fxamacker/cbor/v2` 依赖。
 
 ### Changed
 
@@ -238,13 +225,6 @@ Security-review and verification follow-up to 0.2.0.
 - Isolate frontend sessions and cached authorization; keep legacy governance
   roles pending until explicitly reassigned with a verified boundary.
 - Refuse unsigned Outbox webhook delivery when `OUTBOX_SIGNING_SECRET` is absent.
-
-### Added (W4/W5)
-
-- WebAuthn/Passkey 第二因素（R13）：attestation none、真实 COSE/ES256 验签、RP ID/origin 校验、sign_count 回退拒绝、Step-up 与登录 MFA、管理员策略联动、最后第二因素保护。
-- 个人信息保留与清理（R14）：`cmd/retention`、365 天可配保留期、dry-run/双人确认、legal hold、幂等匿名化、最小审计标识。
-- E2E 冒烟脚本正式收纳到 `scripts/e2e/smoke.sh`（`--base-url`、自动清理、失败快照）。
-- 迁移 `010_webauthn.sql`、`011_retention.sql`；新增 `github.com/fxamacker/cbor/v2` 依赖。
 
 ### Changed
 

@@ -186,6 +186,7 @@ cd web && npm run build # tsc + vite 构建
 - `internal/data`：唯一约束、revision CAS、会话哈希/撤销、目录种子幂等、legacy 导入、GitHub/Google 适配器（本地 fake provider）、SMTP（本地 fake server）、角色/分配跨上下文不可见与不可写。
 - `internal/server`：未登录 401、缺失 CSRF 403、登录、受限管理员越权 403、并发更新 409、导出下载、MFA 完整登录、注册/重置/改密、管理员邮箱变更、OAuth 绑定/登录/OAuth+MFA、委派、接入客户端与 Outbox 投递、MFA 强制与首次改密拦截、OIDC 授权码 + PKCE/refresh/userinfo、OIDC 客户端管理、组织/成员/部门与最后 owner 保护、组织自定义角色与授权、跨租户拒绝、租户审计过滤、存量组织 IAM 回填；OIDC 同意（首次/复用/拒绝/扩权/撤销/prompt）、end_session 白名单与幂等、邀请接受/过期/撤销/配额/跨租户、组织域 explain、租户审计导出隔离与 CSV 注入转义、组织事件 PII 与订阅过滤、gRPC 登录与 MFA 挑战重放、用户名修改冲突、单条预览与组织配额。
 - `docker build` / `docker buildx --platform linux/amd64`：镜像内迁移、健康检查与 SPA 均已验证。
+- `scripts/e2e/smoke.sh`：本地 dev 实例与 **compose 全栈**（MySQL 8.4 + Redis 7 + migrate 001–011）各跑通全部步骤，连续两次全绿、容器日志 0 error/5xx。
 - 真实 SMTP：QQ 邮箱 587/STARTTLS 发信并在收件箱确认（opt-in `TestLiveSMTP`）。
 
 ## 部署
@@ -197,6 +198,17 @@ docker compose up -d --build
 ```
 
 镜像同时包含 `user-center`、`migrate`、`admin-rescue` 与已构建的 SPA。`migrate` 以一次性任务运行，成功后主服务才启动。HTTPS、安全响应头与 Cookie `Secure` 由反向代理和 `COOKIE_SECURE=true` 共同保证。详见 [docs/operations.md](docs/operations.md)。
+
+部署完成后建议跑一次全链路冒烟（失败会自动写快照，不会残留临时目录）：
+
+```bash
+SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
+  scripts/e2e/smoke.sh --base-url http://127.0.0.1:8080 \
+  --compose deployments/docker-compose/docker-compose.yml \
+  --compose-env deployments/docker-compose/.env
+```
+
+覆盖健康检查、未登录 401、CSRF、登录、自服务面、Step-up、组织与租户边界、审计导出、登出失效。compose 环境的账号夹具与参数说明见 [scripts/e2e/README.md](scripts/e2e/README.md)。
 
 ## 文档
 

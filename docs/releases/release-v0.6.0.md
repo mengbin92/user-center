@@ -38,14 +38,25 @@
 
 ## 验证
 
-`./scripts/check.sh`（gofmt + go vet + go test + npm test + npm run build）通过；`go test -race ./domain/... ./internal/biz/ ./internal/data/` 通过；`make api` / `make wire` 生成物无差异；MySQL 8.4 容器真实应用 `001–011` 两次幂等通过；本地 dev 实例 E2E 冒烟通过。
+`./scripts/check.sh`（gofmt + go vet + go test + npm test + npm run build）通过；`go test -race ./domain/... ./internal/biz/ ./internal/data/` 通过；`make api` / `make wire` 生成物无差异；MySQL 8.4 容器真实应用 `001–011` 两次幂等通过；本地 dev 实例 E2E 冒烟通过；**本地 compose 全栈冒烟通过（连续两次全绿）**。
 
-`go vet ./...`、`go test ./...`、`cd web && npm test && npm run build` 全部通过；新增 HTTP 级用例覆盖同意首次/复用/拒绝/扩权/撤销/prompt、登出白名单与幂等、邀请过期/撤销/配额/跨租户、explain 允许/拒绝/过期分配、租户导出隔离/403/CSV 注入/policy revision、组织事件 PII/回滚/去重/订阅过滤。MySQL 迁移真跑已在临时 `mysql:8.4` 容器执行（001–009 两次幂等应用通过）；本地 compose 全流程冒烟仍需在部署环境执行。
+`go vet ./...`、`go test ./...`、`cd web && npm test && npm run build` 全部通过；新增 HTTP 级用例覆盖同意首次/复用/拒绝/扩权/撤销/prompt、登出白名单与幂等、邀请过期/撤销/配额/跨租户、explain 允许/拒绝/过期分配、租户导出隔离/403/CSV 注入/policy revision、组织事件 PII/回滚/去重/订阅过滤。MySQL 迁移真跑已在临时 `mysql:8.4` 容器执行（001–011 两次幂等应用通过）；compose 全栈（MySQL 8.4 + Redis 7 + migrate + user-center）冒烟两次通过。
+
+## compose 冒烟结果（2026-11-05）
+
+| 项 | 结果 |
+|---|---|
+| 镜像 | `user-center:latest` 重建，创建时间与 `HEAD` 一致 |
+| 容器 | mysql/redis healthy，migrate `Exited (0)`，user-center `healthy` |
+| 迁移 | `schema_migrations` 含 `010_webauthn`、`011_retention`；`webauthn_credentials`、`user_legal_holds`、`users.anonymized_at` 均存在 |
+| 冒烟 | `scripts/e2e/smoke.sh --compose ... --compose-env ...` 连续两次全部步骤通过 |
+| 日志 | 两次运行期间容器日志 0 条 `level=error`、0 个 5xx |
+| 落库 | 2 个组织、3 条审计（bootstrap + 2×`organization.create`）、3 条 Outbox（`user.created` + 2×`organization.created`） |
+
+> 首轮失败根因并非环境不可用：`docker compose build | tail` 让管道退出码恒为 0，构建失败被吞掉，`up -d` 复用了 11-04 的旧镜像（镜像内没有 V2.4 路由，`/api/v1/me/oidc-consents` 返回 404）。改为「构建输出落日志 + 校验真实退出码 + 比对镜像创建时间」后一次通过。`scripts/e2e/smoke.sh` 同时新增 `--compose-env`，否则带 `:?` 强制校验的 compose 文件连 `logs` 都无法解析。
 
 ## 未执行 / 已知限制
 
-- **本地 compose 全流程冒烟未通过**：镜像构建成功、MySQL/Redis/migrate 容器正常、`001–011` 迁移真实通过；`user-center` 容器受本机 Docker Desktop 端口转发残留与内部 DNS 异常影响三次启动失败，已 `docker compose down -v` 清理。部署前需在目标环境补跑一次 `scripts/e2e/smoke.sh --compose ...`。等效覆盖：MySQL 容器迁移真跑 + 本地 dev 实例 E2E 冒烟 + 全量测试。
 - 真实浏览器 WebAuthn 交互未在硬件认证器上验收；服务端验证链由软件 P-256 认证器端到端覆盖。
 - 清理任务不常驻、不自动调度，是否纳入定时任务由部署方按合规要求决定。
-- 迁移已在真实 MySQL 8.4 容器验证（`USER_CENTER_MYSQL_TEST_DSN`）；但**本地 compose 全流程冒烟未执行**，HTTP 级验证基于 SQLite 集成测试与生成物一致性检查。
-- v0.5.1 的 Docker E2E 脚本尚未收进 `scripts/e2e/`（路线图 §6 工程前置，本波次未做）。
+- compose 冒烟使用密码账号夹具（bootstrap root + 显式关闭「管理员必须 MFA」策略），管理员 MFA 登录链路本身由 `go test` 的 TOTP/WebAuthn 用例覆盖；部署到目标环境时仍建议按实际策略再跑一次 `scripts/e2e/smoke.sh --compose ...`。

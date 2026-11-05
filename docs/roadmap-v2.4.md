@@ -404,8 +404,9 @@
 - [x] `go vet ./...`
 - [x] `go test ./...`；涉及并发或授权上下文时加 `go test -race ./domain/... ./internal/biz/ ./internal/data/`
 - [x] `cd web && npm test && npm run build`
-- [x] 迁移真跑：`USER_CENTER_MYSQL_TEST_DSN=... go test ./cmd/migrate/`（2026-11-05 在临时 `mysql:8.4` 容器执行，两次幂等应用 001–009 全部通过，并断言新增表/列）
-- [ ] 本地 compose 全流程冒烟（含未登录 401、跨租户拒绝、Step-up、租户审计）—— 2026-11-05 三次尝试均因本机 Docker Desktop 端口转发/内部 DNS 异常失败；等效验证见下
+- [x] 迁移真跑：`USER_CENTER_MYSQL_TEST_DSN=... go test ./cmd/migrate/`（2026-11-05 在临时 `mysql:8.4` 容器执行，两次幂等应用 001–011 全部通过，并断言新增表/列）
+- [x] 本地 compose 全流程冒烟（含未登录 401、跨租户拒绝、Step-up、租户审计）—— 2026-11-05 二轮重跑通过：镜像重建后 `mysql:8.4` + `redis:7` + `migrate`（001–011，退出码 0）+ `user-center` 全栈 healthy，`scripts/e2e/smoke.sh --compose ... --compose-env ...` 连续两次全部步骤通过，容器日志 0 条 error/5xx，落库证据：2 个组织、3 条审计、3 条 Outbox 事件（`user.created` + 2×`organization.created`）
+  - 首次失败的根因不是环境不可用，而是 `docker compose build | tail` 掩盖了构建失败，`up -d` 复用了 11-04 的旧镜像（镜像内没有 V2.4 路由，`/api/v1/me/oidc-consents` 返回 404）。改用「构建输出落日志 + 校验退出码 + 比对镜像创建时间」后一次通过。
 
 工程前置（建议随 W1 一起做）：
 
@@ -454,8 +455,10 @@
 | 2026-11-04 | 初稿 | 基于 `v0.5.1` 盘点；确定 W1–W5 与 R1–R14，明确不纳入项与理由 |
 | 2026-11-05 | W1/W2 合入 | R1–R6 代码、迁移、前端与测试已合入 `develop`（`72437ce`、`4a55083`）；发布说明 `release-v0.6.0.md` |
 | 2026-11-05 | W3 合入 | R7–R12 代码、迁移、前端与测试已合入 `develop`；波次附记 `release-v0.7.0.md` |
-| 2026-11-05 | 范围说明 | R13（WebAuthn/Passkey）按 §3.3 整体滑动到 V2.5；R14 未排期。两者本次未实现，保留 `[ ]` |
+| 2026-11-05 | 范围说明（已更新） | R13（WebAuthn/Passkey）原按 §3.3 可滑动到 V2.5、R14 原未排期；按用户要求两者一并交付，验收项勾选，W4/W5 明细见 `release-v0.8.0.md` |
+| 2026-11-05 | 发版决策 | V2.4 全量统一发 `v0.6.0`（MINOR）；三份 release notes 改为一份正式说明 + 两份波次附记，§5 规则同步更新 |
+| 2026-11-05 | compose 冒烟 | 二轮重跑通过：全栈 healthy、冒烟连续两次全绿、日志 0 error/5xx；首次失败根因是 `build \| tail` 掩盖构建失败导致 `up -d` 复用旧镜像，已改为校验退出码与镜像创建时间 |
 
-> 说明：R1–R12 的验收项已在本地 SQLite 集成测试、前端组件测试与构建中验证；§6 中「MySQL 迁移真跑」已在临时 `mysql:8.4` 容器执行并通过（001–011，R13/R14 新增表/列已断言）；「E2E 脚本收纳」已完成并在本地 dev 实例跑通全部步骤；「本地 compose 全流程冒烟」因本机 Docker Desktop 网络/端口转发异常三次失败，保留 `[ ]`，详见 `release-v0.8.0.md`。R6 的「旧版本不覆盖新状态」属于订阅方投影语义，已在 `docs/architecture.md` §8.1 约定（`aggregate_revision` 判新旧），本仓库不持有下游投影实现。
+> 说明：R1–R12 的验收项已在本地 SQLite 集成测试、前端组件测试与构建中验证；§6 中「MySQL 迁移真跑」已在临时 `mysql:8.4` 容器执行并通过（001–011，R13/R14 新增表/列已断言）；「E2E 脚本收纳」已完成，本地 dev 实例与 **compose 全栈**均跑通全部步骤（compose 连续两次全绿）；「本地 compose 全流程冒烟」已于 2026-11-05 二轮重跑通过，**§6 门禁项全部勾选**。R6 的「旧版本不覆盖新状态」属于订阅方投影语义，已在 `docs/architecture.md` §8.1 约定（`aggregate_revision` 判新旧），本仓库不持有下游投影实现。
 
 维护约定：新差距先补进第 8 节矩阵并标注类型（A/B/C），再决定是否进当前波次；已合并的工作项把 `[ ]` 改成 `[x]` 并在变更记录留一行，不删除历史条目。

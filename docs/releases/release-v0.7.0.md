@@ -30,6 +30,6 @@
 
 ## 未执行 / 已知限制
 
-- 迁移真跑已在临时 `mysql:8.4` 容器通过；**本地 compose 全流程冒烟未执行**，HTTP 级验证基于 SQLite 集成测试。
-- 路线图 §6 工程前置（把 v0.5.1 Docker E2E 脚本收进 `scripts/e2e/`）本次未做。
-- R13 WebAuthn/Passkey 与 R14 个人信息保留清理按路线图分别滑动到 V2.5 / 未排期，未纳入本版。
+- 迁移真跑已在临时 `mysql:8.4` 容器通过；compose 全栈冒烟已在后续波次补跑通过（见 [v0.6.0 发布说明](./release-v0.6.0.md#compose-冒烟结果2026-11-05)）。
+- 路线图 §6 工程前置（把 v0.5.1 Docker E2E 脚本收进 `scripts/e2e/`）已在后续波次完成，见 `release-v0.8.0.md`。
+- R13 WebAuthn/Passkey 与 R14 个人信息保留清理按路线图分别滑动到 V2.5 / 未排期，未纳入本版（后续按用户要求交付，见 `release-v0.8.0.md`）。

@@ -9,13 +9,33 @@ SMOKE_USER=root SMOKE_PASSWORD='ChangeMe-12345' scripts/e2e/smoke.sh
 # compose 实例
 SMOKE_USER=root SMOKE_PASSWORD='ChangeMe-12345' \
   scripts/e2e/smoke.sh --base-url http://127.0.0.1:8080 \
-  --compose deployments/docker-compose/docker-compose.yml
+  --compose deployments/docker-compose/docker-compose.yml \
+  --compose-env /path/to/compose.env
 ```
 
 - `--base-url`：目标实例；默认 `http://127.0.0.1:8080`。
 - `--snapshot-dir`：失败快照目录；默认 `artifacts/e2e-fail-<时间戳>/`，包含失败步骤、最后一次响应体/头、Cookie，指定 `--compose` 时还会附上 `docker compose logs`。
+- `--compose` / `--compose-env`：失败时抓取容器日志。compose 文件对密钥用了 `:?` 强制校验，因此必须同时给 env 文件，否则连 `logs` 都无法解析。
 - `--keep`：成功时保留临时请求文件；默认自动清理，不依赖临时目录残留。
 - 需要的账号是**未启用 MFA 的密码账号**（Step-up 走密码重验路径）。
+
+## compose 预热（一次性夹具）
+
+冒烟账号不会被脚本创建，compose 环境需要先准备好：
+
+```bash
+# 1) 引导 root（容器内官方恢复工具，写审计）
+docker compose --env-file compose.env -f deployments/docker-compose/docker-compose.yml \
+  exec -T user-center /app/admin-rescue -action bootstrap \
+  -username root -email root@example.com -password 'ChangeMe-12345'
+
+# 2) 平台默认要求管理员启用 MFA；冒烟账号是密码账号，需要显式关闭该策略
+docker compose --env-file compose.env -f deployments/docker-compose/docker-compose.yml \
+  exec -T mysql mysql -uusercenter -p"$MYSQL_PASSWORD" usercenter \
+  -e "INSERT INTO auth_settings (name,value,revision,updated_at) VALUES ('auth','{\"MFARequiredForAdmins\":false}',1,UTC_TIMESTAMP(3)) ON DUPLICATE KEY UPDATE value=VALUES(value);"
+```
+
+> 第 2 步只是把「管理员必须启用 MFA」这一策略显式关掉，属于测试夹具；MFA 登录链路本身由 `go test` 中的 TOTP/WebAuthn 用例覆盖。
 
 覆盖：健康检查、未登录 401、CSRF、登录、`/me` 与授权投影、OIDC 同意/WebAuthn 列表、discovery `end_session_endpoint`、Step-up、组织创建与租户审计/邀请/explain、跨租户未知组织 404、配额与 provider 配置视图、登出后会话失效。
 

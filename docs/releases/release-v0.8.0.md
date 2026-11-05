@@ -35,10 +35,10 @@
 
 ## 验证
 
-`go vet ./...`、`go test ./...`（含 WebAuthn 真实 P-256 签名端到端、保留清理 dry-run/legal hold/幂等/未到期用例）、`cd web && npm test && npm run build` 全部通过；MySQL 8.4 容器真实应用 001–011 两次幂等通过；本地实例 E2E 冒烟通过。
+`go vet ./...`、`go test ./...`（含 WebAuthn 真实 P-256 签名端到端、保留清理 dry-run/legal hold/幂等/未到期用例）、`cd web && npm test && npm run build` 全部通过；MySQL 8.4 容器真实应用 001–011 两次幂等通过；本地实例 E2E 冒烟通过；**compose 全栈冒烟连续两次通过**（正式结果见 [v0.6.0 发布说明](./release-v0.6.0.md#compose-冒烟结果2026-11-05)）。
 
 ## 未执行 / 已知限制
 
-- **本地 compose 全流程冒烟未通过**：镜像构建成功、MySQL/Redis/migrate 容器均正常启动，`001–011` 迁移在 MySQL 8.4 容器真实应用两次通过；但 `user-center` 容器在本机 Docker Desktop 恢复后出现 `lookup mysql ... network is unreachable` 与 `Bind for 127.0.0.1:8080 failed: port is already allocated`（端口转发残留），三次重启均未恢复。已 `docker compose down -v` 清理。等效验证由「本地 dev 实例 E2E 冒烟（全部步骤通过）+ MySQL 容器迁移真跑 + 全量 Go/前端测试」覆盖，部署前仍需在目标环境跑一次 compose 冒烟。
+- compose 冒烟使用密码账号夹具（bootstrap root + 显式关闭「管理员必须 MFA」策略），管理员 MFA 登录链路由 `go test` 的 TOTP/WebAuthn 用例覆盖；部署到目标环境时仍建议按实际策略再跑一次 `scripts/e2e/smoke.sh --compose ...`。
 - 真实浏览器 WebAuthn API 需 HTTPS/安全上下文，前端交互未在真实认证器上验收；服务端验证链由软件 P-256 认证器端到端覆盖。
 - 清理任务不常驻、不自动调度，是否纳入定时任务由部署方按合规要求决定。
