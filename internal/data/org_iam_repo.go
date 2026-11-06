@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -402,4 +403,39 @@ func (r *orgIAMRepo) CountActiveAssignments(ctx context.Context, tx biz.Tx, c au
 		Where("role_id = ? AND context_type = ? AND context_id = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?)", roleID, typ, ctxID, "active", time.Now().UTC()).
 		Count(&n).Error
 	return n, err
+}
+
+// RevokeDelegationsForUser soft-invalidates the delegations that involve a user
+// in this organization, in both directions.
+//
+// "Manager" is a role, not a user, so the manager side is resolved through the
+// assignments being revoked: the caller has already marked them revoked in the
+// same transaction, so we take the role ids from that user's grant history in
+// this context. Working from role ids keeps the query to one statement instead
+// of a scan per role.
+//
+// Delegations are revoked, not deleted (D10): an incident review needs to see
+// that the delegation existed and when it stopped being valid.
+func (r *orgIAMRepo) RevokeDelegationsForUser(ctx context.Context, tx biz.Tx, c authorization.Context, userID int64, by int64) (int64, error) {
+	if userID == 0 || !c.IsOrganization() {
+		return 0, nil
+	}
+	db := r.d.dbOr(tx).WithContext(ctx)
+	roleIDs := make([]int64, 0, 8)
+	if err := db.Model(&assignmentPO{}).
+		Where("user_id = ? AND context_type = ? AND context_id = ?", userID, authorization.ContextTypeOrganization, c.OrganizationID).
+		Distinct().Pluck("role_id", &roleIDs).Error; err != nil {
+		return 0, err
+	}
+	now := time.Now().UTC()
+	q := db.Model(&delegationPO{}).
+		Where("context_type = ? AND context_id = ? AND revoked_at IS NULL", authorization.ContextTypeOrganization, c.OrganizationID)
+	if len(roleIDs) == 0 {
+		// No roles left to delegate from: only the target side can still matter.
+		q = q.Where("target_user_scope LIKE ?", "%"+strconv.FormatInt(userID, 10)+"%")
+	} else {
+		q = q.Where("manager_role_id IN ? OR target_user_scope LIKE ?", roleIDs, "%"+strconv.FormatInt(userID, 10)+"%")
+	}
+	res := q.Updates(map[string]any{"revoked_at": now, "created_by": by})
+	return res.RowsAffected, res.Error
 }

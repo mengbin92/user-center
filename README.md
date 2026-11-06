@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.8.0 — 认证与访问加固。** v0.6.x 完成 V2.4 全部功能；v0.7.x 补上运行期能力（Prometheus 指标与 SLO 告警、慢请求日志与全链路 `request_id`、可复现的 MySQL 负载基线、CI 的 MySQL/生成物/compose 三道门禁，并把 `admin` 列表的权限查询从 92 条降到 20 条）；v0.8.0 加固认证与访问：可配置密码策略（字符类/历史/有效期）、并发会话上限与设备治理、统一写接口限流（导出/批量/邀请更严）。组织域 SoD 与委派已出设计，待评审后实现。SCIM、目录同步继续按 V2 后续里程碑推进。设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
+> **状态：v0.9.0 — 组织域治理收口。** v0.6.x 完成 V2.4 全部功能；v0.7.x 补运行期能力（Prometheus 指标与 SLO 告警、慢请求日志与全链路 `request_id`、MySQL 负载基线、CI 三道门禁，`admin` 列表权限查询 92 → 20 条）；v0.8.0 加固认证与访问（可配置密码策略、并发会话上限、统一写接口限流）；v0.9.0 把平台已有的职责分离与委派补到租户域 —— 组织内互斥角色对与角色上限、约束/委派上下文隔离、禁止自授权、成员移除双向级联。SCIM、目录同步继续按 V2 后续里程碑推进。设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
 
 ## 目录
 
@@ -229,6 +229,7 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
 - [V2.5 路线图](docs/roadmap-v2.5.md)
+- [v0.9.0 发布说明](docs/releases/release-v0.9.0.md)
 - [v0.8.0 发布说明](docs/releases/release-v0.8.0.md)
 - [v0.7.1 发布说明](docs/releases/release-v0.7.1.md)
 - [v0.7.0 发布说明](docs/releases/release-v0.7.0.md)

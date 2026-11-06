@@ -84,6 +84,20 @@ service OrganizationService {
   rpc RevokeOrgAssignment(RevokeOrgAssignmentRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/api/v1/orgs/{id}/iam/assignments/{assignment_id}"};
   }
+  // Organization-scoped segregation of duties. Constraints defined here apply
+  // only inside this tenant and can never relax platform policy.
+  rpc ListOrgConstraints(GetOrganizationRequest) returns (OrgConstraintsReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/iam/constraints"};
+  }
+  rpc CreateOrgConstraint(CreateOrgConstraintRequest) returns (OrgConstraint) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/iam/constraints" body: "*"};
+  }
+  rpc UpdateOrgConstraint(UpdateOrgConstraintRequest) returns (OrgConstraint) {
+    option (google.api.http) = {patch: "/api/v1/orgs/{id}/iam/constraints/{constraint_id}" body: "*"};
+  }
+  rpc DeleteOrgConstraint(DeleteOrgConstraintRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/orgs/{id}/iam/constraints/{constraint_id}"};
+  }
   rpc ListOrgAudits(ListOrgAuditsRequest) returns (OrgAuditsReply) {
     option (google.api.http) = {get: "/api/v1/orgs/{id}/audits"};
   }
@@ -446,4 +460,58 @@ message RevokeOrganizationInvitationRequest {
 message AcceptOrganizationInvitationRequest {
   // Raw invitation token from the e-mail; never stored in plaintext.
   string token = 1;
+}
+
+message OrgConstraint {
+  string id = 1;
+  // mutual_exclusion | max_roles
+  string kind = 2;
+  string name = 3;
+  repeated string role_ids = 4;
+  int64 max_count = 5;
+  bool enabled = 6;
+  string revision = 7;
+  // How many existing assignments this constraint currently rejects. Non-zero
+  // after a tightening edit means members already lost access, not that they
+  // will lose it later.
+  int64 violating_assignments = 8;
+}
+
+message OrgConstraintsReply {
+  repeated OrgConstraint items = 1;
+}
+
+message CreateOrgConstraintRequest {
+  string id = 1;
+  string kind = 2;
+  string name = 3;
+  repeated string role_ids = 4;
+  int64 max_count = 5;
+  bool enabled = 6;
+  string reason = 7;
+  string expected_policy_revision = 8;
+  // Required when the new constraint would invalidate existing assignments:
+  // the caller must acknowledge that those members lose access immediately.
+  bool acknowledge_violations = 9;
+}
+
+message UpdateOrgConstraintRequest {
+  string id = 1;
+  string constraint_id = 2;
+  string name = 3;
+  repeated string role_ids = 4;
+  int64 max_count = 5;
+  bool enabled = 6;
+  string expected_revision = 7;
+  string reason = 8;
+  string expected_policy_revision = 9;
+  bool acknowledge_violations = 10;
+}
+
+message DeleteOrgConstraintRequest {
+  string id = 1;
+  string constraint_id = 2;
+  string expected_revision = 3;
+  string reason = 4;
+  string expected_policy_revision = 5;
 }

@@ -1821,6 +1821,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{id}/iam/constraints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Organization-scoped segregation of duties. Constraints defined here apply
+         *      only inside this tenant and can never relax platform policy.
+         */
+        get: operations["OrganizationService_ListOrgConstraints"];
+        put?: never;
+        post: operations["OrganizationService_CreateOrgConstraint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/constraints/{constraint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["OrganizationService_DeleteOrgConstraint"];
+        options?: never;
+        head?: never;
+        patch: operations["OrganizationService_UpdateOrgConstraint"];
+        trace?: never;
+    };
     "/api/v1/orgs/{id}/iam/permissions": {
         parameters: {
             query?: never;
@@ -2364,6 +2400,21 @@ export interface components {
             expires_at?: string;
             reason?: string;
         };
+        "api.usercenter.v1.CreateOrgConstraintRequest": {
+            id?: string;
+            kind?: string;
+            name?: string;
+            role_ids?: string[];
+            max_count?: string;
+            enabled?: boolean;
+            reason?: string;
+            expected_policy_revision?: string;
+            /**
+             * @description Required when the new constraint would invalidate existing assignments:
+             *      the caller must acknowledge that those members lose access immediately.
+             */
+            acknowledge_violations?: boolean;
+        };
         "api.usercenter.v1.CreateOrgRoleRequest": {
             id?: string;
             code?: string;
@@ -2782,6 +2833,25 @@ export interface components {
         "api.usercenter.v1.OrgAuditsReply": {
             items?: components["schemas"]["api.usercenter.v1.OrgAuditEvent"][];
             total?: string;
+        };
+        "api.usercenter.v1.OrgConstraint": {
+            id?: string;
+            /** @description mutual_exclusion | max_roles */
+            kind?: string;
+            name?: string;
+            role_ids?: string[];
+            max_count?: string;
+            enabled?: boolean;
+            revision?: string;
+            /**
+             * @description How many existing assignments this constraint currently rejects. Non-zero
+             *      after a tightening edit means members already lost access, not that they
+             *      will lose it later.
+             */
+            violating_assignments?: string;
+        };
+        "api.usercenter.v1.OrgConstraintsReply": {
+            items?: components["schemas"]["api.usercenter.v1.OrgConstraint"][];
         };
         "api.usercenter.v1.OrgPermissionsReply": {
             items?: components["schemas"]["api.usercenter.v1.Permission"][];
@@ -3295,6 +3365,18 @@ export interface components {
             reason?: string;
             expected_policy_revision?: string;
             post_logout_redirect_uris?: string[];
+        };
+        "api.usercenter.v1.UpdateOrgConstraintRequest": {
+            id?: string;
+            constraint_id?: string;
+            name?: string;
+            role_ids?: string[];
+            max_count?: string;
+            enabled?: boolean;
+            expected_revision?: string;
+            reason?: string;
+            expected_policy_revision?: string;
+            acknowledge_violations?: boolean;
         };
         "api.usercenter.v1.UpdateOrgRoleRequest": {
             id?: string;
@@ -6685,6 +6767,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.ExplainOrgAuthorizationReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_ListOrgConstraints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgConstraintsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_CreateOrgConstraint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateOrgConstraintRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgConstraint"];
+                };
+            };
+        };
+    };
+    OrganizationService_DeleteOrgConstraint: {
+        parameters: {
+            query?: {
+                expected_revision?: string;
+                reason?: string;
+                expected_policy_revision?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                constraint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrganizationService_UpdateOrgConstraint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                constraint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateOrgConstraintRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgConstraint"];
                 };
             };
         };

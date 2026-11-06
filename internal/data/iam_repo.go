@@ -601,12 +601,37 @@ func (r *iamRepo) ListRoleMembers(ctx context.Context, tx biz.Tx, roleID int64) 
 func constraintToBiz(p constraintPO) *biz.Constraint {
 	var ids []int64
 	_ = jsonx.Unmarshal([]byte(p.RoleIDs), &ids)
-	return &biz.Constraint{ID: p.ID, Kind: p.Kind, Name: p.Name, RoleIDs: ids, MaxCount: p.MaxCount, Enabled: p.Enabled, Revision: p.Revision}
+	return &biz.Constraint{
+		ID: p.ID, Kind: p.Kind, Name: p.Name, RoleIDs: ids,
+		MaxCount: p.MaxCount, Enabled: p.Enabled, Revision: p.Revision,
+		Context: contextOf(p.ContextType, p.ContextID),
+	}
 }
 
-func (r *iamRepo) ListConstraints(ctx context.Context, tx biz.Tx) ([]*biz.Constraint, error) {
+// contextOf maps the persisted pair back to the domain type. The zero value and
+// 'platform' both mean platform: rows written before 013 have no explicit type
+// and were platform policy by definition.
+func contextOf(kind string, id int64) authorization.Context {
+	if kind == authorization.ContextTypeOrganization && id > 0 {
+		return authorization.Organization(id)
+	}
+	return authorization.Platform()
+}
+
+// ListConstraints returns the constraints of one context. Callers that need
+// every context must ask for them explicitly (see ListConstraintsAll for the
+// platform admin read path); a default of "return everything" is how tenant
+// data leaks into a decision that should not see it.
+func (r *iamRepo) ListConstraints(ctx context.Context, tx biz.Tx, authCtx authorization.Context) ([]*biz.Constraint, error) {
+	authCtx = authCtx.Normalize()
 	var rows []constraintPO
-	if err := r.d.dbOr(tx).WithContext(ctx).Order("id").Find(&rows).Error; err != nil {
+	q := r.d.dbOr(tx).WithContext(ctx).Order("id")
+	if authCtx.IsOrganization() {
+		q = q.Where("context_type = ? AND context_id = ?", authorization.ContextTypeOrganization, authCtx.OrganizationID)
+	} else {
+		q = q.Where("context_type = ?", authorization.ContextTypePlatform)
+	}
+	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*biz.Constraint, 0, len(rows))
@@ -616,9 +641,18 @@ func (r *iamRepo) ListConstraints(ctx context.Context, tx biz.Tx) ([]*biz.Constr
 	return out, nil
 }
 
-func (r *iamRepo) GetConstraint(ctx context.Context, tx biz.Tx, id int64) (*biz.Constraint, error) {
+func (r *iamRepo) GetConstraint(ctx context.Context, tx biz.Tx, authCtx authorization.Context, id int64) (*biz.Constraint, error) {
+	authCtx = authCtx.Normalize()
 	var p constraintPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).First(&p).Error
+	q := r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id)
+	if authCtx.IsOrganization() {
+		q = q.Where("context_type = ? AND context_id = ?", authorization.ContextTypeOrganization, authCtx.OrganizationID)
+	} else {
+		q = q.Where("context_type = ?", authorization.ContextTypePlatform)
+	}
+	err := q.First(&p).Error
+	// A constraint in another context is reported as missing rather than
+	// forbidden: 403 would confirm that the id exists somewhere.
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -630,7 +664,15 @@ func (r *iamRepo) GetConstraint(ctx context.Context, tx biz.Tx, id int64) (*biz.
 
 func (r *iamRepo) CreateConstraint(ctx context.Context, tx biz.Tx, c *biz.Constraint) (*biz.Constraint, error) {
 	ids, _ := jsonx.Marshal(c.RoleIDs)
-	p := &constraintPO{Kind: c.Kind, Name: c.Name, RoleIDs: string(ids), MaxCount: c.MaxCount, Enabled: c.Enabled, Revision: 1}
+	authCtx := c.Context.Normalize()
+	p := &constraintPO{
+		Kind: c.Kind, Name: c.Name, RoleIDs: string(ids), MaxCount: c.MaxCount,
+		Enabled: c.Enabled, Revision: 1,
+		ContextType: authorization.ContextTypePlatform, ContextID: 0,
+	}
+	if authCtx.IsOrganization() {
+		p.ContextType, p.ContextID = authorization.ContextTypeOrganization, authCtx.OrganizationID
+	}
 	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
 	}
@@ -639,7 +681,17 @@ func (r *iamRepo) CreateConstraint(ctx context.Context, tx biz.Tx, c *biz.Constr
 
 func (r *iamRepo) UpdateConstraint(ctx context.Context, tx biz.Tx, c *biz.Constraint, expected uint64) (*biz.Constraint, error) {
 	ids, _ := jsonx.Marshal(c.RoleIDs)
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&constraintPO{}).Where("id = ? AND revision = ?", c.ID, expected).Updates(map[string]any{
+	// The context predicate is repeated here even though UpdateConstraint is only
+	// reached after a context-scoped read: a WHERE that only matches on id would
+	// let a stale caller id move a row across tenants.
+	authCtx := c.Context.Normalize()
+	q := r.d.dbOr(tx).WithContext(ctx).Model(&constraintPO{}).Where("id = ? AND revision = ?", c.ID, expected)
+	if authCtx.IsOrganization() {
+		q = q.Where("context_type = ? AND context_id = ?", authorization.ContextTypeOrganization, authCtx.OrganizationID)
+	} else {
+		q = q.Where("context_type = ?", authorization.ContextTypePlatform)
+	}
+	res := q.Updates(map[string]any{
 		"name": c.Name, "role_ids": string(ids), "max_count": c.MaxCount, "enabled": c.Enabled, "revision": expected + 1,
 	})
 	if res.Error != nil {
@@ -648,11 +700,26 @@ func (r *iamRepo) UpdateConstraint(ctx context.Context, tx biz.Tx, c *biz.Constr
 	if res.RowsAffected == 0 {
 		return nil, biz.ConflictRevision(expected)
 	}
-	return r.GetConstraint(ctx, tx, c.ID)
+	return r.GetConstraint(ctx, tx, authCtx, c.ID)
 }
 
 func (r *iamRepo) DeleteConstraint(ctx context.Context, tx biz.Tx, id int64) error {
 	return r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).Delete(&constraintPO{}).Error
+}
+
+// ListConstraintsAll returns constraints from every context. Only the platform
+// admin read path uses it, and the caller is responsible for not feeding the
+// result into a single-context decision.
+func (r *iamRepo) ListConstraintsAll(ctx context.Context, tx biz.Tx) ([]*biz.Constraint, error) {
+	var rows []constraintPO
+	if err := r.d.dbOr(tx).WithContext(ctx).Order("context_type, context_id, id").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*biz.Constraint, 0, len(rows))
+	for _, p := range rows {
+		out = append(out, constraintToBiz(p))
+	}
+	return out, nil
 }
 
 func (r *iamRepo) ListMenus(ctx context.Context, tx biz.Tx) ([]*biz.MenuItem, error) {
@@ -745,11 +812,21 @@ func delegationToBiz(p delegationPO) (*biz.Delegation, error) {
 		GrantCeiling: ceiling, CanRedelegate: p.CanRedelegate,
 		StartsAt: p.StartsAt.UTC(), ExpiresAt: p.ExpiresAt, RevokedAt: p.RevokedAt,
 		Revision: p.Revision, CreatedBy: p.CreatedBy, CreatedAt: p.CreatedAt.UTC(),
+		Context: contextOf(p.ContextType, p.ContextID),
 	}, nil
 }
 
 func (r *iamRepo) ListDelegations(ctx context.Context, tx biz.Tx, f biz.DelegationFilter) ([]*biz.Delegation, error) {
 	db := r.d.dbOr(tx).WithContext(ctx).Model(&delegationPO{})
+	// Delegations are scoped like constraints: the filter's Context decides what
+	// is visible, and a missing context means platform only. Returning every
+	// delegation by default is how a tenant rule ends up influencing a platform
+	// decision.
+	if f.Context.IsOrganization() {
+		db = db.Where("context_type = ? AND context_id = ?", authorization.ContextTypeOrganization, f.Context.OrganizationID)
+	} else {
+		db = db.Where("context_type = ?", authorization.ContextTypePlatform)
+	}
 	if f.ManagerRoleID > 0 {
 		db = db.Where("manager_role_id = ?", f.ManagerRoleID)
 	}
@@ -792,11 +869,16 @@ func (r *iamRepo) CreateDelegation(ctx context.Context, tx biz.Tx, d *biz.Delega
 	actions, _ := jsonx.Marshal(d.Actions)
 	scope, _ := jsonx.Marshal(d.TargetUserScope)
 	ceiling, _ := jsonx.Marshal(d.GrantCeiling)
+	authCtx := d.Context.Normalize()
 	p := &delegationPO{
 		ManagerRoleID: d.ManagerRoleID, TargetRoleID: d.TargetRoleID, TargetKind: d.TargetKind,
 		Actions: string(actions), TargetUserScope: string(scope), GrantCeiling: string(ceiling),
 		CanRedelegate: d.CanRedelegate, StartsAt: d.StartsAt, ExpiresAt: d.ExpiresAt,
 		Revision: 1, CreatedBy: d.CreatedBy, CreatedAt: time.Now().UTC(),
+		ContextType: authorization.ContextTypePlatform, ContextID: 0,
+	}
+	if authCtx.IsOrganization() {
+		p.ContextType, p.ContextID = authorization.ContextTypeOrganization, authCtx.OrganizationID
 	}
 	if p.TargetKind == "" {
 		p.TargetKind = "role"

@@ -233,6 +233,9 @@ type delegationPO struct {
 	Revision        uint64     `gorm:"column:revision;not null;default:1"`
 	CreatedBy       int64      `gorm:"column:created_by;not null;default:0"`
 	CreatedAt       time.Time  `gorm:"column:created_at;not null"`
+	// ContextType/ContextID scope the delegation. Pre-V2.5 rows are platform.
+	ContextType string `gorm:"column:context_type;size:16;not null;default:platform;index:idx_iam_delegations_context,priority:1"`
+	ContextID   int64  `gorm:"column:context_id;not null;default:0;index:idx_iam_delegations_context,priority:2"`
 }
 
 func (delegationPO) TableName() string { return "iam_delegations" }
@@ -245,6 +248,10 @@ type constraintPO struct {
 	MaxCount int64  `gorm:"column:max_count;not null;default:0"`
 	Enabled  bool   `gorm:"column:enabled;not null;default:true"`
 	Revision uint64 `gorm:"column:revision;not null;default:1"`
+	// ContextType/ContextID scope the constraint. Rows written before V2.5 are
+	// platform policy, which is what the column default says.
+	ContextType string `gorm:"column:context_type;size:16;not null;default:platform;index:idx_iam_constraints_context,priority:1"`
+	ContextID   int64  `gorm:"column:context_id;not null;default:0;index:idx_iam_constraints_context,priority:2"`
 }
 
 func (constraintPO) TableName() string { return "iam_role_constraints" }

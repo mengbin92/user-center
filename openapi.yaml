@@ -2699,6 +2699,110 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.ExplainOrgAuthorizationReply'
+    /api/v1/orgs/{id}/iam/constraints:
+        get:
+            tags:
+                - OrganizationService
+            description: |-
+                Organization-scoped segregation of duties. Constraints defined here apply
+                 only inside this tenant and can never relax platform policy.
+            operationId: OrganizationService_ListOrgConstraints
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgConstraintsReply'
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_CreateOrgConstraint
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateOrgConstraintRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgConstraint'
+    /api/v1/orgs/{id}/iam/constraints/{constraint_id}:
+        delete:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_DeleteOrgConstraint
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: constraint_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: expected_revision
+                  in: query
+                  schema:
+                    type: string
+                - name: reason
+                  in: query
+                  schema:
+                    type: string
+                - name: expected_policy_revision
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+        patch:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_UpdateOrgConstraint
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: constraint_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateOrgConstraintRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgConstraint'
     /api/v1/orgs/{id}/iam/permissions:
         get:
             tags:
@@ -3743,6 +3847,32 @@ components:
                     type: string
                 reason:
                     type: string
+        api.usercenter.v1.CreateOrgConstraintRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                kind:
+                    type: string
+                name:
+                    type: string
+                role_ids:
+                    type: array
+                    items:
+                        type: string
+                max_count:
+                    type: string
+                enabled:
+                    type: boolean
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
+                acknowledge_violations:
+                    type: boolean
+                    description: |-
+                        Required when the new constraint would invalidate existing assignments:
+                         the caller must acknowledge that those members lose access immediately.
         api.usercenter.v1.CreateOrgRoleRequest:
             type: object
             properties:
@@ -4570,6 +4700,39 @@ components:
                         $ref: '#/components/schemas/api.usercenter.v1.OrgAuditEvent'
                 total:
                     type: string
+        api.usercenter.v1.OrgConstraint:
+            type: object
+            properties:
+                id:
+                    type: string
+                kind:
+                    type: string
+                    description: mutual_exclusion | max_roles
+                name:
+                    type: string
+                role_ids:
+                    type: array
+                    items:
+                        type: string
+                max_count:
+                    type: string
+                enabled:
+                    type: boolean
+                revision:
+                    type: string
+                violating_assignments:
+                    type: string
+                    description: |-
+                        How many existing assignments this constraint currently rejects. Non-zero
+                         after a tightening edit means members already lost access, not that they
+                         will lose it later.
+        api.usercenter.v1.OrgConstraintsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.OrgConstraint'
         api.usercenter.v1.OrgPermissionsReply:
             type: object
             properties:
@@ -5605,6 +5768,31 @@ components:
                     type: array
                     items:
                         type: string
+        api.usercenter.v1.UpdateOrgConstraintRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                constraint_id:
+                    type: string
+                name:
+                    type: string
+                role_ids:
+                    type: array
+                    items:
+                        type: string
+                max_count:
+                    type: string
+                enabled:
+                    type: boolean
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
+                acknowledge_violations:
+                    type: boolean
         api.usercenter.v1.UpdateOrgRoleRequest:
             type: object
             properties:

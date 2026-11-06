@@ -180,13 +180,17 @@ type IAMRepo interface {
 	CountActiveAssignmentsForRole(context.Context, Tx, int64) (int64, error)
 	ListAllRolesWithGrants(context.Context, Tx) ([]*Role, error)
 	ListAssignments(context.Context, Tx, AssignmentFilter) ([]*AssignmentItem, int64, error)
-	ListConstraints(context.Context, Tx) ([]*Constraint, error)
+	// ListConstraints is context-scoped on purpose. A "return everything" default
+	// is how tenant policy leaks into a decision that must not see it; callers
+	// that need all contexts ask for them explicitly.
+	ListConstraints(context.Context, Tx, authorization.Context) ([]*Constraint, error)
+	ListConstraintsAll(context.Context, Tx) ([]*Constraint, error)
 	ListDelegations(context.Context, Tx, DelegationFilter) ([]*Delegation, error)
 	GetDelegation(context.Context, Tx, int64) (*Delegation, error)
 	CreateDelegation(context.Context, Tx, *Delegation) (*Delegation, error)
 	UpdateDelegation(context.Context, Tx, *Delegation, uint64) (*Delegation, error)
 	RevokeDelegation(context.Context, Tx, int64, uint64, int64) error
-	GetConstraint(context.Context, Tx, int64) (*Constraint, error)
+	GetConstraint(context.Context, Tx, authorization.Context, int64) (*Constraint, error)
 	CreateConstraint(context.Context, Tx, *Constraint) (*Constraint, error)
 	UpdateConstraint(context.Context, Tx, *Constraint, uint64) (*Constraint, error)
 	DeleteConstraint(context.Context, Tx, int64) error
@@ -213,6 +217,11 @@ type OrgIAMRepo interface {
 	RevokeAssignment(context.Context, Tx, authorization.Context, int64, uint64, int64) error
 	RevokeMemberAssignments(context.Context, Tx, authorization.Context, int64, []int64, int64) (int64, error)
 	CountActiveAssignments(context.Context, Tx, authorization.Context, int64) (int64, error)
+	// RevokeDelegationsForUser soft-invalidates every delegation in this context
+	// where the user is either the manager or the target. Both directions
+	// matter: dropping only the manager side would leave a channel that can
+	// still grant roles to the removed member.
+	RevokeDelegationsForUser(context.Context, Tx, authorization.Context, int64, int64) (int64, error)
 }
 
 type PermissionFilter struct {
@@ -225,6 +234,9 @@ type DelegationFilter struct {
 	ManagerRoleID int64
 	TargetRoleID  int64
 	Status        string
+	// Context scopes the query. Zero value means platform, matching how
+	// pre-V2.5 rows are interpreted.
+	Context authorization.Context
 }
 
 type RoleFilter struct {

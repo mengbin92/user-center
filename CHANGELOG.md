@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-11-07
+
+**版本判定：MINOR**（v0.8.0 → v0.9.0）。组织域职责分离与委派：新增 4 个 API、2 个权限码、1 个前端 tab、迁移 `013`。修复"组织分配绕过平台 SoD"的安全缺口。详见 [发布说明](docs/releases/release-v0.9.0.md)。
+
+### Added
+
+- 组织约束 CRUD（`mutual_exclusion` / `max_roles`）：`/api/v1/orgs/{id}/iam/constraints`。
+- 迁移 `013`：`iam_role_constraints` 与 `iam_delegations` 增加 `(context_type, context_id)`，`DEFAULT` 即回填存量行。
+- 权限码 `organization.iam.constraint.read`（owner+admin）与 `.manage`（仅 owner）。
+- 收紧约束需显式确认：返回 `violating_assignments`，未确认时返回 `ORGANIZATION_POLICY_VIOLATIONS_PENDING`。
+- 委派上下文隔离：`DelegationFilter.Context`；平台委派不能批准组织分配，反之亦然。
+- 前端组织详情页「职责分离」tab。
+
+### Changed
+
+- 组织分配现在执行约束校验（此前完全没有），行为只会变严。
+- 组织成员不能给自己授权（`ORGANIZATION_SELF_GRANT`）。
+
+### Fixed
+
+- 组织 `AssignRole` 既不校验 `CheckConstraints` 也不校验 `checkDelegation`，平台 SoD 在租户内被绕过。
+- 移除组织成员时未失效其委派，被移除者仍可能通过残留委派获得角色；现双向软失效。
+
 ## [0.8.0] - 2026-11-06
 
 **版本判定：MINOR**（v0.7.1 → v0.8.0）。认证与访问加固：密码策略、会话上限、写接口限流。新增 1 个迁移（`012`）与 3 处默认行为变化。详见 [发布说明](docs/releases/release-v0.8.0.md)。

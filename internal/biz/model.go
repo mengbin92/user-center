@@ -241,7 +241,16 @@ type Delegation struct {
 	Revision        uint64
 	CreatedBy       int64
 	CreatedAt       time.Time
+	// Context scopes the delegation to the platform or one organization.
+	Context authorization.Context
 }
+
+// Delegation actions. Same reasoning as the constraint kinds: these values are
+// persisted and compared, so a literal typo would silently grant nothing.
+const (
+	DelegationActionAssign = "assign"
+	DelegationActionRevoke = "revoke"
+)
 
 func (d Delegation) Active(now time.Time) bool {
 	if d.RevokedAt != nil || now.Before(d.StartsAt) {
@@ -249,6 +258,13 @@ func (d Delegation) Active(now time.Time) bool {
 	}
 	return d.ExpiresAt == nil || now.Before(*d.ExpiresAt)
 }
+
+// Constraint kinds. Named rather than inlined because three call sites used
+// bare strings and a typo would silently disable a policy instead of failing.
+const (
+	ConstraintMutualExclusion = "mutual_exclusion"
+	ConstraintMaxRoles        = "max_roles"
+)
 
 type Constraint struct {
 	ID       int64
@@ -258,6 +274,9 @@ type Constraint struct {
 	MaxCount int64
 	Enabled  bool
 	Revision uint64
+	// Context scopes the constraint to the platform or one organization. The
+	// zero value is platform, which is also what rows written before V2.5 mean.
+	Context authorization.Context
 }
 
 type MenuItem struct {
@@ -511,6 +530,11 @@ const (
 	PermOrgRoleManage       = "organization.iam.role.manage"
 	PermOrgAssignmentRead   = "organization.iam.assignment.read"
 	PermOrgAssignmentManage = "organization.iam.assignment.manage"
+	// Constraints are a governance action, not a member-management one: whoever
+	// can change the rules about which role combinations are legal effectively
+	// holds more power than whoever applies them.
+	PermOrgConstraintRead   = "organization.iam.constraint.read"
+	PermOrgConstraintManage = "organization.iam.constraint.manage"
 	PermOrgAuditRead        = "organization.audit.read"
 	PermOrgSettingsUpdate   = "organization.settings.update"
 	PermOrgArchive          = "organization.archive"

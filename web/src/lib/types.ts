@@ -113,6 +113,13 @@ export type OrgAuditEvent = Schemas['api.usercenter.v1.OrgAuditEvent']
 export type OrgAuditsReply = Schemas['api.usercenter.v1.OrgAuditsReply']
 export type OrgPermissionsReply =
   Schemas['api.usercenter.v1.OrgPermissionsReply']
+export type OrgConstraint = Schemas['api.usercenter.v1.OrgConstraint']
+export type OrgConstraintsReply =
+  Schemas['api.usercenter.v1.OrgConstraintsReply']
+export type CreateOrgConstraintRequest =
+  Schemas['api.usercenter.v1.CreateOrgConstraintRequest']
+export type UpdateOrgConstraintRequest =
+  Schemas['api.usercenter.v1.UpdateOrgConstraintRequest']
 export type OrgRole = Schemas['api.usercenter.v1.OrgRole']
 export type OrgRolesReply = Schemas['api.usercenter.v1.OrgRolesReply']
 export type OrganizationsReply =

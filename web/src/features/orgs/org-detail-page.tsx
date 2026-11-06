@@ -16,6 +16,7 @@ import type { Organization } from '../../lib/types'
 import { OrganizationAuditsTab } from './audits-tab'
 import { OrganizationDepartmentsTab } from './departments-tab'
 import { OrganizationIAMTab } from './iam-tab'
+import { OrganizationSodTab } from './sod-tab'
 import { OrganizationInvitationsTab } from './invitations-tab'
 import { OrganizationMembersTab } from './members-tab'
 import { OrganizationSettingsTab } from './settings-tab'
@@ -34,6 +35,7 @@ const TAB_KEYS = [
   'invitations',
   'departments',
   'roles',
+  'sod',
   'audits',
   'settings',
 ] as const
@@ -113,6 +115,7 @@ export function OrganizationDetailPage() {
                   : []),
                 { key: 'departments', label: '部门' },
                 { key: 'roles', label: '角色与授权' },
+                { key: 'sod', label: '职责分离' },
                 { key: 'audits', label: '审计' },
                 { key: 'settings', label: '设置' },
               ]}
@@ -137,6 +140,9 @@ export function OrganizationDetailPage() {
             ) : null}
             {tab === 'roles' ? (
               <OrganizationIAMTab org={org} orgId={orgId} />
+            ) : null}
+            {tab === 'sod' ? (
+              <OrganizationSodTab org={org} orgId={orgId} />
             ) : null}
             {tab === 'audits' ? (
               <OrganizationAuditsTab

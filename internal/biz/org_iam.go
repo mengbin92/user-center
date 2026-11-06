@@ -39,6 +39,7 @@ var orgBuiltinRoleSpecs = []orgRoleSpec{
 			PermOrgDepartmentRead, PermOrgDepartmentManage,
 			PermOrgRoleRead, PermOrgRoleManage,
 			PermOrgAssignmentRead, PermOrgAssignmentManage,
+			PermOrgConstraintRead, PermOrgConstraintManage,
 			PermOrgAuditRead, PermOrgSettingsUpdate, PermOrgArchive,
 		),
 	},
@@ -48,7 +49,8 @@ var orgBuiltinRoleSpecs = []orgRoleSpec{
 		Grants: allowAll(
 			PermOrgMemberRead, PermOrgMemberManage,
 			PermOrgDepartmentRead, PermOrgDepartmentManage,
-			PermOrgRoleRead, PermOrgAssignmentRead, PermOrgAuditRead,
+			PermOrgRoleRead, PermOrgAssignmentRead,
+			PermOrgConstraintRead, PermOrgAuditRead,
 		),
 	},
 	{
@@ -153,8 +155,23 @@ func syncOrgMembershipRole(ctx context.Context, s *Services, tx Tx, orgID, userI
 
 // revokeOrgMemberAssignments removes every organization-scoped grant a member
 // holds, including custom roles.
+// revokeOrgMemberAssignments removes a member's role assignments and
+// invalidates the delegations that involve them.
+//
+// The delegation half was missing until V2.5: removing someone from an
+// organization revoked their assignments but left any delegation they managed
+// (and any delegation targeting them) alive, so a removed member could still be
+// granted roles or could still delegate on behalf of a role they no longer had.
+// Both directions are soft-invalidated; see OrgIAMRepo.RevokeDelegationsForUser.
 func revokeOrgMemberAssignments(ctx context.Context, s *Services, tx Tx, orgID, userID, by int64) error {
-	_, err := s.OrgIAM.RevokeMemberAssignments(ctx, tx, authorization.Organization(orgID), userID, nil, by)
+	authCtx := authorization.Organization(orgID)
+	if _, err := s.OrgIAM.RevokeMemberAssignments(ctx, tx, authCtx, userID, nil, by); err != nil {
+		return err
+	}
+	// Best-effort on the delegation side: failing to revoke it must not abort
+	// the member removal (that would leave the tenant in a half-removed state),
+	// but the error is worth surfacing to the caller's logs.
+	_, err := s.OrgIAM.RevokeDelegationsForUser(ctx, tx, authCtx, userID, by)
 	return err
 }
 
@@ -494,6 +511,13 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 	if err != nil {
 		return nil, err
 	}
+	// Self-grant is refused before anything else: an org admin who can both
+	// define the rules and grant themselves roles has no rules. This has to be
+	// unconditional rather than "unless the role is benign", because deciding
+	// benignity is exactly the authority being abused.
+	if err := refuseSelfGrant(actor, in.UserID); err != nil {
+		return nil, err
+	}
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return nil, err
 	}
@@ -542,6 +566,9 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 			if n >= *locked.MaxMembers {
 				return ConflictCode("ORGANIZATION_ROLE_FULL", "角色成员数已达上限")
 			}
+		}
+		if err := uc.checkOrgConstraints(ctx, tx, authCtx, in.UserID, locked.ID); err != nil {
+			return err
 		}
 		row, err := uc.OrgIAM.CreateAssignment(ctx, tx, authCtx, &Assignment{
 			UserID: in.UserID, RoleID: role.ID, Boundary: authorization.Scope{All: true},
@@ -623,4 +650,49 @@ func (uc *OrgIAMUsecase) auditOrg(ctx context.Context, tx Tx, actor ActorContext
 		Action: action, Target: target, Reason: reason, Result: "success",
 		RequestID: actor.RequestID, OccurredAt: uc.Clock.Now().UTC(), OrganizationID: orgID,
 	})
+}
+
+// refuseSelfGrant stops a member from granting themselves a role.
+//
+// The organization scope makes this sharper than on the platform: an org admin
+// can create roles, define constraints and then assign roles. Without this
+// check those three powers compose into "whatever I cannot be given, I give
+// myself", and any SoD rule the organization writes is decorative.
+func refuseSelfGrant(actor ActorContext, targetUserID int64) error {
+	if actor.User == nil || targetUserID == 0 {
+		return nil
+	}
+	if actor.User.ID == targetUserID {
+		return ConflictCode("ORGANIZATION_SELF_GRANT",
+			"不能给自己授予角色；请由本组织其他管理员操作")
+	}
+	return nil
+}
+
+// checkOrgConstraints applies the organization's role constraints to a new
+// assignment. It reuses the platform validator and evaluator verbatim: the
+// rules are "at most N of the listed roles" and "at most one of the listed
+// roles", both scoped to role_ids, so a built-in role only participates when it
+// is explicitly listed. Inventing a separate counting rule for tenants would
+// make the same setting mean different things in two places.
+func (uc *OrgIAMUsecase) checkOrgConstraints(ctx context.Context, tx Tx, authCtx authorization.Context, userID int64, roleID int64) error {
+	constraints, err := uc.IAM.ListConstraints(ctx, tx, authCtx)
+	if err != nil {
+		return ErrDependency
+	}
+	if len(constraints) == 0 {
+		return nil
+	}
+	existing, err := uc.OrgIAM.ListAssignments(ctx, tx, authCtx, userID)
+	if err != nil {
+		return ErrDependency
+	}
+	active := make([]int64, 0, len(existing)+1)
+	for _, item := range existing {
+		if item.Assignment == nil || item.Assignment.Revoked {
+			continue
+		}
+		active = append(active, item.Assignment.RoleID)
+	}
+	return CheckConstraints(append(active, roleID), constraints)
 }

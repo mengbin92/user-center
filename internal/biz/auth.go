@@ -571,7 +571,9 @@ func (uc *AuthUsecase) activeRoleSubset(ctx context.Context, userID int64) ([]in
 	if err != nil {
 		return nil, err
 	}
-	constraints, err := uc.IAM.ListConstraints(ctx, nil)
+	// Platform context only: session role activation is a platform concept, and
+	// organization roles are active on their own (see LoadAuthzFactsIn).
+	constraints, err := uc.IAM.ListConstraints(ctx, nil, authorization.Platform())
 	if err != nil {
 		return nil, err
 	}
