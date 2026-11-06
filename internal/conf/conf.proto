@@ -14,6 +14,7 @@ message Bootstrap {
 message Server {
   HTTP http = 1;
   GRPC grpc = 2;
+  Metrics metrics = 3;
 }
 
 message HTTP {
@@ -25,6 +26,15 @@ message HTTP {
 message GRPC {
   string addr = 1;
   int32 timeout_seconds = 2;
+}
+
+// Metrics is a separate listener on purpose: /metrics must never be reachable
+// through the public API listener or require a session.
+message Metrics {
+  // Empty keeps the default 127.0.0.1:9091 so a scrape can only come from the
+  // same host unless it is widened explicitly. "off" disables the listener.
+  string addr = 1;
+  int32 refresh_seconds = 2;
 }
 
 message Data {

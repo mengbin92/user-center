@@ -90,6 +90,47 @@ location / {
 - 日志为 zap JSON；关注 `open database`、`send mail failed`、`run migrations`。
 - 每个请求的 `X-Request-ID` 会写入安全事件与审计；排障时先取该 ID。
 
+### 5.1 指标与采集（v0.7.0）
+
+指标在**独立监听端口**暴露，不走 `/api/v1`，不需要会话，也不经过反向代理：
+
+| 项 | 值 |
+|---|---|
+| 默认地址 | `127.0.0.1:9091`（只绑回环） |
+| 覆盖方式 | `METRICS_ADDR` 环境变量或 `server.metrics.addr` |
+| 关闭 | `METRICS_ADDR=off`（也接受 `none` / `disabled`） |
+| 抓取路径 | `GET /metrics`（同端口另有 `/healthz`） |
+| 刷新周期 | 30 秒，`server.metrics.refresh_seconds` 可调 |
+
+**不要**把该端口挂到公网反代上。指标不含用户标识，但会暴露路由表与流量规模。
+
+| 指标 | 类型 | 标签 | 说明 |
+|---|---|---|---|
+| `usercenter_http_requests_total` | counter | `route`、`method`、`status` | 已认证/未认证都计数，401/403 短路同样计入 |
+| `usercenter_http_request_duration_seconds` | histogram | `route`、`method` | 桶 5ms–5s |
+| `usercenter_event_deliveries` | gauge | `status` | Outbox 投递行数，未知状态归 `other` |
+| `usercenter_schema_migrations_applied` | gauge | — | 已记录的迁移步数（按语句计，不等于文件数） |
+| `usercenter_dependency_up` | gauge | `dependency` | 1 = 上次探测成功；`mysql` / `redis` |
+
+`route` 是路由模板而非原始路径：`/api/v1/orgs/7/members` 与 `/api/v1/orgs/11/members` 都记到 `/api/v1/orgs/{id}/members`。SPA 历史路由与未知路径统一记为 `spa`，因此标签基数由路由表决定，不会随用户输入增长。
+
+两个容易误读的点：
+
+- **SQLite 开发实例**下 `usercenter_schema_migrations_applied` 为 `0`，因为 SQLite 走 AutoMigrate，不写 `schema_migrations`；MySQL 才逐步记录。
+- 未配置 Redis（内存回退模式）时 `usercenter_dependency_up{dependency="redis"}` 为 `1`，含义是"该依赖不适用"，不是"Redis 可用"。
+
+Prometheus 抓取示例：
+
+```yaml
+scrape_configs:
+  - job_name: user-center
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["127.0.0.1:9091"]
+```
+
+跨主机部署时把地址改为该主机的内网地址，并在安全组/防火墙上只放行 Prometheus 实例。SLO 阈值与告警规则见下一阶段的 `docs/operations.md` 后续补充（v0.7.0 S3）。
+
 ## 6. 离线导入与事件投递
 
 ```bash

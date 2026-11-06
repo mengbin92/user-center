@@ -14,6 +14,7 @@ import (
 	usercv1 "github.com/mengbin92/user-center/api/usercenter/v1"
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/internal/conf"
+	"github.com/mengbin92/user-center/internal/obs"
 	"github.com/mengbin92/user-center/internal/service"
 	"github.com/mengbin92/user-center/platform/httpx"
 )
@@ -36,6 +37,7 @@ func NewHTTPServer(
 	cfg *conf.Server,
 	sec *conf.Security,
 	mw *Middleware,
+	metrics *obs.Metrics,
 	log *zap.Logger,
 	auth *service.AuthService,
 	me *service.MeService,
@@ -68,7 +70,9 @@ func NewHTTPServer(
 		khttp.Address(addr),
 		khttp.Timeout(time.Duration(timeout)*time.Second),
 		khttp.ErrorEncoder(encodeError),
-		khttp.Filter(mw.Filter),
+		// Metrics wraps the auth filter: a 401/403 short-circuit must still be
+		// counted, otherwise the error-rate panels silently under-report.
+		khttp.Filter(metrics.HTTP, mw.Filter),
 	)
 	usercv1.RegisterAuthServiceHTTPServer(srv, auth)
 	usercv1.RegisterMeServiceHTTPServer(srv, me)

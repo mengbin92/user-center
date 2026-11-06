@@ -37,6 +37,11 @@ func applyEnv(b *conf.Bootstrap) {
 	if v := os.Getenv("GRPC_ADDR"); v != "" {
 		srv.Grpc.Addr = v
 	}
+	// Empty string here means "disable": operators turn the listener off with
+	// METRICS_ADDR=off rather than by editing a config file in the image.
+	if v, ok := os.LookupEnv("METRICS_ADDR"); ok {
+		srv.Metrics.Addr = v
+	}
 	if v := os.Getenv("PUBLIC_BASE_URL"); v != "" {
 		srv.Http.PublicBaseUrl = v
 	}
