@@ -172,6 +172,18 @@ compose exec -T mysql mysql -uusercenter -p"$MYSQL_PASSWORD" usercenter \
       UNION ALL SELECT 'outbox_events', COUNT(*) FROM event_outbox
       UNION ALL SELECT 'sessions', COUNT(*) FROM iam_sessions;" | tee "$WORK/evidence.txt"
 
+step "metrics endpoint"
+# The scrape listener is only useful if it is reachable from outside the
+# container; a bound-but-unpublished port is invisible until an alert is needed.
+metrics_body=$(curl -fsS http://127.0.0.1:9091/metrics)
+for family in usercenter_http_requests_total usercenter_dependency_up usercenter_db_pool_connections; do
+  if ! grep -q "^$family" <<<"$metrics_body"; then
+    echo "metric family missing from the scrape: $family" >&2
+    exit 1
+  fi
+done
+grep -E '^usercenter_(dependency_up|db_pool_connections|schema_migrations_applied)' <<<"$metrics_body" | tee "$WORK/metrics.txt"
+
 step "container log"
 compose logs --no-color >"$WORK/compose.log" 2>&1 || true
 # A green smoke over a service that logged 5xx is worse than a red build.
