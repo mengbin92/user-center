@@ -32,9 +32,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: compose-e2e-${{ github.run_id }}
+          # The smoke snapshot also contains a cookies file. It belongs to a
+          # throwaway stack that is already torn down, but there is no reason to
+          # keep session material in build artifacts: upload the diagnostic
+          # files only.
           path: |
             /tmp/uc-e2e/*.log
             /tmp/uc-e2e/evidence.txt
-            /tmp/uc-e2e/snapshot
+            /tmp/uc-e2e/snapshot/meta.txt
+            /tmp/uc-e2e/snapshot/last-body
+            /tmp/uc-e2e/snapshot/last-headers
           retention-days: 7
           if-no-files-found: warn

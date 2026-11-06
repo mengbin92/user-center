@@ -72,8 +72,17 @@ trap teardown EXIT
 step() { printf '\n== %s\n' "$*"; }
 
 step "environment"
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$WORK/oidc.pem" 2>/dev/null
-chmod 600 "$WORK/oidc.pem"
+# The container runs as an unprivileged user (see Dockerfile USER app). A 0600
+# key is unreadable there: on Linux the bind mount keeps the source permission,
+# so the service fails with "permission denied" while macOS Docker Desktop
+# silently relaxes it — that is exactly how this passed locally and failed in
+# CI. Keep the directory 0700 and make the key world-readable inside it, the
+# same shape Kubernetes uses for secret volumes (0444).
+SECRETS_DIR="$WORK/secrets"
+mkdir -p "$SECRETS_DIR"
+chmod 700 "$SECRETS_DIR"
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$SECRETS_DIR/oidc.pem" 2>/dev/null
+chmod 444 "$SECRETS_DIR/oidc.pem"
 MYSQL_PASSWORD="$(openssl rand -hex 16)"
 # COOKIE_SECURE must be false: the smoke test talks plain http to 127.0.0.1 and
 # curl will not send a Secure cookie over http. OIDC_ISSUER must be https
@@ -87,14 +96,13 @@ MYSQL_PASSWORD="$(openssl rand -hex 16)"
   printf 'COOKIE_SECURE=false\n'
   printf 'PUBLIC_BASE_URL=http://127.0.0.1:8080\n'
   printf 'OIDC_ISSUER=https://e2e.local\n'
-  printf 'OIDC_SIGNING_KEY_FILE=%s/oidc.pem\n' "$WORK"
+  printf 'OIDC_SIGNING_KEY_FILE=%s/oidc.pem\n' "$SECRETS_DIR"
 } >"$COMPOSE_ENV"
 chmod 600 "$COMPOSE_ENV"
 echo "work dir: $WORK"
 
 if [[ $SKIP_BUILD -eq 0 ]]; then
   step "build image"
-  START=$(date -u +%s)
   # v0.6.0 burned a release on `docker compose build | tail`: the pipe made the
   # exit code always 0, the failure was swallowed, and `up -d` silently reused
   # a stale image. Never pipe the build; keep the log and read PIPESTATUS.
@@ -106,12 +114,13 @@ if [[ $SKIP_BUILD -eq 0 ]]; then
     echo "compose build failed with exit $status" >&2
     exit "$status"
   fi
-  created=$(docker image inspect user-center:latest --format '{{.Created}}')
-  if (( $(date -u -d "$created" +%s) < START )); then
-    echo "image predates this build ($created); refusing to smoke a stale image" >&2
-    exit 1
-  fi
-  echo "image built at $created"
+  # Do not compare the image's Created timestamp with the build start time: on
+  # a full cache hit Docker keeps the original timestamp, so that check fails a
+  # perfectly good build. Content addressing already guarantees the image
+  # matches the sources — the exit code above is the real gate. Record the id
+  # so a failure can be traced to the exact image.
+  image_id=$(docker image inspect user-center:latest --format '{{.Id}}')
+  echo "image: $image_id"
 fi
 
 step "start stack"
@@ -143,6 +152,9 @@ done
 if [[ $ready -ne 1 ]]; then
   echo "service did not become healthy" >&2
   compose ps >&2
+  # The reason is almost always one line in this log; without it the artifact
+  # only shows "Restarting (1)".
+  compose logs --no-color user-center 2>&1 | tail -40 >&2
   exit 1
 fi
 echo "service is up"

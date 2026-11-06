@@ -73,6 +73,9 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.72.0"
+          # Without a token the action fetches its release anonymously and is
+          # subject to stricter rate limiting.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       # Versions are pinned to the ones that produced the committed files:
       # a plugin bump rewrites the header comment and turns this job red.
       - name: Install protoc plugins and wire
