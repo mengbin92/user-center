@@ -57,6 +57,31 @@ jobs:
         if: failure()
         run: docker logs "${{ job.services.mysql.id }}" --tail 100
 
+  # Hand-edited *.pb.go / wire_gen.go is a recurring review finding. Regenerate
+  # in CI and fail on any diff instead of relying on reviewers to notice.
+  generated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          cache: true
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.72.0"
+      # Versions are pinned to the ones that produced the committed files:
+      # a plugin bump rewrites the header comment and turns this job red.
+      - name: Install protoc plugins and wire
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+          go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v3@v3.0.0-20260626125723-668db92c2c00
+          go install github.com/google/gnostic/cmd/protoc-gen-openapi@v0.7.1
+          go install github.com/google/wire/cmd/wire@v0.7.0
+      - run: ./scripts/gen-check.sh
+
   frontend:
     runs-on: ubuntu-24.04
     defaults:
