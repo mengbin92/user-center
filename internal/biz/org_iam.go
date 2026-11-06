@@ -286,7 +286,7 @@ func (uc *OrgIAMUsecase) validateGrants(ctx context.Context, grants []Grant) err
 		if strings.TrimSpace(g.Operation) == "" {
 			return Validation("权限操作不能为空")
 		}
-		p, err := uc.permission(ctx, g.Operation)
+		p, err := uc.permissionWithFacts(ctx, nil, g.Operation)
 		if err != nil {
 			return Validation("权限不存在：" + g.Operation)
 		}

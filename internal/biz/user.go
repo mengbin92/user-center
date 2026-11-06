@@ -444,7 +444,7 @@ func (uc *UserUsecase) SecurityEvents(ctx context.Context, actor ActorContext, p
 // Overview reports scoped counters. Counters never turn an unauthorized read
 // into zero; the caller must hold identity.user.list.
 func (uc *UserUsecase) OverviewView(ctx context.Context, actor ActorContext) (*Overview, error) {
-	filter, err := uc.listUserFilter(ctx, actor, "identity.user.list", UserFilter{})
+	filter, _, err := uc.listUserFilter(ctx, actor, "identity.user.list", UserFilter{})
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +463,14 @@ func (s *Services) ListScope(ctx context.Context, actor ActorContext, operation 
 	if err != nil {
 		return authorization.Scope{}, ErrAuthorizationDown
 	}
-	p, err := s.IAM.GetPermissionByCode(ctx, nil, operation)
+	return s.scopeWithFacts(ctx, facts, actor, operation)
+}
+
+// scopeWithFacts is ListScope for callers that already hold a snapshot. Listing
+// a page needs the same facts for the scope, the deny scan and every row, so
+// reloading them per helper made one request read the policy four times.
+func (s *Services) scopeWithFacts(ctx context.Context, facts *AuthzFacts, actor ActorContext, operation string) (authorization.Scope, error) {
+	p, err := s.permissionWithFacts(ctx, facts, operation)
 	if err != nil {
 		return authorization.Scope{}, ErrPermissionDenied
 	}
@@ -488,7 +495,7 @@ func (s *Services) ListScope(ctx context.Context, actor ActorContext, operation 
 }
 
 func (uc *UserUsecase) ListUsers(ctx context.Context, actor ActorContext, filter UserFilter) ([]*UserListItem, int64, error) {
-	filter, err := uc.listUserFilter(ctx, actor, "identity.user.list", filter)
+	filter, facts, err := uc.listUserFilter(ctx, actor, "identity.user.list", filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -502,12 +509,8 @@ func (uc *UserUsecase) ListUsers(ctx context.Context, actor ActorContext, filter
 	if err != nil {
 		return nil, 0, ErrDependency
 	}
-	// One policy snapshot and two batch lookups for the whole page. Deciding per
-	// row used to reload every role, grant, assignment and constraint each time.
-	facts, err := uc.LoadAuthzFacts(ctx, actor.User.ID, actor.Session.ActiveRoleIDs)
-	if err != nil {
-		return nil, 0, ErrAuthorizationDown
-	}
+	// The scope filter above already loaded the snapshot; reusing it here keeps
+	// a page of rows down to two batch lookups plus two permission reads.
 	ids := make([]int64, 0, len(users))
 	for _, u := range users {
 		ids = append(ids, u.ID)
@@ -1045,7 +1048,7 @@ func (uc *UserUsecase) EffectivePermissions(ctx context.Context, actor ActorCont
 }
 
 func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyword, status string, fields []string, roleID int64, mfa *bool, reason string) (*ExportJob, error) {
-	filter, err := uc.listUserFilter(ctx, actor, "identity.user.export", UserFilter{Keyword: keyword, Status: status, RoleID: roleID, MFA: mfa, Limit: 100000})
+	filter, _, err := uc.listUserFilter(ctx, actor, "identity.user.export", UserFilter{Keyword: keyword, Status: status, RoleID: roleID, MFA: mfa, Limit: 100000})
 	if err != nil {
 		return nil, err
 	}
