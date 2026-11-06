@@ -1,0 +1,40 @@
+name: e2e-compose
+
+# Full stack smoke against a real MySQL 8.4 + Redis 7 compose stack.
+#
+# This does not gate pull requests: it needs a real image build and several
+# minutes. It runs when develop reaches main and on demand.
+#
+# The steps live in scripts/e2e/compose-e2e.sh so a local run executes exactly
+# what CI executes; a pipeline that can only run in CI cannot be debugged.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      WORK: /tmp/uc-e2e
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run the compose E2E
+        run: scripts/e2e/compose-e2e.sh --work-dir "$WORK"
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-e2e-${{ github.run_id }}
+          path: |
+            /tmp/uc-e2e/*.log
+            /tmp/uc-e2e/evidence.txt
+            /tmp/uc-e2e/snapshot
+          retention-days: 7
+          if-no-files-found: warn
