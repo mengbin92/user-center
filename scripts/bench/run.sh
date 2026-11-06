@@ -184,15 +184,17 @@ fi
 
 step "prepare sessions and organization"
 # The login endpoint allows 30 attempts per 5 minutes per IP, so a fresh 24
-# account pool cannot be built on every invocation. Reuse a recent pool for up
-# to four hours (session TTL is 12h by default).
+# account pool cannot be built on every invocation. Reuse a recent pool, but
+# only for half of the service's idle timeout (60 min by default): past that the
+# sessions are rejected and every scenario silently turns into 401s.
 CACHE_DIR="${BENCH_CACHE:-$ROOT/artifacts/.bench-cache}"
 SESSIONS_CACHE="$CACHE_DIR/sessions.json"
 ORG_CACHE="$CACHE_DIR/org_id"
+POOL_MAX_AGE="${POOL_MAX_AGE:-1800}"
 pool_age() {
   python3 -c 'import os,sys,time; print(int(time.time()-os.path.getmtime(sys.argv[1])))' "$1" 2>/dev/null || echo 999999
 }
-if [[ -s "$SESSIONS_CACHE" && -s "$ORG_CACHE" ]] && [[ "$(pool_age "$SESSIONS_CACHE")" -lt 14400 ]]; then
+if [[ -s "$SESSIONS_CACHE" && -s "$ORG_CACHE" ]] && [[ "$(pool_age "$SESSIONS_CACHE")" -lt "$POOL_MAX_AGE" ]]; then
   cp "$SESSIONS_CACHE" "$SESSIONS"
   ORG_ID="$(cat "$ORG_CACHE")"
   echo "   reused session pool (age $(pool_age "$SESSIONS_CACHE")s), org_id=$ORG_ID"
@@ -245,6 +247,15 @@ run_scenario() {
     echo "k6 failed for $name (exit $rc)" >&2
     tail -20 "$log" >&2
     return 1
+  fi
+  # A read scenario with failures is not a baseline: an expired session pool
+  # otherwise reports thousands of 401s as if they were throughput.
+  if [[ "$name" != "login" ]]; then
+    if ! python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["failed_pct"] < 0.01 else 1)' "$OUT_DIR/${name}.json" 2>/dev/null; then
+      echo "scenario $name reported failures; refusing to record it as a baseline" >&2
+      echo "  hint: delete $CACHE_DIR and rerun to rebuild the session pool" >&2
+      return 1
+    fi
   fi
 }
 

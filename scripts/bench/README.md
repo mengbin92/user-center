@@ -32,7 +32,9 @@ scripts/bench/run.sh --vu 32 --duration 60s --scenarios me,admin
    都不可配置。`login` 场景因此只回答两个问题：被限流后的响应成本，以及限流器本身的开销。
    它会让 `http_req_failed` 接近 50%，因为 429 被 k6 计为失败，这是预期结果。
 2. **会话池上限 28**。建池本身要登录，超过 30 就会撞限流，脚本直接拒绝更大的 `--accounts`。
-   池在 `artifacts/.bench-cache/` 里缓存 4 小时，重复跑不会重新登录。
+   池在 `artifacts/.bench-cache/` 里缓存 **30 分钟**（服务空闲超时的一半），重复跑不会重新登录；
+   超期后脚本会重建，否则场景会静默变成一片 401。读场景一旦出现失败，脚本直接报错退出，
+   不会把失效会话的数字当成基线。
 3. **基准账号是 root**。`admin-rescue bootstrap` 只能造 root 账号，而 root 拥有全部权限，
    每次请求都要展开完整权限集。`me` / `admin` 的数字是**权限计算的最坏情况**，普通 `member`
    账号会明显更低。要测普通账号需要另造夹具，目前没做。
@@ -44,6 +46,23 @@ scripts/bench/run.sh --vu 32 --duration 60s --scenarios me,admin
 每个场景一行：`QPS` 是完成的请求数除以时长，`P50/P95/P99` 是服务端响应时间（含 k6 排队），
 `失败率` 除 `login` 外应为 0。跑完在 `artifacts/bench-<stamp>/summary.md` 留一份，
 `<scenario>.json` 是原始数据，`<scenario>.log` 是 k6 完整输出。
+
+## 索引审计
+
+`explain.sql` 灌 2 万行夹具并对请求实际发出的每条查询跑 `EXPLAIN`。它需要独立的一次性库，
+因为 24 行数据下优化器会用全表扫掩盖缺失索引：
+
+```bash
+docker exec -e MYSQL_PWD=... <container> mysql -uroot -e \
+  "DROP DATABASE IF EXISTS usercenter_explain; CREATE DATABASE usercenter_explain;"
+DB_DSN='root:...@tcp(127.0.0.1:3307)/usercenter_explain?parseTime=true&loc=UTC&charset=utf8mb4' \
+  SESSION_SECRET=... CSRF_SECRET=... MFA_ENCRYPTION_KEY=... \
+  go run ./cmd/migrate -config scripts/bench/config.mysql.yaml
+docker exec -i -e MYSQL_PWD=... <container> mysql -uroot --force usercenter_explain < scripts/bench/explain.sql
+```
+
+脚本会先 `TRUNCATE` 再灌，可以重复执行。结论记录在
+[`docs/performance.md` §7](../../docs/performance.md)。
 
 ## 清理
 
