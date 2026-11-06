@@ -1,0 +1,103 @@
+# Prometheus alerting rules for user-center.
+#
+# Thresholds come from docs/performance.md: a single instance saturates around
+# 660-1000 QPS with P95 under 60ms, so 300ms is roughly the point where the
+# service is no longer merely busy. Each rule names the first thing to check;
+# the full playbook is docs/operations.md §5.2.
+groups:
+  - name: user-center
+    rules:
+      - alert: UserCenterHighErrorRate
+        expr: |
+          (
+            sum(rate(usercenter_http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(usercenter_http_requests_total[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "user-center is returning 5xx on more than 1% of requests"
+          description: "{{ $value | humanizePercentage }} of requests failed in the last 5m."
+          first_step: "Check /metrics for the route with the most 5xx, then grep request_id in the service log; 503 usually means DEPENDENCY_UNAVAILABLE (session store or DB)."
+
+      - alert: UserCenterLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(usercenter_http_request_duration_seconds_bucket[5m]))
+          ) > 0.3
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "user-center P95 latency is above 300ms"
+          description: "P95 is {{ $value | humanizeDuration }} over the last 5m."
+          first_step: "Compare usercenter_db_pool_connections in_use vs max and usercenter_db_pool_wait_total growth; an exhausted pool looks exactly like a slow database."
+
+      - alert: UserCenterLoginFailureSpike
+        expr: |
+          (
+            sum(rate(usercenter_http_requests_total{route="/api/v1/auth/login",status=~"4..|5.."}[5m]))
+            /
+            sum(rate(usercenter_http_requests_total{route="/api/v1/auth/login"}[5m]))
+          ) > 0.5
+          and
+          sum(rate(usercenter_http_requests_total{route="/api/v1/auth/login"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "more than half of login attempts are being rejected"
+          description: "Rejection ratio {{ $value | humanizePercentage }} at more than 0.2 req/s."
+          first_step: "Split by status: 429 means the 30/5min per-IP limiter is doing its job, 401 means credential stuffing or a broken client, 5xx means the auth path is failing."
+
+      - alert: UserCenterOutboxBacklog
+        expr: |
+          sum(usercenter_event_deliveries{status=~"pending|retrying|delivering"}) > 1000
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "outbox has more than 1000 undelivered events"
+          description: "{{ $value }} deliveries are pending, retrying or in flight."
+          first_step: "Check whether one subscriber is down (integration client list), then inspect event_deliveries.status and last_error for that subscriber; retrying rows with a far-future next_retry_at indicate backoff after repeated failures."
+
+      - alert: UserCenterDependencyDown
+        expr: usercenter_dependency_up == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "user-center cannot reach {{ $labels.dependency }}"
+          description: "The last probe of {{ $labels.dependency }} failed."
+          first_step: "For mysql: check the pool (open==0 means the pool is not connected). For redis: sessions fall back to the in-memory store, which drops every active session on restart."
+
+      - alert: UserCenterDBPoolExhausted
+        # ignoring(state) is required: the two selectors differ only in that
+        # label, so the default one-to-one match would return an empty vector.
+        expr: |
+          (
+            usercenter_db_pool_connections{state="in_use"}
+            / ignoring(state) usercenter_db_pool_connections{state="max"}
+          ) > 0.9
+          and on()
+          rate(usercenter_db_pool_wait_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "user-center DB connection pool is saturated"
+          description: "{{ $value | humanizePercentage }} of the pool is in use and callers are queueing."
+          first_step: "Raise max_open_conns if MySQL can take it; if the value is 1 or otherwise tiny, the deployment inherited the SQLite profile (see docs/performance.md §5 — that costs 3.5x throughput)."
+
+      - alert: UserCenterMigrationsNotApplied
+        expr: usercenter_schema_migrations_applied == 0
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "user-center has no recorded schema migrations"
+          description: "The instance is serving traffic but schema_migrations is empty."
+          first_step: "The migrate one-shot service probably did not run or failed; run it before serving traffic. Note the gauge is 0 by design on SQLite, so only alert on MySQL deployments."

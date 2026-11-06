@@ -101,10 +101,14 @@ func TestHTTPRecordsServerErrorsUnderOneRoute(t *testing.T) {
 
 func TestRefreshSetsGaugesAndKeepsValuesOnError(t *testing.T) {
 	probe := &fakeProbe{
-		backlog:  map[string]int64{"pending": 3, "delivered": 7, "cancelled": 1, "weird": 2},
-		applied:  21,
-		dbErr:    nil,
-		cacheErr: errors.New("redis down"),
+		backlog:   map[string]int64{"pending": 3, "delivered": 7, "cancelled": 1, "weird": 2},
+		applied:   21,
+		dbErr:     nil,
+		cacheErr:  errors.New("redis down"),
+		poolOpen:  5,
+		poolInUse: 3,
+		poolMax:   20,
+		poolWaits: 12,
 	}
 	m := NewMetrics(probe)
 	m.Refresh(context.Background())
@@ -116,6 +120,10 @@ func TestRefreshSetsGaugesAndKeepsValuesOnError(t *testing.T) {
 	require.Equal(t, float64(21), testutil.ToFloat64(m.migrations))
 	require.Equal(t, float64(1), testutil.ToFloat64(m.dependency.WithLabelValues("mysql")))
 	require.Equal(t, float64(0), testutil.ToFloat64(m.dependency.WithLabelValues("redis")))
+	require.Equal(t, float64(5), testutil.ToFloat64(m.pool.WithLabelValues("open")))
+	require.Equal(t, float64(3), testutil.ToFloat64(m.pool.WithLabelValues("in_use")))
+	require.Equal(t, float64(20), testutil.ToFloat64(m.pool.WithLabelValues("max")))
+	require.Equal(t, float64(12), testutil.ToFloat64(m.poolWaits))
 
 	// A failing query must not zero the last known value.
 	probe.backlogErr = errors.New("db down")
@@ -163,10 +171,15 @@ func TestRunStopsOnContextCancel(t *testing.T) {
 type fakeProbe struct {
 	backlog    map[string]int64
 	applied    int64
+	poolOpen   int
+	poolInUse  int
+	poolMax    int
+	poolWaits  int64
 	backlogErr error
 	appliedErr error
 	dbErr      error
 	cacheErr   error
+	poolErr    error
 }
 
 func (p *fakeProbe) OutboxBacklog(context.Context) (map[string]int64, error) {
@@ -179,6 +192,10 @@ func (p *fakeProbe) SchemaMigrationsApplied(context.Context) (int64, error) {
 
 func (p *fakeProbe) PingDatabase(context.Context) error { return p.dbErr }
 func (p *fakeProbe) PingCache(context.Context) error    { return p.cacheErr }
+
+func (p *fakeProbe) DBPoolStats(context.Context) (int, int, int, int64, error) {
+	return p.poolOpen, p.poolInUse, p.poolMax, p.poolWaits, p.poolErr
+}
 
 func sampleCount(t *testing.T, obs prometheus.Observer) float64 {
 	t.Helper()

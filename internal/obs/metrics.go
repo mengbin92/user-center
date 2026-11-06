@@ -27,6 +27,10 @@ type MetricsProbe interface {
 	SchemaMigrationsApplied(ctx context.Context) (int64, error)
 	PingDatabase(ctx context.Context) error
 	PingCache(ctx context.Context) error
+	// DBPoolStats reports the sql.DB pool. Exhausted pools are a real outage
+	// mode: the dev profile's max_open_conns=1 cost 3.5x throughput, and the
+	// same shape (in_use == max) is invisible without these numbers.
+	DBPoolStats(ctx context.Context) (open, inUse, maxConnections int, waitTotal int64, err error)
 }
 
 // DefaultRefreshInterval is how often the gauges are recomputed.
@@ -41,6 +45,8 @@ type Metrics struct {
 	deliveries *prometheus.GaugeVec
 	migrations prometheus.Gauge
 	dependency *prometheus.GaugeVec
+	pool       *prometheus.GaugeVec
+	poolWaits  prometheus.Gauge
 }
 
 func NewMetrics(probe MetricsProbe) *Metrics {
@@ -68,9 +74,17 @@ func NewMetrics(probe MetricsProbe) *Metrics {
 			Name: "usercenter_dependency_up",
 			Help: "1 when the dependency answered its last probe, 0 otherwise.",
 		}, []string{"dependency"}),
+		pool: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "usercenter_db_pool_connections",
+			Help: "sql.DB pool occupancy: open, in_use, max.",
+		}, []string{"state"}),
+		poolWaits: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "usercenter_db_pool_wait_total",
+			Help: "Cumulative count of connections waited for: non-zero growth means the pool is too small.",
+		}),
 	}
 	m.registry.MustRegister(
-		m.requests, m.duration, m.deliveries, m.migrations, m.dependency,
+		m.requests, m.duration, m.deliveries, m.migrations, m.dependency, m.pool, m.poolWaits,
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
@@ -127,6 +141,12 @@ func (m *Metrics) Refresh(ctx context.Context) {
 	}
 	if applied, err := m.probe.SchemaMigrationsApplied(ctx); err == nil {
 		m.migrations.Set(float64(applied))
+	}
+	if open, inUse, maxConns, waitTotal, err := m.probe.DBPoolStats(ctx); err == nil {
+		m.pool.WithLabelValues("open").Set(float64(open))
+		m.pool.WithLabelValues("in_use").Set(float64(inUse))
+		m.pool.WithLabelValues("max").Set(float64(maxConns))
+		m.poolWaits.Set(float64(waitTotal))
 	}
 	m.dependency.WithLabelValues("mysql").Set(boolGauge(m.probe.PingDatabase(ctx)))
 	m.dependency.WithLabelValues("redis").Set(boolGauge(m.probe.PingCache(ctx)))

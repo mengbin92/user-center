@@ -6,6 +6,7 @@ import (
 	"time"
 
 	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -34,10 +35,31 @@ func NewGRPCServer(cfg *conf.Server, log *zap.Logger, integration *service.Integ
 	srv := kgrpc.NewServer(
 		kgrpc.Address(addr),
 		kgrpc.Timeout(time.Duration(timeout)*time.Second),
-		kgrpc.Options(grpc.ChainUnaryInterceptor(integrationAuth(integration.Usecase()))),
+		kgrpc.Options(grpc.ChainUnaryInterceptor(requestIDInterceptor(), integrationAuth(integration.Usecase()))),
 	)
 	usercv1.RegisterIntegrationServiceServer(srv, integration)
 	return &GRPCServer{Server: srv}
+}
+
+// requestIDInterceptor makes the request id reachable from gRPC handlers and
+// the audit rows they write, and echoes it back so the caller can correlate.
+// The rules match the HTTP middleware: reuse a sane incoming value, otherwise
+// generate one.
+func requestIDInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		id := ""
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			if values := md.Get("x-request-id"); len(values) > 0 {
+				id = strings.TrimSpace(values[0])
+			}
+		}
+		if id == "" || len(id) > 64 {
+			id = uuid.NewString()
+		}
+		ctx = biz.WithRequestID(ctx, id)
+		_ = grpc.SetHeader(ctx, metadata.Pairs("x-request-id", id))
+		return handler(ctx, req)
+	}
 }
 
 func integrationAuth(uc *biz.IntegrationUsecase) grpc.UnaryServerInterceptor {

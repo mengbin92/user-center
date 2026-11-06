@@ -71,3 +71,14 @@ func (d *Data) PingCache(ctx context.Context) error {
 	defer cancel()
 	return d.redis.Ping(ctx).Err()
 }
+
+// DBPoolStats reads sql.DB's own counters. They are in-memory and free, so the
+// refresh timer can call this as often as it likes.
+func (d *Data) DBPoolStats(context.Context) (int, int, int, int64, error) {
+	sqlDB, err := d.db.DB()
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	stats := sqlDB.Stats()
+	return stats.OpenConnections, stats.InUse, stats.MaxOpenConnections, int64(stats.WaitCount), nil
+}
