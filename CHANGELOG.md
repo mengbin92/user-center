@@ -4,9 +4,39 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-11-06
+
+**版本判定：MINOR**（v0.6.1 → v0.7.0）。生产化基座：可观测性、负载基线与工程门禁。无迁移、无破坏性契约变更。详见 [发布说明](docs/releases/release-v0.7.0.md)。
+
+### Added
+
+- Prometheus 指标端点（独立监听，默认 `127.0.0.1:9091`，`METRICS_ADDR=off` 关闭）：HTTP 请求数与延迟直方图（`route` 为模板）、Outbox 投递按状态、迁移步数、依赖连通性、DB 连接池占用与排队。
+- `deployments/prometheus/alerts.yml`：7 条告警规则（5xx 比例、P95 延迟、登录失败激增、Outbox 积压、依赖不可用、连接池耗尽、迁移未应用），`promtool check rules` 通过；运维手册新增 §5.2 SLO 与告警。
+- 慢请求日志（`SLOW_REQUEST_THRESHOLD_MS`，默认 500ms），字段为 `request_id` / 路由模板 / 方法 / 状态 / 耗时，不含 body、header、query 与 Cookie；字段集由测试白名单锁定。
+- gRPC unary interceptor 注入 `request_id` 并通过响应头回写；此前内部 API 写入的审计行该字段为空。
+- `scripts/bench/`：可复现的 MySQL 8.4 负载基线（5 个 k6 场景 + 会话池 + 结果表）与 `explain.sql` 索引审计夹具；`docs/performance.md` 记录环境、基线、梯度与偏差。
+- CI `mysql` job（MySQL 8.4 service 上验迁移幂等与 MySQL 仓储测试）、`generated` job（生成物漂移即失败）、`e2e-compose` workflow（main 分支与手动触发的全栈冒烟）。
+
+### Changed
+
+- 邮件日志把收件人掩码为 `a***@example.com`，含 CR/LF 的地址直接拒绝。
+- compose 默认 `METRICS_ADDR=0.0.0.0:9091` 并把端口发布在宿主机回环。
+
+### Performance
+
+- 修复权限决策的重复查询：单次 `GET /api/v1/admin/users?page_size=20` 的 prepared statement 从 92 条降到 20 条 SELECT；`admin` 场景 16 VUs 从 176 QPS / P95 111 ms 提升到 622 QPS / P95 31 ms。
+- 授权快照增加每请求的操作定义缓存，列表过滤器复用同一份快照；快照仍为每请求，policy revision 语义不变。
+
+### Notes
+
+- 依赖：`github.com/prometheus/client_golang v1.25.0`，它要求 `golang.org/x/oauth2 v0.37.0`（MVS 无法保留 v0.36.0）。
+- v0.6.0 的 W3 波次附记从 `releases/release-v0.7.0.md` 更名为 `releases/release-v0.6.0-w3.md`，避免与真实版本号冲突。
+- 索引审计结论：无缺失索引，故无 `012` 迁移；关键字搜索全表扫、受限 scope 分页 filesort、组织成员列表无分页作为已知限制记录。
+- 大表（会话/审计/Outbox/投递）仍无定期清理，保留期与删除流程待合规确认。
+
 ## [0.6.1] - 2026-11-05
 
-**版本判定：PATCH**（v0.6.0 → v0.6.1）。第二轮完整 code review 修复，无新增能力、无迁移、无破坏性契约变更。共修复 1 个 P1、6 个 P2、9 个 P3，详见 [发布说明](releases/release-v0.6.1.md)。
+**版本判定：PATCH**（v0.6.0 → v0.6.1）。第二轮完整 code review 修复，无新增能力、无迁移、无破坏性契约变更。共修复 1 个 P1、6 个 P2、9 个 P3，详见 [发布说明](docs/releases/release-v0.6.1.md)。
 
 ### Fixed
 
@@ -26,7 +56,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.6.0] - 2026-11-05
 
-**版本判定：MINOR**（v0.5.2 → v0.6.0）。V2.4 R1–R14、code review 修复与工程前置一次性连续交付；分波次 tag 会让 v0.6.0/v0.7.0 缺少后续 P1 安全修复，故统一发版，决策已同步至 [路线图 §5](roadmap-v2.4.md) 与 [发布说明](releases/release-v0.6.0.md)。
+**版本判定：MINOR**（v0.5.2 → v0.6.0）。V2.4 R1–R14、code review 修复与工程前置一次性连续交付；分波次 tag 会让 v0.6.0/v0.7.0 缺少后续 P1 安全修复，故统一发版，决策已同步至 [路线图 §5](docs/roadmap-v2.4.md) 与 [发布说明](docs/releases/release-v0.6.0.md)。
 
 ### Added (W1/W2)
 
