@@ -45,6 +45,22 @@ func applyEnv(b *conf.Bootstrap) {
 	if v := os.Getenv("PUBLIC_BASE_URL"); v != "" {
 		srv.Http.PublicBaseUrl = v
 	}
+	// Write-path limiting is on by default; RATE_LIMIT_ENABLED=false is the
+	// escape hatch for a deployment that fronts the API with its own limiter and
+	// does not want two counters.
+	if v, ok := os.LookupEnv("RATE_LIMIT_ENABLED"); ok {
+		srv.RateLimit.Enabled = v != "false" && v != "0" && v != "off"
+	}
+	if v := os.Getenv("RATE_LIMIT_WRITE_PER_MINUTE"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			srv.RateLimit.WritePerMinute = int32(n)
+		}
+	}
+	if v := os.Getenv("RATE_LIMIT_HEAVY_PER_MINUTE"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			srv.RateLimit.HeavyPerMinute = int32(n)
+		}
+	}
 	if v := os.Getenv("DB_DRIVER"); v != "" {
 		dataConf.Database.Driver = v
 	}

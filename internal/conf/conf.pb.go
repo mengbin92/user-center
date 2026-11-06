@@ -94,6 +94,7 @@ type Server struct {
 	Http          *HTTP                  `protobuf:"bytes,1,opt,name=http,proto3" json:"http,omitempty"`
 	Grpc          *GRPC                  `protobuf:"bytes,2,opt,name=grpc,proto3" json:"grpc,omitempty"`
 	Metrics       *Metrics               `protobuf:"bytes,3,opt,name=metrics,proto3" json:"metrics,omitempty"`
+	RateLimit     *RateLimit             `protobuf:"bytes,4,opt,name=rate_limit,json=rateLimit,proto3" json:"rate_limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -149,6 +150,81 @@ func (x *Server) GetMetrics() *Metrics {
 	return nil
 }
 
+func (x *Server) GetRateLimit() *RateLimit {
+	if x != nil {
+		return x.RateLimit
+	}
+	return nil
+}
+
+// RateLimit bounds authenticated write traffic. It is configuration, not a
+// per-tenant setting: the right ceiling depends on how many instances are
+// behind the load balancer, which settings cannot know.
+type RateLimit struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// false disables this middleware entirely. The authentication endpoints keep
+	// their own limits either way, so they can never be bypassed from here.
+	Enabled bool `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// Requests per minute per subject for ordinary write endpoints.
+	WritePerMinute int32 `protobuf:"varint,2,opt,name=write_per_minute,json=writePerMinute,proto3" json:"write_per_minute,omitempty"`
+	// Stricter budget for exports, batch assignment and invitations, which are
+	// the endpoints that can move bulk data in one call.
+	HeavyPerMinute int32 `protobuf:"varint,3,opt,name=heavy_per_minute,json=heavyPerMinute,proto3" json:"heavy_per_minute,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RateLimit) Reset() {
+	*x = RateLimit{}
+	mi := &file_internal_conf_conf_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RateLimit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RateLimit) ProtoMessage() {}
+
+func (x *RateLimit) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_conf_conf_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RateLimit.ProtoReflect.Descriptor instead.
+func (*RateLimit) Descriptor() ([]byte, []int) {
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RateLimit) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *RateLimit) GetWritePerMinute() int32 {
+	if x != nil {
+		return x.WritePerMinute
+	}
+	return 0
+}
+
+func (x *RateLimit) GetHeavyPerMinute() int32 {
+	if x != nil {
+		return x.HeavyPerMinute
+	}
+	return 0
+}
+
 type HTTP struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Addr           string                 `protobuf:"bytes,1,opt,name=addr,proto3" json:"addr,omitempty"`
@@ -160,7 +236,7 @@ type HTTP struct {
 
 func (x *HTTP) Reset() {
 	*x = HTTP{}
-	mi := &file_internal_conf_conf_proto_msgTypes[2]
+	mi := &file_internal_conf_conf_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -172,7 +248,7 @@ func (x *HTTP) String() string {
 func (*HTTP) ProtoMessage() {}
 
 func (x *HTTP) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[2]
+	mi := &file_internal_conf_conf_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -185,7 +261,7 @@ func (x *HTTP) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HTTP.ProtoReflect.Descriptor instead.
 func (*HTTP) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{2}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *HTTP) GetAddr() string {
@@ -219,7 +295,7 @@ type GRPC struct {
 
 func (x *GRPC) Reset() {
 	*x = GRPC{}
-	mi := &file_internal_conf_conf_proto_msgTypes[3]
+	mi := &file_internal_conf_conf_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -231,7 +307,7 @@ func (x *GRPC) String() string {
 func (*GRPC) ProtoMessage() {}
 
 func (x *GRPC) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[3]
+	mi := &file_internal_conf_conf_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -244,7 +320,7 @@ func (x *GRPC) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GRPC.ProtoReflect.Descriptor instead.
 func (*GRPC) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{3}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GRPC) GetAddr() string {
@@ -275,7 +351,7 @@ type Metrics struct {
 
 func (x *Metrics) Reset() {
 	*x = Metrics{}
-	mi := &file_internal_conf_conf_proto_msgTypes[4]
+	mi := &file_internal_conf_conf_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -287,7 +363,7 @@ func (x *Metrics) String() string {
 func (*Metrics) ProtoMessage() {}
 
 func (x *Metrics) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[4]
+	mi := &file_internal_conf_conf_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -300,7 +376,7 @@ func (x *Metrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Metrics.ProtoReflect.Descriptor instead.
 func (*Metrics) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{4}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Metrics) GetAddr() string {
@@ -327,7 +403,7 @@ type Data struct {
 
 func (x *Data) Reset() {
 	*x = Data{}
-	mi := &file_internal_conf_conf_proto_msgTypes[5]
+	mi := &file_internal_conf_conf_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -339,7 +415,7 @@ func (x *Data) String() string {
 func (*Data) ProtoMessage() {}
 
 func (x *Data) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[5]
+	mi := &file_internal_conf_conf_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -352,7 +428,7 @@ func (x *Data) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Data.ProtoReflect.Descriptor instead.
 func (*Data) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{5}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Data) GetDatabase() *Database {
@@ -382,7 +458,7 @@ type Database struct {
 
 func (x *Database) Reset() {
 	*x = Database{}
-	mi := &file_internal_conf_conf_proto_msgTypes[6]
+	mi := &file_internal_conf_conf_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -394,7 +470,7 @@ func (x *Database) String() string {
 func (*Database) ProtoMessage() {}
 
 func (x *Database) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[6]
+	mi := &file_internal_conf_conf_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -407,7 +483,7 @@ func (x *Database) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Database.ProtoReflect.Descriptor instead.
 func (*Database) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{6}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Database) GetDriver() string {
@@ -449,7 +525,7 @@ type Redis struct {
 
 func (x *Redis) Reset() {
 	*x = Redis{}
-	mi := &file_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_internal_conf_conf_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -461,7 +537,7 @@ func (x *Redis) String() string {
 func (*Redis) ProtoMessage() {}
 
 func (x *Redis) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_internal_conf_conf_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -474,7 +550,7 @@ func (x *Redis) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Redis.ProtoReflect.Descriptor instead.
 func (*Redis) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{7}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Redis) GetAddr() string {
@@ -515,7 +591,7 @@ type Security struct {
 
 func (x *Security) Reset() {
 	*x = Security{}
-	mi := &file_internal_conf_conf_proto_msgTypes[8]
+	mi := &file_internal_conf_conf_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -527,7 +603,7 @@ func (x *Security) String() string {
 func (*Security) ProtoMessage() {}
 
 func (x *Security) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[8]
+	mi := &file_internal_conf_conf_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -540,7 +616,7 @@ func (x *Security) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Security.ProtoReflect.Descriptor instead.
 func (*Security) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{8}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Security) GetSessionSecret() string {
@@ -618,7 +694,7 @@ type Mail struct {
 
 func (x *Mail) Reset() {
 	*x = Mail{}
-	mi := &file_internal_conf_conf_proto_msgTypes[9]
+	mi := &file_internal_conf_conf_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -630,7 +706,7 @@ func (x *Mail) String() string {
 func (*Mail) ProtoMessage() {}
 
 func (x *Mail) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[9]
+	mi := &file_internal_conf_conf_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -643,7 +719,7 @@ func (x *Mail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Mail.ProtoReflect.Descriptor instead.
 func (*Mail) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{9}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Mail) GetDriver() string {
@@ -679,7 +755,7 @@ type SMTP struct {
 
 func (x *SMTP) Reset() {
 	*x = SMTP{}
-	mi := &file_internal_conf_conf_proto_msgTypes[10]
+	mi := &file_internal_conf_conf_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -691,7 +767,7 @@ func (x *SMTP) String() string {
 func (*SMTP) ProtoMessage() {}
 
 func (x *SMTP) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[10]
+	mi := &file_internal_conf_conf_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -704,7 +780,7 @@ func (x *SMTP) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SMTP.ProtoReflect.Descriptor instead.
 func (*SMTP) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{10}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SMTP) GetHost() string {
@@ -744,11 +820,17 @@ const file_internal_conf_conf_proto_rawDesc = "" +
 	"\x06server\x18\x01 \x01(\v2\x17.usercenter.conf.ServerR\x06server\x12)\n" +
 	"\x04data\x18\x02 \x01(\v2\x15.usercenter.conf.DataR\x04data\x125\n" +
 	"\bsecurity\x18\x03 \x01(\v2\x19.usercenter.conf.SecurityR\bsecurity\x12)\n" +
-	"\x04mail\x18\x04 \x01(\v2\x15.usercenter.conf.MailR\x04mail\"\x92\x01\n" +
+	"\x04mail\x18\x04 \x01(\v2\x15.usercenter.conf.MailR\x04mail\"\xcd\x01\n" +
 	"\x06Server\x12)\n" +
 	"\x04http\x18\x01 \x01(\v2\x15.usercenter.conf.HTTPR\x04http\x12)\n" +
 	"\x04grpc\x18\x02 \x01(\v2\x15.usercenter.conf.GRPCR\x04grpc\x122\n" +
-	"\ametrics\x18\x03 \x01(\v2\x18.usercenter.conf.MetricsR\ametrics\"k\n" +
+	"\ametrics\x18\x03 \x01(\v2\x18.usercenter.conf.MetricsR\ametrics\x129\n" +
+	"\n" +
+	"rate_limit\x18\x04 \x01(\v2\x1a.usercenter.conf.RateLimitR\trateLimit\"y\n" +
+	"\tRateLimit\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12(\n" +
+	"\x10write_per_minute\x18\x02 \x01(\x05R\x0ewritePerMinute\x12(\n" +
+	"\x10heavy_per_minute\x18\x03 \x01(\x05R\x0eheavyPerMinute\"k\n" +
 	"\x04HTTP\x12\x12\n" +
 	"\x04addr\x18\x01 \x01(\tR\x04addr\x12'\n" +
 	"\x0ftimeout_seconds\x18\x02 \x01(\x05R\x0etimeoutSeconds\x12&\n" +
@@ -804,36 +886,38 @@ func file_internal_conf_conf_proto_rawDescGZIP() []byte {
 	return file_internal_conf_conf_proto_rawDescData
 }
 
-var file_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_internal_conf_conf_proto_goTypes = []any{
 	(*Bootstrap)(nil), // 0: usercenter.conf.Bootstrap
 	(*Server)(nil),    // 1: usercenter.conf.Server
-	(*HTTP)(nil),      // 2: usercenter.conf.HTTP
-	(*GRPC)(nil),      // 3: usercenter.conf.GRPC
-	(*Metrics)(nil),   // 4: usercenter.conf.Metrics
-	(*Data)(nil),      // 5: usercenter.conf.Data
-	(*Database)(nil),  // 6: usercenter.conf.Database
-	(*Redis)(nil),     // 7: usercenter.conf.Redis
-	(*Security)(nil),  // 8: usercenter.conf.Security
-	(*Mail)(nil),      // 9: usercenter.conf.Mail
-	(*SMTP)(nil),      // 10: usercenter.conf.SMTP
+	(*RateLimit)(nil), // 2: usercenter.conf.RateLimit
+	(*HTTP)(nil),      // 3: usercenter.conf.HTTP
+	(*GRPC)(nil),      // 4: usercenter.conf.GRPC
+	(*Metrics)(nil),   // 5: usercenter.conf.Metrics
+	(*Data)(nil),      // 6: usercenter.conf.Data
+	(*Database)(nil),  // 7: usercenter.conf.Database
+	(*Redis)(nil),     // 8: usercenter.conf.Redis
+	(*Security)(nil),  // 9: usercenter.conf.Security
+	(*Mail)(nil),      // 10: usercenter.conf.Mail
+	(*SMTP)(nil),      // 11: usercenter.conf.SMTP
 }
 var file_internal_conf_conf_proto_depIdxs = []int32{
 	1,  // 0: usercenter.conf.Bootstrap.server:type_name -> usercenter.conf.Server
-	5,  // 1: usercenter.conf.Bootstrap.data:type_name -> usercenter.conf.Data
-	8,  // 2: usercenter.conf.Bootstrap.security:type_name -> usercenter.conf.Security
-	9,  // 3: usercenter.conf.Bootstrap.mail:type_name -> usercenter.conf.Mail
-	2,  // 4: usercenter.conf.Server.http:type_name -> usercenter.conf.HTTP
-	3,  // 5: usercenter.conf.Server.grpc:type_name -> usercenter.conf.GRPC
-	4,  // 6: usercenter.conf.Server.metrics:type_name -> usercenter.conf.Metrics
-	6,  // 7: usercenter.conf.Data.database:type_name -> usercenter.conf.Database
-	7,  // 8: usercenter.conf.Data.redis:type_name -> usercenter.conf.Redis
-	10, // 9: usercenter.conf.Mail.smtp:type_name -> usercenter.conf.SMTP
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	6,  // 1: usercenter.conf.Bootstrap.data:type_name -> usercenter.conf.Data
+	9,  // 2: usercenter.conf.Bootstrap.security:type_name -> usercenter.conf.Security
+	10, // 3: usercenter.conf.Bootstrap.mail:type_name -> usercenter.conf.Mail
+	3,  // 4: usercenter.conf.Server.http:type_name -> usercenter.conf.HTTP
+	4,  // 5: usercenter.conf.Server.grpc:type_name -> usercenter.conf.GRPC
+	5,  // 6: usercenter.conf.Server.metrics:type_name -> usercenter.conf.Metrics
+	2,  // 7: usercenter.conf.Server.rate_limit:type_name -> usercenter.conf.RateLimit
+	7,  // 8: usercenter.conf.Data.database:type_name -> usercenter.conf.Database
+	8,  // 9: usercenter.conf.Data.redis:type_name -> usercenter.conf.Redis
+	11, // 10: usercenter.conf.Mail.smtp:type_name -> usercenter.conf.SMTP
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_internal_conf_conf_proto_init() }
@@ -847,7 +931,7 @@ func file_internal_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_conf_conf_proto_rawDesc), len(file_internal_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

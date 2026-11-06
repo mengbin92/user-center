@@ -47,6 +47,7 @@ type Metrics struct {
 	dependency *prometheus.GaugeVec
 	pool       *prometheus.GaugeVec
 	poolWaits  prometheus.Gauge
+	throttled  *prometheus.CounterVec
 }
 
 func NewMetrics(probe MetricsProbe) *Metrics {
@@ -82,9 +83,13 @@ func NewMetrics(probe MetricsProbe) *Metrics {
 			Name: "usercenter_db_pool_wait_total",
 			Help: "Cumulative count of connections waited for: non-zero growth means the pool is too small.",
 		}),
+		throttled: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "usercenter_rate_limit_hits_total",
+			Help: "Requests rejected by the write rate limiter, by scope.",
+		}, []string{"scope"}),
 	}
 	m.registry.MustRegister(
-		m.requests, m.duration, m.deliveries, m.migrations, m.dependency, m.pool, m.poolWaits,
+		m.requests, m.duration, m.deliveries, m.migrations, m.dependency, m.pool, m.poolWaits, m.throttled,
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
@@ -291,4 +296,14 @@ func isNumeric(s string) bool {
 		}
 	}
 	return true
+}
+
+// RateLimited counts a rejection so the 429 can be alerted on per scope. A
+// rejected request never reaches the handler, so it also never appears in the
+// status-labelled request counter.
+func (m *Metrics) RateLimited(scope string) {
+	if m == nil {
+		return
+	}
+	m.throttled.WithLabelValues(scope).Inc()
 }

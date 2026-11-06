@@ -66,6 +66,7 @@ func NewHTTPServer(
 		}
 	}
 
+	mw.WithWriteLimiter(NewWriteLimiter(cfg, mw.Limiter(), metrics))
 	srv := khttp.NewServer(
 		khttp.Address(addr),
 		khttp.Timeout(time.Duration(timeout)*time.Second),
