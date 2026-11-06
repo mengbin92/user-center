@@ -22,16 +22,29 @@ type userPO struct {
 func (userPO) TableName() string { return "users" }
 
 type credentialPO struct {
-	UserID             int64     `gorm:"column:user_id;primaryKey"`
-	PasswordHash       string    `gorm:"column:password_hash;size:255"`
-	Algorithm          string    `gorm:"column:algorithm;size:32;not null"`
-	PasswordVersion    uint64    `gorm:"column:password_version;not null;default:1"`
-	MustChangePassword bool      `gorm:"column:must_change_password;not null;default:false"`
-	Revision           uint64    `gorm:"column:revision;not null;default:1"`
-	UpdatedAt          time.Time `gorm:"column:updated_at;not null"`
+	UserID             int64  `gorm:"column:user_id;primaryKey"`
+	PasswordHash       string `gorm:"column:password_hash;size:255"`
+	Algorithm          string `gorm:"column:algorithm;size:32;not null"`
+	PasswordVersion    uint64 `gorm:"column:password_version;not null;default:1"`
+	MustChangePassword bool   `gorm:"column:must_change_password;not null;default:false"`
+	// PasswordChangedAt is nil for accounts that predate password rotation.
+	// Nil means "age unknown", not "expired".
+	PasswordChangedAt *time.Time `gorm:"column:password_changed_at"`
+	Revision          uint64     `gorm:"column:revision;not null;default:1"`
+	UpdatedAt         time.Time  `gorm:"column:updated_at;not null"`
 }
 
 func (credentialPO) TableName() string { return "user_credentials" }
+
+// passwordHistoryPO keeps bcrypt hashes only. See migration 012 for why.
+type passwordHistoryPO struct {
+	ID           int64     `gorm:"column:id;primaryKey;autoIncrement"`
+	UserID       int64     `gorm:"column:user_id;not null;index:idx_password_history_user,priority:1"`
+	PasswordHash string    `gorm:"column:password_hash;size:255;not null"`
+	CreatedAt    time.Time `gorm:"column:created_at;not null"`
+}
+
+func (passwordHistoryPO) TableName() string { return "password_history" }
 
 type mfaPO struct {
 	UserID         int64      `gorm:"column:user_id;primaryKey"`

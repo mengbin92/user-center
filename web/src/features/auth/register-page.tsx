@@ -33,6 +33,9 @@ export function RegisterPage() {
   })
   const context = contextQuery.data
   const minLength = context?.password_min_length ?? 10
+  // Falls back to the server default (3) rather than 0: with the context still
+  // loading, showing the rule is better than submitting and being rejected.
+  const minClasses = context?.password_min_classes ?? 3
   const verificationRequired = context?.email_verification_required ?? true
 
   const [step, setStep] = useState<'email' | 'details' | 'done'>('email')
@@ -97,7 +100,7 @@ export function RegisterPage() {
   const submitRegistration = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
-    const passwordError = passwordValidationError(password, minLength)
+    const passwordError = passwordValidationError(password, minLength, minClasses)
     if (passwordError) {
       setError(passwordError)
       return
@@ -279,7 +282,11 @@ export function RegisterPage() {
             label="密码"
             htmlFor="register-password"
             required
-            hint={`至少 ${minLength} 位，建议包含大小写字母、数字与符号`}
+            hint={
+              minClasses > 0
+                ? `至少 ${minLength} 位，且需包含 ${Math.min(minClasses, 4)} 类字符（大写字母、小写字母、数字、符号）`
+                : `至少 ${minLength} 位`
+            }
           >
             <Input
               id="register-password"

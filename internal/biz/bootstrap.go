@@ -21,7 +21,7 @@ func (s *Services) BootstrapRoot(ctx context.Context, username, email, password 
 			return nil, err
 		}
 	}
-	if err := ValidatePassword(password, 12); err != nil {
+	if err := ValidatePassword(password, PasswordPolicy{MinLength: 12}); err != nil {
 		return nil, err
 	}
 	if existing, err := s.Users.GetByUsername(ctx, nil, NormalizeUsername(username)); err == nil {
@@ -47,8 +47,13 @@ func (s *Services) BootstrapRoot(ctx context.Context, username, email, password 
 		created = c
 		if err := s.Credentials.Create(ctx, tx, &Credential{
 			UserID: c.ID, PasswordHash: hash, Algorithm: "bcrypt",
-			PasswordVersion: 1, Revision: 1, UpdatedAt: now,
+			PasswordVersion: 1, ChangedAt: now, Revision: 1, UpdatedAt: now,
 		}); err != nil {
+			return err
+		}
+		// Seed history so the very first rotation cannot restore the bootstrap
+		// password. Without this the reuse rule would silently skip root.
+		if err := s.recordBootstrapHistory(ctx, tx, c.ID, hash); err != nil {
 			return err
 		}
 		root, err := s.IAM.GetRoleByCode(ctx, tx, "root")
@@ -76,7 +81,7 @@ func (s *Services) BootstrapRoot(ctx context.Context, username, email, password 
 // ResetRoot restores the root credential after an operator proves host access.
 // Existing sessions are revoked and the identity version is bumped.
 func (s *Services) ResetRoot(ctx context.Context, username, password string) error {
-	if err := ValidatePassword(password, 12); err != nil {
+	if err := ValidatePassword(password, PasswordPolicy{MinLength: 12}); err != nil {
 		return err
 	}
 	u, err := s.Users.GetByUsername(ctx, nil, NormalizeUsername(username))
@@ -108,6 +113,9 @@ func (s *Services) ResetRoot(ctx context.Context, username, password string) err
 			return err
 		}
 		if _, err := s.Credentials.UpdatePassword(ctx, tx, u.ID, hash, "bcrypt", cred.Revision, false); err != nil {
+			return err
+		}
+		if err := s.recordBootstrapHistory(ctx, tx, u.ID, hash); err != nil {
 			return err
 		}
 		if u.Status != UserStatusEnabled {
@@ -176,4 +184,15 @@ func (s *Services) ResetRootMFA(ctx context.Context, username string) error {
 		payload, _ := jsonx.Marshal(map[string]any{"user_id": itoa(u.ID), "identity_version": uitoa(version), "mfa_enabled": false})
 		return s.emit(ctx, tx, "user", u.ID, version, "credential.changed", string(payload))
 	})
+}
+
+// recordBootstrapHistory stores the bootstrap password hash using the current
+// policy window. Settings can be unavailable during very early bootstrap, in
+// which case a conservative default of five entries is used.
+func (s *Services) recordBootstrapHistory(ctx context.Context, tx Tx, userID int64, hash string) error {
+	keep := 5
+	if settings, err := s.Settings.GetAuth(ctx, nil); err == nil && settings.PasswordHistoryCount > 0 {
+		keep = settings.PasswordHistoryCount
+	}
+	return s.Credentials.RecordPasswordHash(ctx, tx, userID, hash, keep)
 }

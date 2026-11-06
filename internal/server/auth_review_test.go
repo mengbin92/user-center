@@ -157,12 +157,14 @@ func TestCredentialReadFailureDeniesProtectedHTTP(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "DEPENDENCY_UNAVAILABLE")
 }
 
-func TestOversizedPasswordReturnsValidationError(t *testing.T) {
+func TestOversizedPasswordReturnsPolicyViolation(t *testing.T) {
 	h := newHarness(t)
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	rec := h.do(http.MethodPost, "/api/v1/me/password:change", map[string]any{"current_password": "ChangeMe-12345", "new_password": strings.Repeat("a", 73)}, "", true)
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-	require.Contains(t, rec.Body.String(), "VALIDATION_FAILED")
+	// PASSWORD_POLICY_VIOLATION rather than VALIDATION_FAILED: the web form keys
+	// off this reason to show the rule next to the password field.
+	require.Contains(t, rec.Body.String(), "PASSWORD_POLICY_VIOLATION")
 }
 
 type concurrentMFARead struct {

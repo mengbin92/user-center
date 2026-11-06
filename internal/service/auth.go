@@ -38,6 +38,7 @@ func (s *AuthService) GetAuthContext(ctx context.Context, _ *usercv1.GetAuthCont
 		CsrfToken:                 ensureCSRF(ctx, s.deps),
 		PasswordMinLength:         int32(settings.PasswordMinLength),
 		MfaRequiredForAdmins:      settings.MFARequiredForAdmins,
+		PasswordMinClasses:        int32(settings.PasswordMinClasses),
 	}, nil
 }
 
@@ -74,6 +75,7 @@ func (s *AuthService) Login(ctx context.Context, req *usercv1.LoginRequest) (*us
 	reply := &usercv1.LoginReply{
 		Status: result.Status, PasswordChangeRequired: result.PasswordChangeRequired,
 		MfaEnrollmentRequired: s.uc.MFAEnrollmentRequired(ctx, result.User),
+		RecycledSessions:      int32(result.RecycledSessions),
 	}
 	if result.WebAuthnChallenge != "" {
 		reply.Webauthn = &usercv1.WebAuthnChallenge{
@@ -108,6 +110,7 @@ func (s *AuthService) CompleteMFA(ctx context.Context, req *usercv1.CompleteMFAR
 		Status: result.Status, User: userProto(result.User),
 		SessionExpiresAt:       result.Session.ExpiresAt.Format(timeLayout),
 		PasswordChangeRequired: result.PasswordChangeRequired,
+		RecycledSessions:       int32(result.RecycledSessions),
 	}, nil
 }
 

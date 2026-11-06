@@ -2126,6 +2126,12 @@ export interface components {
             /** Format: int32 */
             password_min_length?: number;
             mfa_required_for_admins?: boolean;
+            /**
+             * Format: int32
+             * @description Lets the registration and password-change forms state the composition rule
+             *      before the user submits, instead of surfacing it as a rejection.
+             */
+            password_min_classes?: number;
         };
         "api.usercenter.v1.AuthProviderView": {
             code?: string;
@@ -2155,6 +2161,29 @@ export interface components {
             allowed_email_domains?: string[];
             providers?: string[];
             revision?: string;
+            /**
+             * Format: int32
+             * @description How many of the four character classes (upper, lower, digit, symbol) a new
+             *      password must contain. 0 disables composition rules entirely, which is the
+             *      right setting when an organisation relies on length plus a password
+             *      manager. Only applied when a password is set, never at login.
+             */
+            password_min_classes?: number;
+            /**
+             * Format: int32
+             * @description How many previous password hashes to reject on reuse. 0 disables history.
+             */
+            password_history_count?: number;
+            /**
+             * Format: int32
+             * @description Days before a password is considered stale. 0 never expires.
+             */
+            password_expiry_days?: number;
+            /**
+             * Format: int32
+             * @description Maximum concurrent sessions per user. 0 disables the cap.
+             */
+            max_sessions_per_user?: number;
         };
         "api.usercenter.v1.AuthorizationReply": {
             permissions?: components["schemas"]["api.usercenter.v1.PermissionSummary"][];
@@ -2643,6 +2672,13 @@ export interface components {
             mfa_enrollment_required?: boolean;
             /** @description Present when a WebAuthn credential can satisfy the MFA challenge. */
             webauthn?: components["schemas"]["api.usercenter.v1.WebAuthnChallenge"];
+            /**
+             * Format: int32
+             * @description How many older sessions the per-user cap reclaimed while issuing this one.
+             *      Non-zero means another device was signed out; say so rather than letting
+             *      the user discover it later.
+             */
+            recycled_sessions?: number;
         };
         "api.usercenter.v1.LoginRequest": {
             username?: string;
@@ -3165,6 +3201,14 @@ export interface components {
             update_mask?: string;
             expected_revision?: string;
             reason?: string;
+            /** Format: int32 */
+            password_min_classes?: number;
+            /** Format: int32 */
+            password_history_count?: number;
+            /** Format: int32 */
+            password_expiry_days?: number;
+            /** Format: int32 */
+            max_sessions_per_user?: number;
         };
         "api.usercenter.v1.UpdateConstraintRequest": {
             id?: string;

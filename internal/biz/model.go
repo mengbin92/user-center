@@ -71,8 +71,11 @@ type Credential struct {
 	Algorithm          string
 	PasswordVersion    uint64
 	MustChangePassword bool
-	Revision           uint64
-	UpdatedAt          time.Time
+	// ChangedAt is zero when the age is unknown (accounts created before
+	// password rotation existed). Zero never counts as expired.
+	ChangedAt time.Time
+	Revision  uint64
+	UpdatedAt time.Time
 }
 
 type ExternalIdentity struct {
@@ -116,6 +119,10 @@ type Session struct {
 	IdentityVersion uint64
 	Revision        uint64
 	ActiveRoleIDs   []int64
+	// EvictedSessions is not persisted: it carries how many older sessions the
+	// per-user cap reclaimed while issuing this one, so the login reply can say
+	// so instead of silently signing the user out somewhere else.
+	EvictedSessions int
 }
 
 func (s Session) Valid(now time.Time) bool {
@@ -363,8 +370,35 @@ type AuthSettings struct {
 	MFARequiredForAdmins      bool
 	AllowedEmailDomains       []string
 	Providers                 []string
-	Revision                  uint64
-	UpdatedAt                 time.Time
+	// Password composition, reuse and rotation. Zero values keep the V2.4
+	// behaviour (length only, no history, no expiry).
+	PasswordMinClasses   int
+	PasswordHistoryCount int
+	PasswordExpiryDays   int
+	// MaxSessionsPerUser caps concurrent sessions. 0 disables the cap.
+	MaxSessionsPerUser int
+	Revision           uint64
+	UpdatedAt          time.Time
+}
+
+// PasswordPolicy is the slice of AuthSettings the validator needs. Passing the
+// policy rather than the whole settings struct keeps the four password entry
+// points (register, self-service change, reset, admin initial password) on one
+// code path even if settings grows further.
+type PasswordPolicy struct {
+	MinLength    int
+	MinClasses   int
+	HistoryCount int
+	ExpiryDays   int
+}
+
+func (s AuthSettings) PasswordPolicy() PasswordPolicy {
+	return PasswordPolicy{
+		MinLength:    s.PasswordMinLength,
+		MinClasses:   s.PasswordMinClasses,
+		HistoryCount: s.PasswordHistoryCount,
+		ExpiryDays:   s.PasswordExpiryDays,
+	}
 }
 
 type EmailSettings struct {

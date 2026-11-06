@@ -215,7 +215,7 @@ func (s *SecretBox) Decrypt(v string) (string, error) {
 
 func models() []any {
 	return []any{
-		&userPO{}, &credentialPO{}, &mfaPO{}, &externalIdentityPO{},
+		&userPO{}, &credentialPO{}, &passwordHistoryPO{}, &mfaPO{}, &externalIdentityPO{},
 		&sessionPO{}, &sessionRolePO{}, &securityEventPO{}, &flowCompletionPO{},
 		&policyStatePO{}, &resourcePO{}, &permissionPO{}, &rolePO{},
 		&roleGrantPO{}, &roleInheritancePO{}, &assignmentPO{}, &delegationPO{}, &constraintPO{},

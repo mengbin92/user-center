@@ -44,6 +44,17 @@ message AuthSettings {
   repeated string allowed_email_domains = 7;
   repeated string providers = 8;
   string revision = 9;
+  // How many of the four character classes (upper, lower, digit, symbol) a new
+  // password must contain. 0 disables composition rules entirely, which is the
+  // right setting when an organisation relies on length plus a password
+  // manager. Only applied when a password is set, never at login.
+  int32 password_min_classes = 10;
+  // How many previous password hashes to reject on reuse. 0 disables history.
+  int32 password_history_count = 11;
+  // Days before a password is considered stale. 0 never expires.
+  int32 password_expiry_days = 12;
+  // Maximum concurrent sessions per user. 0 disables the cap.
+  int32 max_sessions_per_user = 13;
 }
 
 message UpdateAuthSettingsRequest {
@@ -58,6 +69,10 @@ message UpdateAuthSettingsRequest {
   string update_mask = 9;
   string expected_revision = 10;
   string reason = 11;
+  int32 password_min_classes = 12;
+  int32 password_history_count = 13;
+  int32 password_expiry_days = 14;
+  int32 max_sessions_per_user = 15;
 }
 
 message GetEmailSettingsRequest {}

@@ -84,6 +84,7 @@ export function SecurityPage() {
     staleTime: 60_000,
   })
   const minPasswordLength = contextQuery.data?.password_min_length ?? 10
+  const minPasswordClasses = contextQuery.data?.password_min_classes ?? 3
   const identitiesQuery = useQuery({
     queryKey: ['me', 'external-identities'],
     queryFn: () => api.me.externalIdentities(),
@@ -308,7 +309,7 @@ export function SecurityPage() {
   const submitPassword = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setPasswordError(null)
-    const policyError = passwordValidationError(newPassword, minPasswordLength)
+    const policyError = passwordValidationError(newPassword, minPasswordLength, minPasswordClasses)
     if (policyError) {
       setPasswordError(policyError)
       return

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -36,6 +37,9 @@ type LoginResult struct {
 	Session                *Session
 	RawToken               string
 	PasswordChangeRequired bool
+	// RecycledSessions is how many older sessions the per-user cap reclaimed
+	// while issuing this one. Non-zero means another device was signed out.
+	RecycledSessions int
 	// Present when a passkey can satisfy this MFA challenge.
 	WebAuthnChallenge     string
 	WebAuthnRPID          string
@@ -113,7 +117,7 @@ func (uc *AuthUsecase) Register(ctx context.Context, in RegisterInput) (*User, e
 	if !emailDomainAllowed(in.Email, settings.AllowedEmailDomains) {
 		return nil, Validation("该邮箱域名不允许注册")
 	}
-	if err := ValidatePassword(in.Password, settings.PasswordMinLength); err != nil {
+	if err := ValidatePassword(in.Password, settings.PasswordPolicy()); err != nil {
 		return nil, err
 	}
 	if in.TermsVersion == "" {
@@ -186,10 +190,16 @@ func (uc *AuthUsecase) Register(ctx context.Context, in RegisterInput) (*User, e
 			PasswordHash:    hash,
 			Algorithm:       "bcrypt",
 			PasswordVersion: 1,
+			ChangedAt:       now,
 			Revision:        1,
 			UpdatedAt:       now,
 		}); err != nil {
 			return err
+		}
+		// Seed the history with the first password so "reuse the last N" is
+		// meaningful from the very first change, not only after one rotation.
+		if err := uc.RecordPasswordHistory(ctx, tx, u.ID, hash, settings.PasswordPolicy()); err != nil {
+			return ErrDependency
 		}
 		member, err := uc.IAM.GetRoleByCode(ctx, tx, "member")
 		if err != nil {
@@ -330,9 +340,20 @@ func (uc *AuthUsecase) login(ctx context.Context, in LoginInput, appID string) (
 	if err != nil {
 		return nil, err
 	}
+	// Report expiry in the login reply so the UI can route straight to the
+	// change-password screen. ValidateSession enforces the same rule on every
+	// later request, so this is a UX hint, not the only guard.
+	changeRequired := cred.MustChangePassword
+	if settings, serr := uc.Settings.GetAuth(ctx, nil); serr == nil {
+		changeRequired = changeRequired || PasswordExpired(cred.ChangedAt, settings.PasswordPolicy(), uc.Clock.Now())
+	}
+	if session.EvictedSessions > 0 {
+		uc.recordSecurity(ctx, user.ID, session.ID, "session_evict", "success", in.IP, in.UserAgent, "")
+	}
 	return &LoginResult{
 		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session,
-		RawToken: raw, PasswordChangeRequired: cred.MustChangePassword,
+		RawToken: raw, PasswordChangeRequired: changeRequired,
+		RecycledSessions: session.EvictedSessions,
 	}, nil
 }
 
@@ -433,9 +454,15 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 	}
 	uc.recordSecurity(ctx, user.ID, session.ID, "login", "success", payload.IP, payload.UA, "")
 	_ = uc.Challenges.Delete(ctx, challengeID)
-	result := &LoginResult{Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw}
+	result := &LoginResult{
+		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw,
+		RecycledSessions: session.EvictedSessions,
+	}
 	if cred != nil {
 		result.PasswordChangeRequired = cred.MustChangePassword
+		if settings, serr := uc.Settings.GetAuth(ctx, nil); serr == nil {
+			result.PasswordChangeRequired = result.PasswordChangeRequired || PasswordExpired(cred.ChangedAt, settings.PasswordPolicy(), uc.Clock.Now())
+		}
 	}
 	return result, nil
 }
@@ -474,6 +501,13 @@ func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User,
 	if err != nil {
 		return nil, "", err
 	}
+	evicted := 0
+	if settings.MaxSessionsPerUser > 0 {
+		evicted, err = uc.evictExcessSessions(ctx, tx, user.ID, settings.MaxSessionsPerUser, now)
+		if err != nil {
+			return nil, "", ErrDependency
+		}
+	}
 	s := &Session{
 		ID:              uc.IDs.NewID(),
 		UserID:          user.ID,
@@ -488,6 +522,7 @@ func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User,
 		IdentityVersion: user.IdentityVersion,
 		Revision:        1,
 		ActiveRoleIDs:   activeRoles,
+		EvictedSessions: evicted,
 	}
 	if err := uc.Sessions.Create(ctx, tx, s); err != nil {
 		return nil, "", ErrDependency
@@ -496,6 +531,39 @@ func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User,
 		uc.recordSecurity(ctx, user.ID, s.ID, "login", "success", ip, ua, "")
 	}
 	return s, raw, nil
+}
+
+// evictExcessSessions keeps at most limit live sessions per user by revoking
+// the least recently used ones before the new session is inserted. Revocation
+// is server-side (revoked_at), so the evicted device gets a 401 on its next
+// request rather than merely disappearing from a list.
+func (uc *AuthUsecase) evictExcessSessions(ctx context.Context, tx Tx, userID int64, limit int, now time.Time) (int, error) {
+	rows, err := uc.Sessions.ListByUser(ctx, tx, userID)
+	if err != nil {
+		return 0, err
+	}
+	live := make([]*Session, 0, len(rows))
+	for _, s := range rows {
+		if s.Valid(now) {
+			live = append(live, s)
+		}
+	}
+	// +1 accounts for the session about to be created.
+	excess := len(live) + 1 - limit
+	if excess <= 0 {
+		return 0, nil
+	}
+	if excess > len(live) {
+		excess = len(live)
+	}
+	sort.Slice(live, func(i, j int) bool { return live[i].LastSeenAt.Before(live[j].LastSeenAt) })
+	for i := 0; i < excess; i++ {
+		if err := uc.Sessions.Revoke(ctx, tx, live[i].ID, &now); err != nil {
+			return 0, err
+		}
+		_ = uc.StepUp.Delete(ctx, StepUpKey(live[i]))
+	}
+	return excess, nil
 }
 
 func (uc *AuthUsecase) activeRoleSubset(ctx context.Context, userID int64) ([]int64, error) {
@@ -588,7 +656,8 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 	if err != nil {
 		return ErrDependency
 	}
-	if err := ValidatePassword(newPassword, settings.PasswordMinLength); err != nil {
+	policy := settings.PasswordPolicy()
+	if err := ValidatePassword(newPassword, policy); err != nil {
 		return err
 	}
 	challenge, err := uc.Challenges.Verify(ctx, "password_reset", challengeID, code)
@@ -598,6 +667,16 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 	user, err := uc.Users.Get(ctx, nil, challenge.UserID)
 	if err != nil {
 		return ErrChallengeInvalid
+	}
+	// Reuse is checked before the challenge is consumed: a rejected password
+	// must not burn the one-time code, otherwise the user has to wait for a new
+	// email just because they repeated an old password.
+	if current, cerr := uc.Credentials.Get(ctx, nil, user.ID); cerr == nil {
+		if err := uc.CheckPasswordReuse(ctx, nil, user.ID, newPassword, policy, current); err != nil {
+			return err
+		}
+	} else if !errors.Is(cerr, ErrResourceNotFound) {
+		return ErrDependency
 	}
 	hash, err := HashPassword(newPassword)
 	if err != nil {
@@ -617,6 +696,9 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 			return err
 		}
 		_ = version
+		if err := uc.RecordPasswordHistory(ctx, tx, user.ID, hash, policy); err != nil {
+			return ErrDependency
+		}
 		newVersion, err := uc.Users.BumpIdentityVersion(ctx, tx, user.ID)
 		if err != nil {
 			return err

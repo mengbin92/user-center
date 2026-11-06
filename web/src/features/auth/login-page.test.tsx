@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { ToastProvider } from '../../components/toast'
 import { LoginPage } from './login-page'
 
 const mocks = vi.hoisted(() => ({ replace: vi.fn() }))
@@ -21,13 +22,15 @@ function mount(next: string) {
   }))
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={[`/login?next=${encodeURIComponent(next)}`]}>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[`/login?next=${encodeURIComponent(next)}`]}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/account" element={<span>账号中心</span>} />
           <Route path="/oidc/authorize" element={<span>错误的 SPA 授权路由</span>} />
         </Routes>
-      </MemoryRouter>
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>,
   )
 }

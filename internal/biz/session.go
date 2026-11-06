@@ -53,8 +53,10 @@ func (uc *SessionUsecase) ValidateSession(ctx context.Context, raw string) (Acto
 	}
 	user.Roles = userRoles
 	passwordChangeRequired := false
-	if cred, cerr := uc.Credentials.Get(ctx, nil, user.ID); cerr == nil {
-		passwordChangeRequired = cred.MustChangePassword
+	var cred *Credential
+	if c, cerr := uc.Credentials.Get(ctx, nil, user.ID); cerr == nil {
+		cred = c
+		passwordChangeRequired = c.MustChangePassword
 	} else if !errors.Is(cerr, ErrResourceNotFound) {
 		return ActorContext{}, ErrDependency
 	}
@@ -65,6 +67,13 @@ func (uc *SessionUsecase) ValidateSession(ctx context.Context, raw string) (Acto
 	}
 	if settings.IdleTimeoutMinutes > 0 {
 		idle = time.Duration(settings.IdleTimeoutMinutes) * time.Minute
+	}
+	// Expiry is enforced here rather than only at login: a session created
+	// before the password aged out must hit the change-password gate on its
+	// next request, not at the next login. The gate is the existing
+	// PasswordChangeRequired check, so there is no second enforcement path.
+	if cred != nil && PasswordExpired(cred.ChangedAt, settings.PasswordPolicy(), now) {
+		passwordChangeRequired = true
 	}
 	_ = uc.Sessions.Touch(ctx, nil, session.ID, now, now.Add(idle))
 	return ActorContext{
@@ -123,6 +132,10 @@ func (uc *SessionUsecase) RevokeOthers(ctx context.Context, actor ActorContext) 
 		}
 		_ = uc.StepUp.Delete(ctx, StepUpKey(s))
 	}
+	// Recorded even when nothing was revoked: "user revoked other sessions" is
+	// exactly the signal an incident review looks for, and an empty result is
+	// itself informative (they acted, no other session existed).
+	uc.recordSecurity(ctx, actor.User.ID, actor.Session.ID, "session_revoke_others", "success", actor.IP, actor.UserAgent, actor.RequestID)
 	return nil
 }
 

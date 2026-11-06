@@ -50,6 +50,12 @@ type CredentialRepo interface {
 	Create(context.Context, Tx, *Credential) error
 	UpdatePassword(context.Context, Tx, int64, string, string, uint64, bool) (uint64, error)
 	BumpPasswordVersion(context.Context, Tx, int64) (uint64, error)
+	// RecentPasswordHashes returns the newest keep hashes for reuse checks.
+	// It must never return plaintext: the table only stores bcrypt output.
+	RecentPasswordHashes(context.Context, Tx, int64, int) ([]string, error)
+	// RecordPasswordHash appends a hash and folds the table back to keep rows,
+	// so history stays bounded instead of growing with every rotation.
+	RecordPasswordHash(context.Context, Tx, int64, string, int) error
 }
 
 type ExternalIdentityRepo interface {

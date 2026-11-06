@@ -3293,6 +3293,12 @@ components:
                     format: int32
                 mfa_required_for_admins:
                     type: boolean
+                password_min_classes:
+                    type: integer
+                    description: |-
+                        Lets the registration and password-change forms state the composition rule
+                         before the user submits, instead of surfacing it as a rejection.
+                    format: int32
         api.usercenter.v1.AuthProviderView:
             type: object
             properties:
@@ -3352,6 +3358,26 @@ components:
                         type: string
                 revision:
                     type: string
+                password_min_classes:
+                    type: integer
+                    description: |-
+                        How many of the four character classes (upper, lower, digit, symbol) a new
+                         password must contain. 0 disables composition rules entirely, which is the
+                         right setting when an organisation relies on length plus a password
+                         manager. Only applied when a password is set, never at login.
+                    format: int32
+                password_history_count:
+                    type: integer
+                    description: How many previous password hashes to reject on reuse. 0 disables history.
+                    format: int32
+                password_expiry_days:
+                    type: integer
+                    description: Days before a password is considered stale. 0 never expires.
+                    format: int32
+                max_sessions_per_user:
+                    type: integer
+                    description: Maximum concurrent sessions per user. 0 disables the cap.
+                    format: int32
         api.usercenter.v1.AuthorizationReply:
             type: object
             properties:
@@ -4325,6 +4351,13 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/api.usercenter.v1.WebAuthnChallenge'
                     description: Present when a WebAuthn credential can satisfy the MFA challenge.
+                recycled_sessions:
+                    type: integer
+                    description: |-
+                        How many older sessions the per-user cap reclaimed while issuing this one.
+                         Non-zero means another device was signed out; say so rather than letting
+                         the user discover it later.
+                    format: int32
         api.usercenter.v1.LoginRequest:
             type: object
             properties:
@@ -5381,6 +5414,18 @@ components:
                     type: string
                 reason:
                     type: string
+                password_min_classes:
+                    type: integer
+                    format: int32
+                password_history_count:
+                    type: integer
+                    format: int32
+                password_expiry_days:
+                    type: integer
+                    format: int32
+                max_sessions_per_user:
+                    type: integer
+                    format: int32
         api.usercenter.v1.UpdateConstraintRequest:
             type: object
             properties:

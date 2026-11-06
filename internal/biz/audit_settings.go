@@ -52,7 +52,7 @@ func (uc *SettingsUsecase) UpdateAuth(ctx context.Context, actor ActorContext, i
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return nil, err
 	}
-	fields, err := mutationFields(updateMask, "registration_enabled", "email_verification_required", "password_min_length", "session_ttl_minutes", "idle_timeout_minutes", "mfa_required_for_admins", "allowed_email_domains", "providers")
+	fields, err := mutationFields(updateMask, "registration_enabled", "email_verification_required", "password_min_length", "session_ttl_minutes", "idle_timeout_minutes", "mfa_required_for_admins", "allowed_email_domains", "providers", "password_min_classes", "password_history_count", "password_expiry_days", "max_sessions_per_user")
 	if err != nil {
 		return nil, err
 	}
@@ -85,9 +85,33 @@ func (uc *SettingsUsecase) UpdateAuth(ctx context.Context, actor ActorContext, i
 	if fields["providers"] {
 		merged.Providers = in.Providers
 	}
+	if fields["password_min_classes"] {
+		merged.PasswordMinClasses = in.PasswordMinClasses
+	}
+	if fields["password_history_count"] {
+		merged.PasswordHistoryCount = in.PasswordHistoryCount
+	}
+	if fields["password_expiry_days"] {
+		merged.PasswordExpiryDays = in.PasswordExpiryDays
+	}
+	if fields["max_sessions_per_user"] {
+		merged.MaxSessionsPerUser = in.MaxSessionsPerUser
+	}
 	in = &merged
 	if in.PasswordMinLength < 8 || in.PasswordMinLength > 72 {
 		return nil, Validation("密码最小长度必须为 8-72 字节")
+	}
+	if in.PasswordMinClasses < 0 || in.PasswordMinClasses > 4 {
+		return nil, Validation("密码字符类要求必须为 0-4")
+	}
+	if in.PasswordHistoryCount < 0 || in.PasswordHistoryCount > 20 {
+		return nil, Validation("密码历史条数必须为 0-20")
+	}
+	if in.PasswordExpiryDays < 0 || in.PasswordExpiryDays > 3650 {
+		return nil, Validation("密码有效期必须为 0-3650 天（0 表示不过期）")
+	}
+	if in.MaxSessionsPerUser < 0 || in.MaxSessionsPerUser > 1000 {
+		return nil, Validation("并发会话上限必须为 0-1000（0 表示不限制）")
 	}
 	if in.SessionTTLMinutes < 5 || in.SessionTTLMinutes > 60*24*30 {
 		return nil, Validation("会话有效期不合法")
