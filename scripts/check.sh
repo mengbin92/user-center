@@ -26,6 +26,7 @@ go vet ./...
 go test ./...
 
 # MySQL-backed tests are gated on an isolated database. CI always provides one.
+# The -run filter means a new MySQL-only test needs "MySQL" in its name.
 if [[ -n "${USER_CENTER_MYSQL_TEST_DSN:-}" ]]; then
   echo "check: running MySQL-backed tests"
   go test -count=1 -run MySQL ./cmd/migrate/

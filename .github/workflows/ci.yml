@@ -49,6 +49,8 @@ jobs:
           cache: true
       # Migrations run first and twice (idempotency); the repository tests then
       # reuse the same database, so the two commands must stay sequential.
+      # -run MySQL keeps the job fast: a new MySQL-only test must have "MySQL"
+      # in its name, otherwise it is silently skipped here.
       - name: Verify migrations and MySQL repositories
         run: |
           go test -count=1 -run MySQL ./cmd/migrate/
