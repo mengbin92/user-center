@@ -95,7 +95,7 @@ func (s *Services) LoadAuthzFactsIn(ctx context.Context, authCtx authorization.C
 			return nil, fmt.Errorf("assignments: %w", err)
 		}
 	}
-	constraints, err := s.IAM.ListConstraints(ctx, nil)
+	constraints, err := s.IAM.ListConstraints(ctx, nil, authCtx)
 	if err != nil {
 		return nil, fmt.Errorf("constraints: %w", err)
 	}

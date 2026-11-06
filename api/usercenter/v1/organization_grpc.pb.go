@@ -43,6 +43,10 @@ const (
 	OrganizationService_ListOrgAssignments_FullMethodName           = "/api.usercenter.v1.OrganizationService/ListOrgAssignments"
 	OrganizationService_CreateOrgAssignment_FullMethodName          = "/api.usercenter.v1.OrganizationService/CreateOrgAssignment"
 	OrganizationService_RevokeOrgAssignment_FullMethodName          = "/api.usercenter.v1.OrganizationService/RevokeOrgAssignment"
+	OrganizationService_ListOrgConstraints_FullMethodName           = "/api.usercenter.v1.OrganizationService/ListOrgConstraints"
+	OrganizationService_CreateOrgConstraint_FullMethodName          = "/api.usercenter.v1.OrganizationService/CreateOrgConstraint"
+	OrganizationService_UpdateOrgConstraint_FullMethodName          = "/api.usercenter.v1.OrganizationService/UpdateOrgConstraint"
+	OrganizationService_DeleteOrgConstraint_FullMethodName          = "/api.usercenter.v1.OrganizationService/DeleteOrgConstraint"
 	OrganizationService_ListOrgAudits_FullMethodName                = "/api.usercenter.v1.OrganizationService/ListOrgAudits"
 	OrganizationService_ExportOrgAudits_FullMethodName              = "/api.usercenter.v1.OrganizationService/ExportOrgAudits"
 	OrganizationService_ExplainOrgAuthorization_FullMethodName      = "/api.usercenter.v1.OrganizationService/ExplainOrgAuthorization"
@@ -86,6 +90,12 @@ type OrganizationServiceClient interface {
 	ListOrgAssignments(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgAssignmentsReply, error)
 	CreateOrgAssignment(ctx context.Context, in *CreateOrgAssignmentRequest, opts ...grpc.CallOption) (*OrgAssignment, error)
 	RevokeOrgAssignment(ctx context.Context, in *RevokeOrgAssignmentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Organization-scoped segregation of duties. Constraints defined here apply
+	// only inside this tenant and can never relax platform policy.
+	ListOrgConstraints(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgConstraintsReply, error)
+	CreateOrgConstraint(ctx context.Context, in *CreateOrgConstraintRequest, opts ...grpc.CallOption) (*OrgConstraint, error)
+	UpdateOrgConstraint(ctx context.Context, in *UpdateOrgConstraintRequest, opts ...grpc.CallOption) (*OrgConstraint, error)
+	DeleteOrgConstraint(ctx context.Context, in *DeleteOrgConstraintRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListOrgAudits(ctx context.Context, in *ListOrgAuditsRequest, opts ...grpc.CallOption) (*OrgAuditsReply, error)
 	ExportOrgAudits(ctx context.Context, in *ExportOrgAuditsRequest, opts ...grpc.CallOption) (*ExportJob, error)
 	ExplainOrgAuthorization(ctx context.Context, in *ExplainOrgAuthorizationRequest, opts ...grpc.CallOption) (*ExplainOrgAuthorizationReply, error)
@@ -336,6 +346,46 @@ func (c *organizationServiceClient) RevokeOrgAssignment(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *organizationServiceClient) ListOrgConstraints(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrgConstraintsReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgConstraintsReply)
+	err := c.cc.Invoke(ctx, OrganizationService_ListOrgConstraints_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) CreateOrgConstraint(ctx context.Context, in *CreateOrgConstraintRequest, opts ...grpc.CallOption) (*OrgConstraint, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgConstraint)
+	err := c.cc.Invoke(ctx, OrganizationService_CreateOrgConstraint_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) UpdateOrgConstraint(ctx context.Context, in *UpdateOrgConstraintRequest, opts ...grpc.CallOption) (*OrgConstraint, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgConstraint)
+	err := c.cc.Invoke(ctx, OrganizationService_UpdateOrgConstraint_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) DeleteOrgConstraint(ctx context.Context, in *DeleteOrgConstraintRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, OrganizationService_DeleteOrgConstraint_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationServiceClient) ListOrgAudits(ctx context.Context, in *ListOrgAuditsRequest, opts ...grpc.CallOption) (*OrgAuditsReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(OrgAuditsReply)
@@ -458,6 +508,12 @@ type OrganizationServiceServer interface {
 	ListOrgAssignments(context.Context, *GetOrganizationRequest) (*OrgAssignmentsReply, error)
 	CreateOrgAssignment(context.Context, *CreateOrgAssignmentRequest) (*OrgAssignment, error)
 	RevokeOrgAssignment(context.Context, *RevokeOrgAssignmentRequest) (*emptypb.Empty, error)
+	// Organization-scoped segregation of duties. Constraints defined here apply
+	// only inside this tenant and can never relax platform policy.
+	ListOrgConstraints(context.Context, *GetOrganizationRequest) (*OrgConstraintsReply, error)
+	CreateOrgConstraint(context.Context, *CreateOrgConstraintRequest) (*OrgConstraint, error)
+	UpdateOrgConstraint(context.Context, *UpdateOrgConstraintRequest) (*OrgConstraint, error)
+	DeleteOrgConstraint(context.Context, *DeleteOrgConstraintRequest) (*emptypb.Empty, error)
 	ListOrgAudits(context.Context, *ListOrgAuditsRequest) (*OrgAuditsReply, error)
 	ExportOrgAudits(context.Context, *ExportOrgAuditsRequest) (*ExportJob, error)
 	ExplainOrgAuthorization(context.Context, *ExplainOrgAuthorizationRequest) (*ExplainOrgAuthorizationReply, error)
@@ -546,6 +602,18 @@ func (UnimplementedOrganizationServiceServer) CreateOrgAssignment(context.Contex
 }
 func (UnimplementedOrganizationServiceServer) RevokeOrgAssignment(context.Context, *RevokeOrgAssignmentRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeOrgAssignment not implemented")
+}
+func (UnimplementedOrganizationServiceServer) ListOrgConstraints(context.Context, *GetOrganizationRequest) (*OrgConstraintsReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOrgConstraints not implemented")
+}
+func (UnimplementedOrganizationServiceServer) CreateOrgConstraint(context.Context, *CreateOrgConstraintRequest) (*OrgConstraint, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOrgConstraint not implemented")
+}
+func (UnimplementedOrganizationServiceServer) UpdateOrgConstraint(context.Context, *UpdateOrgConstraintRequest) (*OrgConstraint, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateOrgConstraint not implemented")
+}
+func (UnimplementedOrganizationServiceServer) DeleteOrgConstraint(context.Context, *DeleteOrgConstraintRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteOrgConstraint not implemented")
 }
 func (UnimplementedOrganizationServiceServer) ListOrgAudits(context.Context, *ListOrgAuditsRequest) (*OrgAuditsReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListOrgAudits not implemented")
@@ -1009,6 +1077,78 @@ func _OrganizationService_RevokeOrgAssignment_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrganizationService_ListOrgConstraints_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).ListOrgConstraints(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_ListOrgConstraints_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).ListOrgConstraints(ctx, req.(*GetOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_CreateOrgConstraint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOrgConstraintRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).CreateOrgConstraint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_CreateOrgConstraint_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).CreateOrgConstraint(ctx, req.(*CreateOrgConstraintRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_UpdateOrgConstraint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateOrgConstraintRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).UpdateOrgConstraint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_UpdateOrgConstraint_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).UpdateOrgConstraint(ctx, req.(*UpdateOrgConstraintRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_DeleteOrgConstraint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteOrgConstraintRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).DeleteOrgConstraint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_DeleteOrgConstraint_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).DeleteOrgConstraint(ctx, req.(*DeleteOrgConstraintRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _OrganizationService_ListOrgAudits_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListOrgAuditsRequest)
 	if err := dec(in); err != nil {
@@ -1269,6 +1409,22 @@ var OrganizationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeOrgAssignment",
 			Handler:    _OrganizationService_RevokeOrgAssignment_Handler,
+		},
+		{
+			MethodName: "ListOrgConstraints",
+			Handler:    _OrganizationService_ListOrgConstraints_Handler,
+		},
+		{
+			MethodName: "CreateOrgConstraint",
+			Handler:    _OrganizationService_CreateOrgConstraint_Handler,
+		},
+		{
+			MethodName: "UpdateOrgConstraint",
+			Handler:    _OrganizationService_UpdateOrgConstraint_Handler,
+		},
+		{
+			MethodName: "DeleteOrgConstraint",
+			Handler:    _OrganizationService_DeleteOrgConstraint_Handler,
 		},
 		{
 			MethodName: "ListOrgAudits",

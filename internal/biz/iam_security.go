@@ -149,7 +149,7 @@ func (uc *IAMUsecase) validateAssignment(ctx context.Context, tx Tx, a *Assignme
 	if err := uc.checkRoleCapacity(ctx, tx, role); err != nil {
 		return err
 	}
-	constraints, err := uc.IAM.ListConstraints(ctx, tx)
+	constraints, err := uc.IAM.ListConstraints(ctx, tx, authorization.Platform())
 	if err != nil {
 		return ErrDependency
 	}

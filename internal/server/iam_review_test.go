@@ -244,7 +244,7 @@ func TestIAMUpdatesLoadImmutableFieldsAndConstraintDeleteChecksRevision(t *testi
 	require.NoError(t, err)
 	rec = h.do(http.MethodDelete, constraintPath+"?expected_revision="+strconv.FormatUint(constraint.Revision, 10)+"&expected_policy_revision="+strconv.FormatUint(policy, 10)+"&reason=review", nil, "", true)
 	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
-	_, err = h.svc.IAM.GetConstraint(ctx, nil, constraint.ID)
+	_, err = h.svc.IAM.GetConstraint(ctx, nil, authorization.Platform(), constraint.ID)
 	require.NoError(t, err)
 	menus, err := h.svc.IAM.ListMenus(ctx, nil)
 	require.NoError(t, err)

@@ -145,12 +145,15 @@ import type {
   CreateOrganizationInvitationRequest,
   CreateOrganizationRequest,
   CreateOrgAssignmentRequest,
+  CreateOrgConstraintRequest,
   CreateOrgRoleRequest,
   Department,
   DepartmentsReply,
   OrgAssignment,
   OrgAssignmentsReply,
   OrgAuditsReply,
+  OrgConstraint,
+  OrgConstraintsReply,
   OrgPermissionsReply,
   OrgRole,
   OrgRolesReply,
@@ -167,6 +170,7 @@ import type {
   UpdateDepartmentRequest,
   UpdateOrganizationMemberRequest,
   UpdateOrganizationRequest,
+  UpdateOrgConstraintRequest,
   UpdateOrgRoleRequest,
 } from './types'
 
@@ -477,6 +481,33 @@ export const api = {
         reason,
         expected_revision: expectedRevision,
       }),
+    // Organization-scoped segregation of duties (V2.5). The server rejects a
+    // write that would invalidate existing assignments unless the caller repeats
+    // it with acknowledge_violations, so the UI can show the count first.
+    listConstraints: (id: string) =>
+      get<OrgConstraintsReply>(`/api/v1/orgs/${enc(id)}/iam/constraints`),
+    createConstraint: (id: string, body: CreateOrgConstraintRequest) =>
+      post<OrgConstraint>(`/api/v1/orgs/${enc(id)}/iam/constraints`, body),
+    updateConstraint: (
+      id: string,
+      constraintId: string,
+      body: UpdateOrgConstraintRequest,
+    ) =>
+      patch<OrgConstraint>(
+        `/api/v1/orgs/${enc(id)}/iam/constraints/${enc(constraintId)}`,
+        body,
+      ),
+    deleteConstraint: (
+      id: string,
+      constraintId: string,
+      params: {
+        expected_revision: string
+        reason: string
+        expected_policy_revision: string
+      },
+    ) =>
+      del(`/api/v1/orgs/${enc(id)}/iam/constraints/${enc(constraintId)}`, params),
+
     exportAudits: (id: string, body: ExportOrgAuditsRequest) =>
       post<ExportJob>(`/api/v1/orgs/${enc(id)}/audits:export`, body),
     downloadAuditExport: (id: string, jobId: string) =>

@@ -211,7 +211,7 @@ func (uc *SessionUsecase) PutRoles(ctx context.Context, actor ActorContext, role
 			unique = append(unique, id)
 		}
 	}
-	constraints, err := uc.IAM.ListConstraints(ctx, nil)
+	constraints, err := uc.IAM.ListConstraints(ctx, nil, authorization.Platform())
 	if err != nil {
 		return nil, 0, ErrDependency
 	}

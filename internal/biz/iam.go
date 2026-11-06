@@ -1131,7 +1131,10 @@ func (uc *IAMUsecase) Constraints(ctx context.Context, actor ActorContext) ([]*C
 	if err := uc.guard(ctx, actor, "iam.constraint.read", false); err != nil {
 		return nil, err
 	}
-	return uc.IAM.ListConstraints(ctx, nil)
+	// The platform admin list is the one place that reads across contexts:
+	// operators need to see that a tenant defined its own SoD rules. Reading
+	// everything is explicit here rather than the default everywhere.
+	return uc.IAM.ListConstraintsAll(ctx, nil)
 }
 
 func validateConstraint(c *Constraint) error {
@@ -1230,7 +1233,7 @@ func (uc *IAMUsecase) UpdateConstraint(ctx context.Context, actor ActorContext, 
 		if err := uc.guard(ctx, actor, "iam.constraint.update", true); err != nil {
 			return err
 		}
-		existing, err := uc.IAM.GetConstraint(ctx, tx, c.ID)
+		existing, err := uc.IAM.GetConstraint(ctx, tx, authorization.Platform(), c.ID)
 		if err != nil {
 			return ErrResourceNotFound
 		}
@@ -1282,7 +1285,7 @@ func (uc *IAMUsecase) DeleteConstraint(ctx context.Context, actor ActorContext, 
 		if err := uc.guard(ctx, actor, "iam.constraint.update", true); err != nil {
 			return err
 		}
-		current, err := uc.IAM.GetConstraint(ctx, tx, id)
+		current, err := uc.IAM.GetConstraint(ctx, tx, authorization.Platform(), id)
 		if err != nil {
 			return ErrResourceNotFound
 		}

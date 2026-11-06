@@ -319,16 +319,17 @@
 - [x] `docs/design/org-sod-delegation.md`：作用域模型（约束/委派沿用角色的 `context_type/context_id`）、与平台约束的关系、冲突判定顺序（6 步）、越权边界、迁移 `013` 与"默认值即回填"方案
 - [x] 明确"组织约束不能放宽平台约束"的合并规则：逐集合独立求值 + AND 合并（交集），组织侧无任何"禁用平台约束"字段
 - [x] 决策矩阵覆盖 platform admin / 组织 owner / 组织自定义 `iam.role.write` 三类角色的 9 类操作
-- [ ] 设计评审通过后才进入实现 —— **待评审**，需确认文档 §13 的 5 个开放问题
-- [x] **设计期发现（未在本阶段实现）**：组织 `AssignRole` 当前既不校验 `CheckConstraints` 也不校验 `checkDelegation`，平台 SoD 在组织域可被绕过；已写入 `docs/security.md` §4 第 10 条已知限制
+- [x] 设计评审完成：8 条发现（F1–F8），推翻 §4 论证与 §7 后果描述，砍掉平台管理员跨租户只读，D6–D10 定案，结论"通过，可进入实现"。评审记录见 `docs/design/org-sod-delegation.md` §0
+- [x] **设计期发现并已修复**：组织 `AssignRole` 原本既不校验 `CheckConstraints` 也不校验委派边界，平台 SoD 在组织域可被绕过。现已在事务内接入约束校验，并补上"不能给自己授权"（`ORGANIZATION_SELF_GRANT`）
 
 验收（实现阶段，评审通过后展开）：
 
-- [ ] 组织内 `mutual_exclusion` 与 `max_roles`，与平台约束求交生效
-- [ ] 组织内委派：只能在组织上下文内授予、只能委托本组织角色
-- [ ] 分配/激活两条路径都执行约束校验（与平台一致，不允许只卡一条）
-- [ ] HTTP 级拒绝测试：跨租户约束不可见、不可写；组织约束不能绕过平台约束
-- [ ] 变更写组织审计 + Outbox 事件（复用 R6 事件命名）
+- [x] 组织内 `mutual_exclusion` 与 `max_roles` 生效。**与设计原稿的偏差**：不是"与平台约束求交"，而是结构性隔离 —— 角色在单表里全局自增，平台约束的 role id 永不匹配组织角色；隔离由 `ListConstraints(ctx, tx, authCtx)` 的显式 context 过滤保证，不依赖 ID 分配。`max_roles` 按 `role_ids` 范围计数（实现期发现原设计对语义理解有误，见设计文档 F9）
+- [x] 组织内委派：`DelegationFilter.Context` 强制过滤；`CreateDelegation` 写 `(context_type, context_id)`；平台委派无法批准组织分配，反向亦然
+- [x] 分配路径执行约束校验（`checkOrgConstraints`）。激活路径不适用：组织分配无需会话激活，`LoadAuthzFactsIn` 每次都按当前分配重算
+- [x] HTTP 级拒绝测试 6 条：平台约束不影响组织决策、组织互斥生效且不跨租户、跨上下文引用被拒（400）、跨租户读写 404、自授权被拒、收紧需确认
+- [x] 变更写组织审计 + Outbox 事件（`organization.constraint.created/updated/deleted`）+ policy revision bump
+- [x] **评审补充**：组织成员移除时双向软失效其委派（原实现只撤销分配，被移除者仍可能被授权或代授）
 
 ---
 
@@ -453,3 +454,4 @@ D1 的连带结论：`v0.7.0` 范围锁定为 **S1–S5 + S9–S11**，不含 S6
 | 2026-11-06 | S6/S7/S8 合入（W3 完成） | 密码策略（`012` 迁移、四处入口共用 `ValidatePassword`、`PASSWORD_POLICY_VIOLATION`）、会话上限与设备治理（`recycled_sessions`）、统一写接口限流（429 + `Retry-After` + `rate_limit_hits_total`）；前端同步规则与设置项 |
 | 2026-11-06 | S12 设计交付（W5 待评审） | `docs/design/org-sod-delegation.md`：作用域模型、交集合并规则、6 步判定顺序、越权边界、迁移 `013`、决策矩阵；**未写实现代码**。评审后回到本节展开实现项 |
 | 2026-11-06 | **v0.8.0 发布** | W3 全部交付（S6/S7/S8），MINOR 发版，含迁移 `012` 与 3 处默认行为变化；发布说明 `docs/releases/release-v0.8.0.md` |
+| 2026-11-06 | S12 评审 + 实现 | 评审 8 条发现（F1/F2 推翻原设计论证与后果描述，F6 砍范围）；实现组织约束 CRUD（迁移 `013`）、约束校验接入组织分配、自授权拦截、委派 context 隔离、成员移除双向级联委派失效 |
