@@ -225,6 +225,7 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 - [运维手册](docs/operations.md)
 - [性能基线](docs/performance.md)
 - [安全设计](docs/security.md)
+- [组织 SoD 与委派（设计）](docs/design/org-sod-delegation.md)
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
 - [V2.5 路线图](docs/roadmap-v2.5.md)

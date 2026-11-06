@@ -111,6 +111,9 @@ location / {
 | `usercenter_event_deliveries` | gauge | `status` | Outbox 投递行数，未知状态归 `other` |
 | `usercenter_schema_migrations_applied` | gauge | — | 已记录的迁移步数（按语句计，不等于文件数） |
 | `usercenter_dependency_up` | gauge | `dependency` | 1 = 上次探测成功；`mysql` / `redis` |
+| `usercenter_db_pool_connections` | gauge | `state` | `open` / `in_use` / `max`，来自 `sql.DB.Stats()` |
+| `usercenter_db_pool_wait_total` | gauge | — | 累计等待连接的次数，持续增长说明池太小 |
+| `usercenter_rate_limit_hits_total` | counter | `scope` | 被写接口限流拒绝的次数：`write` / `export` / `batch` / `invite` |
 
 `route` 是路由模板而非原始路径：`/api/v1/orgs/7/members` 与 `/api/v1/orgs/11/members` 都记到 `/api/v1/orgs/{id}/members`。SPA 历史路由与未知路径统一记为 `spa`，因此标签基数由路由表决定，不会随用户输入增长。
 
@@ -139,6 +142,24 @@ scrape_configs:
 | 邮件投递失败 / console 投递 | `request_id`、`to`（**已脱敏**：`a***@example.com`）、`subject` |
 
 请求体、请求头、查询串、Cookie、密码、验证码、一次性令牌**从不出现在日志里**，`internal/server/logging_test.go` 用字段白名单与内容断言守着这条规则（新增字段会让测试失败，必须显式审查）。`X-Request-ID` 在 HTTP 与 gRPC 两条入口都会注入（缺省生成，超长替换而非截断），审计表的 `request_id` 与日志可互相定位。
+
+### 5.1.1 写接口限流（v0.8.0）
+
+非安全方法（POST/PUT/PATCH/DELETE）按「路由类 + 主体」计数，默认每分钟：普通写 120 次、导出/批量分配/邀请 10 次。
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `RATE_LIMIT_ENABLED` | `true` | 设 `false`/`0`/`off` 关闭。只在外部已有更强限流时使用 |
+| `RATE_LIMIT_WRITE_PER_MINUTE` | `120` | 普通写接口，按用户计 |
+| `RATE_LIMIT_HEAVY_PER_MINUTE` | `10` | `:export`、`:batch-assign`、`:batch-preview`、`/invitations` |
+
+三条运维要点：
+
+- **认证端点不在限流范围内**。`/api/v1/auth/*` 有自己的 IP/账号计数器（登录 30 次/5 分钟等），两层同时生效会让一次请求消耗两份预算，也会给调用方留出挑松一侧绕过的空间。
+- **超限返回 429 + `Retry-After`**（值是最长 60 秒的窗口剩余时间）+ 稳定错误码 `RATE_LIMITED`。客户端应按 `Retry-After` 退避，不要立即重试。
+- **限流后端故障时放行**。Redis 不可用不会导致写请求全部失败，但 `usercenter_dependency_up{dependency="redis"}` 会变成 0，应据此告警。反过来说，看到 `rate_limit_hits_total` 突然为 0 且流量正常，要怀疑限流器是否在工作。
+
+多实例部署时计数共享（有 Redis）；没有 Redis 时每个实例各自计数，实际额度是「配置值 × 实例数」 —— 要么配 Redis，要么按实例数下调额度。
 
 ### 5.2 SLO 与告警（v0.7.0）
 
