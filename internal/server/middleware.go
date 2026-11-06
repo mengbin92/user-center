@@ -33,6 +33,9 @@ type Middleware struct {
 	trustProxy bool
 	// slowThreshold controls when a request is logged. Zero disables it.
 	slowThreshold time.Duration
+	// writeLimiter bounds non-safe requests. Nil disables limiting, which is
+	// what unit tests that do not care about throttling rely on.
+	writeLimiter *WriteLimiter
 }
 
 func NewMiddleware(sessions *biz.SessionUsecase, sec *conf.Security, log *zap.Logger) *Middleware {
@@ -59,6 +62,23 @@ func slowThresholdFromEnv() time.Duration {
 	return time.Duration(ms) * time.Millisecond
 }
 
+// WithWriteLimiter attaches the write-path limiter. It is set from
+// NewHTTPServer rather than NewMiddleware so the middleware can still be built
+// without a limiter (tests, CLI paths).
+func (m *Middleware) WithWriteLimiter(l *WriteLimiter) *Middleware {
+	m.writeLimiter = l
+	return m
+}
+
+// Limiter exposes the shared rate limiter so the write middleware and the
+// authentication flows count against the same backend (Redis or memory).
+func (m *Middleware) Limiter() biz.RateLimiter {
+	if m.sessions == nil {
+		return nil
+	}
+	return m.sessions.Limiter
+}
+
 func (m *Middleware) CookieSecure() bool   { return m.secure }
 func (m *Middleware) CookieDomain() string { return m.domain }
 
@@ -79,6 +99,18 @@ func (m *Middleware) wrap(next http.Handler, requireAuth bool) http.Handler {
 		if ok && requireAuth {
 			if _, has := biz.ActorFromContext(ctx); !has {
 				writeError(rec, http.StatusUnauthorized, "UNAUTHENTICATED", "登录状态无效或已过期")
+				ok = false
+			}
+		}
+		// Limiting happens after authentication so the budget is keyed by the
+		// real subject, and before the handler so a rejected call costs nothing.
+		if ok && m.writeLimiter != nil {
+			if allowed, scope := m.writeLimiter.Allow(ctx, r); !allowed {
+				m.writeLimiter.Reject(rec)
+				m.log.Warn("write rate limited",
+					zap.String("scope", scope),
+					zap.String("request_id", rec.Header().Get("X-Request-ID")),
+					zap.String("method", r.Method))
 				ok = false
 			}
 		}

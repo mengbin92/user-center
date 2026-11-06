@@ -69,8 +69,19 @@ type AuthSettings struct {
 	AllowedEmailDomains       []string               `protobuf:"bytes,7,rep,name=allowed_email_domains,json=allowedEmailDomains,proto3" json:"allowed_email_domains,omitempty"`
 	Providers                 []string               `protobuf:"bytes,8,rep,name=providers,proto3" json:"providers,omitempty"`
 	Revision                  string                 `protobuf:"bytes,9,opt,name=revision,proto3" json:"revision,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// How many of the four character classes (upper, lower, digit, symbol) a new
+	// password must contain. 0 disables composition rules entirely, which is the
+	// right setting when an organisation relies on length plus a password
+	// manager. Only applied when a password is set, never at login.
+	PasswordMinClasses int32 `protobuf:"varint,10,opt,name=password_min_classes,json=passwordMinClasses,proto3" json:"password_min_classes,omitempty"`
+	// How many previous password hashes to reject on reuse. 0 disables history.
+	PasswordHistoryCount int32 `protobuf:"varint,11,opt,name=password_history_count,json=passwordHistoryCount,proto3" json:"password_history_count,omitempty"`
+	// Days before a password is considered stale. 0 never expires.
+	PasswordExpiryDays int32 `protobuf:"varint,12,opt,name=password_expiry_days,json=passwordExpiryDays,proto3" json:"password_expiry_days,omitempty"`
+	// Maximum concurrent sessions per user. 0 disables the cap.
+	MaxSessionsPerUser int32 `protobuf:"varint,13,opt,name=max_sessions_per_user,json=maxSessionsPerUser,proto3" json:"max_sessions_per_user,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *AuthSettings) Reset() {
@@ -166,6 +177,34 @@ func (x *AuthSettings) GetRevision() string {
 	return ""
 }
 
+func (x *AuthSettings) GetPasswordMinClasses() int32 {
+	if x != nil {
+		return x.PasswordMinClasses
+	}
+	return 0
+}
+
+func (x *AuthSettings) GetPasswordHistoryCount() int32 {
+	if x != nil {
+		return x.PasswordHistoryCount
+	}
+	return 0
+}
+
+func (x *AuthSettings) GetPasswordExpiryDays() int32 {
+	if x != nil {
+		return x.PasswordExpiryDays
+	}
+	return 0
+}
+
+func (x *AuthSettings) GetMaxSessionsPerUser() int32 {
+	if x != nil {
+		return x.MaxSessionsPerUser
+	}
+	return 0
+}
+
 type UpdateAuthSettingsRequest struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
 	RegistrationEnabled       bool                   `protobuf:"varint,1,opt,name=registration_enabled,json=registrationEnabled,proto3" json:"registration_enabled,omitempty"`
@@ -179,6 +218,10 @@ type UpdateAuthSettingsRequest struct {
 	UpdateMask                string                 `protobuf:"bytes,9,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	ExpectedRevision          string                 `protobuf:"bytes,10,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
 	Reason                    string                 `protobuf:"bytes,11,opt,name=reason,proto3" json:"reason,omitempty"`
+	PasswordMinClasses        int32                  `protobuf:"varint,12,opt,name=password_min_classes,json=passwordMinClasses,proto3" json:"password_min_classes,omitempty"`
+	PasswordHistoryCount      int32                  `protobuf:"varint,13,opt,name=password_history_count,json=passwordHistoryCount,proto3" json:"password_history_count,omitempty"`
+	PasswordExpiryDays        int32                  `protobuf:"varint,14,opt,name=password_expiry_days,json=passwordExpiryDays,proto3" json:"password_expiry_days,omitempty"`
+	MaxSessionsPerUser        int32                  `protobuf:"varint,15,opt,name=max_sessions_per_user,json=maxSessionsPerUser,proto3" json:"max_sessions_per_user,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -288,6 +331,34 @@ func (x *UpdateAuthSettingsRequest) GetReason() string {
 		return x.Reason
 	}
 	return ""
+}
+
+func (x *UpdateAuthSettingsRequest) GetPasswordMinClasses() int32 {
+	if x != nil {
+		return x.PasswordMinClasses
+	}
+	return 0
+}
+
+func (x *UpdateAuthSettingsRequest) GetPasswordHistoryCount() int32 {
+	if x != nil {
+		return x.PasswordHistoryCount
+	}
+	return 0
+}
+
+func (x *UpdateAuthSettingsRequest) GetPasswordExpiryDays() int32 {
+	if x != nil {
+		return x.PasswordExpiryDays
+	}
+	return 0
+}
+
+func (x *UpdateAuthSettingsRequest) GetMaxSessionsPerUser() int32 {
+	if x != nil {
+		return x.MaxSessionsPerUser
+	}
+	return 0
 }
 
 type GetEmailSettingsRequest struct {
@@ -918,7 +989,7 @@ var File_api_usercenter_v1_settings_proto protoreflect.FileDescriptor
 const file_api_usercenter_v1_settings_proto_rawDesc = "" +
 	"\n" +
 	" api/usercenter/v1/settings.proto\x12\x11api.usercenter.v1\x1a\x1cgoogle/api/annotations.proto\"\x18\n" +
-	"\x16GetAuthSettingsRequest\"\xb8\x03\n" +
+	"\x16GetAuthSettingsRequest\"\x85\x05\n" +
 	"\fAuthSettings\x121\n" +
 	"\x14registration_enabled\x18\x01 \x01(\bR\x13registrationEnabled\x12>\n" +
 	"\x1bemail_verification_required\x18\x02 \x01(\bR\x19emailVerificationRequired\x12.\n" +
@@ -928,7 +999,12 @@ const file_api_usercenter_v1_settings_proto_rawDesc = "" +
 	"\x17mfa_required_for_admins\x18\x06 \x01(\bR\x14mfaRequiredForAdmins\x122\n" +
 	"\x15allowed_email_domains\x18\a \x03(\tR\x13allowedEmailDomains\x12\x1c\n" +
 	"\tproviders\x18\b \x03(\tR\tproviders\x12\x1a\n" +
-	"\brevision\x18\t \x01(\tR\brevision\"\x8f\x04\n" +
+	"\brevision\x18\t \x01(\tR\brevision\x120\n" +
+	"\x14password_min_classes\x18\n" +
+	" \x01(\x05R\x12passwordMinClasses\x124\n" +
+	"\x16password_history_count\x18\v \x01(\x05R\x14passwordHistoryCount\x120\n" +
+	"\x14password_expiry_days\x18\f \x01(\x05R\x12passwordExpiryDays\x121\n" +
+	"\x15max_sessions_per_user\x18\r \x01(\x05R\x12maxSessionsPerUser\"\xdc\x05\n" +
 	"\x19UpdateAuthSettingsRequest\x121\n" +
 	"\x14registration_enabled\x18\x01 \x01(\bR\x13registrationEnabled\x12>\n" +
 	"\x1bemail_verification_required\x18\x02 \x01(\bR\x19emailVerificationRequired\x12.\n" +
@@ -942,7 +1018,11 @@ const file_api_usercenter_v1_settings_proto_rawDesc = "" +
 	"updateMask\x12+\n" +
 	"\x11expected_revision\x18\n" +
 	" \x01(\tR\x10expectedRevision\x12\x16\n" +
-	"\x06reason\x18\v \x01(\tR\x06reason\"\x19\n" +
+	"\x06reason\x18\v \x01(\tR\x06reason\x120\n" +
+	"\x14password_min_classes\x18\f \x01(\x05R\x12passwordMinClasses\x124\n" +
+	"\x16password_history_count\x18\r \x01(\x05R\x14passwordHistoryCount\x120\n" +
+	"\x14password_expiry_days\x18\x0e \x01(\x05R\x12passwordExpiryDays\x121\n" +
+	"\x15max_sessions_per_user\x18\x0f \x01(\x05R\x12maxSessionsPerUser\"\x19\n" +
 	"\x17GetEmailSettingsRequest\"\xe7\x01\n" +
 	"\rEmailSettings\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x12\x12\n" +

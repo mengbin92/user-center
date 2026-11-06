@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-11-06
+
+**版本判定：MINOR**（v0.7.1 → v0.8.0）。认证与访问加固：密码策略、会话上限、写接口限流。新增 1 个迁移（`012`）与 3 处默认行为变化。详见 [发布说明](docs/releases/release-v0.8.0.md)。
+
+### Added
+
+- 密码策略可配：`password_min_classes`（默认 3）、`password_history_count`（默认 5）、`password_expiry_days`（默认 0 即不过期）；四处入口共用同一校验函数。
+- 迁移 `012`：`password_history`（只存 bcrypt 摘要，写入时折叠到策略窗口）与 `user_credentials.password_changed_at`。
+- 稳定错误码 `PASSWORD_POLICY_VIOLATION`；`/api/v1/auth/context` 返回 `password_min_classes`，前端四张表单在提交前提示规则。
+- 每用户并发会话上限 `max_sessions_per_user`（默认 10），超限按最久未活跃回收；登录响应返回 `recycled_sessions` 并前端提示。
+- 统一写接口限流：按「主体 + 路由类」计数，普通写 120 次/分钟，导出/批量/邀请 10 次/分钟；429 + `Retry-After` + `RATE_LIMITED`；新指标 `usercenter_rate_limit_hits_total{scope}`；`RATE_LIMIT_*` 可配。
+- `docs/design/org-sod-delegation.md`：组织 SoD 与委派设计（**仅设计，未实现**，待评审）。
+
+### Changed
+
+- 密码复杂度默认开启（新设密码需 3 类字符）；存量账号不受影响，登录不校验强度。
+- 会话默认上限 10（此前无上限）。
+- 写接口默认限流（此前仅认证路径有独立计数器）。
+- `POST /me/sessions:revoke-others` 现写安全事件 `session_revoke_others`。
+
+### Fixed
+
+- root 首次改密无法被历史拦截（`password_history` 在引导时为空）：bootstrap 与 admin-rescue 现在会播种初始密码。
+- 记录已知限制：组织 `AssignRole` 不校验约束与委派，平台 SoD 在组织域可绕过（修复随 S12 实现）。
+
 ## [0.7.1] - 2026-11-06
 
 **版本判定：PATCH**（v0.7.0 → v0.7.1）。仅修复 CI 与 E2E 脚本；无代码、API、迁移变更。详见 [发布说明](docs/releases/release-v0.7.1.md)。

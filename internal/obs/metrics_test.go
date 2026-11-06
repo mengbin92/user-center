@@ -205,3 +205,27 @@ func sampleCount(t *testing.T, obs prometheus.Observer) float64 {
 	require.NoError(t, hist.Write(&metric))
 	return float64(metric.GetHistogram().GetSampleCount())
 }
+
+// Rejected requests never reach the handler, so they only appear here. The
+// scope label is what makes "exports are being hammered" distinguishable from
+// "someone is clicking save too fast".
+func TestRateLimitHitsAreLabeledByScope(t *testing.T) {
+	m := NewMetrics(&fakeProbe{})
+	m.RateLimited("export")
+	m.RateLimited("export")
+	m.RateLimited("write")
+
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	body := rec.Body.String()
+
+	require.Contains(t, body, `usercenter_rate_limit_hits_total{scope="export"} 2`)
+	require.Contains(t, body, `usercenter_rate_limit_hits_total{scope="write"} 1`)
+}
+
+// A nil Metrics is the "metrics disabled" path; counting must be a no-op
+// instead of a panic in the request path.
+func TestRateLimitedIsNilSafe(t *testing.T) {
+	var m *Metrics
+	require.NotPanics(t, func() { m.RateLimited("write") })
+}

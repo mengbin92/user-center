@@ -15,6 +15,21 @@ message Server {
   HTTP http = 1;
   GRPC grpc = 2;
   Metrics metrics = 3;
+  RateLimit rate_limit = 4;
+}
+
+// RateLimit bounds authenticated write traffic. It is configuration, not a
+// per-tenant setting: the right ceiling depends on how many instances are
+// behind the load balancer, which settings cannot know.
+message RateLimit {
+  // false disables this middleware entirely. The authentication endpoints keep
+  // their own limits either way, so they can never be bypassed from here.
+  bool enabled = 1;
+  // Requests per minute per subject for ordinary write endpoints.
+  int32 write_per_minute = 2;
+  // Stricter budget for exports, batch assignment and invitations, which are
+  // the endpoints that can move bulk data in one call.
+  int32 heavy_per_minute = 3;
 }
 
 message HTTP {

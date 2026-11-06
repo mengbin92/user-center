@@ -27,11 +27,15 @@ func (r *credentialRepo) Get(ctx context.Context, tx biz.Tx, userID int64) (*biz
 	if err != nil {
 		return nil, err
 	}
-	return &biz.Credential{
+	c := &biz.Credential{
 		UserID: p.UserID, PasswordHash: p.PasswordHash, Algorithm: p.Algorithm,
 		PasswordVersion: p.PasswordVersion, MustChangePassword: p.MustChangePassword,
 		Revision: p.Revision, UpdatedAt: p.UpdatedAt.UTC(),
-	}, nil
+	}
+	if p.PasswordChangedAt != nil {
+		c.ChangedAt = p.PasswordChangedAt.UTC()
+	}
+	return c, nil
 }
 
 func (r *credentialRepo) Create(ctx context.Context, tx biz.Tx, c *biz.Credential) error {
@@ -39,6 +43,10 @@ func (r *credentialRepo) Create(ctx context.Context, tx biz.Tx, c *biz.Credentia
 		UserID: c.UserID, PasswordHash: c.PasswordHash, Algorithm: c.Algorithm,
 		PasswordVersion: c.PasswordVersion, MustChangePassword: c.MustChangePassword,
 		Revision: c.Revision, UpdatedAt: c.UpdatedAt,
+	}
+	if !c.ChangedAt.IsZero() {
+		t := c.ChangedAt.UTC()
+		p.PasswordChangedAt = &t
 	}
 	if p.Revision == 0 {
 		p.Revision = 1
@@ -57,6 +65,7 @@ func (r *credentialRepo) UpdatePassword(ctx context.Context, tx biz.Tx, userID i
 		"algorithm":            algorithm,
 		"password_version":     gorm.Expr("password_version + 1"),
 		"must_change_password": mustChange,
+		"password_changed_at":  now,
 		"revision":             expected + 1,
 		"updated_at":           now,
 	})
@@ -71,6 +80,49 @@ func (r *credentialRepo) UpdatePassword(ctx context.Context, tx biz.Tx, userID i
 		return 0, biz.ConflictRevision(p.Revision)
 	}
 	return expected + 1, nil
+}
+
+func (r *credentialRepo) RecentPasswordHashes(ctx context.Context, tx biz.Tx, userID int64, keep int) ([]string, error) {
+	if keep <= 0 {
+		return nil, nil
+	}
+	var rows []passwordHistoryPO
+	if err := r.d.dbOr(tx).WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("id DESC").Limit(keep).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, p := range rows {
+		out = append(out, p.PasswordHash)
+	}
+	return out, nil
+}
+
+// RecordPasswordHash appends the hash and then trims everything older than the
+// newest keep rows. Trimming here (rather than in a background job) keeps the
+// table bounded without another moving part, and the delete is idempotent.
+func (r *credentialRepo) RecordPasswordHash(ctx context.Context, tx biz.Tx, userID int64, hash string, keep int) error {
+	if hash == "" || keep <= 0 {
+		return nil
+	}
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if err := db.Create(&passwordHistoryPO{
+		UserID: userID, PasswordHash: hash, CreatedAt: time.Now().UTC(),
+	}).Error; err != nil {
+		return err
+	}
+	var cutoff []int64
+	if err := db.Model(&passwordHistoryPO{}).Where("user_id = ?", userID).
+		Order("id DESC").Offset(keep).Limit(1000).Pluck("id", &cutoff).Error; err != nil {
+		return err
+	}
+	if len(cutoff) == 0 {
+		return nil
+	}
+	return db.Where("user_id = ? AND id <= ?", userID, cutoff[len(cutoff)-1]).
+		Delete(&passwordHistoryPO{}).Error
 }
 
 func (r *credentialRepo) BumpPasswordVersion(ctx context.Context, tx biz.Tx, userID int64) (uint64, error) {

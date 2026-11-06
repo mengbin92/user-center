@@ -47,6 +47,9 @@ message AuthContext {
   string csrf_token = 4;
   int32 password_min_length = 5;
   bool mfa_required_for_admins = 6;
+  // Lets the registration and password-change forms state the composition rule
+  // before the user submits, instead of surfacing it as a rejection.
+  int32 password_min_classes = 7;
 }
 
 message CreateRegistrationChallengeRequest {
@@ -83,6 +86,10 @@ message LoginReply {
   bool mfa_enrollment_required = 7;
   // Present when a WebAuthn credential can satisfy the MFA challenge.
   WebAuthnChallenge webauthn = 8;
+  // How many older sessions the per-user cap reclaimed while issuing this one.
+  // Non-zero means another device was signed out; say so rather than letting
+  // the user discover it later.
+  int32 recycled_sessions = 9;
 }
 
 message WebAuthnChallenge {

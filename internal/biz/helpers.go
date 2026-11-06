@@ -9,9 +9,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/bits"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/mengbin92/user-center/domain/authorization"
@@ -142,20 +144,117 @@ func HMACCode(secret, purpose, code string) string {
 
 // Password policy and hashing.
 
-func ValidatePassword(pw string, minLen int) error {
+// Password classes used by composition rules. A class counts once however many
+// times it appears; spaces and non-ASCII letters are not classes, so a
+// passphrase of words still needs punctuation or a digit to reach three.
+const (
+	passwordClassUpper = 1 << iota
+	passwordClassLower
+	passwordClassDigit
+	passwordClassSymbol
+)
+
+// passwordClasses returns which of the four classes appear in pw.
+func passwordClasses(pw string) int {
+	var mask int
+	for _, r := range pw {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			mask |= passwordClassUpper
+		case r >= 'a' && r <= 'z':
+			mask |= passwordClassLower
+		case r >= '0' && r <= '9':
+			mask |= passwordClassDigit
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			// Non-ASCII letters and digits carry no class of their own: forcing
+			// "must contain uppercase" on a Chinese password is not meaningful.
+			// They still count toward length.
+		case unicode.IsSpace(r):
+			// Whitespace is neither a symbol nor a class.
+		default:
+			mask |= passwordClassSymbol
+		}
+	}
+	return bits.OnesCount(uint(mask))
+}
+
+// ValidatePassword is the single password-policy gate. Register, self-service
+// change, reset-by-code and admin-issued initial passwords all call it, so the
+// rules cannot drift apart between entry points.
+//
+// Violations return PASSWORD_POLICY_VIOLATION rather than VALIDATION_FAILED:
+// the UI needs to show the concrete reason next to the field, and a generic
+// "request invalid" makes the strongest requirement invisible.
+func ValidatePassword(pw string, policy PasswordPolicy) error {
+	minLen := policy.MinLength
 	if minLen < 8 {
 		minLen = 8
 	}
 	if utf8.RuneCountInString(pw) < minLen {
-		return Validation(fmt.Sprintf("密码至少需要 %d 个字符", minLen))
+		return PasswordPolicyError(fmt.Sprintf("密码至少需要 %d 个字符", minLen))
 	}
 	if len(pw) > 72 {
-		return Validation("密码不能超过 72 个字节")
+		return PasswordPolicyError("密码不能超过 72 个字节")
 	}
 	if strings.TrimSpace(pw) != pw {
-		return Validation("密码首尾不能包含空白字符")
+		return PasswordPolicyError("密码首尾不能包含空白字符")
+	}
+	if classes := policy.MinClasses; classes > 0 {
+		if classes > 4 {
+			classes = 4
+		}
+		if got := passwordClasses(pw); got < classes {
+			return PasswordPolicyError(fmt.Sprintf(
+				"密码需至少包含 %d 类字符（大写字母、小写字母、数字、符号），当前只有 %d 类", classes, got))
+		}
 	}
 	return nil
+}
+
+// PasswordExpired reports whether a password set at changedAt has outlived the
+// policy. A zero changedAt means the age is unknown (accounts that predate the
+// policy): those are never treated as expired, and are stamped on next change.
+func PasswordExpired(changedAt time.Time, policy PasswordPolicy, now time.Time) bool {
+	if policy.ExpiryDays <= 0 || changedAt.IsZero() {
+		return false
+	}
+	return now.After(changedAt.AddDate(0, 0, policy.ExpiryDays))
+}
+
+// CheckPasswordReuse rejects a candidate that matches the account's current
+// password or anything inside the history window. current may be nil when the
+// account has no password yet (OAuth-only accounts).
+//
+// Only bcrypt comparisons happen here; the stored values are hashes, so a
+// database dump does not expose previous passwords.
+func (s *Services) CheckPasswordReuse(ctx context.Context, tx Tx, userID int64, candidate string, policy PasswordPolicy, current *Credential) error {
+	if policy.HistoryCount <= 0 {
+		return nil
+	}
+	if current != nil && current.PasswordHash != "" && VerifyPassword(current.PasswordHash, candidate) {
+		return PasswordPolicyError("新密码不能与当前密码相同")
+	}
+	hashes, err := s.Credentials.RecentPasswordHashes(ctx, tx, userID, policy.HistoryCount)
+	if err != nil {
+		return ErrDependency
+	}
+	for _, h := range hashes {
+		if VerifyPassword(h, candidate) {
+			return PasswordPolicyError(fmt.Sprintf("新密码不能与最近 %d 次使用过的密码相同", policy.HistoryCount))
+		}
+	}
+	return nil
+}
+
+// RecordPasswordHistory appends the newly set hash so the next change can
+// detect reuse. Callers must invoke it inside the same transaction that writes
+// the credential: a history row without the matching credential (or the
+// reverse) would make the reuse rule lie.
+func (s *Services) RecordPasswordHistory(ctx context.Context, tx Tx, userID int64, hash string, policy PasswordPolicy) error {
+	if policy.HistoryCount <= 0 {
+		return nil
+	}
+	return s.Credentials.RecordPasswordHash(ctx, tx, userID, hash, policy.HistoryCount)
 }
 
 func HashPassword(pw string) (string, error) {

@@ -131,6 +131,8 @@ func authSettingsProto(s *biz.AuthSettings) *usercv1.AuthSettings {
 		PasswordMinLength: int32(s.PasswordMinLength), SessionTtlMinutes: int32(s.SessionTTLMinutes),
 		IdleTimeoutMinutes: int32(s.IdleTimeoutMinutes), MfaRequiredForAdmins: s.MFARequiredForAdmins,
 		AllowedEmailDomains: s.AllowedEmailDomains, Providers: s.Providers, Revision: rev(s.Revision),
+		PasswordMinClasses: int32(s.PasswordMinClasses), PasswordHistoryCount: int32(s.PasswordHistoryCount),
+		PasswordExpiryDays: int32(s.PasswordExpiryDays), MaxSessionsPerUser: int32(s.MaxSessionsPerUser),
 	}
 }
 
@@ -160,6 +162,8 @@ func (s *SettingsService) UpdateAuthSettings(ctx context.Context, req *usercv1.U
 		PasswordMinLength: int(req.GetPasswordMinLength()), SessionTTLMinutes: int(req.GetSessionTtlMinutes()),
 		IdleTimeoutMinutes: int(req.GetIdleTimeoutMinutes()), MFARequiredForAdmins: req.GetMfaRequiredForAdmins(),
 		AllowedEmailDomains: req.GetAllowedEmailDomains(), Providers: req.GetProviders(),
+		PasswordMinClasses: int(req.GetPasswordMinClasses()), PasswordHistoryCount: int(req.GetPasswordHistoryCount()),
+		PasswordExpiryDays: int(req.GetPasswordExpiryDays()), MaxSessionsPerUser: int(req.GetMaxSessionsPerUser()),
 	}, req.GetUpdateMask(), expected, auditReason)
 	if err != nil {
 		return nil, err

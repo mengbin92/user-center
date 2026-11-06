@@ -30,7 +30,7 @@ func NewLogger() *zap.Logger {
 
 func ProvideServer(b *conf.Bootstrap) *conf.Server {
 	if b.Server == nil {
-		return &conf.Server{Http: &conf.HTTP{Addr: ":8080"}, Grpc: &conf.GRPC{Addr: ":9090"}, Metrics: defaultMetrics()}
+		return &conf.Server{Http: &conf.HTTP{Addr: ":8080"}, Grpc: &conf.GRPC{Addr: ":9090"}, Metrics: defaultMetrics(), RateLimit: defaultRateLimit()}
 	}
 	if b.Server.Http == nil {
 		b.Server.Http = &conf.HTTP{Addr: ":8080"}
@@ -41,7 +41,18 @@ func ProvideServer(b *conf.Bootstrap) *conf.Server {
 	if b.Server.Metrics == nil {
 		b.Server.Metrics = defaultMetrics()
 	}
+	if b.Server.RateLimit == nil {
+		b.Server.RateLimit = defaultRateLimit()
+	}
 	return b.Server
+}
+
+// defaultRateLimit enables write-path limiting. The config proto cannot express
+// "enabled unless explicitly false", so the default is materialised here: an
+// operator upgrading into this version gets protection without editing config,
+// and can still switch it off with rate_limit.enabled=false.
+func defaultRateLimit() *conf.RateLimit {
+	return &conf.RateLimit{Enabled: true, WritePerMinute: 120, HeavyPerMinute: 10}
 }
 
 // defaultMetrics binds the scrape listener to loopback: exposing it must be an

@@ -8,6 +8,7 @@ import { Button } from '../../components/button'
 import { FullPageLoading } from '../../app/guards'
 import { InlineAlert } from '../../components/card'
 import { Checkbox, Field, Input } from '../../components/input'
+import { useToast } from '../../components/toast'
 import { AuthShell } from './auth-shell'
 import { ProviderButtons } from './provider-buttons'
 import { api } from '../../lib/api'
@@ -42,6 +43,7 @@ function describeAuthError(error: unknown): string {
 
 export function LoginPage() {
   const { status, hasAdmin, signIn } = useAuth()
+  const toast = useToast()
   const [searchParams] = useSearchParams()
   const next = safeNext(searchParams.get('next'))
   const oauthErrorParam = searchParams.get('oauth_error')
@@ -112,6 +114,15 @@ export function LoginPage() {
         setCode('')
         setPhase('mfa')
         return
+      }
+      if (reply.recycled_sessions) {
+        // The per-user session cap reclaimed older sessions while signing in.
+        // Say so: otherwise the user finds another device logged out with no
+        // explanation and assumes the account was compromised.
+        toast.info(
+          '已退出其他设备',
+          `同时在线会话已达上限，已自动退出 ${reply.recycled_sessions} 个最久未使用的会话。`,
+        )
       }
       if (reply.password_change_required) {
         setPostLoginPath(`/account/security?password_change_required=1${oidcNext ? `&next=${encodeURIComponent(oidcNext)}` : ''}`)

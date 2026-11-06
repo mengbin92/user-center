@@ -44,6 +44,14 @@ func Validation(msg string) error {
 	return kerrors.BadRequest("VALIDATION_FAILED", msg)
 }
 
+// PasswordPolicyError marks a rejection that a user can act on by choosing a
+// different password. It is deliberately distinct from VALIDATION_FAILED so the
+// web form can attach the reason to the password field instead of showing a
+// generic "request invalid".
+func PasswordPolicyError(msg string) error {
+	return kerrors.BadRequest("PASSWORD_POLICY_VIOLATION", msg)
+}
+
 func ConflictCode(reason, msg string) error {
 	return kerrors.Conflict(reason, msg)
 }

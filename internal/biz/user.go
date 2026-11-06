@@ -116,7 +116,11 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, actor ActorContext, c
 			}
 		}
 	}
-	if err := ValidatePassword(next, settings.PasswordMinLength); err != nil {
+	policy := settings.PasswordPolicy()
+	if err := ValidatePassword(next, policy); err != nil {
+		return err
+	}
+	if err := uc.CheckPasswordReuse(ctx, nil, actor.User.ID, next, policy, cred); err != nil {
 		return err
 	}
 	if cred != nil && VerifyPassword(cred.PasswordHash, next) {
@@ -144,13 +148,16 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, actor ActorContext, c
 			}
 		}
 		if cred == nil {
-			if err := uc.Credentials.Create(ctx, tx, &Credential{UserID: actor.User.ID, PasswordHash: hash, Algorithm: "bcrypt", PasswordVersion: 1, Revision: 1, UpdatedAt: now}); err != nil {
+			if err := uc.Credentials.Create(ctx, tx, &Credential{UserID: actor.User.ID, PasswordHash: hash, Algorithm: "bcrypt", PasswordVersion: 1, Revision: 1, ChangedAt: now, UpdatedAt: now}); err != nil {
 				return err
 			}
 		} else {
 			if _, err := uc.Credentials.UpdatePassword(ctx, tx, actor.User.ID, hash, "bcrypt", cred.Revision, false); err != nil {
 				return err
 			}
+		}
+		if err := uc.RecordPasswordHistory(ctx, tx, actor.User.ID, hash, policy); err != nil {
+			return ErrDependency
 		}
 		version, err := uc.Users.BumpIdentityVersion(ctx, tx, actor.User.ID)
 		if err != nil {
@@ -611,7 +618,7 @@ func (uc *UserUsecase) CreateUser(ctx context.Context, actor ActorContext, in Cr
 		if err := uc.RequireStepUp(ctx, actor); err != nil {
 			return nil, err
 		}
-		if err := ValidatePassword(in.InitialPassword, settings.PasswordMinLength); err != nil {
+		if err := ValidatePassword(in.InitialPassword, settings.PasswordPolicy()); err != nil {
 			return nil, err
 		}
 		hash, err = HashPassword(in.InitialPassword)
@@ -636,6 +643,12 @@ func (uc *UserUsecase) CreateUser(ctx context.Context, actor ActorContext, in Cr
 		return nil, Validation("未设置初始密码时必须提供激活邮箱")
 	}
 	now := uc.Clock.Now().UTC()
+	// An account created without an initial password has no password age; leave
+	// it zero so the expiry rule never treats it as stale.
+	var changedAt time.Time
+	if hash != "" {
+		changedAt = now
+	}
 	u := &User{
 		Username: in.Username, UsernameNormalized: NormalizeUsername(in.Username),
 		DisplayName: displayName, Email: in.Email, EmailNormalized: NormalizeEmail(in.Email),
@@ -657,9 +670,14 @@ func (uc *UserUsecase) CreateUser(ctx context.Context, actor ActorContext, in Cr
 		created = created0
 		if err := uc.Credentials.Create(ctx, tx, &Credential{
 			UserID: created.ID, PasswordHash: hash, Algorithm: "bcrypt",
-			PasswordVersion: 1, MustChangePassword: hash != "", Revision: 1, UpdatedAt: now,
+			PasswordVersion: 1, MustChangePassword: hash != "", ChangedAt: changedAt, Revision: 1, UpdatedAt: now,
 		}); err != nil {
 			return err
+		}
+		if hash != "" {
+			if err := uc.RecordPasswordHistory(ctx, tx, created.ID, hash, settings.PasswordPolicy()); err != nil {
+				return ErrDependency
+			}
 		}
 		for _, roleID := range roleIDs {
 			if _, err := uc.IAM.CreateAssignment(ctx, tx, &Assignment{

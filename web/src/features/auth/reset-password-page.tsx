@@ -31,12 +31,13 @@ export function ResetPasswordPage() {
     staleTime: 60_000,
   })
   const minLength = contextQuery.data?.password_min_length ?? 10
+  const minClasses = contextQuery.data?.password_min_classes ?? 3
   const hasLinkParams = Boolean(initialChallenge && initialCode)
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
-    const passwordError = passwordValidationError(password, minLength)
+    const passwordError = passwordValidationError(password, minLength, minClasses)
     if (passwordError) {
       setError(passwordError)
       return

@@ -23,8 +23,12 @@ type AuthForm = {
   registrationEnabled: boolean
   emailVerificationRequired: boolean
   passwordMinLength: string
+  passwordMinClasses: string
+  passwordHistoryCount: string
+  passwordExpiryDays: string
   sessionTtlMinutes: string
   idleTimeoutMinutes: string
+  maxSessionsPerUser: string
   mfaRequiredForAdmins: boolean
   allowedEmailDomains: string
   providers: string
@@ -34,8 +38,12 @@ const EMPTY_FORM: AuthForm = {
   registrationEnabled: true,
   emailVerificationRequired: true,
   passwordMinLength: '10',
+  passwordMinClasses: '3',
+  passwordHistoryCount: '5',
+  passwordExpiryDays: '0',
   sessionTtlMinutes: '720',
   idleTimeoutMinutes: '60',
+  maxSessionsPerUser: '10',
   mfaRequiredForAdmins: true,
   allowedEmailDomains: '',
   providers: '',
@@ -59,8 +67,12 @@ export function AdminAuthSettingsPage() {
       registrationEnabled: data.registration_enabled ?? true,
       emailVerificationRequired: data.email_verification_required ?? true,
       passwordMinLength: String(data.password_min_length ?? 10),
+      passwordMinClasses: String(data.password_min_classes ?? 0),
+      passwordHistoryCount: String(data.password_history_count ?? 0),
+      passwordExpiryDays: String(data.password_expiry_days ?? 0),
       sessionTtlMinutes: String(data.session_ttl_minutes ?? 720),
       idleTimeoutMinutes: String(data.idle_timeout_minutes ?? 60),
+      maxSessionsPerUser: String(data.max_sessions_per_user ?? 0),
       mfaRequiredForAdmins: data.mfa_required_for_admins ?? true,
       allowedEmailDomains: (data.allowed_email_domains ?? []).join(', '),
       providers: (data.providers ?? []).join(', '),
@@ -73,8 +85,12 @@ export function AdminAuthSettingsPage() {
         registration_enabled: form.registrationEnabled,
         email_verification_required: form.emailVerificationRequired,
         password_min_length: Number(form.passwordMinLength) || 0,
+        password_min_classes: Number(form.passwordMinClasses) || 0,
+        password_history_count: Number(form.passwordHistoryCount) || 0,
+        password_expiry_days: Number(form.passwordExpiryDays) || 0,
         session_ttl_minutes: Number(form.sessionTtlMinutes) || 0,
         idle_timeout_minutes: Number(form.idleTimeoutMinutes) || 0,
+        max_sessions_per_user: Number(form.maxSessionsPerUser) || 0,
         mfa_required_for_admins: form.mfaRequiredForAdmins,
         allowed_email_domains: splitList(form.allowedEmailDomains),
         providers: splitList(form.providers),
@@ -95,6 +111,22 @@ export function AdminAuthSettingsPage() {
     const idle = Number(form.idleTimeoutMinutes)
     if (!Number.isInteger(passwordMin) || passwordMin < 8 || passwordMin > 72) {
       return '密码最小长度必须为 8-72'
+    }
+    const minClasses = Number(form.passwordMinClasses)
+    if (!Number.isInteger(minClasses) || minClasses < 0 || minClasses > 4) {
+      return '密码字符类要求必须为 0-4（0 表示不要求）'
+    }
+    const history = Number(form.passwordHistoryCount)
+    if (!Number.isInteger(history) || history < 0 || history > 20) {
+      return '密码历史条数必须为 0-20（0 表示不检查复用）'
+    }
+    const expiryDays = Number(form.passwordExpiryDays)
+    if (!Number.isInteger(expiryDays) || expiryDays < 0 || expiryDays > 3650) {
+      return '密码有效期必须为 0-3650 天（0 表示不过期）'
+    }
+    const maxSessions = Number(form.maxSessionsPerUser)
+    if (!Number.isInteger(maxSessions) || maxSessions < 0 || maxSessions > 1000) {
+      return '并发会话上限必须为 0-1000（0 表示不限制）'
     }
     if (!Number.isInteger(sessionTtl) || sessionTtl < 5 || sessionTtl > 43200) {
       return '会话有效期必须为 5-43200 分钟'
@@ -194,6 +226,62 @@ export function AdminAuthSettingsPage() {
                     value={form.passwordMinLength}
                     onChange={(event) =>
                       setForm({ ...form, passwordMinLength: event.target.value })
+                    }
+                    inputMode="numeric"
+                  />
+                </Field>
+                <Field
+                  label="密码字符类要求"
+                  htmlFor="settings-password-classes"
+                  hint="0-4；需同时包含几类字符"
+                >
+                  <Input
+                    id="settings-password-classes"
+                    value={form.passwordMinClasses}
+                    onChange={(event) =>
+                      setForm({ ...form, passwordMinClasses: event.target.value })
+                    }
+                    inputMode="numeric"
+                  />
+                </Field>
+                <Field
+                  label="密码历史条数"
+                  htmlFor="settings-password-history"
+                  hint="0-20；禁止复用最近几次密码"
+                >
+                  <Input
+                    id="settings-password-history"
+                    value={form.passwordHistoryCount}
+                    onChange={(event) =>
+                      setForm({ ...form, passwordHistoryCount: event.target.value })
+                    }
+                    inputMode="numeric"
+                  />
+                </Field>
+                <Field
+                  label="密码有效期（天）"
+                  htmlFor="settings-password-expiry"
+                  hint="0 表示不过期；到期后登录即要求改密"
+                >
+                  <Input
+                    id="settings-password-expiry"
+                    value={form.passwordExpiryDays}
+                    onChange={(event) =>
+                      setForm({ ...form, passwordExpiryDays: event.target.value })
+                    }
+                    inputMode="numeric"
+                  />
+                </Field>
+                <Field
+                  label="并发会话上限"
+                  htmlFor="settings-max-sessions"
+                  hint="0 表示不限制；超限回收最久未活跃会话"
+                >
+                  <Input
+                    id="settings-max-sessions"
+                    value={form.maxSessionsPerUser}
+                    onChange={(event) =>
+                      setForm({ ...form, maxSessionsPerUser: event.target.value })
                     }
                     inputMode="numeric"
                   />

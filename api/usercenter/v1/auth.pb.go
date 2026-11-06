@@ -67,8 +67,11 @@ type AuthContext struct {
 	CsrfToken                 string                 `protobuf:"bytes,4,opt,name=csrf_token,json=csrfToken,proto3" json:"csrf_token,omitempty"`
 	PasswordMinLength         int32                  `protobuf:"varint,5,opt,name=password_min_length,json=passwordMinLength,proto3" json:"password_min_length,omitempty"`
 	MfaRequiredForAdmins      bool                   `protobuf:"varint,6,opt,name=mfa_required_for_admins,json=mfaRequiredForAdmins,proto3" json:"mfa_required_for_admins,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// Lets the registration and password-change forms state the composition rule
+	// before the user submits, instead of surfacing it as a rejection.
+	PasswordMinClasses int32 `protobuf:"varint,7,opt,name=password_min_classes,json=passwordMinClasses,proto3" json:"password_min_classes,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *AuthContext) Reset() {
@@ -141,6 +144,13 @@ func (x *AuthContext) GetMfaRequiredForAdmins() bool {
 		return x.MfaRequiredForAdmins
 	}
 	return false
+}
+
+func (x *AuthContext) GetPasswordMinClasses() int32 {
+	if x != nil {
+		return x.PasswordMinClasses
+	}
+	return 0
 }
 
 type CreateRegistrationChallengeRequest struct {
@@ -386,9 +396,13 @@ type LoginReply struct {
 	PasswordChangeRequired bool   `protobuf:"varint,6,opt,name=password_change_required,json=passwordChangeRequired,proto3" json:"password_change_required,omitempty"`
 	MfaEnrollmentRequired  bool   `protobuf:"varint,7,opt,name=mfa_enrollment_required,json=mfaEnrollmentRequired,proto3" json:"mfa_enrollment_required,omitempty"`
 	// Present when a WebAuthn credential can satisfy the MFA challenge.
-	Webauthn      *WebAuthnChallenge `protobuf:"bytes,8,opt,name=webauthn,proto3" json:"webauthn,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Webauthn *WebAuthnChallenge `protobuf:"bytes,8,opt,name=webauthn,proto3" json:"webauthn,omitempty"`
+	// How many older sessions the per-user cap reclaimed while issuing this one.
+	// Non-zero means another device was signed out; say so rather than letting
+	// the user discover it later.
+	RecycledSessions int32 `protobuf:"varint,9,opt,name=recycled_sessions,json=recycledSessions,proto3" json:"recycled_sessions,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *LoginReply) Reset() {
@@ -475,6 +489,13 @@ func (x *LoginReply) GetWebauthn() *WebAuthnChallenge {
 		return x.Webauthn
 	}
 	return nil
+}
+
+func (x *LoginReply) GetRecycledSessions() int32 {
+	if x != nil {
+		return x.RecycledSessions
+	}
+	return 0
 }
 
 type WebAuthnChallenge struct {
@@ -768,7 +789,7 @@ var File_api_usercenter_v1_auth_proto protoreflect.FileDescriptor
 const file_api_usercenter_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"\x1capi/usercenter/v1/auth.proto\x12\x11api.usercenter.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1eapi/usercenter/v1/common.proto\"\x17\n" +
-	"\x15GetAuthContextRequest\"\xa4\x02\n" +
+	"\x15GetAuthContextRequest\"\xd6\x02\n" +
 	"\vAuthContext\x121\n" +
 	"\x14registration_enabled\x18\x01 \x01(\bR\x13registrationEnabled\x12>\n" +
 	"\x1bemail_verification_required\x18\x02 \x01(\bR\x19emailVerificationRequired\x12\x1c\n" +
@@ -776,7 +797,8 @@ const file_api_usercenter_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"csrf_token\x18\x04 \x01(\tR\tcsrfToken\x12.\n" +
 	"\x13password_min_length\x18\x05 \x01(\x05R\x11passwordMinLength\x125\n" +
-	"\x17mfa_required_for_admins\x18\x06 \x01(\bR\x14mfaRequiredForAdmins\":\n" +
+	"\x17mfa_required_for_admins\x18\x06 \x01(\bR\x14mfaRequiredForAdmins\x120\n" +
+	"\x14password_min_classes\x18\a \x01(\x05R\x12passwordMinClasses\":\n" +
 	"\"CreateRegistrationChallengeRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\"\xbb\x01\n" +
 	"\x0fRegisterRequest\x12\x1a\n" +
@@ -791,7 +813,7 @@ const file_api_usercenter_v1_auth_proto_rawDesc = "" +
 	"\fLoginRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1a\n" +
-	"\bremember\x18\x03 \x01(\bR\bremember\"\x88\x03\n" +
+	"\bremember\x18\x03 \x01(\bR\bremember\"\xb5\x03\n" +
 	"\n" +
 	"LoginReply\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12!\n" +
@@ -801,7 +823,8 @@ const file_api_usercenter_v1_auth_proto_rawDesc = "" +
 	"\x12session_expires_at\x18\x05 \x01(\tR\x10sessionExpiresAt\x128\n" +
 	"\x18password_change_required\x18\x06 \x01(\bR\x16passwordChangeRequired\x126\n" +
 	"\x17mfa_enrollment_required\x18\a \x01(\bR\x15mfaEnrollmentRequired\x12@\n" +
-	"\bwebauthn\x18\b \x01(\v2$.api.usercenter.v1.WebAuthnChallengeR\bwebauthn\"x\n" +
+	"\bwebauthn\x18\b \x01(\v2$.api.usercenter.v1.WebAuthnChallengeR\bwebauthn\x12+\n" +
+	"\x11recycled_sessions\x18\t \x01(\x05R\x10recycledSessions\"x\n" +
 	"\x11WebAuthnChallenge\x12\x1c\n" +
 	"\tchallenge\x18\x01 \x01(\tR\tchallenge\x12\x13\n" +
 	"\x05rp_id\x18\x02 \x01(\tR\x04rpId\x120\n" +

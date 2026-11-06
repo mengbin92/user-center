@@ -275,6 +275,14 @@ func defaultAuthSettings() *biz.AuthSettings {
 		RegistrationEnabled: true, EmailVerificationRequired: true,
 		PasswordMinLength: 10, SessionTTLMinutes: 720, IdleTimeoutMinutes: 60,
 		MFARequiredForAdmins: true, Providers: []string{}, Revision: 1,
+		// Composition and reuse apply only when a password is set, so accounts
+		// created before this policy keep working unchanged. Expiry stays off:
+		// forcing rotation on a schedule is not required here and would lock out
+		// accounts on the day it is switched on.
+		PasswordMinClasses:   3,
+		PasswordHistoryCount: 5,
+		PasswordExpiryDays:   0,
+		MaxSessionsPerUser:   10,
 	}
 }
 

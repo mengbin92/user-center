@@ -64,6 +64,7 @@ export function AdminUsersPage() {
     staleTime: 60_000,
   })
   const passwordMinimum = authContext.data?.password_min_length ?? 10
+  const passwordMinClasses = authContext.data?.password_min_classes ?? 3
 
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -161,7 +162,9 @@ export function AdminUsersPage() {
       setFormError('不发送激活邮件时，必须设置初始密码')
       return
     }
-    const passwordError = initialPassword ? passwordValidationError(initialPassword, passwordMinimum) : null
+    const passwordError = initialPassword
+      ? passwordValidationError(initialPassword, passwordMinimum, passwordMinClasses)
+      : null
     if (passwordError) {
       setFormError(passwordError)
       return

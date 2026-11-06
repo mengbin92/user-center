@@ -70,7 +70,15 @@ type harness struct {
 	d      *data.Data
 }
 
-func newHarness(t *testing.T) *harness {
+// harnessOption tunes the server config for one test. Used by the rate-limit
+// tests, which need a tiny budget instead of the production default.
+type harnessOption func(*conf.Server)
+
+func withRateLimit(rl *conf.RateLimit) harnessOption {
+	return func(s *conf.Server) { s.RateLimit = rl }
+}
+
+func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	t.Helper()
 	dir := t.TempDir()
 	sec := &conf.Security{
@@ -132,7 +140,16 @@ func newHarness(t *testing.T) *harness {
 
 	deps := service.NewDeps(sec)
 	mw := server.NewMiddleware(sessions, sec, zap.NewNop())
-	srvCfg := &conf.Server{Http: &conf.HTTP{Addr: ":0", TimeoutSeconds: 30}}
+	// Write limiting is exercised by its own tests with an explicit budget.
+	// Leaving it at the production default here would make every unrelated test
+	// depend on how many requests it happens to issue.
+	srvCfg := &conf.Server{
+		Http:      &conf.HTTP{Addr: ":0", TimeoutSeconds: 30},
+		RateLimit: &conf.RateLimit{Enabled: false},
+	}
+	for _, opt := range opts {
+		opt(srvCfg)
+	}
 	hs := server.NewHTTPServer(
 		srvCfg, sec, mw, obs.NewMetrics(nil), zap.NewNop(),
 		service.NewAuthService(auth, deps),
