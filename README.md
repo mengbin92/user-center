@@ -182,6 +182,10 @@ cd web && npm test      # 前端组件测试
 cd web && npm run build # tsc + vite 构建
 ```
 
+合入前跑 `./scripts/check.sh`：gofmt → 生成物漂移校验 → `go vet` → `go test` → MySQL 测试（仅在设置 `USER_CENTER_MYSQL_TEST_DSN` 时）→ 前端测试与构建。生成物校验要求工作区干净且 `buf`/`wire` 在 PATH，两个前提缺失时会跳过并打印原因而不是静默通过；单独运行用 `./scripts/gen-check.sh`。
+
+MySQL 相关测试与迁移幂等由 CI 的 `mysql` job（`mysql:8.4` service）覆盖，不再依赖发版前手工跑一次。
+
 关键覆盖：
 - `domain/authorization`：Scope 求交/包含、deny、过期、继承环检测、`platform` / `organization:{id}` 上下文隔离与 `context_types` 拒绝。
 - `internal/data`：唯一约束、revision CAS、会话哈希/撤销、目录种子幂等、legacy 导入、GitHub/Google 适配器（本地 fake provider）、SMTP（本地 fake server）、角色/分配跨上下文不可见与不可写。
