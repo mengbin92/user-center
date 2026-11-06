@@ -445,3 +445,4 @@ D1 的连带结论：`v0.7.0` 范围锁定为 **S1–S5 + S9–S11**，不含 S6
 | 2026-11-06 | S11 合入 | `eaaa6ab`：`e2e-compose` workflow + `scripts/e2e/compose-e2e.sh`；本地实跑 `E2E OK` 并落库证据 |
 | 2026-11-06 | S2/S3 合入 | `9a85879`（gRPC `request_id`、慢请求日志、邮件掩码、7 条告警规则）、`f176bdf`（连接池探测测试）；compose 暴露 metrics 端口并纳入 E2E 断言 |
 | 2026-11-06 | **v0.7.0 发布** | W1/W2/W4 全部交付，MINOR 发版；发布说明 `docs/releases/release-v0.7.0.md`；W3/W5/W6 留待下一版 |
+| 2026-11-06 | **v0.7.1 补丁** | v0.7.0 打标后 `e2e-compose` 首次在真实 Linux runner 运行失败（OIDC 私钥 `0600` + 非 root 用户）；同时移除会误报的镜像时间守卫。发布说明 `docs/releases/release-v0.7.1.md` |

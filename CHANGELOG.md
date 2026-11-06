@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-11-06
+
+**版本判定：PATCH**（v0.7.0 → v0.7.1）。仅修复 CI 与 E2E 脚本；无代码、API、迁移变更。详见 [发布说明](docs/releases/release-v0.7.1.md)。
+
+### Fixed
+
+- compose E2E 在 Linux 上启动失败：OIDC 私钥以 `0600` 生成，容器以非 root 用户运行导致 `permission denied`；改为 `0700` 目录内 `0444` 文件（macOS Docker Desktop 放宽挂载权限，故本地无法复现）。
+- 镜像陈旧判定误报：Docker 缓存完全命中时 `Created` 时间不变，正确的构造被判为陈旧；该判断还依赖 GNU `date -d`，在 macOS 上静默失效。现在只保留 `PIPESTATUS` 真实退出码这道门，并记录镜像 ID。
+- 失败产物上传整个快照目录（含会话 Cookie）；改为只上传诊断文件。
+- `buf-setup-action` 未传 token 触发匿名限流警告。
+- 健康门禁失败时不打印服务日志，只显示 `Restarting (1)`。
+
 ## [0.7.0] - 2026-11-06
 
 **版本判定：MINOR**（v0.6.1 → v0.7.0）。生产化基座：可观测性、负载基线与工程门禁。无迁移、无破坏性契约变更。详见 [发布说明](docs/releases/release-v0.7.0.md)。
