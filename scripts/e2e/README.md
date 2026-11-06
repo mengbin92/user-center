@@ -1,6 +1,19 @@
 # E2E 冒烟
 
-`smoke.sh` 是 v0.5.1 Docker E2E 的正式收纳版本，用于本地 compose 或开发实例：
+`smoke.sh` 是 v0.5.1 Docker E2E 的正式收纳版本，用于本地 compose 或开发实例。
+`compose-e2e.sh` 则把「构建镜像 → 起栈 → 夹具 → 冒烟 → 落库证据」整条链路包成一个可重复的脚本，
+CI 的 `e2e-compose` workflow 调用的就是它（本地与 CI 执行同一份逻辑）。
+
+```bash
+# 整条 compose 链路（构建 + 起栈 + 冒烟 + 证据），失败时自动收集日志
+scripts/e2e/compose-e2e.sh --work-dir /tmp/uc-compose-e2e
+
+# 只重跑冒烟，复用已起的栈
+scripts/e2e/compose-e2e.sh --skip-build --keep
+```
+
+`compose-e2e.sh` 默认在结束时 `down -v`；`--keep` 保留栈便于排查。它不接受复用的 `.env`，
+每次都生成一次性密钥与 OIDC 私钥。
 
 ```bash
 # 开发实例（SQLite）

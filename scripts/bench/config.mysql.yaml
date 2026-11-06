@@ -1,0 +1,45 @@
+# Benchmark profile: MySQL 8.4 with a connection pool that matches the instance.
+#
+# Deliberately separate from configs/config.dev.yaml, whose max_open_conns: 1 is
+# required for SQLite but serialises every request on one MySQL connection
+# (measured: QPS flat from 2 VUs upward, latency growing linearly with VUs).
+#
+# DB_DSN, SESSION_SECRET, CSRF_SECRET, MFA_ENCRYPTION_KEY, OIDC_SIGNING_KEY_PATH
+# and OIDC_ISSUER are injected by scripts/bench/run.sh through the environment.
+server:
+  http:
+    addr: "127.0.0.1:18080"
+    timeout_seconds: 30
+    public_base_url: "http://127.0.0.1:18080"
+  grpc:
+    addr: "127.0.0.1:19090"
+    timeout_seconds: 30
+  metrics:
+    addr: "off"
+
+data:
+  database:
+    driver: mysql
+    source: ""
+    max_open_conns: 20
+    max_idle_conns: 10
+  redis:
+    addr: ""
+    password: ""
+    db: 0
+
+# Values are placeholders; run.sh overrides all three through the environment.
+security:
+  session_secret: "bench-placeholder"
+  csrf_secret: "bench-placeholder"
+  mfa_encryption_key: "bench-placeholder"
+  cookie_secure: false
+  cookie_domain: ""
+  session_ttl_minutes: 720
+  idle_timeout_minutes: 60
+  step_up_ttl_minutes: 5
+  trust_proxy_headers: false
+
+mail:
+  driver: console
+  from: "no-reply@bench.local"

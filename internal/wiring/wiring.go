@@ -18,6 +18,7 @@ import (
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/internal/conf"
 	"github.com/mengbin92/user-center/internal/data"
+	"github.com/mengbin92/user-center/internal/obs"
 	"github.com/mengbin92/user-center/internal/server"
 	"github.com/mengbin92/user-center/internal/service"
 )
@@ -29,7 +30,7 @@ func NewLogger() *zap.Logger {
 
 func ProvideServer(b *conf.Bootstrap) *conf.Server {
 	if b.Server == nil {
-		return &conf.Server{Http: &conf.HTTP{Addr: ":8080"}, Grpc: &conf.GRPC{Addr: ":9090"}}
+		return &conf.Server{Http: &conf.HTTP{Addr: ":8080"}, Grpc: &conf.GRPC{Addr: ":9090"}, Metrics: defaultMetrics()}
 	}
 	if b.Server.Http == nil {
 		b.Server.Http = &conf.HTTP{Addr: ":8080"}
@@ -37,7 +38,16 @@ func ProvideServer(b *conf.Bootstrap) *conf.Server {
 	if b.Server.Grpc == nil {
 		b.Server.Grpc = &conf.GRPC{Addr: ":9090"}
 	}
+	if b.Server.Metrics == nil {
+		b.Server.Metrics = defaultMetrics()
+	}
 	return b.Server
+}
+
+// defaultMetrics binds the scrape listener to loopback: exposing it must be an
+// explicit decision, never a side effect of upgrading.
+func defaultMetrics() *conf.Metrics {
+	return &conf.Metrics{Addr: "127.0.0.1:9091"}
 }
 
 func ProvideData(b *conf.Bootstrap) *conf.Data {
@@ -141,25 +151,26 @@ func envOr(key, def string) string {
 	return def
 }
 
-// App owns the two transports and the one-time bootstrap hook.
+// App owns the transports, the metrics listener and the one-time bootstrap hook.
 type App struct {
-	http   *server.HTTPServer
-	grpc   *server.GRPCServer
-	svc    *biz.Services
-	worker *biz.IntegrationAdminUsecase
-	log    *zap.Logger
+	http    *server.HTTPServer
+	grpc    *server.GRPCServer
+	metrics *server.MetricsServer
+	svc     *biz.Services
+	worker  *biz.IntegrationAdminUsecase
+	log     *zap.Logger
 }
 
-func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, svc *biz.Services, worker *biz.IntegrationAdminUsecase, log *zap.Logger) *App {
-	return &App{http: httpSrv, grpc: grpcSrv, svc: svc, worker: worker, log: log}
+func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, metricsSrv *server.MetricsServer, svc *biz.Services, worker *biz.IntegrationAdminUsecase, log *zap.Logger) *App {
+	return &App{http: httpSrv, grpc: grpcSrv, metrics: metricsSrv, svc: svc, worker: worker, log: log}
 }
 
 func (a *App) Run() error {
 	opts := []kratos.Option{
 		kratos.Name("user-center"),
-		kratos.Version("0.5.2"),
+		kratos.Version("0.6.1"),
 		kratos.Logger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))),
-		kratos.Server(a.http.Server, a.grpc.Server),
+		kratos.Server(a.http.Server, a.grpc.Server, a.metrics),
 		kratos.BeforeStart(a.bootstrap),
 		kratos.BeforeStart(func(ctx context.Context) error {
 			go a.worker.StartWorker(ctx)
@@ -219,4 +230,9 @@ var ProviderSet = wire.NewSet(
 	NewRuntimeConfig,
 	NewLogger,
 	NewApp,
+	obs.NewMetrics,
+	server.NewMetricsServer,
+	// *data.Data owns the queries behind the gauges; internal/obs only sees
+	// the probe interface.
+	wire.Bind(new(obs.MetricsProbe), new(*data.Data)),
 )

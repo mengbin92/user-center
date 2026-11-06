@@ -90,6 +90,88 @@ location / {
 - 日志为 zap JSON；关注 `open database`、`send mail failed`、`run migrations`。
 - 每个请求的 `X-Request-ID` 会写入安全事件与审计；排障时先取该 ID。
 
+### 5.1 指标与采集（v0.7.0）
+
+指标在**独立监听端口**暴露，不走 `/api/v1`，不需要会话，也不经过反向代理：
+
+| 项 | 值 |
+|---|---|
+| 默认地址 | `127.0.0.1:9091`（只绑回环） |
+| 覆盖方式 | `METRICS_ADDR` 环境变量或 `server.metrics.addr` |
+| 关闭 | `METRICS_ADDR=off`（也接受 `none` / `disabled`） |
+| 抓取路径 | `GET /metrics`（同端口另有 `/healthz`） |
+| 刷新周期 | 30 秒，`server.metrics.refresh_seconds` 可调 |
+
+**不要**把该端口挂到公网反代上。指标不含用户标识，但会暴露路由表与流量规模。
+
+| 指标 | 类型 | 标签 | 说明 |
+|---|---|---|---|
+| `usercenter_http_requests_total` | counter | `route`、`method`、`status` | 已认证/未认证都计数，401/403 短路同样计入 |
+| `usercenter_http_request_duration_seconds` | histogram | `route`、`method` | 桶 5ms–5s |
+| `usercenter_event_deliveries` | gauge | `status` | Outbox 投递行数，未知状态归 `other` |
+| `usercenter_schema_migrations_applied` | gauge | — | 已记录的迁移步数（按语句计，不等于文件数） |
+| `usercenter_dependency_up` | gauge | `dependency` | 1 = 上次探测成功；`mysql` / `redis` |
+
+`route` 是路由模板而非原始路径：`/api/v1/orgs/7/members` 与 `/api/v1/orgs/11/members` 都记到 `/api/v1/orgs/{id}/members`。SPA 历史路由与未知路径统一记为 `spa`，因此标签基数由路由表决定，不会随用户输入增长。
+
+两个容易误读的点：
+
+- **SQLite 开发实例**下 `usercenter_schema_migrations_applied` 为 `0`，因为 SQLite 走 AutoMigrate，不写 `schema_migrations`；MySQL 才逐步记录。
+- 未配置 Redis（内存回退模式）时 `usercenter_dependency_up{dependency="redis"}` 为 `1`，含义是"该依赖不适用"，不是"Redis 可用"。
+
+Prometheus 抓取示例：
+
+```yaml
+scrape_configs:
+  - job_name: user-center
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["127.0.0.1:9091"]
+```
+
+跨主机部署时把地址改为该主机的内网地址，并在安全组/防火墙上只放行 Prometheus 实例。容器部署时容器内的 `127.0.0.1` 在宿主机不可达，因此 compose 已把 `METRICS_ADDR` 设为 `0.0.0.0:9091` 并把端口发布在 `127.0.0.1:9091`（只回环，不默认暴露）；需要换端口或关闭时改这两处，关闭用 `METRICS_ADDR=off`。`scripts/e2e/compose-e2e.sh` 会断言该端点从宿主机可抓取，避免"端口绑了但没发布"这种只有告警响时才发现的问题。
+
+日志字段（结构化，字段名稳定）：
+
+| 场景 | 字段 |
+|---|---|
+| 慢请求（超过 `SLOW_REQUEST_THRESHOLD_MS`，默认 500ms） | `request_id`、`route`（模板，非原始路径）、`method`、`status`、`duration_ms` |
+| 邮件投递失败 / console 投递 | `request_id`、`to`（**已脱敏**：`a***@example.com`）、`subject` |
+
+请求体、请求头、查询串、Cookie、密码、验证码、一次性令牌**从不出现在日志里**，`internal/server/logging_test.go` 用字段白名单与内容断言守着这条规则（新增字段会让测试失败，必须显式审查）。`X-Request-ID` 在 HTTP 与 gRPC 两条入口都会注入（缺省生成，超长替换而非截断），审计表的 `request_id` 与日志可互相定位。
+
+### 5.2 SLO 与告警（v0.7.0）
+
+服务目标（单实例，来自 `docs/performance.md` 的实测水位）：
+
+| 指标 | 目标 | 依据 |
+|---|---|---|
+| 可用性 | 月度 99.9% | 5xx 比例是主要信号 |
+| P95 延迟 | < 300 ms | 实测 32 VUs 下 P95 < 60 ms，300 ms 是"明显不正常"的线 |
+| 5xx 比例 | < 1% | 正常应为 0（冒烟与压测均为 0） |
+| Outbox 未投递 | < 1000 条 | 正常为个位数；上千意味着订阅方故障 |
+| DB 连接池占用 | < 90% 且无排队 | 池耗尽的表现与"数据库慢"无法区分，必须单独看 |
+
+告警规则在 [`deployments/prometheus/alerts.yml`](../deployments/prometheus/alerts.yml)，接入方式：
+
+```yaml
+# prometheus.yml
+rule_files:
+  - /etc/prometheus/rules/user-center.yml
+```
+
+| 告警 | 触发条件 | 影响 | 首步排查 |
+|---|---|---|---|
+| `UserCenterHighErrorRate` | 5xx 占比 > 1%，持续 5 分钟 | 用户看到报错 | `/metrics` 找 5xx 最多的 route → 用该请求的 `request_id` 查日志；503 多为依赖不可用 |
+| `UserCenterLatencyHigh` | P95 > 300 ms，持续 10 分钟 | 全站变慢 | 先看连接池 `in_use/max` 与 `wait_total` 增长率，排除池饱和再查 SQL |
+| `UserCenterLoginFailureSpike` | 登录非 2xx 占比 > 50% 且 > 0.2 req/s，持续 10 分钟 | 用户无法登录 | 按状态码拆分：429 = 限流正常工作、401 = 撞库或客户端配置错误、5xx = 认证链路故障 |
+| `UserCenterOutboxBacklog` | 未投递事件 > 1000，持续 15 分钟 | 下游收不到变更 | 查 `event_deliveries` 按 subscriber 分组，通常单个订阅方不可达 |
+| `UserCenterDependencyDown` | `dependency_up == 0`，持续 2 分钟 | MySQL 时全站不可用；Redis 时退化为内存会话 | Redis 回退后重启会丢全部会话，需提前告知 |
+| `UserCenterDBPoolExhausted` | 占用 > 90% 且 `wait_total` 在涨，持续 5 分钟 | 请求排队，延迟飙升 | 先确认 `max_open_conns` 不是 SQLite 的 1；能加就加，不能加先限流 |
+| `UserCenterMigrationsNotApplied` | `schema_migrations_applied == 0`，持续 10 分钟 | 表结构缺失，功能大面积报错 | `migrate` 一次性任务没跑或失败；**该规则仅对 MySQL 部署启用**，SQLite 走 AutoMigrate 时此值恒为 0 |
+
+为什么 P95 用直方图而不是平均值：平均值会被大量快请求稀释，掩盖尾部；实测里 admin 列表修复前 P50 88 ms 时 P95 已 111 ms，平均值看不出问题。
+
 ## 6. 离线导入与事件投递
 
 ```bash

@@ -13,16 +13,21 @@ import (
 
 // AuthzFacts is the resolved policy snapshot for one actor in one context.
 type AuthzFacts struct {
-	PolicyRevision  uint64
-	UserRevision    uint64
-	Context         authorization.Context
-	Roles           map[int64]*Role
-	Assignments     []*Assignment
-	ActiveRoleIDs   []int64
-	Constraints     []*Constraint
-	Sources         []authorization.GrantSource
-	Permission      *Permission
-	PermissionError error
+	PolicyRevision uint64
+	UserRevision   uint64
+	Context        authorization.Context
+	Roles          map[int64]*Role
+	Assignments    []*Assignment
+	ActiveRoleIDs  []int64
+	Constraints    []*Constraint
+	Sources        []authorization.GrantSource
+
+	// permissions memoises the operation definitions resolved through this
+	// snapshot. A list endpoint decides two operations for every row, so
+	// resolving the dictionary per decision turned one request into ~70
+	// SELECTs on iam_permissions. Facts are owned by a single request and are
+	// never shared across goroutines, so no lock is needed.
+	permissions map[string]*Permission
 }
 
 func (f *AuthzFacts) role(id int64) *Role {
@@ -175,10 +180,24 @@ func (f *AuthzFacts) resolveSources(now time.Time) error {
 	return nil
 }
 
-func (s *Services) permission(ctx context.Context, operation string) (*Permission, error) {
+// permissionWithFacts resolves an operation definition at most once per facts
+// snapshot. Callers that already hold facts must use this instead of
+// GetPermissionByCode directly.
+func (s *Services) permissionWithFacts(ctx context.Context, facts *AuthzFacts, operation string) (*Permission, error) {
+	if facts != nil {
+		if p, ok := facts.permissions[operation]; ok {
+			return p, nil
+		}
+	}
 	p, err := s.IAM.GetPermissionByCode(ctx, nil, operation)
 	if err != nil {
 		return nil, err
+	}
+	if facts != nil {
+		if facts.permissions == nil {
+			facts.permissions = make(map[string]*Permission, 4)
+		}
+		facts.permissions[operation] = p
 	}
 	return p, nil
 }
@@ -199,8 +218,14 @@ func (s *Services) DecideIn(ctx context.Context, actor ActorContext, authCtx aut
 	return s.decideWithFacts(ctx, facts, actor, operation, targetUserID, wholeObject)
 }
 
+// DecideWithFacts is the exported form of decideWithFacts for callers that
+// already loaded a snapshot (list endpoints).
+func (s *Services) DecideWithFacts(ctx context.Context, facts *AuthzFacts, actor ActorContext, operation string, targetUserID int64, wholeObject bool) (authorization.Decision, error) {
+	return s.decideWithFacts(ctx, facts, actor, operation, targetUserID, wholeObject)
+}
+
 func (s *Services) decideWithFacts(ctx context.Context, facts *AuthzFacts, actor ActorContext, operation string, targetUserID int64, wholeObject bool) (authorization.Decision, error) {
-	p, err := s.permission(ctx, operation)
+	p, err := s.permissionWithFacts(ctx, facts, operation)
 	if err != nil {
 		if errors.Is(err, ErrResourceNotFound) {
 			return authorization.Decision{Reason: "OPERATION_UNBOUND", Operation: operation}, nil

@@ -93,6 +93,7 @@ type Server struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Http          *HTTP                  `protobuf:"bytes,1,opt,name=http,proto3" json:"http,omitempty"`
 	Grpc          *GRPC                  `protobuf:"bytes,2,opt,name=grpc,proto3" json:"grpc,omitempty"`
+	Metrics       *Metrics               `protobuf:"bytes,3,opt,name=metrics,proto3" json:"metrics,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -137,6 +138,13 @@ func (x *Server) GetHttp() *HTTP {
 func (x *Server) GetGrpc() *GRPC {
 	if x != nil {
 		return x.Grpc
+	}
+	return nil
+}
+
+func (x *Server) GetMetrics() *Metrics {
+	if x != nil {
+		return x.Metrics
 	}
 	return nil
 }
@@ -253,6 +261,62 @@ func (x *GRPC) GetTimeoutSeconds() int32 {
 	return 0
 }
 
+// Metrics is a separate listener on purpose: /metrics must never be reachable
+// through the public API listener or require a session.
+type Metrics struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty keeps the default 127.0.0.1:9091 so a scrape can only come from the
+	// same host unless it is widened explicitly. "off" disables the listener.
+	Addr           string `protobuf:"bytes,1,opt,name=addr,proto3" json:"addr,omitempty"`
+	RefreshSeconds int32  `protobuf:"varint,2,opt,name=refresh_seconds,json=refreshSeconds,proto3" json:"refresh_seconds,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *Metrics) Reset() {
+	*x = Metrics{}
+	mi := &file_internal_conf_conf_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Metrics) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Metrics) ProtoMessage() {}
+
+func (x *Metrics) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_conf_conf_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Metrics.ProtoReflect.Descriptor instead.
+func (*Metrics) Descriptor() ([]byte, []int) {
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Metrics) GetAddr() string {
+	if x != nil {
+		return x.Addr
+	}
+	return ""
+}
+
+func (x *Metrics) GetRefreshSeconds() int32 {
+	if x != nil {
+		return x.RefreshSeconds
+	}
+	return 0
+}
+
 type Data struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Database      *Database              `protobuf:"bytes,1,opt,name=database,proto3" json:"database,omitempty"`
@@ -263,7 +327,7 @@ type Data struct {
 
 func (x *Data) Reset() {
 	*x = Data{}
-	mi := &file_internal_conf_conf_proto_msgTypes[4]
+	mi := &file_internal_conf_conf_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -275,7 +339,7 @@ func (x *Data) String() string {
 func (*Data) ProtoMessage() {}
 
 func (x *Data) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[4]
+	mi := &file_internal_conf_conf_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -288,7 +352,7 @@ func (x *Data) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Data.ProtoReflect.Descriptor instead.
 func (*Data) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{4}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Data) GetDatabase() *Database {
@@ -318,7 +382,7 @@ type Database struct {
 
 func (x *Database) Reset() {
 	*x = Database{}
-	mi := &file_internal_conf_conf_proto_msgTypes[5]
+	mi := &file_internal_conf_conf_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -330,7 +394,7 @@ func (x *Database) String() string {
 func (*Database) ProtoMessage() {}
 
 func (x *Database) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[5]
+	mi := &file_internal_conf_conf_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -343,7 +407,7 @@ func (x *Database) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Database.ProtoReflect.Descriptor instead.
 func (*Database) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{5}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Database) GetDriver() string {
@@ -385,7 +449,7 @@ type Redis struct {
 
 func (x *Redis) Reset() {
 	*x = Redis{}
-	mi := &file_internal_conf_conf_proto_msgTypes[6]
+	mi := &file_internal_conf_conf_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -397,7 +461,7 @@ func (x *Redis) String() string {
 func (*Redis) ProtoMessage() {}
 
 func (x *Redis) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[6]
+	mi := &file_internal_conf_conf_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -410,7 +474,7 @@ func (x *Redis) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Redis.ProtoReflect.Descriptor instead.
 func (*Redis) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{6}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Redis) GetAddr() string {
@@ -451,7 +515,7 @@ type Security struct {
 
 func (x *Security) Reset() {
 	*x = Security{}
-	mi := &file_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_internal_conf_conf_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -463,7 +527,7 @@ func (x *Security) String() string {
 func (*Security) ProtoMessage() {}
 
 func (x *Security) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_internal_conf_conf_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -476,7 +540,7 @@ func (x *Security) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Security.ProtoReflect.Descriptor instead.
 func (*Security) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{7}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Security) GetSessionSecret() string {
@@ -554,7 +618,7 @@ type Mail struct {
 
 func (x *Mail) Reset() {
 	*x = Mail{}
-	mi := &file_internal_conf_conf_proto_msgTypes[8]
+	mi := &file_internal_conf_conf_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -566,7 +630,7 @@ func (x *Mail) String() string {
 func (*Mail) ProtoMessage() {}
 
 func (x *Mail) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[8]
+	mi := &file_internal_conf_conf_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -579,7 +643,7 @@ func (x *Mail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Mail.ProtoReflect.Descriptor instead.
 func (*Mail) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{8}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Mail) GetDriver() string {
@@ -615,7 +679,7 @@ type SMTP struct {
 
 func (x *SMTP) Reset() {
 	*x = SMTP{}
-	mi := &file_internal_conf_conf_proto_msgTypes[9]
+	mi := &file_internal_conf_conf_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +691,7 @@ func (x *SMTP) String() string {
 func (*SMTP) ProtoMessage() {}
 
 func (x *SMTP) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[9]
+	mi := &file_internal_conf_conf_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +704,7 @@ func (x *SMTP) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SMTP.ProtoReflect.Descriptor instead.
 func (*SMTP) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{9}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SMTP) GetHost() string {
@@ -680,17 +744,21 @@ const file_internal_conf_conf_proto_rawDesc = "" +
 	"\x06server\x18\x01 \x01(\v2\x17.usercenter.conf.ServerR\x06server\x12)\n" +
 	"\x04data\x18\x02 \x01(\v2\x15.usercenter.conf.DataR\x04data\x125\n" +
 	"\bsecurity\x18\x03 \x01(\v2\x19.usercenter.conf.SecurityR\bsecurity\x12)\n" +
-	"\x04mail\x18\x04 \x01(\v2\x15.usercenter.conf.MailR\x04mail\"^\n" +
+	"\x04mail\x18\x04 \x01(\v2\x15.usercenter.conf.MailR\x04mail\"\x92\x01\n" +
 	"\x06Server\x12)\n" +
 	"\x04http\x18\x01 \x01(\v2\x15.usercenter.conf.HTTPR\x04http\x12)\n" +
-	"\x04grpc\x18\x02 \x01(\v2\x15.usercenter.conf.GRPCR\x04grpc\"k\n" +
+	"\x04grpc\x18\x02 \x01(\v2\x15.usercenter.conf.GRPCR\x04grpc\x122\n" +
+	"\ametrics\x18\x03 \x01(\v2\x18.usercenter.conf.MetricsR\ametrics\"k\n" +
 	"\x04HTTP\x12\x12\n" +
 	"\x04addr\x18\x01 \x01(\tR\x04addr\x12'\n" +
 	"\x0ftimeout_seconds\x18\x02 \x01(\x05R\x0etimeoutSeconds\x12&\n" +
 	"\x0fpublic_base_url\x18\x03 \x01(\tR\rpublicBaseUrl\"C\n" +
 	"\x04GRPC\x12\x12\n" +
 	"\x04addr\x18\x01 \x01(\tR\x04addr\x12'\n" +
-	"\x0ftimeout_seconds\x18\x02 \x01(\x05R\x0etimeoutSeconds\"k\n" +
+	"\x0ftimeout_seconds\x18\x02 \x01(\x05R\x0etimeoutSeconds\"F\n" +
+	"\aMetrics\x12\x12\n" +
+	"\x04addr\x18\x01 \x01(\tR\x04addr\x12'\n" +
+	"\x0frefresh_seconds\x18\x02 \x01(\x05R\x0erefreshSeconds\"k\n" +
 	"\x04Data\x125\n" +
 	"\bdatabase\x18\x01 \x01(\v2\x19.usercenter.conf.DatabaseR\bdatabase\x12,\n" +
 	"\x05redis\x18\x02 \x01(\v2\x16.usercenter.conf.RedisR\x05redis\"\x86\x01\n" +
@@ -736,34 +804,36 @@ func file_internal_conf_conf_proto_rawDescGZIP() []byte {
 	return file_internal_conf_conf_proto_rawDescData
 }
 
-var file_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_internal_conf_conf_proto_goTypes = []any{
 	(*Bootstrap)(nil), // 0: usercenter.conf.Bootstrap
 	(*Server)(nil),    // 1: usercenter.conf.Server
 	(*HTTP)(nil),      // 2: usercenter.conf.HTTP
 	(*GRPC)(nil),      // 3: usercenter.conf.GRPC
-	(*Data)(nil),      // 4: usercenter.conf.Data
-	(*Database)(nil),  // 5: usercenter.conf.Database
-	(*Redis)(nil),     // 6: usercenter.conf.Redis
-	(*Security)(nil),  // 7: usercenter.conf.Security
-	(*Mail)(nil),      // 8: usercenter.conf.Mail
-	(*SMTP)(nil),      // 9: usercenter.conf.SMTP
+	(*Metrics)(nil),   // 4: usercenter.conf.Metrics
+	(*Data)(nil),      // 5: usercenter.conf.Data
+	(*Database)(nil),  // 6: usercenter.conf.Database
+	(*Redis)(nil),     // 7: usercenter.conf.Redis
+	(*Security)(nil),  // 8: usercenter.conf.Security
+	(*Mail)(nil),      // 9: usercenter.conf.Mail
+	(*SMTP)(nil),      // 10: usercenter.conf.SMTP
 }
 var file_internal_conf_conf_proto_depIdxs = []int32{
-	1, // 0: usercenter.conf.Bootstrap.server:type_name -> usercenter.conf.Server
-	4, // 1: usercenter.conf.Bootstrap.data:type_name -> usercenter.conf.Data
-	7, // 2: usercenter.conf.Bootstrap.security:type_name -> usercenter.conf.Security
-	8, // 3: usercenter.conf.Bootstrap.mail:type_name -> usercenter.conf.Mail
-	2, // 4: usercenter.conf.Server.http:type_name -> usercenter.conf.HTTP
-	3, // 5: usercenter.conf.Server.grpc:type_name -> usercenter.conf.GRPC
-	5, // 6: usercenter.conf.Data.database:type_name -> usercenter.conf.Database
-	6, // 7: usercenter.conf.Data.redis:type_name -> usercenter.conf.Redis
-	9, // 8: usercenter.conf.Mail.smtp:type_name -> usercenter.conf.SMTP
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	1,  // 0: usercenter.conf.Bootstrap.server:type_name -> usercenter.conf.Server
+	5,  // 1: usercenter.conf.Bootstrap.data:type_name -> usercenter.conf.Data
+	8,  // 2: usercenter.conf.Bootstrap.security:type_name -> usercenter.conf.Security
+	9,  // 3: usercenter.conf.Bootstrap.mail:type_name -> usercenter.conf.Mail
+	2,  // 4: usercenter.conf.Server.http:type_name -> usercenter.conf.HTTP
+	3,  // 5: usercenter.conf.Server.grpc:type_name -> usercenter.conf.GRPC
+	4,  // 6: usercenter.conf.Server.metrics:type_name -> usercenter.conf.Metrics
+	6,  // 7: usercenter.conf.Data.database:type_name -> usercenter.conf.Database
+	7,  // 8: usercenter.conf.Data.redis:type_name -> usercenter.conf.Redis
+	10, // 9: usercenter.conf.Mail.smtp:type_name -> usercenter.conf.SMTP
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_internal_conf_conf_proto_init() }
@@ -777,7 +847,7 @@ func file_internal_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_conf_conf_proto_rawDesc), len(file_internal_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

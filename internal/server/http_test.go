@@ -25,6 +25,7 @@ import (
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/internal/conf"
 	"github.com/mengbin92/user-center/internal/data"
+	"github.com/mengbin92/user-center/internal/obs"
 	"github.com/mengbin92/user-center/internal/server"
 	"github.com/mengbin92/user-center/internal/service"
 	"github.com/mengbin92/user-center/pkg/totp"
@@ -133,7 +134,7 @@ func newHarness(t *testing.T) *harness {
 	mw := server.NewMiddleware(sessions, sec, zap.NewNop())
 	srvCfg := &conf.Server{Http: &conf.HTTP{Addr: ":0", TimeoutSeconds: 30}}
 	hs := server.NewHTTPServer(
-		srvCfg, sec, mw, zap.NewNop(),
+		srvCfg, sec, mw, obs.NewMetrics(nil), zap.NewNop(),
 		service.NewAuthService(auth, deps),
 		service.NewMeService(users, security, sessions, biz.NewOIDCUsecase(svc), biz.NewWebAuthnUsecase(svc), deps),
 		service.NewAdminUserService(users, sessions),

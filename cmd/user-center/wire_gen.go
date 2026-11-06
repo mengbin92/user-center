@@ -10,6 +10,7 @@ import (
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/internal/conf"
 	"github.com/mengbin92/user-center/internal/data"
+	"github.com/mengbin92/user-center/internal/obs"
 	"github.com/mengbin92/user-center/internal/server"
 	"github.com/mengbin92/user-center/internal/service"
 	"github.com/mengbin92/user-center/internal/wiring"
@@ -68,6 +69,7 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	services := biz.NewServices(userRepo, credentialRepo, externalIdentityRepo, mfaRepo, sessionRepo, securityEventRepo, flowCompletionRepo, challengeStore, rateLimiter, stepUpStore, mailSender, auditRepo, policyRepo, iamRepo, outboxRepo, settingsRepo, exportRepo, integrationClientRepo, oidcClientRepo, oidcCodeRepo, oidcConsentRepo, oidcSigner, webAuthnRepo, organizationRepo, orgIAMRepo, dataData, clock, iDs, secretBox, v, runtimeConfig)
 	sessionUsecase := biz.NewSessionUsecase(services)
 	middleware := server.NewMiddleware(sessionUsecase, security, logger)
+	metrics := obs.NewMetrics(dataData)
 	authUsecase := biz.NewAuthUsecase(services)
 	deps := service.NewDeps(security)
 	authService := service.NewAuthService(authUsecase, deps)
@@ -90,11 +92,12 @@ func wireApp(b *conf.Bootstrap) (*wiring.App, func(), error) {
 	orgIAMUsecase := biz.NewOrgIAMUsecase(services)
 	organizationService := service.NewOrganizationService(organizationUsecase, orgIAMUsecase)
 	artifactDir := server.NewArtifactDir()
-	httpServer := server.NewHTTPServer(confServer, security, middleware, logger, authService, meService, adminUserService, iamService, auditService, settingsService, integrationAdminService, oidcAdminService, organizationService, userUsecase, artifactDir)
+	httpServer := server.NewHTTPServer(confServer, security, middleware, metrics, logger, authService, meService, adminUserService, iamService, auditService, settingsService, integrationAdminService, oidcAdminService, organizationService, userUsecase, artifactDir)
 	integrationUsecase := biz.NewIntegrationUsecase(services)
 	integrationService := service.NewIntegrationService(integrationUsecase)
 	grpcServer := server.NewGRPCServer(confServer, logger, integrationService)
-	app := wiring.NewApp(httpServer, grpcServer, services, integrationAdminUsecase, logger)
+	metricsServer := server.NewMetricsServer(confServer, metrics, logger)
+	app := wiring.NewApp(httpServer, grpcServer, metricsServer, services, integrationAdminUsecase, logger)
 	return app, func() {
 		cleanup()
 	}, nil

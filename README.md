@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.6.1 — V2.4 已交付 OIDC 交互式同意与 RP-initiated logout、组织邀请/租户审计/组织事件、内部 gRPC 登录、WebAuthn 与个人信息保留清理；v0.6.1 修复第二轮 review 发现的组织提权、登出会话残留与邀请竞态等问题。** SCIM、目录同步继续按 V2 后续里程碑推进。设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
+> **状态：v0.7.0 — 生产化基座。** v0.6.x 已完成 V2.4 全部功能（OIDC 同意与 RP-initiated logout、组织邀请/租户审计/组织事件、内部 gRPC 登录、WebAuthn、个人信息保留清理）；v0.7.0 补上运行期能力：Prometheus 指标与 SLO 告警、慢请求日志与全链路 `request_id`、可复现的 MySQL 负载基线与索引审计、CI 的 MySQL/生成物/compose 三道门禁，并把 `admin` 列表的权限查询从 92 条降到 20 条（3.5 倍吞吐）。SCIM、目录同步继续按 V2 后续里程碑推进。设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
 
 ## 目录
 
@@ -155,6 +155,7 @@ scripts/                  开发与检查脚本
 **已实现（V1）**：用户生命周期（创建/资料/启停/归档）、密码与邮箱变更、管理员邮箱变更、强制首次改密、TOTP + 恢复码、管理员强制 MFA、Step-up、会话治理、角色/会话角色、权限目录、角色继承、授权分配（含列表与批量，事务内整批拒绝）、委派、职责分离、菜单投影、授权解释/模拟、审计与导出、认证配置、GitHub/Google 登录与绑定、接入客户端管理、gRPC 客户端鉴权、Outbox Webhook 投递、`cmd/import-legacy` 离线导入。
 
 **V2 已交付**：
+- v0.7.0：Prometheus 指标（独立回环监听）、7 条 SLO 告警规则、慢请求日志与全链路 `request_id`、MySQL 负载基线与索引审计、CI 的 MySQL/生成物/compose 门禁；`admin` 列表单请求 SELECT 92 → 20。
 - v0.3.0：标准 OIDC Provider（discovery/JWKS/authorization code + PKCE/token/userinfo/refresh）、OIDC 客户端管理与 RSA 签名密钥配置。
 - v0.4.0：组织、部门与成员管理；owner/admin/member 组织角色；最后 owner 保护；平台管理员组织目录与归档；成员邮箱按角色脱敏。
 - v0.5.0：组织域 IAM（`organization:{id}` 上下文、内置/自定义组织角色、组织内授权分配与权限目录）与多租户隔离（上下文查询、租户审计、跨租户拒绝）；存量组织自动回填。
@@ -181,6 +182,10 @@ go test ./...           # 领域、仓储（SQLite）、HTTP 集成、MFA 全流
 cd web && npm test      # 前端组件测试
 cd web && npm run build # tsc + vite 构建
 ```
+
+合入前跑 `./scripts/check.sh`：gofmt → 生成物漂移校验 → `go vet` → `go test` → MySQL 测试（仅在设置 `USER_CENTER_MYSQL_TEST_DSN` 时）→ 前端测试与构建。生成物校验要求工作区干净且 `buf`/`wire` 在 PATH，两个前提缺失时会跳过并打印原因而不是静默通过；单独运行用 `./scripts/gen-check.sh`。
+
+MySQL 相关测试与迁移幂等由 CI 的 `mysql` job（`mysql:8.4` service）覆盖，不再依赖发版前手工跑一次。
 
 关键覆盖：
 - `domain/authorization`：Scope 求交/包含、deny、过期、继承环检测、`platform` / `organization:{id}` 上下文隔离与 `context_types` 拒绝。
@@ -218,13 +223,16 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 - [数据模型](docs/data-model.md)
 - [从 micro-one-api 迁移](docs/migration.md)
 - [运维手册](docs/operations.md)
+- [性能基线](docs/performance.md)
 - [安全设计](docs/security.md)
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
+- [V2.5 路线图](docs/roadmap-v2.5.md)
+- [v0.7.0 发布说明](docs/releases/release-v0.7.0.md)
 - [v0.6.1 发布说明](docs/releases/release-v0.6.1.md)
 - [v0.6.0 发布说明](docs/releases/release-v0.6.0.md)
-- [W3 波次附记](docs/releases/release-v0.7.0.md)
-- [W4/W5 波次附记](docs/releases/release-v0.8.0.md)
+- [W3 波次附记](docs/releases/release-v0.6.0-w3.md)
+- [W4/W5 波次附记](docs/releases/release-v0.6.0-w4w5.md)
 - [v0.5.2 发布说明](docs/releases/release-v0.5.2.md)
 - [v0.5.1 发布说明](docs/releases/release-v0.5.1.md)
 - [v0.5.0 发布说明](docs/releases/release-v0.5.0.md)

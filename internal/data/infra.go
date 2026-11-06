@@ -318,7 +318,7 @@ func (m *mailSender) Send(ctx context.Context, to, subject, body string) error {
 			"Content-Type: text/plain; charset=UTF-8\r\n\r\n" + body + "\r\n")
 		if err := sendSMTP(ctx, addr, host, auth, from, to, msg); err != nil {
 			// SMTP peers may echo rejected message data in their error text.
-			m.log.Error("send mail failed", zap.String("to", to))
+			m.log.Error("send mail failed", zap.String("to", maskEmail(to)), requestIDField(ctx))
 			return err
 		}
 		return nil
@@ -326,8 +326,29 @@ func (m *mailSender) Send(ctx context.Context, to, subject, body string) error {
 	if driver != "console" {
 		return biz.ErrDependency
 	}
-	m.log.Info("mail (console driver)", zap.String("to", to), zap.String("subject", subject))
+	m.log.Info("mail (console driver)", zap.String("to", maskEmail(to)), zap.String("subject", subject), requestIDField(ctx))
 	return nil
+}
+
+// maskEmail keeps the domain (useful when debugging a provider outage) and
+// drops the local part: mail logs must not become a second copy of the users
+// table. The message body is never logged — invitation and reset mails carry
+// one-time tokens.
+func maskEmail(addr string) string {
+	// A newline here is a header-injection attempt; it must not be echoed even
+	// in masked form.
+	if strings.ContainsAny(addr, "\r\n") {
+		return "***"
+	}
+	local, domain, ok := strings.Cut(addr, "@")
+	if !ok || local == "" || domain == "" {
+		return "***"
+	}
+	return local[:1] + "***@" + domain
+}
+
+func requestIDField(ctx context.Context) zap.Field {
+	return zap.String("request_id", biz.RequestID(ctx))
 }
 
 func sendSMTP(ctx context.Context, addr, host string, auth smtp.Auth, from, to string, msg []byte) error {
