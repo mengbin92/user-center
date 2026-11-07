@@ -230,6 +230,7 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 - [V2.4 路线图](docs/roadmap-v2.4.md)
 - [V2.5 路线图](docs/roadmap-v2.5.md)
 - [v0.9.0 发布说明](docs/releases/release-v0.9.0.md)
+- [S13 演练记录：备份恢复与升级回滚](docs/releases/drill-2026-11-07-s13.md)
 - [v0.8.0 发布说明](docs/releases/release-v0.8.0.md)
 - [v0.7.1 发布说明](docs/releases/release-v0.7.1.md)
 - [v0.7.0 发布说明](docs/releases/release-v0.7.0.md)

@@ -153,5 +153,5 @@ organization:{id}            → 单个组织的成员、部门、组织角色�
 
 - 每个请求生成/透传 `X-Request-ID`，写入安全事件与审计。
 - 结构化日志（zap）记录启动、邮件、数据库/迁移错误。
-- `/healthz` 供容器探针使用。
+- `/healthz` 是存活探针（只看进程），`/readyz` 是就绪探针（查 MySQL 真实查询，Redis 仅报告）。容器 healthcheck 与负载均衡用 `/readyz`：用 `/healthz` 时数据库挂了容器仍报 healthy（S13 演练实测）。
 - Prometheus / OpenTelemetry 接入点保留在 `cmd` 启动层，当前未默认导出，避免无配置时产生外部依赖。
