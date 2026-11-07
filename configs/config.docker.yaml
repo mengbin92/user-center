@@ -1,3 +1,17 @@
+# OAuth (GitHub / Google) credentials are NOT read from this file. They come
+# from the environment:
+#   OAUTH_GITHUB_CLIENT_ID / OAUTH_GITHUB_CLIENT_SECRET
+#   OAUTH_GOOGLE_CLIENT_ID / OAUTH_GOOGLE_CLIENT_SECRET
+# A provider is enabled only when both values for it are non-empty. Secrets
+# never belong in a checked-in config or a compose env file in production;
+# inject them from the secret manager.
+#
+# Callback URL must be HTTPS and must match PUBLIC_BASE_URL's host:
+#   https://<public-host>/api/v1/auth/providers/{provider}/callback
+# localhost/http callbacks are refused by the real providers and must not be
+# used for acceptance. S14 (real-provider sandbox acceptance) is still N/A
+# until decision D4 supplies credentials and a public HTTPS domain; see
+# docs/roadmap-v2.5.md W6 and docs/security.md section 4 item 1.
 server:
   http:
     addr: ":8080"

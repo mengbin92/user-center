@@ -35,7 +35,11 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
-    image: user-center:latest
+    # Parametrised so a rollback can pin the previous image without editing the
+    # manifest (`USER_CENTER_IMAGE=user-center:v0.6.1 docker compose up -d`).
+    # Rolling back by editing the file is how manifests drift from what was
+    # actually deployed.
+    image: ${USER_CENTER_IMAGE:-user-center:latest}
     command: ["/app/migrate", "-config", "/app/configs/config.docker.yaml"]
     environment:
       CONF_PATH: /app/configs/config.docker.yaml
@@ -52,7 +56,7 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
-    image: user-center:latest
+    image: ${USER_CENTER_IMAGE:-user-center:latest}
     restart: unless-stopped
     environment:
       CONF_PATH: /app/configs/config.docker.yaml
@@ -93,10 +97,18 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      # /readyz verifies MySQL (and reports Redis), unlike /healthz which only
+      # proves the process is up. Using the liveness endpoint here made a
+      # database outage invisible: the container stayed "healthy" with nothing
+      # behind it (found by the S13 restore drill).
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
       interval: 15s
       timeout: 3s
       retries: 5
+      # A restore or a cold cache can take a while; without a start period the
+      # retries are consumed during boot and the container is marked unhealthy
+      # before it ever served a request.
+      start_period: 30s
 
 volumes:
   mysql-data:

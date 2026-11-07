@@ -86,7 +86,21 @@ location / {
 
 ## 5. 健康检查与日志
 
-- `GET /healthz` → `{"status":"ok"}`；仅表示进程存活，不代表 DB/Redis 可用。
+两个端点，**职责不同，不要混用**：
+
+| 端点 | 语义 | 依赖 | 谁用 |
+|---|---|---|---|
+| `GET /healthz` | 存活：进程在跑 | 无 | 进程守护、`restart` 判断。**不得**接负载均衡 |
+| `GET /readyz` | 就绪：现在能服务 | MySQL（必需）、Redis（仅报告） | 负载均衡、`docker healthcheck`、部署脚本 |
+
+`/readyz` 返回 `{"status":"ok","checks":{"mysql":"ok","redis":"ok"}}`，MySQL 不可达时返回 **503** 并带上具体错误。
+
+三条设计取舍：
+
+- **`/healthz` 刻意不查数据库**。惰性检查在依赖故障时会让编排器不停重启——重启治不好数据库，还会把日志冲掉。
+- **`/readyz` 查的是真实查询，不是 ping**。`database/sql` 的 `PingContext` 发的是 `COM_PING`，库被删了也返回成功；S13 演练中 `DROP DATABASE` 后 `/readyz` 仍然 200 就是这么发现的。现在它执行 `SELECT COUNT(*) FROM schema_migrations`，schema 缺失即失败。
+- **Redis 挂不导致未就绪**。限流与 step-up 会降级（见 `docs/security.md` 的 fail-open），但认证仍然工作；把缓存故障升级成整体不可用是更严重的错误。
+
 - 日志为 zap JSON；关注 `open database`、`send mail failed`、`run migrations`。
 - 每个请求的 `X-Request-ID` 会写入安全事件与审计；排障时先取该 ID。
 
@@ -210,8 +224,9 @@ Webhook 工作线程随主服务启动，每 15 秒拉取一次；`X-UserCenter-
 ## 7. 备份与恢复
 
 ```bash
-# 数据库
-mysqldump --single-transaction --routines --triggers \
+# 数据库：--single-transaction 依赖 InnoDB（本项目全部表），不需要锁写
+mysqldump --single-transaction --routines --triggers --events \
+  --set-gtid-purged=OFF --no-tablespaces --default-character-set=utf8mb4 \
   -h HOST -u usercenter -p usercenter > usercenter-$(date +%F).sql
 
 # 导出制品
@@ -219,14 +234,89 @@ docker run --rm -v user-center_artifacts:/data -v "$PWD":/backup alpine \
   tar czf /backup/artifacts-$(date +%F).tgz -C /data .
 ```
 
+`--routines --triggers --events` 三个都要带：漏掉时恢复过程不会报错，问题会在第一个后台任务运行时才暴露。
+
 恢复：
 
 1. 停 `user-center`，保留 `migrate` 镜像版本；
-2. 恢复 MySQL 到同版本 schema；
+2. 恢复 MySQL 到同版本 schema（`DROP DATABASE` 后重建再导入，见下）；
 3. 恢复制品目录（可选，导出任务可重新生成）；
-4. 启动服务并执行 `GET /healthz`、管理员登录、`/me/authorization` 抽查。
+4. 启动服务，**用 `GET /readyz` 而不是 `/healthz` 验证**（`/healthz` 只证明进程活着，见 §5）；
+5. 管理员登录 + `/me/authorization` 抽查 + `scripts/e2e/smoke.sh`。
 
 审计表不允许通过恢复旧备份回滚来“消除”事件；如有合规要求，应在恢复后记录恢复操作本身。
+
+### 7.1 恢复会带回会话，不会带回 Redis（实测结论）
+
+数据库里存着 `iam_sessions`，所以**恢复备份会让备份时刻仍然有效的会话重新可用**——其中包括之后被撤销的会话。Redis 里的东西（挑战、step-up 凭据、限流计数）不备份，恢复后自然重建，这是对的。
+
+两条操作含义：
+
+- 因**安全事件**而回滚到备份后，必须显式撤销会话，不能假设“恢复 = 踢下线”。用 `POST /api/v1/me/sessions:revoke-others` 不够（只作用于本人）；需要按用户批量撤销，或临时提升受影响账号的 `identity_version`。
+- 按**数据损坏**而恢复时，会话复活是无害的，但用户可能发现自己“又登录了”，需要在通知里说明。
+
+### 7.2 演练记录（S13，2026-11-07）
+
+脚本：`scripts/dr/restore-drill.sh`、`scripts/dr/upgrade-rollback-drill.sh`。两者都会在本地起完整 compose 栈（MySQL 8.4 + Redis 7），失败时保留工作目录与日志。
+
+**备份恢复演练**（空库 + 1 组织 1 用户 2 审计 2 Outbox 的小数据集，用于验证流程而非容量）：
+
+| 步骤 | 实测 |
+|---|---|
+| `mysqldump` | 67 KB / **150–200 ms** |
+| `DROP DATABASE` + 重建 | **341–371 ms**（39 张表） |
+| 导入恢复 | **366–637 ms** |
+| 服务自动恢复（未重启容器） | **831–1,392 ms** |
+| 恢复后 `smoke.sh` | 通过，**0.8–1.1 s** |
+| 数据一致性 | 10 张表的行数 + 自增高水位**逐表一致** |
+
+数值取自本机 3 次执行的区间，见 [演练记录](releases/drill-2026-11-07-s13.md)。
+
+关键结论：
+
+- **连接池能自己恢复**，不需要重启容器。恢复期间 `/readyz` 先失败再自动转好，这是可以按它做告警的依据。
+- **数据量小时耗时几乎全是固定开销**，这个数字不能外推到生产。要估真实容量请用 `scripts/bench` 的规模数据重跑本脚本。
+- **回滚到没有 `/readyz` 的旧版本时**，当前 compose 的 healthcheck 会被旧版 SPA fallback 的 200 蒙混成 healthy。这是"旧镜像 + 新清单"的固有代价；按 §7.3 回退时清单也一并回退，不要只换镜像。
+- 恢复脚本断言的是“行数 + `MAX(id)`”，只比行数会漏掉“尾部被截断但总数恰好相同”的情况。
+
+**升级回滚演练**（`v0.6.1` → 当前版本 → 回滚）：
+
+| 步骤 | 实测 |
+|---|---|
+| 旧版本迁移步数 | 58 步 |
+| 升级到当前（13 个迁移文件） | 58 → 64 步 / **341–352 ms** |
+| 新版就绪 | **44–91 ms** |
+| 回滚总耗时（停服 + 重建库 + 导入 + 起旧镜像） | **1,081–1,243 ms**，其中数据库恢复 766–803 ms |
+| 回滚后数据一致性 | 8 张表**逐表一致** |
+| 回滚后 `smoke.sh` | 通过（`--skip-readyz`，旧版本没有该端点） |
+
+### 7.3 能回滚到哪一步
+
+这是本节存在的理由。结论按“回滚目标”分三类，**每类的可行性不同**：
+
+| 回滚目标 | 可行 | 前提 |
+|---|---|---|
+| 回到上一个镜像 + 恢复备份库 | ✅ 已实测 | 有升级前备份。这是唯一无条件安全的路径 |
+| 回到上一个镜像 + **保留**当前库 | ⚠️ 能跑，但会丢数据 | 见下 |
+| 回退 schema（执行反向 DDL） | ❌ 不支持 | 项目不提供 down 迁移 |
+
+**为什么“回退 schema”不支持**：迁移目录里存在不可逆 DDL（当前是 `006_org_iam.sql` 的 `DROP INDEX uk_iam_roles_code`，脚本会自动扫描并列出）。没有任何 down 脚本，回退 schema 只能靠恢复备份。这不是遗漏，而是刻意选择——维护 13 份 down 迁移的成本远高于“恢复备份”这一条路径，且 down 脚本本身容易写错。
+
+**“保留当前库 + 旧镜像”实测会发生什么**（这是运维最容易做的动作，所以必须写清）：
+
+- 旧二进制**能启动、能登录、能过 smoke**。原因是 012/013 新增的列都是 `NULL` 或带 `DEFAULT`，旧 ORM 用显式列清单，不会碰到它们。
+- 但**这不是契约，是巧合**。旧代码不知道新列存在，写入时会留下不一致：实测在新版改密码后切回旧版再改一次密码，`password_history` 行数**没有增加**、`password_changed_at` **没有更新**，HTTP 却返回 200。也就是说，**回退期间发生的密码变更不会进入历史，"禁止复用最近 N 次密码" 在回退窗口内失效**，而且没有任何报错。
+- 同理，组织约束、委派 context 等新表/新列在旧版视角下完全不参与判定，等于**回退窗口内平台 SoD 与组织 SoD 全部暂停**。
+
+因此：**回退镜像时如果不恢复数据库，必须同时接受“回退窗口内新增的安全能力失效”，并在恢复新版后按窗口内的操作补做审计核查**。做不到就不要只回退镜像。
+
+**版本化镜像**：`docker-compose.yml` 的镜像名已参数化为 `${USER_CENTER_IMAGE:-user-center:latest}`，回退不需要改文件：
+
+```bash
+USER_CENTER_IMAGE=user-center:v0.6.1 docker compose up -d --no-deps user-center
+```
+
+改文件来指定版本会让清单逐渐偏离实际部署的东西，也会在下次 `git pull` 时被覆盖。
 
 ## 8. 紧急恢复 root
 
@@ -252,12 +342,16 @@ docker compose run --rm user-center /app/admin-rescue \
 
 ## 10. 升级
 
-1. 备份数据库与制品；
+1. 备份数据库与制品（**这一步就是回滚能力本身**，见 §7.3）；
 2. 构建/拉取新镜像（`migrate` 与主服务同版本）；
-3. 先运行 `migrate`；DDL 必须向后兼容一个版本；
+3. 先运行 `migrate`，确认退出码为 0；DDL 必须向后兼容一个版本；
 4. 滚动重启主服务；
-5. 验证登录、`/me/authorization`、用户列表、审计写入；
-6. 保留上一版本镜像用于回退。回退二进制前确认新迁移未引入不可逆列删除。
+5. 用 `GET /readyz` 确认就绪，再验证登录、`/me/authorization`、用户列表、审计写入；
+6. 保留上一版本镜像用于回退（`docker tag` 保留带版本号的 tag，不要只留 `latest`）。
+
+顺序不能反：**迁移先于代码**。反过来时新代码会读到 `context_type=''` 之类的旧行（S12 的 `013` 就是这种形状）。
+
+回退见 §7.3，包括“只回退镜像不恢复数据库”的具体后果。
 
 ## 11. 容量与扩展
 

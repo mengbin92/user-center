@@ -10,6 +10,7 @@ SNAPSHOT_DIR=""
 COMPOSE_FILE=""
 COMPOSE_ENV=""
 KEEP=0
+SKIP_READYZ=0
 SMOKE_USER="${SMOKE_USER:-root}"
 SMOKE_PASSWORD="${SMOKE_PASSWORD:-ChangeMe-12345}"
 
@@ -22,6 +23,7 @@ Usage: scripts/e2e/smoke.sh [options]
   --compose-env FILE   env file for the compose file (required when the
                        compose file uses :? interpolation, e.g. secrets)
   --keep               keep temporary request artifacts on success
+  --skip-readyz        skip the /readyz assertion (for releases predating S13)
   -h, --help           show this help
 Environment: SMOKE_USER, SMOKE_PASSWORD (password-only account, no MFA).
 USAGE
@@ -34,6 +36,7 @@ while [[ $# -gt 0 ]]; do
     --compose) COMPOSE_FILE="$2"; shift 2 ;;
     --compose-env) COMPOSE_ENV="$2"; shift 2 ;;
     --keep) KEEP=1; shift ;;
+    --skip-readyz) SKIP_READYZ=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -101,6 +104,14 @@ json_field() {
 # 1. Health and unauthenticated gate.
 step="healthz"
 request GET /healthz 200
+# Liveness alone would pass with a dead database; readiness is what the
+# deployment actually depends on, so the smoke test asserts both. Rollback
+# drills run this against releases that predate /readyz and pass
+# --skip-readyz explicitly -- silent omission would hide a real regression.
+if [[ $SKIP_READYZ -eq 0 ]]; then
+  step="readyz"
+  request GET /readyz 200
+fi
 step="unauthenticated /me"
 request GET /api/v1/me 401
 

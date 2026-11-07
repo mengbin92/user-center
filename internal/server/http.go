@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -85,9 +86,35 @@ func NewHTTPServer(
 	usercv1.RegisterOIDCAdminServiceHTTPServer(srv, oidcAdmin)
 	usercv1.RegisterOrganizationServiceHTTPServer(srv, organizations)
 
+	// Liveness: the process is up and the HTTP loop is running. It deliberately
+	// does not touch the database -- a liveness check that fails when a
+	// dependency is down causes a restart loop that cannot fix the dependency
+	// and destroys the logs needed to diagnose it.
 	srv.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	// Readiness: can this instance serve traffic right now. Container health
+	// checks and load balancers must use this one; /healthz returning 200 while
+	// the database is gone is exactly the failure this endpoint exists to make
+	// visible (found by the S13 restore drill: dropping the database left the
+	// container reporting healthy).
+	srv.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ready, checks := metrics.Ready(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		if !ready {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+		status := "ok"
+		if !ready {
+			status = "unavailable"
+		}
+		payload := struct {
+			Status string            `json:"status"`
+			Checks map[string]string `json:"checks"`
+		}{Status: status, Checks: checks}
+		_ = json.NewEncoder(w).Encode(payload)
 	})
 
 	mountOAuthRoutes(srv, mw, auth, publicBase)
@@ -256,7 +283,7 @@ func oauthProviderFromPath(path string) string {
 func spaHandler(dir string, log *zap.Logger) http.Handler {
 	fs := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/healthz") {
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/healthz") || strings.HasPrefix(r.URL.Path, "/readyz") {
 			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "资源不存在")
 			return
 		}

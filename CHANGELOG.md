@@ -4,6 +4,41 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-11-07
+
+**版本判定：MINOR**（v0.9.0 → v0.10.0）。运维就绪：新增对外端点 `/readyz`、变更容器 healthcheck 与数据库探针语义、新增两个可复现的灾难恢复演练脚本。修复"数据库不可用时容器仍报 healthy"的真实缺陷。**无数据库迁移**。详见 [发布说明](docs/releases/release-v0.10.0.md)。
+
+### Added
+
+- `GET /readyz`：MySQL 必需（不可达返回 503 并附错误），Redis 仅报告；`GET /healthz` 保持纯存活探针。
+- compose healthcheck 改指 `/readyz` 并加 `start_period`；镜像名参数化为 `${USER_CENTER_IMAGE:-user-center:latest}`，回退无需改清单。
+- `scripts/dr/`：`restore-drill.sh`（备份→清库→恢复→冒烟）、`upgrade-rollback-drill.sh`（v0.6.1→当前→回滚）、`compare_fingerprint.py`、`lib.sh`。
+- `scripts/e2e/smoke.sh` 默认断言 `/readyz`；新增 `--skip-readyz` 供旧版本演练使用。
+- `docs/operations.md` §5/§7/§10 与 [S13 演练记录](docs/releases/drill-2026-11-07-s13.md)；`configs/config.docker.yaml` 补 OAuth 环境变量与 HTTPS 回调说明。
+- 新增测试 6 条：`internal/obs/ready_test.go`、`internal/server/probe_test.go`。
+
+### Changed
+
+- `Data.PingDatabase` 从 `PingContext`（`COM_PING`，空库也返回成功）改为真实查询 `schema_migrations`；`usercenter_dependency_up` 指标随之变准。
+- 演练就绪轮询改为校验响应体；S13 之前的版本改用 `wait_legacy_ready`（healthz + 真实 SQL）。
+- 路线图 W6 波次行、D3/D4 决策状态、W5 版本行回填，删除过时的"W3 可降 v0.7.1"假设。
+
+### Fixed
+
+- `DROP DATABASE` 后容器仍报 healthy：`/healthz` 是静态 200 却被当作健康判断。
+- 初版 `/readyz` 假绿（依赖 `COM_PING`）、旧版 SPA fallback 假绿（未知路径返回 200 + HTML）。
+- 演练脚本自身两处口径错误：升级后误用"完全相等"比对、fingerprint 漏表。
+
+### 演练结论（详见运维手册）
+
+- 恢复会带回会话（session 在 MySQL，含之后被撤销的），Redis 不备份且自然重建；安全事件回滚后必须显式撤销会话。
+- 只回退镜像不恢复库会静默丢数据：改密码返回 200 却不写 `password_history`、不更新 `password_changed_at`。唯一安全路径是旧镜像 + 恢复备份库 + 清单一并回退。
+- 项目不提供 down 迁移；不可逆 DDL 由演练脚本从迁移文件自动扫描（当前 1 处）。
+
+### 未执行
+
+- **S14 真实 OAuth 沙箱验收：N/A**。决策 D4 未提供凭据与 HTTPS 回调域名，四项验收保留未勾选，未创建虚构的验收记录。
+
 ## [0.9.0] - 2026-11-07
 
 **版本判定：MINOR**（v0.8.0 → v0.9.0）。组织域职责分离与委派：新增 4 个 API、2 个权限码、1 个前端 tab、迁移 `013`。修复"组织分配绕过平台 SoD"的安全缺口。详见 [发布说明](docs/releases/release-v0.9.0.md)。

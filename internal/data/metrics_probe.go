@@ -50,14 +50,23 @@ func (d *Data) SchemaMigrationsApplied(ctx context.Context) (int64, error) {
 	return applied, err
 }
 
+// PingDatabase answers "can this instance actually serve requests", not "is
+// there a TCP connection to MySQL".
+//
+// database/sql's PingContext sends COM_PING, which the server answers even when
+// the schema this process depends on is gone -- the S13 restore drill dropped
+// the database and /readyz still returned 200. A readiness check that passes
+// against an empty server is worse than no check, because it keeps the instance
+// in rotation. So this runs a real query against a table the migrator creates;
+// a missing schema now fails the probe.
+//
+// schema_migrations is the sentinel because it is created by the migrate step
+// itself: if it is absent, this release never ran here.
 func (d *Data) PingDatabase(ctx context.Context) error {
-	sqlDB, err := d.db.DB()
-	if err != nil {
-		return err
-	}
 	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
-	return sqlDB.PingContext(ctx)
+	var n int64
+	return d.db.WithContext(ctx).Table("schema_migrations").Count(&n).Error
 }
 
 // PingCache reports nil when Redis is not configured: the gauge means "this
