@@ -127,7 +127,7 @@ location / {
 | `usercenter_dependency_up` | gauge | `dependency` | 1 = 上次探测成功；`mysql` / `redis` |
 | `usercenter_db_pool_connections` | gauge | `state` | `open` / `in_use` / `max`，来自 `sql.DB.Stats()` |
 | `usercenter_db_pool_wait_total` | gauge | — | 累计等待连接的次数，持续增长说明池太小 |
-| `usercenter_rate_limit_hits_total` | counter | `scope` | 被写接口限流拒绝的次数：`write` / `export` / `batch` / `invite` |
+| `usercenter_rate_limit_hits_total` | counter | `scope` | 被写接口限流拒绝的次数：`write` / `export` / `batch` / `invite`；四个 scope 在启动时预置为 0（否则空序列会让 `rate()` 返回空向量） |
 
 `route` 是路由模板而非原始路径：`/api/v1/orgs/7/members` 与 `/api/v1/orgs/11/members` 都记到 `/api/v1/orgs/{id}/members`。SPA 历史路由与未知路径统一记为 `spa`，因此标签基数由路由表决定，不会随用户输入增长。
 
@@ -167,11 +167,18 @@ scrape_configs:
 | `RATE_LIMIT_WRITE_PER_MINUTE` | `120` | 普通写接口，按用户计 |
 | `RATE_LIMIT_HEAVY_PER_MINUTE` | `10` | `:export`、`:batch-assign`、`:batch-preview`、`/invitations` |
 
-三条运维要点：
+四条运维要点：
 
 - **认证端点不在限流范围内**。`/api/v1/auth/*` 有自己的 IP/账号计数器（登录 30 次/5 分钟等），两层同时生效会让一次请求消耗两份预算，也会给调用方留出挑松一侧绕过的空间。
 - **超限返回 429 + `Retry-After`**（值是最长 60 秒的窗口剩余时间）+ 稳定错误码 `RATE_LIMITED`。客户端应按 `Retry-After` 退避，不要立即重试。
-- **限流后端故障时放行**。Redis 不可用不会导致写请求全部失败，但 `usercenter_dependency_up{dependency="redis"}` 会变成 0，应据此告警。反过来说，看到 `rate_limit_hits_total` 突然为 0 且流量正常，要怀疑限流器是否在工作。
+- **限流后端故障时放行**。Redis 不可用不会导致写请求全部失败，但 `usercenter_dependency_up{dependency="redis"}` 会变成 0，应据此告警。
+- **限流指标在冷启动时就有值 0**。`usercenter_rate_limit_hits_total` 的四个 `scope`（`write` / `export` / `batch` / `invite`）在进程启动时全部预置为 0。此前 `CounterVec` 不预初始化时**没有任何时间序列**，`rate()` / `increase()` 拿到的是空向量而非 0，而 `absent()` 会对一台完全健康的实例误报。现在可以安全地写基于增长率的告警，例如：
+
+  ```promql
+  sum by (scope) (increase(usercenter_rate_limit_hits_total[5m])) > 100
+  ```
+
+  **不要用 `absent(usercenter_rate_limit_hits_total)` 判断限流器是否在工作**（序列恒存在，永远不会触发）。真要确认限流器生效，用 `docs/releases/drill-2026-11-07-s13.md` 里的做法发一组超预算请求，观察 429 与对应 scope 的计数是否同步增长。
 
 多实例部署时计数共享（有 Redis）；没有 Redis 时每个实例各自计数，实际额度是「配置值 × 实例数」 —— 要么配 Redis，要么按实例数下调额度。
 

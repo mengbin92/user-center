@@ -15,6 +15,11 @@ scripts/e2e/compose-e2e.sh --skip-build --keep
 `compose-e2e.sh` 默认在结束时 `down -v`；`--keep` 保留栈便于排查。它不接受复用的 `.env`，
 每次都生成一次性密钥与 OIDC 私钥。
 
+⚠️ **不要与另一个 `--keep` 栈同时跑**：项目名默认取目录名 `docker-compose`，
+第二次执行会复用第一个栈的容器但换上新的 `.env`，MySQL 密码随即不匹配，
+`migrate` 直接以 exit 1 失败。用 `--keep` 排查完先 `down -v` 再跑下一次；
+需要并行时用 `COMPOSE_PROJECT_NAME` 显式区分。
+
 ```bash
 # 开发实例（SQLite）
 SMOKE_USER=root SMOKE_PASSWORD='ChangeMe-12345' scripts/e2e/smoke.sh

@@ -3,6 +3,7 @@ package obs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -228,4 +229,39 @@ func TestRateLimitHitsAreLabeledByScope(t *testing.T) {
 func TestRateLimitedIsNilSafe(t *testing.T) {
 	var m *Metrics
 	require.NotPanics(t, func() { m.RateLimited("write") })
+}
+
+// A fresh process that has never rejected a request must still expose every
+// documented scope at zero. Before this was fixed, CounterVec had no series at
+// all and rate()/increase() expressions returned an empty vector, while
+// absent() fired on a perfectly healthy instance. This is the regression lock.
+func TestRateLimitScopesAreSeededAtZeroOnFreshMetrics(t *testing.T) {
+	m := NewMetrics(&fakeProbe{})
+
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	body := rec.Body.String()
+
+	require.Contains(t, body, "# TYPE usercenter_rate_limit_hits_total counter")
+	for _, scope := range RateLimitScopes {
+		require.Contains(t, body, fmt.Sprintf(`usercenter_rate_limit_hits_total{scope="%s"} 0`, scope),
+			"scope %q must be present with value 0 in a fresh scrape", scope)
+	}
+	require.Len(t, RateLimitScopes, 4)
+}
+
+// Seeding must not distort counting: an actual rejection still increments from
+// zero, and the other scopes stay at zero rather than being bumped.
+func TestRateLimitedIncrementsFromSeededZero(t *testing.T) {
+	m := NewMetrics(&fakeProbe{})
+	m.RateLimited(RateLimitScopeExport)
+
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	body := rec.Body.String()
+
+	require.Contains(t, body, `usercenter_rate_limit_hits_total{scope="export"} 1`)
+	require.Contains(t, body, `usercenter_rate_limit_hits_total{scope="write"} 0`)
+	require.Contains(t, body, `usercenter_rate_limit_hits_total{scope="batch"} 0`)
+	require.Contains(t, body, `usercenter_rate_limit_hits_total{scope="invite"} 0`)
 }
