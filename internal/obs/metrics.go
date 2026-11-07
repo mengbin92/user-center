@@ -19,6 +19,32 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Rate-limit scope labels. These live in obs rather than in the HTTP layer so
+// the scrape can expose the complete label set from startup without obs having
+// to import server (which would invert the dependency).
+//
+// A CounterVec emits a series only after WithLabelValues is called for that
+// label. Without seeding, a service that has never rejected a request exposes
+// no usercenter_rate_limit_hits_total series at all: not "0", but absent. Any
+// rate()/increase() expression then returns an empty vector, and an absent()
+// alert fires on a perfectly healthy instance. Defining the set here makes the
+// seeding and the writer agree on the same labels.
+const (
+	RateLimitScopeWrite  = "write"
+	RateLimitScopeExport = "export"
+	RateLimitScopeBatch  = "batch"
+	RateLimitScopeInvite = "invite"
+)
+
+// RateLimitScopes is the complete, stable set of scope labels. Operators can
+// rely on every one of these being present in a fresh scrape with value 0.
+var RateLimitScopes = []string{
+	RateLimitScopeWrite,
+	RateLimitScopeExport,
+	RateLimitScopeBatch,
+	RateLimitScopeInvite,
+}
+
 // MetricsProbe supplies the storage facts behind the gauges. Implementations
 // live in internal/data; every method must be cheap enough to run on a timer
 // and must not panic when the dependency is down.
@@ -93,9 +119,17 @@ func NewMetrics(probe MetricsProbe) *Metrics {
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
-	// Register the label sets up front so panels do not start blank.
+	// Register the label sets up front so panels do not start blank. Both the
+	// dependency gauges and the rate-limit counter must be seeded: a counter
+	// with no series is invisible to rate()/increase(), not zero.
 	for _, dep := range []string{"mysql", "redis"} {
 		m.dependency.WithLabelValues(dep).Set(0)
+	}
+	for _, scope := range RateLimitScopes {
+		// Add(0) creates the series without changing its value. Using
+		// WithLabelValues alone also works but reads as an accident; the
+		// explicit zero makes the intent obvious to the next reader.
+		m.throttled.WithLabelValues(scope).Add(0)
 	}
 	return m
 }

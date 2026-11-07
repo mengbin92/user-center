@@ -67,11 +67,11 @@ var heavyScopes = []struct {
 	scope string
 	match func(string) bool
 }{
-	{"export", func(p string) bool { return strings.HasSuffix(p, ":export") }},
-	{"batch", func(p string) bool {
+	{obs.RateLimitScopeExport, func(p string) bool { return strings.HasSuffix(p, ":export") }},
+	{obs.RateLimitScopeBatch, func(p string) bool {
 		return strings.HasSuffix(p, ":batch-assign") || strings.HasSuffix(p, ":batch-preview")
 	}},
-	{"invite", func(p string) bool { return strings.HasSuffix(p, "/invitations") }},
+	{obs.RateLimitScopeInvite, func(p string) bool { return strings.HasSuffix(p, "/invitations") }},
 }
 
 // scopeFor returns the metric scope and whether the request is subject to a
@@ -89,7 +89,7 @@ func scopeFor(method, path string) (string, bool) {
 			return h.scope, true
 		}
 	}
-	return "write", false
+	return obs.RateLimitScopeWrite, false
 }
 
 func isSafeMethod(method string) bool {
