@@ -195,6 +195,40 @@ func boolGauge(err error) float64 {
 	return 0
 }
 
+// Ready reports whether the service can serve requests right now, and why not
+// if it cannot.
+//
+// This is separate from a liveness check on purpose. Liveness answers "should
+// the orchestrator restart me" -- a process that is up but cannot reach MySQL
+// must NOT be restarted, because restarting does not bring the database back
+// and a restart loop loses the logs that explain the outage. Readiness answers
+// "should traffic come here", and for that the database is mandatory.
+//
+// Redis is reported but not fatal: without it step-up and rate limiting degrade
+// (documented in docs/security.md as fail-open), while authentication still
+// works against MySQL. Failing readiness on Redis would turn a cache outage
+// into a full outage.
+func (m *Metrics) Ready(ctx context.Context) (ready bool, checks map[string]string) {
+	checks = map[string]string{"mysql": "ok", "redis": "ok"}
+	if m == nil || m.probe == nil {
+		// No probe configured (unit tests, CLI paths): nothing to verify, so the
+		// honest answer is "ready" rather than a permanent 503.
+		return true, checks
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	ready = true
+	if err := m.probe.PingDatabase(ctx); err != nil {
+		checks["mysql"] = err.Error()
+		ready = false
+	}
+	if err := m.probe.PingCache(ctx); err != nil {
+		checks["redis"] = err.Error()
+	}
+	return ready, checks
+}
+
 type statusRecorder struct {
 	http.ResponseWriter
 	status      int
