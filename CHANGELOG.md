@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-11-07
+
+**版本判定：PATCH**（v0.10.0 → v0.10.1）。修复限流命中计数器冷启动无时间序列的可观测性缺陷，并修正运维文档表述。无新增端点、无行为变更、无迁移。详见 [发布说明](docs/releases/release-v0.10.1.md)。
+
+### Fixed
+
+- `usercenter_rate_limit_hits_total` 在从未拒绝过请求的进程里**完全没有时间序列**（Prometheus `CounterVec` 只在 `WithLabelValues` 后物化），导致 `rate()`/`increase()` 拿到空向量、`absent()` 对健康实例误报。现由 `NewMetrics` 对 4 个 scope 以 `Add(0)` 预置。
+- scope 名称提取为 `internal/obs` 导出常量，`internal/server/ratelimit.go` 改为引用，消除预初始化列表与写入方漂移的可能。
+- `docs/operations.md` §5.1.1 原文「看到指标突然为 0 要怀疑限流器」描述的是不可能发生的观察；改为准确表述，给出基于 `increase()` 的告警表达式，并明确不要用 `absent()`。指标表补注零值预置。
+- `scripts/e2e/README.md` 补充「`compose-e2e.sh` 与 `--keep` 栈共用默认项目名导致 migrate 密码不匹配」的排障说明。
+
+### 未新增
+
+- `alerts.yml` 未加限流告警规则：拒绝率阈值缺生产基线，凭空加 page 告警只会制造噪音。
+
 ## [0.10.0] - 2026-11-07
 
 **版本判定：MINOR**（v0.9.0 → v0.10.0）。运维就绪：新增对外端点 `/readyz`、变更容器 healthcheck 与数据库探针语义、新增两个可复现的灾难恢复演练脚本。修复"数据库不可用时容器仍报 healthy"的真实缺陷。**无数据库迁移**。详见 [发布说明](docs/releases/release-v0.10.0.md)。
