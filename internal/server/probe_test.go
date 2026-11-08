@@ -59,3 +59,34 @@ func TestProbesAreUnauthenticated(t *testing.T) {
 		require.Equal(t, http.StatusOK, rec.Code, "%s must not require auth", path)
 	}
 }
+
+// The metric label must come from the server's own route table, so this asserts
+// the table is actually populated by construction: the protobuf routes come from
+// WalkRoute, the raw handlers (probes, OIDC, provider callbacks, artifact
+// downloads) are registered explicitly, and anything else is "unknown".
+//
+// Without this wiring the matcher would be empty and every request would quietly
+// label itself "unknown" -- correct-looking, useless, and impossible to notice.
+func TestServerRouteTableClassifiesRequests(t *testing.T) {
+	h := newHarness(t)
+	require.Greater(t, h.metrics.Routes().Len(), 100, "the protobuf route table must be walked")
+
+	for _, tc := range []struct{ method, path, want string }{
+		// Protobuf route, with an action suffix and a numeric identifier.
+		{http.MethodPost, "/api/v1/admin/users/4242:archive", "/api/v1/admin/users/{id}:archive"},
+		// The same path under a different method resolves to its own template.
+		{http.MethodGet, "/api/v1/admin/users/4242", "/api/v1/admin/users/{id}"},
+		// Raw handlers must be in the table too.
+		{http.MethodGet, "/readyz", "/readyz"},
+		{http.MethodGet, "/healthz", "/healthz"},
+		{http.MethodPost, "/oidc/token", "/oidc/token"},
+		{http.MethodGet, "/api/v1/auth/providers/github/callback", "/api/v1/auth/providers/{provider}/callback"},
+		// SPA history routes collapse into one label; invented API paths do not
+		// become labels at all.
+		{http.MethodGet, "/admin/users", "spa"},
+		{http.MethodGet, "/api/v1/unknown-tenant-1", "unknown"},
+	} {
+		require.Equal(t, tc.want, h.metrics.RouteLabel(tc.method, tc.path),
+			"%s %s", tc.method, tc.path)
+	}
+}

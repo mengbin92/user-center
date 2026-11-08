@@ -3,9 +3,13 @@ package server_test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -80,20 +84,39 @@ func withRateLimit(rl *conf.RateLimit) harnessOption {
 }
 
 func newHarness(t *testing.T, opts ...harnessOption) *harness {
+	return newHarnessFor(t, nil, opts...)
+}
+
+// newHarnessFor assembles the HTTP stack over dataConf, defaulting to an
+// isolated SQLite file. The MySQL-gated tests pass the shared isolated
+// database instead: migrations and the catalog seed are applied by the
+// migrate test that CI runs first, and every MySQL test shares one root, so
+// bootstrap tolerates an existing root user.
+func newHarnessFor(t *testing.T, dataConf *conf.Data, opts ...harnessOption) *harness {
 	t.Helper()
 	dir := t.TempDir()
 	sec := &conf.Security{
 		SessionSecret: "test-session-secret", CsrfSecret: "test-csrf-secret",
 		MfaEncryptionKey: "test-mfa-key", SessionTtlMinutes: 60, IdleTimeoutMinutes: 60,
 	}
-	dataConf := &conf.Data{Database: &conf.Database{
-		Driver: "sqlite", Source: "file:" + filepath.Join(dir, "test.db") + "?_fk=1",
-	}}
+	if dataConf == nil {
+		dataConf = &conf.Data{Database: &conf.Database{
+			Driver: "sqlite", Source: "file:" + filepath.Join(dir, "test.db") + "?_fk=1",
+		}}
+	}
+	if dataConf.Database.Driver == "mysql" {
+		// The MySQL driver rejects the short sample secrets SQLite tolerates.
+		sec.SessionSecret = "isolated-mysql-test-secret-at-least-32-bytes"
+		sec.CsrfSecret = "isolated-mysql-test-secret-at-least-32-bytes"
+		sec.MfaEncryptionKey = "isolated-mysql-test-secret-at-least-32-bytes"
+	}
 	d, cleanup, err := data.NewData(dataConf, sec, zap.NewNop())
 	require.NoError(t, err)
 	t.Cleanup(cleanup)
-	require.NoError(t, d.AutoMigrate())
-	require.NoError(t, data.SeedCatalog(d.DB()))
+	if dataConf.Database.Driver == "sqlite" {
+		require.NoError(t, d.AutoMigrate())
+		require.NoError(t, data.SeedCatalog(d.DB()))
+	}
 	settingsRepo := data.NewSettingsRepo(d)
 	baseSettings, err := settingsRepo.GetAuth(context.Background(), nil)
 	require.NoError(t, err)
@@ -137,7 +160,13 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	organizations := service.NewOrganizationService(biz.NewOrganizationUsecase(svc), biz.NewOrgIAMUsecase(svc))
 
 	_, err = svc.BootstrapRoot(context.Background(), "root", "root@example.com", "ChangeMe-12345")
-	require.NoError(t, err)
+	if err != nil && dataConf.Database.Driver == "mysql" {
+		// Later tests against the shared MySQL database reuse the root the
+		// first MySQL test created.
+		require.Contains(t, err.Error(), "already exists")
+	} else {
+		require.NoError(t, err)
+	}
 
 	deps := service.NewDeps(sec)
 	mw := server.NewMiddleware(sessions, sec, zap.NewNop())
@@ -171,6 +200,24 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	h := &harness{t: t, srv: hs.Server, jar: jar, metrics: metrics, users: users, iam: iam, auth: auth, svc: svc, artDir: runtime.ArtifactDir, mail: mailer, d: d}
 	h.refreshCSRF()
 	return h
+}
+
+// newMySQLHarness wires the same full HTTP stack against the isolated MySQL
+// database the MySQL-gated tests share. It skips without the DSN, matching
+// the data-layer MySQL tests.
+func newMySQLHarness(t *testing.T) *harness {
+	t.Helper()
+	dsn := os.Getenv("USER_CENTER_MYSQL_TEST_DSN")
+	if dsn == "" {
+		t.Skip("set USER_CENTER_MYSQL_TEST_DSN after applying migrations to an isolated database")
+	}
+	// The OIDC signer only mints an ephemeral key for SQLite; give the MySQL
+	// stack a throwaway key instead of demanding a mounted one.
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	t.Setenv("OIDC_SIGNING_KEY_PEM", string(pem.EncodeToMemory(
+		&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})))
+	return newHarnessFor(t, &conf.Data{Database: &conf.Database{Driver: "mysql", Source: dsn}})
 }
 
 func (h *harness) refreshCSRF() {

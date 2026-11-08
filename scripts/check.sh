@@ -31,6 +31,7 @@ if [[ -n "${USER_CENTER_MYSQL_TEST_DSN:-}" ]]; then
   echo "check: running MySQL-backed tests"
   go test -count=1 -run MySQL ./cmd/migrate/
   go test -count=1 -run MySQL ./internal/data/
+  go test -count=1 -run MySQL ./internal/server/
 else
   echo "check: skipped MySQL-backed tests (USER_CENTER_MYSQL_TEST_DSN unset)"
 fi
