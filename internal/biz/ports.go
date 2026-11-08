@@ -229,10 +229,10 @@ type OrgIAMRepo interface {
 	RevokeMemberAssignments(context.Context, Tx, authorization.Context, int64, []int64, int64) (int64, error)
 	CountActiveAssignments(context.Context, Tx, authorization.Context, int64) (int64, error)
 	// RevokeDelegationsForUser soft-invalidates every delegation in this context
-	// where the user is either the manager or the target. Both directions
-	// matter: dropping only the manager side would leave a channel that can
-	// still grant roles to the removed member.
-	RevokeDelegationsForUser(context.Context, Tx, authorization.Context, int64, int64) (int64, error)
+	// where the user is either the target or the person who issued it from one
+	// of managerRoleIDs. Both directions matter: dropping only one side would
+	// leave a channel that can still grant roles to the removed member.
+	RevokeDelegationsForUser(context.Context, Tx, authorization.Context, int64, []int64, int64) (int64, error)
 }
 
 type PermissionFilter struct {

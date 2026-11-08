@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
+	"slices"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -408,34 +409,88 @@ func (r *orgIAMRepo) CountActiveAssignments(ctx context.Context, tx biz.Tx, c au
 // RevokeDelegationsForUser soft-invalidates the delegations that involve a user
 // in this organization, in both directions.
 //
-// "Manager" is a role, not a user, so the manager side is resolved through the
-// assignments being revoked: the caller has already marked them revoked in the
-// same transaction, so we take the role ids from that user's grant history in
-// this context. Working from role ids keeps the query to one statement instead
-// of a scan per role.
+// Target side: the delegation names the user in target_user_scope. The scope is
+// parsed and compared by ID, not by LIKE: `target_user_scope LIKE '%2%'` also
+// matched the delegation that only mentioned user 21, silently cutting off a
+// third party.
+//
+// Manager side: a delegation is issued *from a role*, so it is revoked when the
+// removal leaves that role with no active holder in the tenant -- the delegation
+// can no longer authorise anything, and leaving it alive would let the removed
+// member reactivate it simply by rejoining and being granted the same role
+// again (D10: re-joining must not restore a delegation).
+//
+// What this deliberately does NOT do:
+//
+//   - revoke a shared role's delegation just because one holder left; the other
+//     holders still need it (that was the "created_by == userID" shortcut, which
+//     also conflated the issuer with the manager -- an owner issuing a delegation
+//     for somebody else's role never matched);
+//   - overwrite created_by, which is the record of who issued it.
 //
 // Delegations are revoked, not deleted (D10): an incident review needs to see
 // that the delegation existed and when it stopped being valid.
-func (r *orgIAMRepo) RevokeDelegationsForUser(ctx context.Context, tx biz.Tx, c authorization.Context, userID int64, by int64) (int64, error) {
+func (r *orgIAMRepo) RevokeDelegationsForUser(ctx context.Context, tx biz.Tx, c authorization.Context, userID int64, managerRoleIDs []int64, by int64) (int64, error) {
 	if userID == 0 || !c.IsOrganization() {
 		return 0, nil
 	}
 	db := r.d.dbOr(tx).WithContext(ctx)
-	roleIDs := make([]int64, 0, 8)
-	if err := db.Model(&assignmentPO{}).
-		Where("user_id = ? AND context_type = ? AND context_id = ?", userID, authorization.ContextTypeOrganization, c.OrganizationID).
-		Distinct().Pluck("role_id", &roleIDs).Error; err != nil {
+
+	// Which of the removed roles have no holder left? Computed after the
+	// assignments were revoked, in the same transaction.
+	orphaned := make(map[int64]bool, len(managerRoleIDs))
+	for _, roleID := range managerRoleIDs {
+		var holders int64
+		if err := db.Model(&assignmentPO{}).
+			Where("role_id = ? AND context_type = ? AND context_id = ? AND status = ?",
+				roleID, authorization.ContextTypeOrganization, c.OrganizationID, "active").
+			Count(&holders).Error; err != nil {
+			return 0, err
+		}
+		orphaned[roleID] = holders == 0
+	}
+
+	// Candidates are read per context, then filtered in Go: an exact match
+	// against a JSON column has no portable SQL form (MySQL and SQLite spell the
+	// JSON functions differently), and a tenant's delegation set is small.
+	var rows []delegationPO
+	if err := db.Where("context_type = ? AND context_id = ? AND revoked_at IS NULL",
+		authorization.ContextTypeOrganization, c.OrganizationID).Find(&rows).Error; err != nil {
 		return 0, err
 	}
 	now := time.Now().UTC()
-	q := db.Model(&delegationPO{}).
-		Where("context_type = ? AND context_id = ? AND revoked_at IS NULL", authorization.ContextTypeOrganization, c.OrganizationID)
-	if len(roleIDs) == 0 {
-		// No roles left to delegate from: only the target side can still matter.
-		q = q.Where("target_user_scope LIKE ?", "%"+strconv.FormatInt(userID, 10)+"%")
-	} else {
-		q = q.Where("manager_role_id IN ? OR target_user_scope LIKE ?", roleIDs, "%"+strconv.FormatInt(userID, 10)+"%")
+	ids := make([]int64, 0, 4)
+	for i := range rows {
+		targets, err := delegationTargetsUser(rows[i].TargetUserScope, userID)
+		if err != nil {
+			// A malformed scope must not authorise a revocation. Skip it and let
+			// the operator see the broken row rather than widen the blast radius.
+			continue
+		}
+		if targets || orphaned[rows[i].ManagerRoleID] {
+			ids = append(ids, rows[i].ID)
+		}
 	}
-	res := q.Updates(map[string]any{"revoked_at": now, "created_by": by})
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	res := db.Model(&delegationPO{}).Where("id IN ?", ids).
+		Updates(map[string]any{"revoked_at": now})
 	return res.RowsAffected, res.Error
+}
+
+// delegationTargetsUser reports whether the scope names userID exactly.
+func delegationTargetsUser(raw string, userID int64) (bool, error) {
+	if strings.TrimSpace(raw) == "" {
+		return false, nil
+	}
+	var scope authorization.Scope
+	if err := jsonx.Unmarshal([]byte(raw), &scope); err != nil {
+		return false, err
+	}
+	if scope.All {
+		// "everyone in the tenant" includes this user by construction.
+		return true, nil
+	}
+	return slices.Contains(scope.UserIDs, userID), nil
 }

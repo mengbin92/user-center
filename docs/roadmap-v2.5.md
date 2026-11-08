@@ -326,6 +326,11 @@
 
 - [x] 组织内 `mutual_exclusion` 与 `max_roles` 生效。**与设计原稿的偏差**：不是"与平台约束求交"，而是结构性隔离 —— 角色在单表里全局自增，平台约束的 role id 永不匹配组织角色；隔离由 `ListConstraints(ctx, tx, authCtx)` 的显式 context 过滤保证，不依赖 ID 分配。`max_roles` 按 `role_ids` 范围计数（实现期发现原设计对语义理解有误，见设计文档 F9）
 - [x] 组织内委派：`DelegationFilter.Context` 强制过滤；`CreateDelegation` 写 `(context_type, context_id)`；平台委派无法批准组织分配，反向亦然
+      **求值侧已实现，入口未交付**：设计 §12 的 P4（组织委派 CRUD API）与 P5（界面）不在本阶段范围内，
+      因此当前只能授予自己已持有的能力；语义比设计更严格，不放宽任何权限。见 `docs/security.md` §4.10
+- [x] 分配与撤销路径执行**能力边界**（`checkOrgDelegation`）：仅有 `organization.iam.assignment.manage`
+      不再足以授予任意角色；要么自己持有目标角色的全部 operation，要么存在本组织内覆盖目标用户/角色/动作/有效期/授权上限的有效委派，
+      否则 `DELEGATION_REQUIRED`。上下文由 `DelegationFilter.Context` 保证，平台委派与其他租户的委派无法匹配
 - [x] 分配路径执行约束校验（`checkOrgConstraints`）。激活路径不适用：组织分配无需会话激活，`LoadAuthzFactsIn` 每次都按当前分配重算
 - [x] HTTP 级拒绝测试 6 条：平台约束不影响组织决策、组织互斥生效且不跨租户、跨上下文引用被拒（400）、跨租户读写 404、自授权被拒、收紧需确认
 - [x] 变更写组织审计 + Outbox 事件（`organization.constraint.created/updated/deleted`）+ policy revision bump

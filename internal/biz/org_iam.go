@@ -165,13 +165,28 @@ func syncOrgMembershipRole(ctx context.Context, s *Services, tx Tx, orgID, userI
 // Both directions are soft-invalidated; see OrgIAMRepo.RevokeDelegationsForUser.
 func revokeOrgMemberAssignments(ctx context.Context, s *Services, tx Tx, orgID, userID, by int64) error {
 	authCtx := authorization.Organization(orgID)
+	// Read the live assignments before they are revoked: the delegation cleanup
+	// must only consider the roles this removal actually takes away, not every
+	// role the member happened to hold in the past.
+	items, err := s.OrgIAM.ListAssignments(ctx, tx, authCtx, userID)
+	if err != nil {
+		return err
+	}
+	now := s.Clock.Now()
+	revokedRoles := make([]int64, 0, len(items))
+	for _, item := range items {
+		if item.Assignment == nil || !item.Assignment.Active(now) {
+			continue
+		}
+		revokedRoles = append(revokedRoles, item.Assignment.RoleID)
+	}
 	if _, err := s.OrgIAM.RevokeMemberAssignments(ctx, tx, authCtx, userID, nil, by); err != nil {
 		return err
 	}
 	// Best-effort on the delegation side: failing to revoke it must not abort
 	// the member removal (that would leave the tenant in a half-removed state),
 	// but the error is worth surfacing to the caller's logs.
-	_, err := s.OrgIAM.RevokeDelegationsForUser(ctx, tx, authCtx, userID, by)
+	_, err = s.OrgIAM.RevokeDelegationsForUser(ctx, tx, authCtx, userID, revokedRoles, by)
 	return err
 }
 
@@ -676,6 +691,16 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 		if err := uc.checkOrgConstraints(ctx, tx, authCtx, in.UserID, locked.ID); err != nil {
 			return err
 		}
+		// Design order (§5): constraints, then the delegation boundary. An
+		// assignment operation alone never implies authority over the role's
+		// capabilities. Platform administrators keep the governance override the
+		// older organization endpoints grant them.
+		if !isPlatformAdmin(actor) {
+			if err := uc.checkOrgDelegation(ctx, tx, actor, authCtx, in.UserID, locked.ID,
+				DelegationActionAssign, authorization.Scope{All: true}, uc.Clock.Now(), in.ExpiresAt); err != nil {
+				return err
+			}
+		}
 		row, err := uc.OrgIAM.CreateAssignment(ctx, tx, authCtx, &Assignment{
 			UserID: in.UserID, RoleID: role.ID, Boundary: authorization.Scope{All: true},
 			ExpiresAt: in.ExpiresAt, Origin: OriginExplicit, AssignedBy: actor.User.ID,
@@ -728,6 +753,14 @@ func (uc *OrgIAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContex
 		}
 		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, assignment.UserID); err != nil {
 			return err
+		}
+		// The boundary: revoking authority you never had is also a way to break a
+		// tenant (someone else's audit trail disappears).
+		if !isPlatformAdmin(actor) {
+			if err := uc.checkOrgDelegation(ctx, tx, actor, authCtx, assignment.UserID, assignment.RoleID,
+				DelegationActionRevoke, assignment.Boundary, assignment.StartsAt, assignment.ExpiresAt); err != nil {
+				return err
+			}
 		}
 		if err := uc.OrgIAM.RevokeAssignment(ctx, tx, authCtx, assignmentID, expected, actor.User.ID); err != nil {
 			return err
