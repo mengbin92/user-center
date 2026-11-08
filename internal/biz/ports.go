@@ -18,6 +18,11 @@ type TxManager interface {
 type UserRepo interface {
 	Create(context.Context, Tx, *User) (*User, error)
 	Get(context.Context, Tx, int64) (*User, error)
+	// LockUser takes a row lock on the user for the life of tx. It exists so a
+	// per-user invariant (the concurrent-session cap) is serialised across
+	// instances: counting rows and inserting one is only atomic if every writer
+	// queues on the same row first.
+	LockUser(context.Context, Tx, int64) error
 	GetByUsername(context.Context, Tx, string) (*User, error)
 	GetByEmail(context.Context, Tx, string) (*User, error)
 	Update(context.Context, Tx, *User, uint64) (*User, error)
