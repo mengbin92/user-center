@@ -284,6 +284,33 @@ func (s *Services) RecordPasswordHistory(ctx context.Context, tx Tx, userID int6
 	return s.Credentials.RecordPasswordHash(ctx, tx, userID, hash, policy.HistoryCount)
 }
 
+// RecordPasswordBeforeRotation puts the password that is about to be replaced
+// into the history window, unless that exact digest is already there.
+//
+// Migration 014 covers accounts that existed when it ran; this covers the shapes
+// a one-shot migration cannot:
+//
+//   - an account older than the feature (its current digest was never recorded);
+//   - a SQLite dev database upgraded through AutoMigrate;
+//   - the history window being switched off and back on at runtime. With the
+//     window at 0 the rotation records nothing, so re-enabling it left the
+//     current password unrecorded while older rows were still present.
+//
+// In all three "A -> B, then B -> A" would succeed, which is exactly the reuse
+// the policy promises to reject.
+//
+// It must run inside the rotation's transaction and before UpdatePassword:
+// afterwards the old digest is gone and unrecoverable.
+func (s *Services) RecordPasswordBeforeRotation(ctx context.Context, tx Tx, userID int64, previous *Credential, policy PasswordPolicy) error {
+	if previous == nil || previous.PasswordHash == "" || policy.HistoryCount <= 0 {
+		return nil
+	}
+	if _, err := s.Credentials.EnsurePasswordHistoryRecorded(ctx, tx, userID, previous.PasswordHash, previous.ChangedAt, policy.HistoryCount); err != nil {
+		return ErrDependency
+	}
+	return nil
+}
+
 func HashPassword(pw string) (string, error) {
 	b, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 	if err != nil {

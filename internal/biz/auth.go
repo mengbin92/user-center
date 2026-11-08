@@ -754,6 +754,11 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 		if err != nil {
 			return ErrDependency
 		}
+		// Same rule as a self-service change: a reset must not let the account
+		// walk back to the password that was in place before the window existed.
+		if err := uc.RecordPasswordBeforeRotation(ctx, tx, user.ID, credential, policy); err != nil {
+			return err
+		}
 		version, err := uc.Credentials.UpdatePassword(ctx, tx, user.ID, hash, "bcrypt", credential.Revision, false)
 		if err != nil {
 			return err

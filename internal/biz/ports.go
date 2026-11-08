@@ -61,6 +61,12 @@ type CredentialRepo interface {
 	// RecordPasswordHash appends a hash and folds the table back to keep rows,
 	// so history stays bounded instead of growing with every rotation.
 	RecordPasswordHash(context.Context, Tx, int64, string, int) error
+	// EnsurePasswordHistoryRecorded inserts previous when that exact digest is
+	// not in the history window yet, and reports whether it did. Used before a
+	// credential is overwritten: a password that was never recorded (history
+	// switched off at the time, or an account older than the feature) must still
+	// be protected from being set again.
+	EnsurePasswordHistoryRecorded(context.Context, Tx, int64, string, time.Time, int) (bool, error)
 }
 
 type ExternalIdentityRepo interface {
