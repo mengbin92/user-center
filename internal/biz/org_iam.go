@@ -587,6 +587,19 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 	}
 	var created *Assignment
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// One serialisation point for the whole invariant.
+		//
+		// A role-row lock is per role, but the rule being enforced ("this
+		// member must not end up holding two mutually exclusive roles") is a
+		// property of the member's role *set*. Two admins granting different
+		// roles at the same time lock different rows, read the same pre-insert
+		// set, and both pass. The policy row is the lock every constraint write
+		// already takes (orgPolicyGuard), so taking it here makes grants and
+		// policy changes mutually exclusive and gives both paths the same lock
+		// order: policy -> role.
+		if _, err := uc.Policy.PolicyRevision(ctx, tx); err != nil {
+			return ErrDependency
+		}
 		// Lock the role row: the duplicate and max_members checks below must not
 		// run on a stale snapshot when two admins grant the same role at once.
 		locked, err := uc.OrgIAM.GetRoleForUpdate(ctx, tx, authCtx, role.ID)
@@ -662,6 +675,11 @@ func (uc *OrgIAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContex
 		}
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// Same serialisation point as the grant path: lock the shared policy
+		// row before the write touches anything.
+		if _, err := uc.Policy.PolicyRevision(ctx, tx); err != nil {
+			return ErrDependency
+		}
 		if err := uc.OrgIAM.RevokeAssignment(ctx, tx, authCtx, assignmentID, expected, actor.User.ID); err != nil {
 			return err
 		}
