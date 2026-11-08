@@ -80,8 +80,17 @@ func (s *Services) LoadAuthzFactsIn(ctx context.Context, authCtx authorization.C
 		// tenant gate, and session role activation only applies to platform
 		// roles, so the caller's platform role IDs must not be reused here.
 		activeRoleIDs = []int64{}
+		now := s.Clock.Now()
+		byRole := make(map[int64]*Role, len(roles))
+		for _, r := range roles {
+			byRole[r.ID] = r
+		}
 		for _, a := range assignments {
-			if !a.Revoked {
+			// Same predicate as the SoD checks: revoked, expired, not-yet-started
+			// and archived-role assignments hold nothing. Using `!Revoked` here
+			// meant an expired assignment still counted against constraints and
+			// denied every organization request from that member.
+			if assignmentHolds(a, byRole, now) {
 				activeRoleIDs = append(activeRoleIDs, a.RoleID)
 			}
 		}

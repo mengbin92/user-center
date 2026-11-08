@@ -339,3 +339,89 @@ func TestOrgMemberRemovalInvalidatesDelegations(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, active, "removing a member must invalidate delegations targeting them")
 }
+
+func TestExpiredAssignmentStopsCountingTowardsSoD(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	fixtureStepUp(h)
+
+	orgID := orgByCode(t, h, "sod-expiry")
+	roleX := createOrgRole(t, h, orgID, "expiring-approver")
+	roleY := createOrgRole(t, h, orgID, "expiring-payer")
+	member := createOrgMemberForConstraint(t, h, orgID, "expiry-target")
+
+	rec := h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/iam/assignments", map[string]any{
+		"user_id": member, "role_id": roleX, "reason": "grant x",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	// Age the grant out: the row still exists and is not revoked, exactly the
+	// state the old predicate mistook for "held".
+	require.NoError(t, h.d.DB().Exec(
+		"UPDATE iam_user_roles SET expires_at = ? WHERE user_id = ? AND role_id = ?",
+		time.Now().UTC().Add(-time.Hour), mustParseID(t, member), mustParseID(t, roleX)).Error)
+
+	// The conflict count must be zero, so no acknowledgement is demanded.
+	body := map[string]any{
+		"kind": "mutual_exclusion", "name": "expiry-rule", "role_ids": []string{roleX, roleY},
+		"enabled": true, "reason": "expiry", "expected_policy_revision": policyRevision(t, h),
+	}
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/iam/constraints", body, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, "0", decode[map[string]any](t, rec)["violating_assignments"])
+
+	// And the opposite role is assignable: the expired grant is not "held".
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/iam/assignments", map[string]any{
+		"user_id": member, "role_id": roleY, "reason": "grant y",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	// The authorized role set used by every organization decision excludes the
+	// expired assignment as well.
+	facts, err := h.svc.LoadAuthzFactsIn(t.Context(), authorization.Organization(mustParseID(t, orgID)),
+		mustParseID(t, member), nil)
+	require.NoError(t, err)
+	require.NotContains(t, facts.ActiveRoleIDs, mustParseID(t, roleX),
+		"an expired assignment must not be an active role")
+	require.Contains(t, facts.ActiveRoleIDs, mustParseID(t, roleY))
+}
+
+// The constraint write runs inside a transaction that has already checked out a
+// connection. Counting the violations on a *second* connection (the old
+// `ListMembers(ctx, nil, ...)`) waits for the pool to release the one this
+// goroutine is holding: with max_open_conns=1 the dev profile deadlocks until
+// the request times out, and a busier pool has the same shape under load.
+//
+// The pool is pinned to one connection here, which is the configuration that
+// turns the bug into a hang rather than a slow query.
+
+func TestConstraintWriteUsesOnlyOneConnection(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	fixtureStepUp(h)
+
+	orgID := orgByCode(t, h, "sod-pool")
+	roleX := createOrgRole(t, h, orgID, "pool-approver")
+	roleY := createOrgRole(t, h, orgID, "pool-payer")
+	createOrgMemberForConstraint(t, h, orgID, "pool-target")
+
+	sqlDB, err := h.d.DB().DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { sqlDB.SetMaxOpenConns(0) })
+
+	rec := h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/iam/constraints", map[string]any{
+		"kind": "mutual_exclusion", "name": "pool-rule", "role_ids": []string{roleX, roleY},
+		"enabled": true, "reason": "single connection", "expected_policy_revision": policyRevision(t, h),
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Zero(t, sqlDB.Stats().WaitCount,
+		"a nested query must reuse the transaction's connection, not queue for a second one")
+}
+
+// The upgrade path, not just the fresh-install path.
+//
+// ensureOrganizationIAM skips an organization whose owner role already exists
+// with a non-empty grant set, so every tenant created before the role spec grew
+// kept a 403 on its own SoD page -- even after the catalog was seeded. The
+// migrate-time backfill has to repair those roles additively.

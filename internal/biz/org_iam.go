@@ -687,9 +687,21 @@ func (uc *OrgIAMUsecase) checkOrgConstraints(ctx context.Context, tx Tx, authCtx
 	if err != nil {
 		return ErrDependency
 	}
+	roles, err := uc.OrgIAM.ListRoles(ctx, tx, authCtx)
+	if err != nil {
+		return ErrDependency
+	}
+	byID := make(map[int64]*Role, len(roles))
+	for _, r := range roles {
+		byID[r.ID] = r
+	}
+	now := uc.Clock.Now()
 	active := make([]int64, 0, len(existing)+1)
 	for _, item := range existing {
-		if item.Assignment == nil || item.Assignment.Revoked {
+		// Expired and not-yet-started assignments confer nothing, so they must
+		// not participate: otherwise an assignment that ended last month blocks
+		// the opposite role forever.
+		if !assignmentHolds(item.Assignment, byID, now) {
 			continue
 		}
 		active = append(active, item.Assignment.RoleID)

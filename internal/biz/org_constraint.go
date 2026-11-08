@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mengbin92/user-center/domain/authorization"
 )
@@ -260,10 +261,23 @@ func (uc *OrgIAMUsecase) countViolations(ctx context.Context, tx Tx, authCtx aut
 	if !c.Enabled {
 		return 0, nil
 	}
-	members, err := uc.Organizations.ListMembers(ctx, nil, orgIDOf(authCtx))
+	// tx, not nil: the caller already holds this transaction's connection, and
+	// the dev profile runs max_open_conns=1. Borrowing a second connection here
+	// waits for the pool to release the one the same goroutine is holding, so
+	// every constraint write timed out under load.
+	members, err := uc.Organizations.ListMembers(ctx, tx, orgIDOf(authCtx))
 	if err != nil {
 		return 0, ErrDependency
 	}
+	roles, err := uc.OrgIAM.ListRoles(ctx, tx, authCtx)
+	if err != nil {
+		return 0, ErrDependency
+	}
+	byID := make(map[int64]*Role, len(roles))
+	for _, r := range roles {
+		byID[r.ID] = r
+	}
+	now := uc.Clock.Now()
 	var violations int64
 	for _, m := range members {
 		if m.Status != OrgMemberActive {
@@ -275,7 +289,10 @@ func (uc *OrgIAMUsecase) countViolations(ctx context.Context, tx Tx, authCtx aut
 		}
 		held := make([]int64, 0, len(items))
 		for _, item := range items {
-			if item.Assignment == nil || item.Assignment.Revoked {
+			// Only assignments that actually confer the role count. Counting
+			// revoked or expired history would report violations for members who
+			// hold nothing, and the acknowledgement prompt would be a lie.
+			if !assignmentHolds(item.Assignment, byID, now) {
 				continue
 			}
 			held = append(held, item.Assignment.RoleID)
@@ -293,6 +310,25 @@ func orgIDOf(c authorization.Context) int64 {
 		return c.OrganizationID
 	}
 	return 0
+}
+
+// assignmentHolds reports whether an assignment actually confers its role at
+// `now`: not revoked, already started, not yet expired, and pointing at a role
+// that is still active within the same context.
+//
+// Every segregation-of-duties path must use this same predicate. The previous
+// three copies each stopped at `Revoked`, so an assignment that had naturally
+// expired still counted as held: granting the other half of a mutually
+// exclusive pair was refused forever, and a member whose only "conflict" was
+// years-old history was locked out of the whole organization.
+func assignmentHolds(a *Assignment, roles map[int64]*Role, now time.Time) bool {
+	if a == nil || !a.Active(now) {
+		return false
+	}
+	if role, ok := roles[a.RoleID]; ok && role != nil && role.Status != RoleStatusActive {
+		return false
+	}
+	return true
 }
 
 // orgPolicyGuard mirrors IAMUsecase.policyGuard. It is duplicated rather than
