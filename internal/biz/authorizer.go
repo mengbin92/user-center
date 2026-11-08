@@ -45,15 +45,27 @@ func (s *Services) LoadAuthzFacts(ctx context.Context, userID int64, activeRoleI
 // come exclusively from that tenant's roles and assignments, so neither side
 // can widen the other's authority.
 func (s *Services) LoadAuthzFactsIn(ctx context.Context, authCtx authorization.Context, userID int64, activeRoleIDs []int64) (*AuthzFacts, error) {
+	return s.loadAuthzFacts(ctx, nil, authCtx, userID, activeRoleIDs)
+}
+
+// LoadAuthzFactsInTx is the transaction-scoped form. A caller that is about to
+// write must decide on the same snapshot it writes against: reading the facts on
+// a separate connection means the permission it verified may already have been
+// revoked by the time the insert runs.
+func (s *Services) LoadAuthzFactsInTx(ctx context.Context, tx Tx, authCtx authorization.Context, userID int64, activeRoleIDs []int64) (*AuthzFacts, error) {
+	return s.loadAuthzFacts(ctx, tx, authCtx, userID, activeRoleIDs)
+}
+
+func (s *Services) loadAuthzFacts(ctx context.Context, tx Tx, authCtx authorization.Context, userID int64, activeRoleIDs []int64) (*AuthzFacts, error) {
 	authCtx = authCtx.Normalize()
 	if err := authCtx.Validate(); err != nil {
 		return nil, ErrAuthorizationDown
 	}
-	policyRev, err := s.Policy.PolicyRevision(ctx, nil)
+	policyRev, err := s.Policy.PolicyRevision(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("policy revision: %w", err)
 	}
-	userRev, err := s.Policy.UserRevision(ctx, nil, userID)
+	userRev, err := s.Policy.UserRevision(ctx, tx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("user revision: %w", err)
 	}
@@ -63,11 +75,11 @@ func (s *Services) LoadAuthzFactsIn(ctx context.Context, authCtx authorization.C
 		if s.OrgIAM == nil {
 			return nil, ErrAuthorizationDown
 		}
-		roles, err = s.OrgIAM.ListRoles(ctx, nil, authCtx)
+		roles, err = s.OrgIAM.ListRoles(ctx, tx, authCtx)
 		if err != nil {
 			return nil, fmt.Errorf("roles: %w", err)
 		}
-		items, err := s.OrgIAM.ListAssignments(ctx, nil, authCtx, userID)
+		items, err := s.OrgIAM.ListAssignments(ctx, tx, authCtx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("assignments: %w", err)
 		}
@@ -95,16 +107,16 @@ func (s *Services) LoadAuthzFactsIn(ctx context.Context, authCtx authorization.C
 			}
 		}
 	} else {
-		roles, err = s.IAM.ListAllRolesWithGrants(ctx, nil)
+		roles, err = s.IAM.ListAllRolesWithGrants(ctx, tx)
 		if err != nil {
 			return nil, fmt.Errorf("roles: %w", err)
 		}
-		assignments, err = s.IAM.ListAssignmentsForUser(ctx, nil, userID)
+		assignments, err = s.IAM.ListAssignmentsForUser(ctx, tx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("assignments: %w", err)
 		}
 	}
-	constraints, err := s.IAM.ListConstraints(ctx, nil, authCtx)
+	constraints, err := s.IAM.ListConstraints(ctx, tx, authCtx)
 	if err != nil {
 		return nil, fmt.Errorf("constraints: %w", err)
 	}
@@ -224,6 +236,34 @@ func (s *Services) DecideIn(ctx context.Context, actor ActorContext, authCtx aut
 	if err != nil {
 		return authorization.Decision{}, err
 	}
+	return s.decideWithFacts(ctx, facts, actor, operation, targetUserID, wholeObject)
+}
+
+// DecideInTx evaluates an operation against the transaction's own snapshot.
+//
+// It exists for write paths that must not decide on a permission and then write
+// on a later one: an operation revoked between the pre-flight check and the
+// transaction would still be honoured by a decision taken outside it. The
+// permission definition is loaded inside the transaction too, so nothing here
+// borrows a second connection (see the single-connection pool test).
+func (s *Services) DecideInTx(ctx context.Context, tx Tx, actor ActorContext, authCtx authorization.Context, operation string, targetUserID int64, wholeObject bool) (authorization.Decision, error) {
+	facts, err := s.LoadAuthzFactsInTx(ctx, tx, authCtx, actor.User.ID, actor.Session.ActiveRoleIDs)
+	if err != nil {
+		return authorization.Decision{}, err
+	}
+	p, err := s.IAM.GetPermissionByCode(ctx, tx, operation)
+	if err != nil {
+		if errors.Is(err, ErrResourceNotFound) {
+			return authorization.Decision{Reason: "OPERATION_UNBOUND", Operation: operation}, nil
+		}
+		return authorization.Decision{}, err
+	}
+	// Pre-seed the memo so decideWithFacts does not re-resolve it outside the
+	// transaction.
+	if facts.permissions == nil {
+		facts.permissions = make(map[string]*Permission, 1)
+	}
+	facts.permissions[operation] = p
 	return s.decideWithFacts(ctx, facts, actor, operation, targetUserID, wholeObject)
 }
 

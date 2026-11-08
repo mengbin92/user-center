@@ -541,6 +541,46 @@ func (uc *OrgIAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, or
 	})
 }
 
+// authorizeOrgInTx re-checks an organization operation against the transaction's
+// own snapshot, immediately after the policy lock is taken.
+//
+// orgGuard runs before the transaction opens, so between "the actor holds
+// organization.iam.assignment.manage" and "the assignment is inserted" another
+// request can revoke that very permission. Everything the write then compares --
+// the target role's capabilities, the delegations -- is read inside the
+// transaction and would happily pass: the actor still holds the *audit* role, so
+// granting it looked like "handing out what I already have".
+//
+// A platform administrator keeps the governance override orgGuard already
+// grants them (D7 removed it only for the V2.5 constraint endpoints, which use
+// orgConstraintGuard instead). Without this branch the new capability check
+// silently closed the older organization-role management path for support
+// accounts.
+func (uc *OrgIAMUsecase) authorizeOrgInTx(ctx context.Context, tx Tx, actor ActorContext, orgID int64, operation string, targetUserID int64) error {
+	if isPlatformAdmin(actor) {
+		return nil
+	}
+	authCtx := authorization.Organization(orgID)
+	member, err := uc.Organizations.GetMember(ctx, tx, orgID, actor.User.ID)
+	if err != nil {
+		if errors.Is(err, ErrResourceNotFound) {
+			return ErrPermissionDenied
+		}
+		return ErrDependency
+	}
+	if member.Status != OrgMemberActive {
+		return ErrPermissionDenied
+	}
+	d, err := uc.DecideInTx(ctx, tx, actor, authCtx, operation, targetUserID, false)
+	if err != nil {
+		return ErrAuthorizationDown
+	}
+	if !d.Allowed {
+		return ErrPermissionDenied
+	}
+	return nil
+}
+
 func (uc *OrgIAMUsecase) Assignments(ctx context.Context, actor ActorContext, orgID int64) ([]*AssignmentItem, error) {
 	authCtx, err := uc.orgGuard(ctx, actor, orgID, PermOrgAssignmentRead, 0, true)
 	if err != nil {
@@ -599,6 +639,12 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 		// order: policy -> role.
 		if _, err := uc.Policy.PolicyRevision(ctx, tx); err != nil {
 			return ErrDependency
+		}
+		// Re-verify the operation on this snapshot. The pre-transaction check in
+		// orgGuard is a fast rejection, not the authorization decision: by the
+		// time the insert runs the actor may no longer hold the operation.
+		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, in.UserID); err != nil {
+			return err
 		}
 		// Lock the role row: the duplicate and max_members checks below must not
 		// run on a stale snapshot when two admins grant the same role at once.
@@ -675,10 +721,13 @@ func (uc *OrgIAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContex
 		}
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		// Same serialisation point as the grant path: lock the shared policy
-		// row before the write touches anything.
+		// Same two-step as the grant path: lock the shared policy row, then
+		// re-verify the operation on this snapshot before touching the row.
 		if _, err := uc.Policy.PolicyRevision(ctx, tx); err != nil {
 			return ErrDependency
+		}
+		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, assignment.UserID); err != nil {
+			return err
 		}
 		if err := uc.OrgIAM.RevokeAssignment(ctx, tx, authCtx, assignmentID, expected, actor.User.ID); err != nil {
 			return err
