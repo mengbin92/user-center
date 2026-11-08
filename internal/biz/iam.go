@@ -1131,10 +1131,12 @@ func (uc *IAMUsecase) Constraints(ctx context.Context, actor ActorContext) ([]*C
 	if err := uc.guard(ctx, actor, "iam.constraint.read", false); err != nil {
 		return nil, err
 	}
-	// The platform admin list is the one place that reads across contexts:
-	// operators need to see that a tenant defined its own SoD rules. Reading
-	// everything is explicit here rather than the default everywhere.
-	return uc.IAM.ListConstraintsAll(ctx, nil)
+	// Platform scope only. Reading across contexts was an explicit exception
+	// until V2.5; the design then deleted it (F6/D7): a platform account had a
+	// cross-tenant read path with no requirement behind it, which is exactly the
+	// shape of a later "just let them write it too" change. Tenant rules stay
+	// visible to that tenant and in its audit trail.
+	return uc.IAM.ListConstraints(ctx, nil, authorization.Platform())
 }
 
 func validateConstraint(c *Constraint) error {

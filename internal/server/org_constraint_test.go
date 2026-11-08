@@ -425,3 +425,93 @@ func TestConstraintWriteUsesOnlyOneConnection(t *testing.T) {
 // with a non-empty grant set, so every tenant created before the role spec grew
 // kept a 403 on its own SoD page -- even after the catalog was seeded. The
 // migrate-time backfill has to repair those roles additively.
+
+func TestPlatformAdminHasNoOrganizationConstraintEntryPoint(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	fixtureStepUp(h)
+
+	orgA := orgByCode(t, h, "d7-tenant")
+	roleX := createOrgRole(t, h, orgA, "d7-approver")
+	roleY := createOrgRole(t, h, orgA, "d7-payer")
+
+	rec := h.do(http.MethodPost, "/api/v1/orgs/"+orgA+"/iam/constraints", map[string]any{
+		"kind": "mutual_exclusion", "name": "tenant-only", "role_ids": []string{roleX, roleY},
+		"enabled": true, "reason": "tenant rule", "expected_policy_revision": policyRevision(t, h),
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	constraintID := decode[map[string]any](t, rec)["id"].(string)
+
+	// Root is currently the owner, which is a legitimate membership. Give the
+	// tenant a second owner and leave: from here root is a platform admin and
+	// nothing else.
+	iamFixtureUser(t, h, "d7-owner")
+	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/orgs/"+orgA+"/members", map[string]any{
+		"identifier": "d7-owner", "role": "owner", "reason": "hand over",
+	}, "", true).Code)
+	root, err := h.svc.Users.GetByUsername(t.Context(), nil, "root")
+	require.NoError(t, err)
+	member, err := h.svc.Organizations.GetMember(t.Context(), nil, mustParseID(t, orgA), root.ID)
+	require.NoError(t, err)
+	require.NoError(t, h.svc.Organizations.RemoveMember(t.Context(), nil, mustParseID(t, orgA), root.ID, member.Revision))
+
+	rec = h.do(http.MethodGet, "/api/v1/orgs/"+orgA+"/iam/constraints", nil, "", false)
+	require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgA+"/iam/constraints", map[string]any{
+		"kind": "mutual_exclusion", "name": "platform-written", "role_ids": []string{roleX, roleY},
+		"enabled": true, "reason": "platform override", "expected_policy_revision": policyRevision(t, h),
+	}, "", true)
+	require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+
+	rec = h.do(http.MethodPatch, "/api/v1/orgs/"+orgA+"/iam/constraints/"+constraintID, map[string]any{
+		"name": "platform-edited", "role_ids": []string{roleX, roleY}, "max_count": "0", "enabled": false,
+		"expected_revision": "1", "reason": "platform override",
+		"expected_policy_revision": policyRevision(t, h),
+	}, "", true)
+	require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+
+	rec = h.do(http.MethodDelete, "/api/v1/orgs/"+orgA+"/iam/constraints/"+constraintID+
+		"?expected_revision=1&reason=platform&expected_policy_revision="+policyRevision(t, h), nil, "", true)
+	require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+
+	// And the platform list stays platform-only even for the account that can
+	// read it.
+	rec = h.do(http.MethodGet, "/api/v1/admin/iam/constraints", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	for _, raw := range decode[map[string]any](t, rec)["items"].([]any) {
+		require.NotEqual(t, "tenant-only", raw.(map[string]any)["name"],
+			"a tenant rule must not appear in the platform constraint list")
+	}
+}
+
+// The ordinary owner -- not root, no platform roles -- must be able to use the
+// feature. Every S12 rejection test used root, which took the platform bypass in
+// orgGuard and therefore never exercised the real permission lookup.
+
+func TestOrdinaryOwnerCanManageOwnConstraints(t *testing.T) {
+	h := newHarness(t)
+	iamFixtureUser(t, h, "plain-owner")
+	require.Equal(t, http.StatusOK, h.login("plain-owner", "FixturePass-123").Code)
+	fixtureStepUp(h)
+
+	orgID := orgByCode(t, h, "plain-tenant")
+	roleX := createOrgRole(t, h, orgID, "plain-approver")
+	roleY := createOrgRole(t, h, orgID, "plain-payer")
+
+	rec := h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/iam/constraints", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	rec = h.do(http.MethodPost, "/api/v1/orgs/"+orgID+"/iam/constraints", map[string]any{
+		"kind": "mutual_exclusion", "name": "owner-written", "role_ids": []string{roleX, roleY},
+		"enabled": true, "reason": "own policy", "expected_policy_revision": policyRevision(t, h),
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NotEmpty(t, decode[map[string]any](t, rec)["id"])
+}
+
+// An assignment that has expired confers nothing, so it must stop counting
+// towards segregation of duties. It used to keep counting (`Revoked` was the
+// only filter), which refused the opposite role forever and -- worse -- kept
+// denying every organization request from a member whose "conflict" was old
+// history.
