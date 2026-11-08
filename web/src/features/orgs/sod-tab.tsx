@@ -103,6 +103,11 @@ export function OrganizationSodTab({
     successMessage: '职责分离规则已保存',
     successDescription: '规则仅在本组织内生效，对后续授权立即生效。',
     invalidate: [['orgs', orgId, 'constraints']],
+    // A write advances the server's policy revision. Without refetching the
+    // authorization projection the next write still quotes the previous
+    // revision and fails with POLICY_CONFLICT -- so creating two rules in a row
+    // could never work.
+    refreshAuth: true,
     onSuccess: () => {
       closeAll()
     },
@@ -118,6 +123,8 @@ export function OrganizationSodTab({
     successMessage: '规则已删除',
     successDescription: '已生效的授权不会被撤销。',
     invalidate: [['orgs', orgId, 'constraints']],
+    // Same reason as the create path: deletion bumps the policy revision too.
+    refreshAuth: true,
     onSuccess: () => setDeleting(null),
   })
 
@@ -141,7 +148,11 @@ export function OrganizationSodTab({
     }
     if (kind === 'max_roles') {
       const n = Number(maxCount)
-      if (!Number.isInteger(n) || n < 0) return '角色数量上限必须为 0 或正整数'
+      // The server rejects max_count <= 0 (validateConstraint), and the design
+      // deleted the "0 means built-in roles only" reading: the count is scoped
+      // to the selected roles, so 0 has no meaning. Offering it here only led
+      // the user into a save that can never succeed.
+      if (!Number.isInteger(n) || n < 1) return '角色数量上限必须为正整数'
     }
     return null
   }
@@ -236,7 +247,11 @@ export function OrganizationSodTab({
                     <TD>{KIND_LABEL[c.kind as ConstraintKind] ?? c.kind}</TD>
                     <TD>
                       {c.kind === 'max_roles'
-                        ? `最多 ${c.max_count ?? 0} 个自定义角色`
+                        ? // The cap counts only the listed roles, so name both
+                          // sides. "最多 N 个自定义角色" read as a whole-tenant
+                          // total and was wrong for every constraint that did
+                          // not list every role.
+                          `所选 ${(c.role_ids ?? []).length} 个角色中最多 ${c.max_count ?? 0} 个`
                         : (c.role_ids ?? [])
                             .map((id) => rolesById.get(id ?? '')?.name ?? id)
                             .join(' / ')}
@@ -297,9 +312,9 @@ export function OrganizationSodTab({
           </Field>
           {kind === 'max_roles' ? (
             <Field
-              label="最多自定义角色数"
+              label="所选角色中最多可同时持有"
               htmlFor="sod-max"
-              hint="0 表示本组织只使用内置角色；内置角色不计入"
+              hint="只统计下方勾选的角色，至少为 1；未勾选的内置角色不参与计数"
             >
               <Input
                 id="sod-max"
