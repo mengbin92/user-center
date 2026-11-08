@@ -1,9 +1,9 @@
 // Package obs holds the Prometheus instrumentation for the user center.
 //
-// It deliberately depends on nothing but the standard library, the Kratos
-// transport metadata and the Prometheus client: the repository queries that
-// feed the gauges are injected as a probe interface so storage knowledge stays
-// in internal/data.
+// It deliberately depends on nothing but the standard library, the Prometheus
+// client and the gorilla/mux matcher the HTTP router already uses: the
+// repository queries that feed the gauges are injected as a probe interface so
+// storage knowledge stays in internal/data.
 package obs
 
 import (
@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kratos/kratos/v3/transport"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -65,6 +64,7 @@ const DefaultRefreshInterval = 30 * time.Second
 type Metrics struct {
 	registry *prometheus.Registry
 	probe    MetricsProbe
+	routes   *RouteSet
 
 	requests   *prometheus.CounterVec
 	duration   *prometheus.HistogramVec
@@ -80,6 +80,9 @@ func NewMetrics(probe MetricsProbe) *Metrics {
 	m := &Metrics{
 		registry: prometheus.NewRegistry(),
 		probe:    probe,
+		// Always non-nil: an unconfigured set matches nothing and collapses
+		// every request into "unknown"/"spa", which is the safe default.
+		routes: NewRouteSet(),
 		requests: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "usercenter_http_requests_total",
 			Help: "HTTP requests by route template, method and status code.",
@@ -146,11 +149,22 @@ func (m *Metrics) HTTP(next http.Handler) http.Handler {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		route := RouteLabel(r.Context(), r.URL.Path)
+		route := m.RouteLabel(r.Method, r.URL.Path)
+		method := MethodLabel(r.Method)
 		status := strconv.Itoa(rec.status)
-		m.requests.WithLabelValues(route, r.Method, status).Inc()
-		m.duration.WithLabelValues(route, r.Method).Observe(time.Since(start).Seconds())
+		m.requests.WithLabelValues(route, method, status).Inc()
+		m.duration.WithLabelValues(route, method).Observe(time.Since(start).Seconds())
 	})
+}
+
+// Routes is the template table this instance classifies requests against. The
+// server fills it during construction (protobuf routes via WalkRoute, raw
+// handlers explicitly) and then stops writing to it.
+func (m *Metrics) Routes() *RouteSet {
+	if m == nil {
+		return nil
+	}
+	return m.routes
 }
 
 // Refresh recomputes the gauges once. Probe errors leave the previous value in
@@ -285,47 +299,67 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 	return r.ResponseWriter.Write(b)
 }
 
-// RouteLabel returns the low-cardinality route key for a request. It prefers
-// the router's path template and falls back to masking the raw path, so an
-// unknown URL never becomes its own label value.
-func RouteLabel(ctx context.Context, rawPath string) string {
-	template := ""
-	if tr, ok := transport.FromServerContext(ctx); ok {
-		if t, ok := tr.(interface{ PathTemplate() string }); ok {
-			template = t.PathTemplate()
-		}
+// RouteLabel returns the low-cardinality route key for a request path.
+//
+// The label comes from the registered template table and nowhere else. A path
+// that is not a registered route becomes one of two constants:
+//
+//	"spa"     a client-side history route or asset, served by the SPA catch-all
+//	"unknown" anything else, including invented /api/v1/... URLs
+//
+// Deriving the label from the request URL (even with numeric segments masked)
+// is not acceptable: `/api/v1/admin/users/alice:archive` and
+// `/api/v1/unknown-tenant-1` would each become their own series, so an
+// unauthenticated caller controls the process's memory and the scrape size.
+func (m *Metrics) RouteLabel(method, rawPath string) string {
+	if m == nil {
+		return ClassifyPath(nil, method, rawPath)
 	}
-	if template == "" {
-		template = rawPath
-	}
-	return normalizeRoute(template, rawPath)
+	return ClassifyPath(m.routes, method, rawPath)
 }
 
-// instrumentedPrefixes are the families worth breaking down. Everything else
-// (SPA history routes, asset paths, unknown URLs) collapses into one label.
-var instrumentedPrefixes = []string{"/api/v1/", "/oidc/", "/.well-known/"}
-
-func normalizeRoute(template, rawPath string) string {
-	// No usable template: the raw path is all we have, so mask it first and
-	// collapse anything outside the instrumented families.
-	if template == "" {
-		if rawPath != "/healthz" && !hasAnyPrefix(rawPath, instrumentedPrefixes) {
-			return "spa"
-		}
-		return maskSegments(rawPath)
+// ClassifyPath is the single decision point behind every route label: the
+// request counter, the latency histogram and the slow-request log all call it,
+// so they cannot drift apart. See Metrics.RouteLabel for why the request URL is
+// never used as the label itself.
+func ClassifyPath(routes *RouteSet, method, rawPath string) string {
+	if template, ok := routes.Match(method, rawPath); ok {
+		return template
 	}
-	if template == "/" {
-		if rawPath == "/" {
-			return "/"
-		}
-		// HandlePrefix("/") matches every SPA path with the template "/".
+	if isSPAPath(rawPath) {
 		return "spa"
 	}
-	if template != "/healthz" && !hasAnyPrefix(template, instrumentedPrefixes) {
-		return "spa"
-	}
-	return maskSegments(template)
+	return "unknown"
 }
+
+// MethodLabel maps the request method onto a closed set. The raw method is
+// attacker-controlled in the same way the path is: arbitrary tokens would each
+// create a series.
+func MethodLabel(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut,
+		http.MethodPatch, http.MethodDelete, http.MethodOptions:
+		return method
+	default:
+		return "other"
+	}
+}
+
+// isSPAPath reports whether the path can only be the single-page app: it is
+// outside every API family, so the SPA catch-all handles it (or would, when
+// built). Collapsing them is correct because the SPA has no per-url semantics
+// the operator can act on.
+func isSPAPath(rawPath string) bool {
+	if rawPath == "" || rawPath == "/" {
+		return true
+	}
+	return !hasAnyPrefix(rawPath, instrumentedPrefixes)
+}
+
+// instrumentedPrefixes are the families that belong to the server's own API
+// surface. A path outside them is SPA traffic; inside them but unmatched is an
+// unknown endpoint.
+var instrumentedPrefixes = []string{"/api/", "/oidc/", "/.well-known/", "/healthz", "/readyz"}
 
 func hasAnyPrefix(s string, prefixes []string) bool {
 	for _, p := range prefixes {
@@ -334,36 +368,6 @@ func hasAnyPrefix(s string, prefixes []string) bool {
 		}
 	}
 	return false
-}
-
-const maxRouteSegments = 10
-
-// maskSegments replaces numeric segments with {id} and truncates paths that are
-// longer than any registered route, so a hand-crafted URL cannot inflate the
-// label cardinality.
-func maskSegments(p string) string {
-	segments := strings.Split(p, "/")
-	for i, segment := range segments {
-		if isNumeric(segment) {
-			segments[i] = "{id}"
-		}
-	}
-	if len(segments) > maxRouteSegments {
-		return strings.Join(segments[:maxRouteSegments], "/") + "/**"
-	}
-	return strings.Join(segments, "/")
-}
-
-func isNumeric(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 // RateLimited counts a rejection so the 429 can be alerted on per scope. A

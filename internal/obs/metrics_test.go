@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,8 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// stubTransport satisfies transport.Transporter so the template branch of
-// RouteLabel can be exercised without a live router.
+// stubTransport satisfies transport.Transporter so a caller that still holds a
+// Kratos transport can be exercised. Routing no longer reads it: the label comes
+// from the registered template table (see RouteSet), never from the request.
 type stubTransport struct {
 	template string
 }
@@ -34,47 +34,85 @@ func withTemplate(ctx context.Context, template string) context.Context {
 	return transport.NewServerContext(ctx, stubTransport{template: template})
 }
 
-func TestRouteLabelMasksIdentifiers(t *testing.T) {
-	// Raw-path fallback: the auth filter sits outside the router, so most
-	// requests arrive here without a template.
-	for _, path := range []string{
-		"/api/v1/admin/users/42",
-		"/api/v1/admin/users/31337",
-	} {
-		require.Equal(t, "/api/v1/admin/users/{id}", RouteLabel(context.Background(), path))
+// registered builds a Metrics whose route table mirrors a real server: the
+// protobuf templates plus the raw handlers.
+func registered(method string, templates ...string) *Metrics {
+	m := NewMetrics(nil)
+	for _, template := range templates {
+		m.Routes().Add(method, template)
 	}
-	// A router template is used verbatim.
-	ctx := withTemplate(context.Background(), "/api/v1/orgs/{id}/audits")
-	require.Equal(t, "/api/v1/orgs/{id}/audits", RouteLabel(ctx, "/api/v1/orgs/7/audits"))
+	return m
 }
 
-func TestRouteLabelCollapsesForeignPaths(t *testing.T) {
+func TestRouteLabelMatchesOnlyRegisteredTemplates(t *testing.T) {
+	// Same shape as the real router: the read route and the action route are
+	// separate (method, template) entries, which is what keeps {id} from
+	// swallowing "4242:archive".
+	m := registered(MethodAny, "/api/v1/orgs/{id}/members")
+	m.Routes().Add(http.MethodGet, "/api/v1/admin/users/{id}")
+	m.Routes().Add(http.MethodPost, "/api/v1/admin/users/{id}:archive")
+
+	// Two different user ids collapse onto the template.
+	for _, path := range []string{"/api/v1/admin/users/42", "/api/v1/admin/users/31337"} {
+		require.Equal(t, "/api/v1/admin/users/{id}", m.RouteLabel(http.MethodGet, path))
+	}
+	// The action suffix is part of the template, not of the identifier.
+	require.Equal(t, "/api/v1/admin/users/{id}:archive", m.RouteLabel(http.MethodPost, "/api/v1/admin/users/4242:archive"))
+	// A non-numeric identifier must not leak either: it reaches the same
+	// template because the label is not derived from the path.
+	require.Equal(t, "/api/v1/admin/users/{id}:archive", m.RouteLabel(http.MethodPost, "/api/v1/admin/users/alice:archive"))
+	require.Equal(t, "/api/v1/orgs/{id}/members", m.RouteLabel(http.MethodGet, "/api/v1/orgs/9/members"))
+}
+
+func TestRouteLabelUnknownPathsCollapseToOneSeries(t *testing.T) {
+	m := registered(MethodAny, "/api/v1/auth/login")
+
+	// The cardinality attack from the review: 100 invented tenant URLs used to
+	// create 100 counter series and an unauthenticated caller could keep going.
+	for i := range 100 {
+		require.Equal(t, "unknown", m.RouteLabel(http.MethodGet, fmt.Sprintf("/api/v1/unknown-tenant-%d", i)))
+	}
+	require.Equal(t, "unknown", m.RouteLabel(http.MethodPost, "/api/v1/admin/users/4242:archive"))
+	require.Equal(t, "unknown", m.RouteLabel(http.MethodGet, "/oidc/not-a-route"))
+}
+
+func TestRouteLabelCollapsesSPAAndProbes(t *testing.T) {
+	m := registered(MethodAny, "/healthz", "/readyz")
 	cases := map[string]string{
 		"/admin/users/42":      "spa",
 		"/assets/index-abc.js": "spa",
-		"/":                    "/",
+		"/":                    "spa",
 		"/healthz":             "/healthz",
+		"/readyz":              "/readyz",
 	}
 	for path, want := range cases {
-		require.Equal(t, want, RouteLabel(context.Background(), path), "path %s", path)
+		require.Equal(t, want, m.RouteLabel(http.MethodGet, path), "path %s", path)
 	}
-	// HandlePrefix("/") hands every SPA path the template "/".
-	ctx := withTemplate(context.Background(), "/")
-	require.Equal(t, "spa", RouteLabel(ctx, "/admin/users/42"))
-	require.Equal(t, "/", RouteLabel(ctx, "/"))
 }
 
-func TestRouteLabelTruncatesLongPaths(t *testing.T) {
-	path := "/api/v1/admin/users/1/2/3/4/5/6/7/8/9/10/11"
-	label := RouteLabel(context.Background(), path)
-	require.True(t, strings.HasSuffix(label, "/**"), "label = %s", label)
-	require.LessOrEqual(t, strings.Count(label, "/"), maxRouteSegments+1)
-	// Two different over-long URLs must not produce two labels.
-	require.Equal(t, label, RouteLabel(context.Background(), path+"2"))
+func TestClassifyPathIsNilSafe(t *testing.T) {
+	// A nil RouteSet (metrics disabled, CLI paths) must not panic and must not
+	// fall back to echoing the URL.
+	require.Equal(t, "spa", ClassifyPath(nil, http.MethodGet, "/account/security"))
+	require.Equal(t, "unknown", ClassifyPath(nil, http.MethodGet, "/api/v1/admin/users/4242"))
+}
+
+func TestMethodLabelIsBounded(t *testing.T) {
+	for _, method := range []string{
+		http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut,
+		http.MethodPatch, http.MethodDelete, http.MethodOptions,
+	} {
+		require.Equal(t, method, MethodLabel(method))
+	}
+	// Anything else is one bucket: the attacker-controlled verb must not
+	// become a label value.
+	for _, method := range []string{"PROPFIND", "get", "", "M-SEARCH"} {
+		require.Equal(t, "other", MethodLabel(method))
+	}
 }
 
 func TestHTTPRecordsStatusAndRoute(t *testing.T) {
-	m := NewMetrics(nil)
+	m := registered(MethodAny, "/api/v1/auth/login")
 	next := m.HTTP(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
@@ -88,7 +126,7 @@ func TestHTTPRecordsStatusAndRoute(t *testing.T) {
 }
 
 func TestHTTPRecordsServerErrorsUnderOneRoute(t *testing.T) {
-	m := NewMetrics(nil)
+	m := registered(MethodAny, "/api/v1/orgs/{id}/members")
 	next := m.HTTP(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -98,6 +136,15 @@ func TestHTTPRecordsServerErrorsUnderOneRoute(t *testing.T) {
 	// Both organisation IDs land on the same route label.
 	require.Equal(t, float64(2), testutil.ToFloat64(
 		m.requests.WithLabelValues("/api/v1/orgs/{id}/members", http.MethodGet, "500")))
+}
+
+// An unknown method on a known path must not widen the label set.
+func TestHTTPFoldsUnknownMethods(t *testing.T) {
+	m := registered(MethodAny, "/api/v1/auth/login")
+	next := m.HTTP(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	next.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("PROPFIND", "/api/v1/auth/login", nil))
+	require.Equal(t, float64(1), testutil.ToFloat64(
+		m.requests.WithLabelValues("/api/v1/auth/login", "other", "200")))
 }
 
 func TestRefreshSetsGaugesAndKeepsValuesOnError(t *testing.T) {

@@ -9,14 +9,13 @@ import (
 	"net/url"
 	"strings"
 
-	khttp "github.com/go-kratos/kratos/v3/transport/http"
-
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/internal/obs"
 	"github.com/mengbin92/user-center/internal/service"
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
-func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase) {
+func mountOIDCRoutes(handle func(string, string, http.HandlerFunc), mw *Middleware, uc *biz.OIDCUsecase) {
 	discovery := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !oidcMethods(w, r, http.MethodGet, http.MethodHead) {
 			return
@@ -182,12 +181,12 @@ func mountOIDCRoutes(srv *khttp.Server, mw *Middleware, uc *biz.OIDCUsecase) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>已退出登录</title></head><body style="font-family:system-ui;padding:48px;text-align:center"><p>已退出用户中心登录。</p><p><a href="/login">重新登录</a></p></body></html>`))
 	})
-	srv.HandleFunc("/.well-known/openid-configuration", mw.Filter(discovery).ServeHTTP)
-	srv.HandleFunc("/oidc/jwks", mw.Filter(jwks).ServeHTTP)
-	srv.HandleFunc("/oidc/authorize", mw.Filter(authorize).ServeHTTP)
-	srv.HandleFunc("/oidc/token", mw.Filter(token).ServeHTTP)
-	srv.HandleFunc("/oidc/userinfo", mw.Filter(userinfo).ServeHTTP)
-	srv.HandleFunc("/oidc/logout", mw.Filter(logout).ServeHTTP)
+	handle(obs.MethodAny, "/.well-known/openid-configuration", mw.Filter(discovery).ServeHTTP)
+	handle(obs.MethodAny, "/oidc/jwks", mw.Filter(jwks).ServeHTTP)
+	handle(obs.MethodAny, "/oidc/authorize", mw.Filter(authorize).ServeHTTP)
+	handle(obs.MethodAny, "/oidc/token", mw.Filter(token).ServeHTTP)
+	handle(obs.MethodAny, "/oidc/userinfo", mw.Filter(userinfo).ServeHTTP)
+	handle(obs.MethodAny, "/oidc/logout", mw.Filter(logout).ServeHTTP)
 }
 
 func oidcMethods(w http.ResponseWriter, r *http.Request, allowed ...string) bool {
