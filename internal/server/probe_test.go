@@ -21,16 +21,32 @@ func TestHealthzIsLivenessOnly(t *testing.T) {
 	require.Contains(t, rec.Body.String(), `"status":"ok"`)
 }
 
-// Readiness needs the database, so with a working fixture it must be 200. The
-// failing branch is covered in internal/obs (a fake probe), because breaking the
-// real database from an HTTP test would be a much slower way to assert the same
-// thing.
+// Readiness needs the database, so with a working fixture it must be 200.
 func TestReadyzReportsDependencyState(t *testing.T) {
 	h := newHarness(t)
 	rec := h.do(http.MethodGet, "/readyz", nil, "", false)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Contains(t, rec.Body.String(), `"status":"ok"`)
 	require.Contains(t, rec.Body.String(), `"mysql":"ok"`)
+}
+
+// The wiring test the previous version was missing: it injected a nil probe,
+// which answers "ready" without touching anything, so a green /readyz proved
+// nothing. Dropping the sentinel table is the S13 failure in its smallest form,
+// and it must fail readiness while liveness stays green.
+func TestReadyzFailsWhenTheSchemaIsGone(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.do(http.MethodGet, "/readyz", nil, "", false).Code)
+
+	require.NoError(t, h.d.DB().Exec("DROP TABLE users").Error)
+
+	rec := h.do(http.MethodGet, "/readyz", nil, "", false)
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), `"status":"unavailable"`)
+	require.NotContains(t, rec.Body.String(), `"mysql":"ok"`)
+
+	require.Equal(t, http.StatusOK, h.do(http.MethodGet, "/healthz", nil, "", false).Code,
+		"liveness must not depend on the database")
 }
 
 // Neither probe may require authentication or a CSRF token: they are polled by

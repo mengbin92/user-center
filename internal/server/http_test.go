@@ -57,17 +57,18 @@ func (m *captureMail) last() capturedMail {
 }
 
 type harness struct {
-	t      *testing.T
-	srv    http.Handler
-	jar    http.CookieJar
-	csrf   string
-	users  *biz.UserUsecase
-	iam    *biz.IAMUsecase
-	auth   *biz.AuthUsecase
-	svc    *biz.Services
-	artDir string
-	mail   *captureMail
-	d      *data.Data
+	t       *testing.T
+	srv     http.Handler
+	jar     http.CookieJar
+	csrf    string
+	metrics *obs.Metrics
+	users   *biz.UserUsecase
+	iam     *biz.IAMUsecase
+	auth    *biz.AuthUsecase
+	svc     *biz.Services
+	artDir  string
+	mail    *captureMail
+	d       *data.Data
 }
 
 // harnessOption tunes the server config for one test. Used by the rate-limit
@@ -150,8 +151,9 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	for _, opt := range opts {
 		opt(srvCfg)
 	}
+	metrics := obs.NewMetrics(d)
 	hs := server.NewHTTPServer(
-		srvCfg, sec, mw, obs.NewMetrics(nil), zap.NewNop(),
+		srvCfg, sec, mw, metrics, zap.NewNop(),
 		service.NewAuthService(auth, deps),
 		service.NewMeService(users, security, sessions, biz.NewOIDCUsecase(svc), biz.NewWebAuthnUsecase(svc), deps),
 		service.NewAdminUserService(users, sessions),
@@ -166,7 +168,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	)
 	_ = integration
 	jar, _ := cookiejar.New(nil)
-	h := &harness{t: t, srv: hs.Server, jar: jar, users: users, iam: iam, auth: auth, svc: svc, artDir: runtime.ArtifactDir, mail: mailer, d: d}
+	h := &harness{t: t, srv: hs.Server, jar: jar, metrics: metrics, users: users, iam: iam, auth: auth, svc: svc, artDir: runtime.ArtifactDir, mail: mailer, d: d}
 	h.refreshCSRF()
 	return h
 }

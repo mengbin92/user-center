@@ -60,13 +60,18 @@ func (d *Data) SchemaMigrationsApplied(ctx context.Context) (int64, error) {
 // in rotation. So this runs a real query against a table the migrator creates;
 // a missing schema now fails the probe.
 //
-// schema_migrations is the sentinel because it is created by the migrate step
-// itself: if it is absent, this release never ran here.
+// The sentinel is `users`, not `schema_migrations`. schema_migrations is
+// MySQL-only bookkeeping: SQLite creates no such table, so the previous probe
+// reported a perfectly migrated dev database as permanently unready. `users` is
+// created by both drivers and is read on every request path, which makes it the
+// honest "this schema is usable" question. Limit(1) instead of COUNT(*): the
+// probe only needs one row to prove the table is readable, and never needs to
+// scan.
 func (d *Data) PingDatabase(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
-	var n int64
-	return d.db.WithContext(ctx).Table("schema_migrations").Count(&n).Error
+	var rows []struct{ ID int64 }
+	return d.db.WithContext(ctx).Table("users").Select("id").Limit(1).Find(&rows).Error
 }
 
 // PingCache reports nil when Redis is not configured: the gauge means "this

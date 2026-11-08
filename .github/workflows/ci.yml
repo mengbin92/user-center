@@ -122,4 +122,9 @@ jobs:
           docker run -d --name uc-ci -e DB_DRIVER=sqlite -e DB_DSN='file:/tmp/uc.db?_fk=1' -e HTTP_ADDR=:8080 -e GRPC_ADDR=:9090 -p 18080:8080 user-center:ci sh -c "/app/migrate -config /app/configs/config.dev.yaml && /app/user-center -config /app/configs/config.dev.yaml"
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18080/healthz && break || sleep 2; done
           curl -fsS http://127.0.0.1:18080/healthz
+          # Readiness answers a different question than liveness, and it is what
+          # the image's built-in HEALTHCHECK now uses. Assert both: a green
+          # healthz over a 503 readyz is exactly the "container healthy, database
+          # gone" state S13 was about.
+          curl -fsS http://127.0.0.1:18080/readyz
           curl -fsS -I http://127.0.0.1:18080/login
