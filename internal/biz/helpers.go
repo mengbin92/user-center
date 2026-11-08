@@ -221,6 +221,33 @@ func PasswordExpired(changedAt time.Time, policy PasswordPolicy, now time.Time) 
 	return now.After(changedAt.AddDate(0, 0, policy.ExpiryDays))
 }
 
+// credentialRestricted answers the one question every credential entry point
+// has to ask: "is this account allowed to act normally, or must it set a new
+// password first".
+//
+// It exists so the answer cannot differ by protocol. The browser gate lives in
+// ValidateSession (which turns it into ActorContext.PasswordChangeRequired),
+// and the OIDC and internal gRPC surfaces call this helper. Before that split,
+// `MustChangePassword` was checked in three places and expiry in only two, so a
+// refresh token kept minting new tokens for an expired password.
+//
+// Expiry and "must change" collapse into the same gate on purpose: both mean
+// "this credential has to be replaced", and having two flags would mean two
+// enforcement paths that inevitably drift.
+func (s *Services) credentialRestricted(ctx context.Context, tx Tx, credential *Credential) (bool, error) {
+	if credential == nil {
+		return false, nil
+	}
+	if credential.MustChangePassword {
+		return true, nil
+	}
+	settings, err := s.Settings.GetAuth(ctx, tx)
+	if err != nil {
+		return false, ErrDependency
+	}
+	return PasswordExpired(credential.ChangedAt, settings.PasswordPolicy(), s.Clock.Now()), nil
+}
+
 // CheckPasswordReuse rejects a candidate that matches the account's current
 // password or anything inside the history window. current may be nil when the
 // account has no password yet (OAuth-only accounts).

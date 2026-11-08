@@ -263,7 +263,7 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 			return ctx, false
 		}
 		if actor.PasswordChangeRequired && requiresPasswordChange(r.URL.Path) {
-			writeError(w, http.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "首次登录必须先修改初始密码")
+			writeError(w, http.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "必须先修改密码后才能继续")
 			return ctx, false
 		}
 	}
