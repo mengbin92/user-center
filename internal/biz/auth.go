@@ -432,6 +432,18 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 	var session *Session
 	var raw string
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// Lock the user before the transaction performs ANY consistent read.
+		//
+		// MySQL's default REPEATABLE READ pins the snapshot at the transaction's
+		// first consistent read, which here is the challenge completion or the
+		// passkey credential lookup. Locking afterwards would take the row lock
+		// on a snapshot that already excludes a session another transaction
+		// committed in the meantime, so the cap check could still miss it. The
+		// inner issueSessionLocked call re-locks the same row, which is a no-op
+		// inside the same transaction.
+		if err := uc.Users.LockUser(ctx, tx, user.ID); err != nil {
+			return ErrDependency
+		}
 		if err := uc.Flows.Complete(ctx, tx, challengeID, "mfa", user.ID, "session"); err != nil {
 			return err
 		}
