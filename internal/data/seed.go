@@ -93,6 +93,13 @@ var seededPermissions = []seedPermission{
 	{"organization.iam.role.manage", "管理组织角色", "organization", "high", "创建、修改与归档本组织角色", []string{"all"}, 950},
 	{"organization.iam.assignment.read", "查看组织授权", "organization", "low", "查看本组织成员的角色分配", []string{"all"}, 960},
 	{"organization.iam.assignment.manage", "管理组织授权", "organization", "high", "向本组织成员分配或撤销角色", []string{"all", "user_ids"}, 970},
+	// V2.5 S12. Without these two in the catalog, AuthorizeIn fails with
+	// OPERATION_UNBOUND and every organization owner -- the role that is
+	// *supposed* to hold constraint management -- gets a flat 403. The grants
+	// alone were never enough: the permission dictionary is what the decision
+	// resolves the operation through.
+	{"organization.iam.constraint.read", "查看组织职责分离", "organization", "low", "读取本组织职责分离约束", []string{"all"}, 975},
+	{"organization.iam.constraint.manage", "管理组织职责分离", "organization", "critical", "管理本组织职责分离约束", []string{"all"}, 976},
 	{"organization.audit.read", "查看组织审计", "organization", "medium", "读取本组织的授权审计", []string{"all"}, 980},
 	{"organization.settings.update", "修改组织设置", "organization", "high", "修改组织名称等基础设置", []string{"all"}, 990},
 	{"organization.archive", "归档组织", "organization", "critical", "归档本组织并冻结成员访问", []string{"all"}, 1000},

@@ -515,3 +515,46 @@ func TestOrdinaryOwnerCanManageOwnConstraints(t *testing.T) {
 // only filter), which refused the opposite role forever and -- worse -- kept
 // denying every organization request from a member whose "conflict" was old
 // history.
+
+func TestOrganizationBackfillRestoresMissingConstraintGrants(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	fixtureStepUp(h)
+
+	orgID := orgByCode(t, h, "upgrade-tenant")
+
+	// Simulate the pre-V2.5 state: the built-in owner role exists, has grants,
+	// and is missing the two constraint operations.
+	res := h.d.DB().Exec(`DELETE FROM iam_role_permissions
+		WHERE operation IN (?, ?)
+		  AND role_id IN (SELECT id FROM iam_roles
+		                  WHERE context_type = 'organization' AND context_id = ? AND code = 'org_owner')`,
+		biz.PermOrgConstraintRead, biz.PermOrgConstraintManage, mustParseID(t, orgID))
+	require.NoError(t, res.Error)
+	require.Equal(t, int64(2), res.RowsAffected, "fixture must remove both grants")
+
+	rec := h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/iam/constraints", nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code,
+		"without the grants the owner really is denied: %s", rec.Body.String())
+
+	require.NoError(t, h.svc.BackfillOrganizationIAM(t.Context()))
+
+	rec = h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/iam/constraints", nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	// And the repair is additive: the owner keeps everything else it had.
+	roles, err := h.svc.OrgIAM.ListRoles(t.Context(), nil, authorization.Organization(mustParseID(t, orgID)))
+	require.NoError(t, err)
+	ownerOps := map[string]bool{}
+	for _, role := range roles {
+		if role.Code != biz.OrgRoleCodeOwner {
+			continue
+		}
+		for _, g := range role.Grants {
+			ownerOps[g.Operation] = true
+		}
+	}
+	for _, op := range []string{biz.PermOrgConstraintRead, biz.PermOrgConstraintManage, biz.PermOrgMemberManage, biz.PermOrgAuditRead} {
+		require.True(t, ownerOps[op], "owner must hold %s after the backfill", op)
+	}
+}

@@ -213,8 +213,55 @@ func (s *Services) BackfillOrganizationIAM(ctx context.Context) error {
 		if err := s.ensureOrganizationIAM(ctx, org.ID); err != nil {
 			return err
 		}
+		if err := s.reconcileOrgBuiltinGrants(ctx, org.ID); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// reconcileOrgBuiltinGrants adds grants that the current binary requires but the
+// stored built-in role does not have yet.
+//
+// ensureOrganizationIAM cannot do this: it skips an organization whose owner
+// role already exists and whose grants are non-empty, which is every tenant
+// created before the role spec grew (V2.5 added the two constraint operations).
+// Those tenants kept a 403 on their own SoD page even after the catalog was
+// seeded. Additive only -- grants an operator added or customised are preserved,
+// because this is a migration, not a reset.
+func (s *Services) reconcileOrgBuiltinGrants(ctx context.Context, orgID int64) error {
+	authCtx := authorization.Organization(orgID)
+	return s.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		for _, spec := range orgBuiltinRoleSpecs {
+			role, err := s.OrgIAM.GetRoleByCode(ctx, tx, authCtx, spec.Code)
+			if errors.Is(err, ErrResourceNotFound) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			held := make(map[string]bool, len(role.Grants))
+			for _, g := range role.Grants {
+				held[g.Operation] = true
+			}
+			added := false
+			merged := append([]Grant{}, role.Grants...)
+			for _, want := range spec.Grants {
+				if held[want.Operation] {
+					continue
+				}
+				merged = append(merged, want)
+				added = true
+			}
+			if !added {
+				continue
+			}
+			if _, err := s.OrgIAM.PutRoleGrants(ctx, tx, authCtx, role.ID, merged, role.Revision); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 type OrgRoleInput struct {
