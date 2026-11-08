@@ -15,6 +15,14 @@ import (
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
+// mountOIDCRoutes installs the protocol endpoints.
+//
+// The handlers are passed to the server's own registration function rather than
+// wrapped in mw.Filter: the global khttp.Filter chain (metrics + mw.Filter) is
+// applied once to the router, so an inner mw.Filter would run prepare() and the
+// write limiter a second time for the same request. That halved every OIDC
+// write budget (a 120/min limit behaved like 60/min) and charged the token
+// endpoint twice for one call.
 func mountOIDCRoutes(handle func(string, string, http.HandlerFunc), mw *Middleware, uc *biz.OIDCUsecase) {
 	discovery := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !oidcMethods(w, r, http.MethodGet, http.MethodHead) {
@@ -181,12 +189,12 @@ func mountOIDCRoutes(handle func(string, string, http.HandlerFunc), mw *Middlewa
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>已退出登录</title></head><body style="font-family:system-ui;padding:48px;text-align:center"><p>已退出用户中心登录。</p><p><a href="/login">重新登录</a></p></body></html>`))
 	})
-	handle(obs.MethodAny, "/.well-known/openid-configuration", mw.Filter(discovery).ServeHTTP)
-	handle(obs.MethodAny, "/oidc/jwks", mw.Filter(jwks).ServeHTTP)
-	handle(obs.MethodAny, "/oidc/authorize", mw.Filter(authorize).ServeHTTP)
-	handle(obs.MethodAny, "/oidc/token", mw.Filter(token).ServeHTTP)
-	handle(obs.MethodAny, "/oidc/userinfo", mw.Filter(userinfo).ServeHTTP)
-	handle(obs.MethodAny, "/oidc/logout", mw.Filter(logout).ServeHTTP)
+	handle(obs.MethodAny, "/.well-known/openid-configuration", discovery)
+	handle(obs.MethodAny, "/oidc/jwks", jwks)
+	handle(obs.MethodAny, "/oidc/authorize", authorize)
+	handle(obs.MethodAny, "/oidc/token", token)
+	handle(obs.MethodAny, "/oidc/userinfo", userinfo)
+	handle(obs.MethodAny, "/oidc/logout", logout)
 }
 
 func oidcMethods(w http.ResponseWriter, r *http.Request, allowed ...string) bool {

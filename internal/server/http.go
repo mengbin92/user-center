@@ -296,8 +296,11 @@ func mountOAuthRoutes(handle func(string, string, http.HandlerFunc), mw *Middlew
 		}
 		http.Redirect(w, r, result.Redirect, http.StatusFound)
 	})
-	handle(obs.MethodAny, "/api/v1/auth/providers/{provider}/start", mw.Filter(start).ServeHTTP)
-	handle(obs.MethodAny, "/api/v1/auth/providers/{provider}/callback", mw.Filter(callback).ServeHTTP)
+	// The global khttp.Filter chain (metrics + mw.Filter) already wraps the
+	// router, so these handlers must NOT be wrapped a second time: the previous
+	// mw.Filter(...) here ran prepare() and the write limiter twice per request.
+	handle(obs.MethodAny, "/api/v1/auth/providers/{provider}/start", start)
+	handle(obs.MethodAny, "/api/v1/auth/providers/{provider}/callback", callback)
 }
 
 func oauthProviderFromPath(path string) string {

@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,30 @@ func TestWriteBudgetRejectsBurstButNotReads(t *testing.T) {
 	// to look at the page that explains what happened.
 	require.Equal(t, http.StatusOK,
 		h.do(http.MethodGet, "/api/v1/me/authorization", nil, "", false).Code)
+}
+
+// Raw protocol routes are mounted through the same server as the protobuf ones,
+// so the global filter chain already runs prepare() and the write limiter for
+// them. Wrapping them in mw.Filter a second time (which the OIDC endpoints used
+// to do) spent two units of budget per request, halving the configured limit.
+func TestRawOIDCRouteSpendsOneBudgetUnitPerRequest(t *testing.T) {
+	h := newHarness(t, withRateLimit(&conf.RateLimit{
+		Enabled: true, WritePerMinute: 3, HeavyPerMinute: 2,
+	}))
+
+	// An anonymous /oidc/token POST is keyed by IP. The endpoint itself rejects
+	// it (unknown client, so 401) -- irrelevant here: the assertion is that
+	// three attempts fit a budget of three and the fourth is refused.
+	form := url.Values{"grant_type": {"authorization_code"}}
+	for i := 1; i <= 3; i++ {
+		rec := h.doForm("/oidc/token", form, "client", "secret")
+		require.NotEqual(t, http.StatusTooManyRequests, rec.Code,
+			"attempt %d must fit the configured budget of 3", i)
+		require.Less(t, rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	rec := h.doForm("/oidc/token", form, "client", "secret")
+	require.Equal(t, http.StatusTooManyRequests, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "RATE_LIMITED")
 }
 
 func TestHeavyEndpointsHaveTheirOwnStricterBudget(t *testing.T) {
