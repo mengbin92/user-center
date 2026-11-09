@@ -40,6 +40,10 @@ type Draft = {
   ceiling: Ceiling
   startsAt: string
   expiresAt: string
+  // Empty means "all current and future members"; otherwise the delegation is
+  // bounded to these user ids. The server compares this against the assignment
+  // target on every write.
+  userScope: string[]
 }
 
 type Confirm = {
@@ -81,6 +85,11 @@ export function OrganizationDelegations({
     queryFn: () => api.orgs.listRoles(orgId),
     retry: false,
   })
+  const membersQuery = useQuery({
+    queryKey: ['orgs', orgId, 'members'],
+    queryFn: () => api.orgs.listMembers(orgId),
+    retry: false,
+  })
 
   const { authorization } = useAuth()
   const canManage = org.role === 'owner'
@@ -94,6 +103,8 @@ export function OrganizationDelegations({
   const [actions, setActions] = useState<string[]>(['assign'])
   const [startsAt, setStartsAt] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
+  const [scopeAll, setScopeAll] = useState(true)
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
 
   const roles = useMemo(() => rolesQuery.data?.items ?? [], [rolesQuery.data])
   const rolesById = useMemo(() => {
@@ -129,6 +140,9 @@ export function OrganizationDelegations({
         target_role_id: payload.draft.targetRole,
         actions: payload.draft.actions,
         grant_ceiling: payload.draft.ceiling,
+        target_user_scope: payload.draft.userScope.length > 0
+          ? { user_ids: payload.draft.userScope }
+          : { all: true },
         starts_at: toRFC3339(payload.draft.startsAt),
         expires_at: toRFC3339(payload.draft.expiresAt),
         reason: payload.reason,
@@ -147,6 +161,9 @@ export function OrganizationDelegations({
         delegation_id: payload.item.id ?? '',
         actions: payload.draft.actions,
         grant_ceiling: payload.draft.ceiling,
+        target_user_scope: payload.draft.userScope.length > 0
+          ? { user_ids: payload.draft.userScope }
+          : { all: true },
         starts_at: toRFC3339(payload.draft.startsAt),
         expires_at: toRFC3339(payload.draft.expiresAt),
         expected_revision: payload.item.revision ?? '0',
@@ -182,6 +199,8 @@ export function OrganizationDelegations({
     setActions(['assign'])
     setStartsAt('')
     setExpiresAt('')
+    setScopeAll(true)
+    setSelectedUsers([])
     setDialog({ mode: 'create' })
   }
 
@@ -192,6 +211,10 @@ export function OrganizationDelegations({
     setActions(item.actions ?? ['assign'])
     setStartsAt(toLocalInput(item.starts_at))
     setExpiresAt(toLocalInput(item.expires_at))
+    const scope = item.target_user_scope
+    const scopedUsers = scope?.user_ids ?? []
+    setScopeAll(!scope || scope.all === true || scopedUsers.length === 0)
+    setSelectedUsers(scopedUsers)
     setDialog({ mode: 'update', item })
   }
 
@@ -201,6 +224,9 @@ export function OrganizationDelegations({
       return '管理角色不能与目标角色相同'
     }
     if (actions.length === 0) return '请至少选择一个动作'
+    if (!scopeAll && selectedUsers.length === 0) {
+      return '请选择至少一个目标用户，或改为全部成员'
+    }
     if (ceiling.length === 0) {
       return '目标角色没有可授予的权限，请先为其配置授权'
     }
@@ -213,7 +239,10 @@ export function OrganizationDelegations({
       setFormError(error)
       return
     }
-    const draft: Draft = { managerRole, targetRole, actions: [...actions], ceiling, startsAt, expiresAt }
+    const draft: Draft = {
+      managerRole, targetRole, actions: [...actions], ceiling, startsAt, expiresAt,
+      userScope: scopeAll ? [] : [...selectedUsers],
+    }
     if (dialog?.mode === 'update') {
       const item = dialog.item
       setConfirm({
@@ -356,6 +385,43 @@ export function OrganizationDelegations({
               ))}
             </div>
           </Field>
+          <Field label="目标用户范围" hint="限定这条委派能用于哪些成员的授权；服务端每次分配都会比对">
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="radio" checked={scopeAll} onChange={() => setScopeAll(true)} />
+                全部成员（含后续加入）
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="radio" checked={!scopeAll} onChange={() => setScopeAll(false)} />
+                指定成员
+              </label>
+              {!scopeAll ? (
+                <div className="max-h-40 space-y-1 overflow-y-auto pl-6">
+                  {(membersQuery.data?.items ?? []).map((m) => {
+                    const uid = m.user_id ?? ''
+                    return (
+                      <label key={uid || m.username} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.includes(uid)}
+                          onChange={(event) =>
+                            setSelectedUsers((prev) =>
+                              event.target.checked ? [...prev, uid] : prev.filter((x) => x !== uid),
+                            )
+                          }
+                        />
+                        {m.display_name || m.username}
+                        <span className="text-slate-400">{m.username}</span>
+                      </label>
+                    )
+                  })}
+                  {(membersQuery.data?.items ?? []).length === 0 ? (
+                    <p className="text-xs text-slate-500">本组织暂无成员。</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </Field>
           <Field label="生效时间" htmlFor="dlg-starts" hint="留空表示立即生效">
             <Input id="dlg-starts" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
           </Field>
@@ -386,6 +452,7 @@ export function OrganizationDelegations({
         confirmLabel={confirm?.confirmLabel ?? '确认'}
         tone={confirm?.danger ? 'danger' : undefined}
         busy={busy}
+        error={formError}
       />
     </Card>
   )

@@ -170,11 +170,11 @@ scripts/                  开发与检查脚本
 
 - 租户物理隔离的**存量数据 cutover**（基础设施与 SCIM / 目录同步租户数据域已交付，未完成项见 `docs/tenancy.md` §4）；SCIM 2.0 供给、企业目录同步与组织级 SoD 已交付（约束 + 委派 CRUD + 界面），R13/R14 已实现，见下；
 - OAuth 真实提供方沙箱验收：代码与本地 fake provider 测试已就绪，需配置真实凭据后执行；QQ 邮箱 SMTP 已完成真实发信与 IMAP 送达验收（[记录](docs/acceptance-smtp-2026-11-03.md)）；
-- 组织委派已可通过 `GET/POST /api/v1/orgs/{id}/iam/delegations`、`PATCH .../delegations/{delegation_id}` 与 `POST .../delegations/{delegation_id}:revoke` 管理，界面位于「职责分离」页；写入沿用 `organization.iam.constraint.read/.manage` 治理权限、`reason`、`expected_revision` 与 `expected_policy_revision` 两道 CAS、Step-up、组织审计与 Outbox。详见 [安全设计](docs/security.md)。
+- 组织委派已可通过 `GET/POST /api/v1/orgs/{id}/iam/delegations`、`PATCH .../delegations/{delegation_id}` 与 `POST .../delegations/{delegation_id}:revoke` 管理，界面位于「职责分离」页，支持新建/编辑/撤销，目标用户范围可选「全部成员」或「指定成员」；写入沿用 `organization.iam.constraint.read/.manage` 治理权限、`reason`、`expected_revision` 与 `expected_policy_revision` 两道 CAS、Step-up、组织审计与 Outbox。详见 [安全设计](docs/security.md)。
 
 **设计边界（已实现，不是待办）**：
 
-- 委派只放宽“把目标角色分配给目标用户 / 从目标用户撤销”的能力校验；管理角色、目标角色、目标用户范围、动作（`assign`/`revoke`）、有效期与 `grant_ceiling` 必须同时覆盖，管理角色还必须仍在调用者的活跃会话中。平台委派已交付 CRUD 与页面；组织委派见上方“仍延后”。
+- 委派只放宽“把目标角色分配给目标用户 / 从目标用户撤销”的能力校验；管理角色、目标角色、目标用户范围、动作（`assign`/`revoke`）、有效期与 `grant_ceiling` 必须同时覆盖，管理角色还必须仍在调用者的活跃会话中。平台委派与组织委派均已交付 CRUD 与页面（组织委派位于「职责分离」页，4 个 `/api/v1/orgs/{id}/iam/delegations` 端点）。
 - 角色 Grant/继承的变更仍要求**直接权限**（平台 `iam.role.update` + 授权上限校验；组织角色走 `organization.iam.role.manage`，且没有继承概念）。委派不能创建/修改角色、Grant、继承，也不能修改委派本身；HTTP 拒绝用例见 [delegation_boundary_test.go](internal/server/delegation_boundary_test.go)。
 
 这些差异不会把权限退化回 `role >= 10`：未实现的模块不暴露菜单/接口，而不是用空实现伪装完成。

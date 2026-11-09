@@ -13,7 +13,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - 新增 4 个组织委派端点：`GET/POST /api/v1/orgs/{id}/iam/delegations`、`PATCH .../delegations/{delegation_id}`、`POST .../delegations/{delegation_id}:revoke`。此前求值侧 `checkOrgDelegation` 的委派分支在生产不可达（没有写入口），现在可由 owner 通过 HTTP 创建并撤销。
 - 写入侧强制治理权限（读 owner+admin、写仅 owner）、Step-up、`reason`、`expected_revision` 与 `expected_policy_revision` 两道 CAS、组织审计、Outbox 事件与 policy revision bump；管理/目标角色必须同属本组织且 active，授权上限不得超过创建者在本组织持有的能力。
 - 仓储写入增加 `context_type/context_id` 谓词作为纵深防御；跨租户 id 一律 404，平台委派不进入组织列表。
-- 前端「职责分离」页新增委派列表、创建/编辑/撤销对话框；授权上限由目标角色的 grants 自动快照，避免手写出永不可用的委派。
+- 前端「职责分离」页新增委派列表、创建/编辑/撤销对话框；授权上限由目标角色的 grants 自动快照，避免手写出永不可用的委派；目标用户范围可选「全部成员」或「指定成员」，失败原因在对话框内展示。组件测试覆盖列表、创建（含 ceiling 与 user_ids 断言）与撤销。
 - HTTP 级测试：创建后解锁分配、撤销后重新拒绝；并覆盖缺少 `reason`、平台角色/跨租户角色引用、越权 ceiling、策略版本冲突、非 owner 写入、非成员读取、跨租户更新/撤销、revision CAS 等拒绝用例。
 - 文档状态回填：`README.md`、`docs/api.md`、`docs/security.md` §4.10、`docs/roadmap-v2.5.md`、设计文档 §12/§14（含实现期修正 F10）。
 
