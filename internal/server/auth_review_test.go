@@ -194,14 +194,23 @@ func TestConcurrentTOTPReplayOnlyCreatesOneSession(t *testing.T) {
 	h.svc.MFA = state
 	code, err := totp.Code(secret, time.Now().Unix()/30+1, 6)
 	require.NoError(t, err)
-	results := make(chan int, 2)
+	type outcome struct {
+		code int
+		body string
+	}
+	results := make(chan outcome, 2)
 	for _, challenge := range challenges {
 		go func(id string) {
-			results <- h.do(http.MethodPost, "/api/v1/auth/mfa/complete", map[string]any{"challenge_id": id, "code": code}, "", true).Code
+			rec := h.do(http.MethodPost, "/api/v1/auth/mfa/complete", map[string]any{"challenge_id": id, "code": code}, "", true)
+			results <- outcome{code: rec.Code, body: rec.Body.String()}
 		}(challenge)
 	}
-	statuses := []int{<-results, <-results}
-	require.ElementsMatch(t, []int{http.StatusOK, http.StatusBadRequest}, statuses)
+	first, second := <-results, <-results
+	// Keep the bodies in the failure message: a 503 here means a dependency
+	// error (for SQLite, a write lock) rather than the expected replay
+	// rejection, and the body is the only place that distinguishes them.
+	require.ElementsMatch(t, []int{http.StatusOK, http.StatusBadRequest},
+		[]int{first.code, second.code}, "first=%+v second=%+v", first, second)
 }
 
 type passwordlessCredentials struct{ biz.CredentialRepo }

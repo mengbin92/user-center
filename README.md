@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，可独立完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.12.0 — 组织委派、SCIM 2.0、企业目录同步与租户 schema 隔离。** 补齐组织级 SoD 的委派写入入口与界面；新增 SCIM 2.0 用户/组供给与凭据管理（[文档](docs/scim.md)）；新增企业目录同步（LDAP/AD 与 JSON 网关，[文档](docs/directory-sync.md)）；交付可选的按组织独立 schema 路由与租户数据域隔离（[文档](docs/tenancy.md)，**存量数据 cutover 未完成**）。**升级须先执行迁移 `015` 与 `016`**，完整范围见 [v0.12.0 发布说明](docs/releases/release-v0.12.0.md)。真实上游供应商登录验收保持未验证。
+> **状态：v0.12.1 — 组织委派、SCIM 2.0、企业目录同步与租户 schema 隔离。** v0.12.1 为 PATCH：修复 CI 上并发 TOTP 用例的偶发 503（SQLite 写锁缺少 busy timeout），无 API、迁移与配置变更。补齐组织级 SoD 的委派写入入口与界面；新增 SCIM 2.0 用户/组供给与凭据管理（[文档](docs/scim.md)）；新增企业目录同步（LDAP/AD 与 JSON 网关，[文档](docs/directory-sync.md)）；交付可选的按组织独立 schema 路由与租户数据域隔离（[文档](docs/tenancy.md)，**存量数据 cutover 未完成**）。**升级须先执行迁移 `015` 与 `016`**，完整范围见 [v0.12.0 发布说明](docs/releases/release-v0.12.0.md)。真实上游供应商登录验收保持未验证。
 
 ## 目录
 

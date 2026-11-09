@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-09
+
+**版本判定：PATCH。** 修复 CI 上 `TestConcurrentTOTPReplayOnlyCreatesOneSession` 偶发 503：SQLite 串行化写入，第二个并发写者未配置 busy timeout 时立即返回 `database is locked`，被映射为「依赖服务不可用」。为 SQLite DSN 追加 `_busy_timeout=10000`（仅测试与开发；生产 MySQL 不受影响），并让该用例在失败时输出两个响应体，便于下次直接区分锁冲突与重放拒绝。新增 DSN 单元测试。
+
 ## [0.12.0] - 2026-11-09
 
 **版本判定：MINOR（v0.11.0 → v0.12.0）。** V2.6 四项能力按阶段独立提交并统一发版；新增 14 个 RPC、9 条 SCIM 原始路由、3 个迁移（`015`、`016`、`017`）与相应界面。租户物理隔离默认关闭，阶段④已完整交付（含存量 cutover 工具），详见 [发布说明](docs/releases/release-v0.12.0.md)。
