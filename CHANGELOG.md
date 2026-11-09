@@ -8,7 +8,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.12.0] - 2026-11-09
 
-**版本判定：MINOR（v0.11.0 → v0.12.0）。** V2.6 四项能力按阶段独立提交并统一发版；新增 14 个 RPC、9 条 SCIM 原始路由、2 个迁移（`015`、`016`）与相应界面。租户物理隔离默认关闭，阶段④的存量 cutover 未完成，未完成项以 `[ ]` 列在 `docs/tenancy.md` §4。详见 [发布说明](docs/releases/release-v0.12.0.md)。
+**版本判定：MINOR（v0.11.0 → v0.12.0）。** V2.6 四项能力按阶段独立提交并统一发版；新增 14 个 RPC、9 条 SCIM 原始路由、3 个迁移（`015`、`016`、`017`）与相应界面。租户物理隔离默认关闭，阶段④已完整交付（含存量 cutover 工具），详见 [发布说明](docs/releases/release-v0.12.0.md)。
 
 ### 阶段① — 组织级 SoD 补齐（组织委派 CRUD 与界面）
 
@@ -23,7 +23,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - 新增 `/scim/v2/{ServiceProviderConfig,ResourceTypes,Schemas,Users,Groups}` 协议面：SCIM schema、ListResponse 分页、闭合 filter 语法、PATCH、ETag/`If-Match`、标准 Error 消息与 `scimType`。原始路由位于 `/api/v1/` 之外，不受浏览器 CSRF 约束，但每个请求都由处理器自行做 Bearer 鉴权。
 - 新增 4 个平台管理端点签发/列出/轮换/停用 SCIM 凭据；凭据**绑定唯一组织**，只存 SHA-256 摘要、明文只返回一次，停用立即生效。管理写入要求平台管理员 + Step-up + `reason` + `expected_revision` + 平台审计。
-- 迁移 `015`：`scim_tokens`、`scim_identities`、`scim_groups`、`scim_group_members`（SQLite 同步纳入 `AutoMigrate`）。**升级须先执行迁移 015 再启动服务。**
+- 迁移 `015`：`scim_tokens`、`scim_identities`、`scim_groups`、`scim_group_members`。**升级须先执行迁移 015 再启动服务。**
 - 供给写路径：`externalId` 权威匹配、跨租户邮箱拒绝（409）、`active=false` 只停用本组织成员资格并撤销其角色/委派、`DELETE` 保留全局账号与审计、组成员只允许本组织已供给用户；全部写组织审计。
 - 前端组织设置页新增平台管理员可见的凭据管理（签发/轮换/停用 + 一次性展示）。
 - HTTP 级测试 4 组：发现与鉴权、供给生命周期、租户边界与组成员、凭据治理拒绝；覆盖无/错/停用 token、缺 schemas、非法 filter/path、跨租户 id、跨租户邮箱绑定、组成员越权、`If-Match` 412、唯一性冲突、非平台管理员签发、凭据不回显。
@@ -34,7 +34,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - 新增两类连接器：`ldap`（go-ldap，Simple Bind、分页搜索、`whenChanged>=cursor` 增量、`userAccountControl` 判定停用、属性映射可配）与 `jsonfeed`（HTTP JSON 网关，`since` 游标、显式 `deleted` 与 `full` 标记）。连接器实现统一 `Fetch` 接口，新增源不改引擎。
 - 外部凭据按 `docs/api.md` 原有前置落地加密入库（`SecretBox`/AES-GCM）、只写不读、轮换（`expected_revision` + `reason` + Step-up）与平台审计；明文协议仅允许回环地址并禁用重定向（SSRF 防护）。
 - 同步引擎：独立 30s worker 按 `interval_seconds` 调度、`full` / `delta` / `dry_run` 三种模式、增量游标、`directory_objects` 映射、tombstone 对账（`disable` / `delete` / `keep`）、`source_wins` / `local_wins` 冲突策略、逐对象报告与 `partial` 状态；`dry_run` 不写入也不推进游标。供给复用 SCIM 路径，不存在第二套账号创建逻辑。
-- 迁移 `016`：`directory_sources`、`directory_sync_runs`、`directory_objects`（SQLite 同步纳入 `AutoMigrate`）。**升级须先执行迁移 016 再启动服务。**
+- 迁移 `016`：`directory_sources`、`directory_sync_runs`、`directory_objects`。**升级须先执行迁移 016 再启动服务。**
 - 新增 6 个平台管理端点与组织设置页（仅平台管理员可见）；全部写操作要求平台管理员 + Step-up + `reason`。
 - HTTP 级测试 2 组：供给/对账生命周期（dry-run、全量、增量停用、全量 tombstone、运行记录留存）与治理拒绝（缺 reason、明文非回环 URL、未知连接器、非法 config、非平台账号读写、凭据不回显、过期 revision）。
 - 新增 `docs/directory-sync.md`（含未实现项：组/部门层级同步、非 AD LDAP 增量、原生 Entra/飞书连接器、多实例分布式租约、写回），回填 README、API/安全/数据模型文档与两份路线图。
@@ -48,6 +48,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - 编排：`cmd/tenant-schema -org / -all / -list` 幂等建库；建表全部执行签入的 SQL（`internal/data/tenantddl/{mysql,sqlite}.sql`，`go:embed`），不使用 GORM Migrator。
 - 分域：组织成员/部门/邀请/角色/权限/继承/分配/约束/委派/审计与 SCIM/目录租户数据全部落到各自组织 schema；`organizations`、`users`、会话、平台 IAM、outbox、`tenant_schemas` 留在平台。平台审计改为跨 schema 聚合。
 - 测试：`internal/data/tenancy_test.go`（不同连接池、跨 schema 不可见、同 externalId 跨租户可共存、平台库无租户行、默认关闭、非法 id）与 `internal/server/tenancy_test.go`（HTTP 级：A 的 token 读 B 的用户 404、列表只含本租户、平台库无租户映射）。
+- 迁移 `017`：`tenant_schemas`（平台侧租户 schema 注册表，跨租户查询的唯一边界）。**启用隔离前须先执行 017，再运行 `cmd/tenant-schema` 与 `cmd/tenant-migrate`。**
 - 新增 `docs/tenancy.md`；回填 `README.md`、`docs/api.md`、`docs/security.md` §4.5、`docs/data-model.md`、`docs/operations.md` 与两份路线图的追踪状态。
 - 存量 cutover：`cmd/tenant-migrate` 按表复制并校验行数，支持 `-dry-run` 与 `-purge`；`scripts/dr/tenant-schemas.sh` 备份所有租户库。账号/会话按设计留在平台 schema（见文档 §6）。
 
