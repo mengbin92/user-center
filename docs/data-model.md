@@ -118,7 +118,7 @@ V2.3 起角色/分配合法上下文为 `platform` 与 `organization:{id}`：零
 | `scim_tokens`、`directory_sources`（治理凭据与配置） | 平台 schema，仍带 `organization_id` |
 | `users`、`organization_members`、`iam_*`、`iam_audit_events`、`iam_policy_state` 等存量表 | 平台 schema，继续逻辑隔离 |
 
-分域边界、已交付能力与**未完成的 cutover 清单**见 `docs/tenancy.md`。
+分域边界与启用方式见 `docs/tenancy.md`。
 
 ## 5. Revision 语义
 

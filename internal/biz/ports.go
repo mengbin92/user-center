@@ -15,6 +15,14 @@ type TxManager interface {
 	InTx(context.Context, func(context.Context, Tx) error) error
 }
 
+// TenantProvisioner prepares the physical schema of one organization. It lives
+// behind an interface so biz never imports the data layer; the data
+// implementation returns an error when schema isolation is disabled.
+type TenantProvisioner interface {
+	IsolationEnabled() bool
+	EnsureTenantSchema(context.Context, int64) (string, error)
+}
+
 type UserRepo interface {
 	Create(context.Context, Tx, *User) (*User, error)
 	Get(context.Context, Tx, int64) (*User, error)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sort"
 	"strconv"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/pkg/jsonx"
+	"github.com/mengbin92/user-center/platform/tenant"
 )
 
 type auditRepo struct{ d *Data }
@@ -29,11 +31,67 @@ func (r *auditRepo) Append(ctx context.Context, tx biz.Tx, e *biz.AuditEvent) er
 	if p.OccurredAt.IsZero() {
 		p.OccurredAt = time.Now().UTC()
 	}
-	return r.d.dbOr(tx).WithContext(ctx).Create(p).Error
+	// Tenant audit rows live in the organization's own schema. The event
+	// carries the tenant, so the write is routed even when the caller's
+	// context is platform-scoped (for example a worker).
+	if p.OrganizationID > 0 {
+		ctx = tenant.With(ctx, p.OrganizationID)
+	}
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error
 }
 
 func (r *auditRepo) List(ctx context.Context, tx biz.Tx, f biz.AuditFilter) ([]*biz.AuditEvent, int64, error) {
-	db := r.d.dbOr(tx).WithContext(ctx).Model(&auditEventPO{})
+	if r.d.IsolationEnabled() && f.OrganizationID == 0 {
+		return r.listAcrossTenants(ctx, tx, f)
+	}
+	if f.OrganizationID > 0 {
+		ctx = tenant.With(ctx, f.OrganizationID)
+	}
+	return r.listOne(ctx, tx, f)
+}
+
+// listAcrossTenants merges the platform audit log with every tenant schema.
+// Pagination happens after the merge because each schema has its own ordering;
+// doing it per schema would return the wrong slice.
+func (r *auditRepo) listAcrossTenants(ctx context.Context, tx biz.Tx, f biz.AuditFilter) ([]*biz.AuditEvent, int64, error) {
+	ids, err := r.d.TenantOrganizationIDs(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	noPage := f
+	noPage.Offset, noPage.Limit, noPage.OrganizationID = 0, 0, 0
+	platform, total, err := r.listOne(ctx, tx, noPage)
+	if err != nil {
+		return nil, 0, err
+	}
+	all := platform
+	for _, orgID := range ids {
+		items, n, err := r.listOne(tenant.With(ctx, orgID), tx, noPage)
+		if err != nil {
+			return nil, 0, err
+		}
+		total += n
+		all = append(all, items...)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].OccurredAt.Equal(all[j].OccurredAt) {
+			return all[i].EventID > all[j].EventID
+		}
+		return all[i].OccurredAt.After(all[j].OccurredAt)
+	})
+	start := f.Offset
+	if start > len(all) {
+		start = len(all)
+	}
+	end := len(all)
+	if f.Limit > 0 && start+f.Limit < end {
+		end = start + f.Limit
+	}
+	return all[start:end], total, nil
+}
+
+func (r *auditRepo) listOne(ctx context.Context, tx biz.Tx, f biz.AuditFilter) ([]*biz.AuditEvent, int64, error) {
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&auditEventPO{})
 	if f.Action != "" {
 		db = db.Where("action = ?", f.Action)
 	}
@@ -57,7 +115,14 @@ func (r *auditRepo) List(ctx context.Context, tx biz.Tx, f biz.AuditFilter) ([]*
 		return nil, 0, err
 	}
 	var rows []auditEventPO
-	if err := db.Order("occurred_at DESC, event_id DESC").Offset(f.Offset).Limit(f.Limit).Find(&rows).Error; err != nil {
+	q := db.Order("occurred_at DESC, event_id DESC")
+	if f.Offset > 0 {
+		q = q.Offset(f.Offset)
+	}
+	if f.Limit > 0 {
+		q = q.Limit(f.Limit)
+	}
+	if err := q.Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	out := make([]*biz.AuditEvent, 0, len(rows))

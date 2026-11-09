@@ -50,7 +50,7 @@ func (r *orgIAMRepo) scoped(ctx context.Context, tx biz.Tx, c authorization.Cont
 	if err != nil {
 		return nil, biz.ErrAuthorizationDown
 	}
-	return r.d.dbOr(tx).WithContext(ctx).Model(model).
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).Model(model).
 		Where("context_type = ? AND context_id = ?", typ, id), nil
 }
 
@@ -60,7 +60,7 @@ func (r *orgIAMRepo) loadGrants(ctx context.Context, tx biz.Tx, roleIDs []int64)
 		return out, nil
 	}
 	var rows []roleGrantPO
-	if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id IN ?", roleIDs).Find(&rows).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("role_id IN ?", roleIDs).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	for _, g := range rows {
@@ -94,7 +94,7 @@ func (r *orgIAMRepo) ListRoles(ctx context.Context, tx biz.Tx, c authorization.C
 	}
 	var edges []roleInheritancePO
 	if len(ids) > 0 {
-		if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id IN ?", ids).Find(&edges).Error; err != nil {
+		if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("role_id IN ?", ids).Find(&edges).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -130,7 +130,7 @@ func (r *orgIAMRepo) getRole(ctx context.Context, tx biz.Tx, c authorization.Con
 	if err != nil {
 		return nil, biz.ErrAuthorizationDown
 	}
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 	if lock && (db.Dialector == nil || db.Dialector.Name() != "sqlite") {
 		db = db.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
 	}
@@ -142,11 +142,11 @@ func (r *orgIAMRepo) getRole(ctx context.Context, tx biz.Tx, c authorization.Con
 		return nil, err
 	}
 	var grants []roleGrantPO
-	if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id = ?", p.ID).Find(&grants).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("role_id = ?", p.ID).Find(&grants).Error; err != nil {
 		return nil, err
 	}
 	var edges []roleInheritancePO
-	if err := r.d.dbOr(tx).WithContext(ctx).Where("role_id = ?", p.ID).Find(&edges).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("role_id = ?", p.ID).Find(&edges).Error; err != nil {
 		return nil, err
 	}
 	out := &biz.Role{
@@ -174,7 +174,7 @@ func (r *orgIAMRepo) GetRoleByCode(ctx context.Context, tx biz.Tx, c authorizati
 		return nil, biz.ErrAuthorizationDown
 	}
 	var p rolePO
-	err = r.d.dbOr(tx).WithContext(ctx).
+	err = r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("context_type = ? AND context_id = ? AND code = ?", typ, ctxID, code).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
@@ -195,7 +195,7 @@ func (r *orgIAMRepo) CreateRole(ctx context.Context, tx biz.Tx, c authorization.
 		Builtin: role.Builtin, Status: role.Status, MaxMembers: role.MaxMembers,
 		Revision: 1, ContextType: typ, ContextID: ctxID,
 	}
-	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error; err != nil {
 		// A concurrent first-write may have created the same (context, code).
 		// Map it to the domain conflict so callers never see driver errors.
 		if isDuplicateKeyError(err) {
@@ -212,7 +212,7 @@ func (r *orgIAMRepo) UpdateRole(ctx context.Context, tx biz.Tx, c authorization.
 	if err != nil {
 		return nil, biz.ErrAuthorizationDown
 	}
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&rolePO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&rolePO{}).
 		Where("id = ? AND context_type = ? AND context_id = ? AND revision = ?", role.ID, typ, ctxID, expected).
 		Updates(map[string]any{
 			"name": role.Name, "description": role.Description, "status": role.Status,
@@ -232,7 +232,7 @@ func (r *orgIAMRepo) PutRoleGrants(ctx context.Context, tx biz.Tx, c authorizati
 	if err != nil {
 		return 0, biz.ErrAuthorizationDown
 	}
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 	var role rolePO
 	if err := db.Where("id = ? AND context_type = ? AND context_id = ?", roleID, typ, ctxID).First(&role).Error; err != nil {
 		return 0, biz.ErrResourceNotFound
@@ -271,11 +271,18 @@ func (r *orgIAMRepo) ListAssignments(ctx context.Context, tx biz.Tx, c authoriza
 	if err != nil {
 		return nil, biz.ErrAuthorizationDown
 	}
-	db := r.d.dbOr(tx).WithContext(ctx).Table("iam_user_roles AS ur").
-		Joins("JOIN users AS u ON u.id = ur.user_id").
-		Joins("JOIN iam_roles AS r ON r.id = ur.role_id").
+	// SQLite tenants live in their own database file, so the platform `users`
+	// table cannot be joined from there. The names are filled in a second,
+	// platform-side query instead. MySQL keeps the join (cross-schema joins are
+	// valid on one instance).
+	crossDB := r.d.isSQLite() && r.d.IsolationEnabled()
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx).Table(r.d.TenantTable(ctx, "iam_user_roles")+" AS ur").
+		Joins("JOIN "+r.d.TenantTable(ctx, "iam_roles")+" AS r ON r.id = ur.role_id").
 		Where("ur.context_type = ? AND ur.context_id = ?", typ, ctxID).
 		Where("r.context_type = ? AND r.context_id = ?", typ, ctxID)
+	if !crossDB {
+		db = db.Joins("JOIN users AS u ON u.id = ur.user_id")
+	}
 	if userID > 0 {
 		db = db.Where("ur.user_id = ?", userID)
 	}
@@ -291,10 +298,31 @@ func (r *orgIAMRepo) ListAssignments(ctx context.Context, tx biz.Tx, c authoriza
 		CreatedAt                                 time.Time
 	}
 	var rows []row
-	err = db.Select("ur.id, ur.user_id, ur.role_id, u.username, u.display_name, r.code AS role_code, r.name AS role_name, ur.boundary, ur.starts_at, ur.expires_at, ur.status, ur.origin, ur.revision, ur.assigned_by, ur.created_at").
-		Order("ur.id").Scan(&rows).Error
+	fields := "ur.id, ur.user_id, ur.role_id, r.code AS role_code, r.name AS role_name, ur.boundary, ur.starts_at, ur.expires_at, ur.status, ur.origin, ur.revision, ur.assigned_by, ur.created_at"
+	if !crossDB {
+		fields = "ur.id, ur.user_id, ur.role_id, u.username, u.display_name, r.code AS role_code, r.name AS role_name, ur.boundary, ur.starts_at, ur.expires_at, ur.status, ur.origin, ur.revision, ur.assigned_by, ur.created_at"
+	}
+	err = db.Select(fields).Order("ur.id").Scan(&rows).Error
 	if err != nil {
 		return nil, err
+	}
+	names := map[int64]userPO{}
+	if crossDB && len(rows) > 0 {
+		ids := make([]int64, 0, len(rows))
+		seen := map[int64]bool{}
+		for _, x := range rows {
+			if !seen[x.UserID] {
+				seen[x.UserID] = true
+				ids = append(ids, x.UserID)
+			}
+		}
+		var users []userPO
+		if err := r.d.db.WithContext(ctx).Where("id IN ?", ids).Find(&users).Error; err != nil {
+			return nil, err
+		}
+		for _, u := range users {
+			names[u.ID] = u
+		}
 	}
 	out := make([]*biz.AssignmentItem, 0, len(rows))
 	for _, x := range rows {
@@ -302,8 +330,14 @@ func (r *orgIAMRepo) ListAssignments(ctx context.Context, tx biz.Tx, c authoriza
 		if err := jsonx.Unmarshal([]byte(x.Boundary), &scope); err != nil {
 			return nil, err
 		}
+		username, displayName := x.Username, x.DisplayName
+		if crossDB {
+			if u, ok := names[x.UserID]; ok {
+				username, displayName = u.Username, u.DisplayName
+			}
+		}
 		out = append(out, &biz.AssignmentItem{
-			Username: x.Username, DisplayName: x.DisplayName,
+			Username: username, DisplayName: displayName,
 			RoleCode: x.RoleCode, RoleName: x.RoleName,
 			Assignment: &biz.Assignment{
 				ID: x.ID, UserID: x.UserID, RoleID: x.RoleID, Boundary: scope,
@@ -322,7 +356,7 @@ func (r *orgIAMRepo) GetAssignment(ctx context.Context, tx biz.Tx, c authorizati
 		return nil, biz.ErrAuthorizationDown
 	}
 	var p assignmentPO
-	err = r.d.dbOr(tx).WithContext(ctx).
+	err = r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("id = ? AND context_type = ? AND context_id = ?", id, typ, ctxID).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
@@ -354,7 +388,7 @@ func (r *orgIAMRepo) CreateAssignment(ctx context.Context, tx biz.Tx, c authoriz
 	if p.StartsAt.IsZero() {
 		p.StartsAt = p.CreatedAt
 	}
-	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
 	}
 	return assignmentToBiz(*p)
@@ -365,7 +399,7 @@ func (r *orgIAMRepo) RevokeAssignment(ctx context.Context, tx biz.Tx, c authoriz
 	if err != nil {
 		return biz.ErrAuthorizationDown
 	}
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&assignmentPO{}).
 		Where("id = ? AND context_type = ? AND context_id = ? AND revision = ?", id, typ, ctxID, expected).
 		Updates(map[string]any{"status": "revoked", "revision": expected + 1, "assigned_by": by})
 	if res.Error != nil {
@@ -385,7 +419,7 @@ func (r *orgIAMRepo) RevokeMemberAssignments(ctx context.Context, tx biz.Tx, c a
 	if err != nil {
 		return 0, biz.ErrAuthorizationDown
 	}
-	db := r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&assignmentPO{}).
 		Where("user_id = ? AND context_type = ? AND context_id = ? AND status = ?", userID, typ, ctxID, "active")
 	if len(roleIDs) > 0 {
 		db = db.Where("role_id IN ?", roleIDs)
@@ -400,7 +434,7 @@ func (r *orgIAMRepo) CountActiveAssignments(ctx context.Context, tx biz.Tx, c au
 		return 0, biz.ErrAuthorizationDown
 	}
 	var n int64
-	err = r.d.dbOr(tx).WithContext(ctx).Model(&assignmentPO{}).
+	err = r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&assignmentPO{}).
 		Where("role_id = ? AND context_type = ? AND context_id = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?)", roleID, typ, ctxID, "active", time.Now().UTC()).
 		Count(&n).Error
 	return n, err
@@ -434,7 +468,7 @@ func (r *orgIAMRepo) RevokeDelegationsForUser(ctx context.Context, tx biz.Tx, c 
 	if userID == 0 || !c.IsOrganization() {
 		return 0, nil
 	}
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 
 	// Which of the removed roles have no holder left? Computed after the
 	// assignments were revoked, in the same transaction.

@@ -168,7 +168,7 @@ scripts/                  开发与检查脚本
 
 **仍延后（V2 后续里程碑）**：排期、验收标准与明确不做的项见 [V2.4 路线图](docs/roadmap-v2.4.md)。
 
-- 租户物理隔离的**存量数据 cutover**（基础设施与 SCIM / 目录同步租户数据域已交付，未完成项见 `docs/tenancy.md` §4）；SCIM 2.0 供给、企业目录同步与组织级 SoD 已交付（约束 + 委派 CRUD + 界面），R13/R14 已实现，见下；
+- **无待办**：V2.6 四项能力已全部交付；SCIM 2.0 供给、企业目录同步、租户物理隔离与组织级 SoD 均已落地（约束 + 委派 CRUD + 界面），R13/R14 已实现，见下；
 - OAuth 真实提供方沙箱验收：代码与本地 fake provider 测试已就绪，需配置真实凭据后执行；QQ 邮箱 SMTP 已完成真实发信与 IMAP 送达验收（[记录](docs/acceptance-smtp-2026-11-03.md)）；
 - 组织委派已可通过 `GET/POST /api/v1/orgs/{id}/iam/delegations`、`PATCH .../delegations/{delegation_id}` 与 `POST .../delegations/{delegation_id}:revoke` 管理，界面位于「职责分离」页，支持新建/编辑/撤销，目标用户范围可选「全部成员」或「指定成员」；写入沿用 `organization.iam.constraint.read/.manage` 治理权限、`reason`、`expected_revision` 与 `expected_policy_revision` 两道 CAS、Step-up、组织审计与 Outbox。详见 [安全设计](docs/security.md)。
 

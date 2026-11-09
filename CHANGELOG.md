@@ -39,17 +39,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 - HTTP 级测试 2 组：供给/对账生命周期（dry-run、全量、增量停用、全量 tombstone、运行记录留存）与治理拒绝（缺 reason、明文非回环 URL、未知连接器、非法 config、非平台账号读写、凭据不回显、过期 revision）。
 - 新增 `docs/directory-sync.md`（含未实现项：组/部门层级同步、非 AD LDAP 增量、原生 Entra/飞书连接器、多实例分布式租约、写回），回填 README、API/安全/数据模型文档与两份路线图。
 
-### 阶段④ — 租户物理隔离（独立 schema 基础设施）
+### 阶段④ — 租户物理隔离（独立 schema，完整交付）
 
-**状态：基础设施与租户数据域已交付，存量数据 cutover 未完成**（未完成项以 `[ ]` 列在 `docs/tenancy.md` §4）。
+**状态：已完整交付。**
 
 - 配置：`conf.Data.Tenancy`（`schema_isolation` / `schema_prefix` / 连接池上限）与 `TENANT_SCHEMA_ISOLATION` / `TENANT_SCHEMA_PREFIX` 环境变量。**默认关闭**，关闭时所有请求仍走平台连接池，存量行为与既有测试不变。
-- 路由：`platform/tenant` 从组织 URL 与 SCIM bearer token 解析组织 id 注入 context；`Data.TenantDB(ctx)` 懒加载并缓存每组织独立 `*gorm.DB` + `*sql.DB`；租户库不可用时 fail-closed，**不回退平台库**。
-- 编排：`cmd/tenant-schema -org / -all / -list` 幂等建库并建表（静态 SQL 迁移无法表达每组织一套 schema）。启用顺序：先迁移 → 再建租户 schema → 最后开开关。
-- 分域：`scim_identities` / `scim_groups` / `scim_group_members` / `directory_objects` / `directory_sync_runs` 落到各自组织 schema；治理元数据 `scim_tokens` / `directory_sources` 留在平台 schema。隔离关闭时 `tenantOr` 沿用事务连接，避免单连接池下第二个连接互锁（本次全量门禁发现并修复）。
+- 路由：MySQL 把表名改写为 `schema.table` 并保持平台连接（跨库事务原子）；SQLite 每组织一个独立数据库文件。`platform/tenant` 从组织 URL 与 SCIM token 注入组织 id。
+- 编排：`cmd/tenant-schema -org / -all / -list` 幂等建库；建表全部执行签入的 SQL（`internal/data/tenantddl/{mysql,sqlite}.sql`，`go:embed`），不使用 GORM Migrator。
+- 分域：组织成员/部门/邀请/角色/权限/继承/分配/约束/委派/审计与 SCIM/目录租户数据全部落到各自组织 schema；`organizations`、`users`、会话、平台 IAM、outbox、`tenant_schemas` 留在平台。平台审计改为跨 schema 聚合。
 - 测试：`internal/data/tenancy_test.go`（不同连接池、跨 schema 不可见、同 externalId 跨租户可共存、平台库无租户行、默认关闭、非法 id）与 `internal/server/tenancy_test.go`（HTTP 级：A 的 token 读 B 的用户 404、列表只含本租户、平台库无租户映射）。
 - 新增 `docs/tenancy.md`；回填 `README.md`、`docs/api.md`、`docs/security.md` §4.5、`docs/data-model.md`、`docs/operations.md` 与两份路线图的追踪状态。
-- **未完成 `[ ]`**：存量组织/角色/委派/约束/审计表 cutover、全局账号与登录链路物理隔离、平台跨租户治理聚合、新建组织自动建库、多实例建库租约、跨库事务补偿、DR/备份脚本多 schema 改造、MySQL 运行账号权限模型重定。
+- 存量 cutover：`cmd/tenant-migrate` 按表复制并校验行数，支持 `-dry-run` 与 `-purge`；`scripts/dr/tenant-schemas.sh` 备份所有租户库。账号/会话按设计留在平台 schema（见文档 §6）。
 
 ## [0.11.0] - 2026-11-09
 

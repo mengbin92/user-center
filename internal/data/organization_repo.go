@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/platform/tenant"
 )
 
 type organizationRepo struct{ d *Data }
@@ -26,7 +27,7 @@ func orgToBiz(p *organizationPO) *biz.Organization {
 func (r *organizationRepo) CreateOrganization(ctx context.Context, tx biz.Tx, org *biz.Organization) (*biz.Organization, error) {
 	now := time.Now().UTC()
 	p := &organizationPO{
-		Code: org.Code, Name: org.Name, Status: biz.OrgStatusActive,
+		Code: org.Code, Name: org.Name, Status: firstNonEmptyString(org.Status, biz.OrgStatusActive),
 		Revision: 1, CreatedBy: org.CreatedBy, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
@@ -59,8 +60,36 @@ func (r *organizationRepo) GetOrganizationByCode(ctx context.Context, tx biz.Tx,
 	return orgToBiz(&p), nil
 }
 
+// ListOrganizationsForUser is a genuinely cross-tenant query: membership rows
+// live in each organization's schema, so with isolation on it has to iterate
+// the registry instead of reading one table.
 func (r *organizationRepo) ListOrganizationsForUser(ctx context.Context, tx biz.Tx, userID int64) ([]*biz.Organization, error) {
-	db := r.d.dbOr(tx).WithContext(ctx)
+	if !r.d.IsolationEnabled() {
+		return r.listOrganizationsForUser(ctx, tx, userID)
+	}
+	ids, err := r.d.TenantOrganizationIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*biz.Organization, 0, len(ids))
+	for _, orgID := range ids {
+		items, err := r.listOrganizationsForUser(tenant.With(ctx, orgID), tx, userID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, items...)
+	}
+	return out, nil
+}
+
+func (r *organizationRepo) listOrganizationsForUser(ctx context.Context, tx biz.Tx, userID int64) ([]*biz.Organization, error) {
+	// SQLite tenants are separate database files, so membership and the
+	// organization row cannot be joined. Read both sides and stitch them.
+	if r.d.isSQLite() && r.d.IsolationEnabled() {
+		return r.listOrganizationsForUserSQLite(ctx, tx, userID)
+	}
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
+	members := r.d.TenantTable(ctx, "organization_members")
 	type row struct {
 		ID          int64
 		Code        string
@@ -75,8 +104,8 @@ func (r *organizationRepo) ListOrganizationsForUser(ctx context.Context, tx biz.
 		MemberCount int64
 	}
 	var rows []row
-	err := db.Table("organization_members AS m").
-		Select("o.id, o.code, o.name, o.status, o.revision, o.created_by, o.created_at, o.updated_at, o.archived_at, m.role, (SELECT COUNT(*) FROM organization_members mm WHERE mm.organization_id = o.id AND mm.status = 'active') AS member_count").
+	err := db.Table(members+" AS m").
+		Select("o.id, o.code, o.name, o.status, o.revision, o.created_by, o.created_at, o.updated_at, o.archived_at, m.role, (SELECT COUNT(*) FROM "+members+" mm WHERE mm.organization_id = o.id AND mm.status = 'active') AS member_count").
 		Joins("JOIN organizations AS o ON o.id = m.organization_id").
 		Where("m.user_id = ? AND m.status = ? AND o.status = ?", userID, biz.OrgMemberActive, biz.OrgStatusActive).
 		Order("o.id").Scan(&rows).Error
@@ -114,9 +143,15 @@ func (r *organizationRepo) ListAllOrganizations(ctx context.Context, tx biz.Tx, 
 }
 
 func (r *organizationRepo) UpdateOrganization(ctx context.Context, tx biz.Tx, org *biz.Organization, expected uint64) (*biz.Organization, error) {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationPO{}).Where("id = ? AND revision = ?", org.ID, expected).Updates(map[string]any{
+	updates := map[string]any{
 		"name": org.Name, "revision": expected + 1, "updated_at": time.Now().UTC(),
-	})
+	}
+	// An empty status means "leave it alone": the rename path only carries a
+	// name, and writing "" there would silently archive the organization.
+	if org.Status != "" {
+		updates["status"] = org.Status
+	}
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationPO{}).Where("id = ? AND revision = ?", org.ID, expected).Updates(updates)
 	if res.Error != nil {
 		return nil, res.Error
 	}
@@ -148,7 +183,7 @@ func (r *organizationRepo) CountOrganizations(ctx context.Context, tx biz.Tx) (i
 
 func (r *organizationRepo) GetMember(ctx context.Context, tx biz.Tx, orgID, userID int64) (*biz.OrganizationMember, error) {
 	var p organizationMemberPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("organization_id = ? AND user_id = ?", orgID, userID).First(&p).Error
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("organization_id = ? AND user_id = ?", orgID, userID).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -167,7 +202,8 @@ func memberToBiz(p *organizationMemberPO) *biz.OrganizationMember {
 }
 
 func (r *organizationRepo) ListMembers(ctx context.Context, tx biz.Tx, orgID int64) ([]*biz.OrganizationMember, error) {
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
+	members := r.d.TenantTable(ctx, "organization_members")
 	// Explicit fields: scanning into an embedded PO silently yields zero values
 	// because the embedded type is unexported, which dropped ids and roles.
 	type row struct {
@@ -185,29 +221,53 @@ func (r *organizationRepo) ListMembers(ctx context.Context, tx biz.Tx, orgID int
 		DisplayName    string
 		Email          *string
 	}
+	crossDB := r.d.isSQLite() && r.d.IsolationEnabled()
+	fields := `m.id, m.organization_id, m.user_id, m.role, m.department_id, m.status,
+			m.revision, m.invited_by, m.joined_at, m.updated_at`
+	q := db.Table(members + " AS m").Select(fields)
+	if !crossDB {
+		q = q.Select(fields + `, u.username, u.display_name, u.email`).
+			Joins("JOIN users AS u ON u.id = m.user_id")
+	}
 	var rows []row
-	err := db.Table("organization_members AS m").
-		Select(`m.id, m.organization_id, m.user_id, m.role, m.department_id, m.status,
-			m.revision, m.invited_by, m.joined_at, m.updated_at,
-			u.username, u.display_name, u.email`).
-		Joins("JOIN users AS u ON u.id = m.user_id").
-		Where("m.organization_id = ? AND m.status = ?", orgID, biz.OrgMemberActive).
+	err := q.Where("m.organization_id = ? AND m.status = ?", orgID, biz.OrgMemberActive).
 		Order("CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, m.id").
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
+	names := map[int64]userPO{}
+	if crossDB && len(rows) > 0 {
+		ids := make([]int64, 0, len(rows))
+		for _, x := range rows {
+			ids = append(ids, x.UserID)
+		}
+		var users []userPO
+		if err := r.d.db.WithContext(ctx).Where("id IN ?", ids).Find(&users).Error; err != nil {
+			return nil, err
+		}
+		for _, u := range users {
+			names[u.ID] = u
+		}
+	}
 	out := make([]*biz.OrganizationMember, 0, len(rows))
 	for i := range rows {
+		username, displayName := rows[i].Username, rows[i].DisplayName
+		email := rows[i].Email
+		if crossDB {
+			if u, ok := names[rows[i].UserID]; ok {
+				username, displayName, email = u.Username, u.DisplayName, u.Email
+			}
+		}
 		m := &biz.OrganizationMember{
 			ID: rows[i].ID, OrganizationID: rows[i].OrganizationID, UserID: rows[i].UserID,
 			Role: rows[i].Role, DepartmentID: rows[i].DepartmentID, Status: rows[i].Status,
 			Revision: rows[i].Revision, InvitedBy: rows[i].InvitedBy,
 			JoinedAt: rows[i].JoinedAt.UTC(),
-			Username: rows[i].Username, DisplayName: rows[i].DisplayName,
+			Username: username, DisplayName: displayName,
 		}
-		if rows[i].Email != nil {
-			m.Email = *rows[i].Email
+		if email != nil {
+			m.Email = *email
 		}
 		out = append(out, m)
 	}
@@ -221,7 +281,7 @@ func (r *organizationRepo) AddMember(ctx context.Context, tx biz.Tx, m *biz.Orga
 		DepartmentID: m.DepartmentID, Status: biz.OrgMemberActive,
 		Revision: 1, InvitedBy: m.InvitedBy, JoinedAt: now, UpdatedAt: now,
 	}
-	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
 	}
 	return memberToBiz(p), nil
@@ -229,7 +289,7 @@ func (r *organizationRepo) AddMember(ctx context.Context, tx biz.Tx, m *biz.Orga
 
 func (r *organizationRepo) RestoreMember(ctx context.Context, tx biz.Tx, orgID, userID int64, role string, departmentID *int64, by int64) (*biz.OrganizationMember, error) {
 	now := time.Now().UTC()
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationMemberPO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationMemberPO{}).
 		Where("organization_id = ? AND user_id = ? AND status = ?", orgID, userID, biz.OrgMemberRemoved).
 		Updates(map[string]any{
 			"status": biz.OrgMemberActive, "role": role, "department_id": departmentID,
@@ -246,7 +306,7 @@ func (r *organizationRepo) RestoreMember(ctx context.Context, tx biz.Tx, orgID, 
 }
 
 func (r *organizationRepo) UpdateMember(ctx context.Context, tx biz.Tx, m *biz.OrganizationMember, expected uint64) (*biz.OrganizationMember, error) {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationMemberPO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationMemberPO{}).
 		Where("organization_id = ? AND user_id = ? AND revision = ?", m.OrganizationID, m.UserID, expected).
 		Updates(map[string]any{
 			"role": m.Role, "department_id": m.DepartmentID,
@@ -262,7 +322,7 @@ func (r *organizationRepo) UpdateMember(ctx context.Context, tx biz.Tx, m *biz.O
 }
 
 func (r *organizationRepo) RemoveMember(ctx context.Context, tx biz.Tx, orgID, userID int64, expected uint64) error {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationMemberPO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationMemberPO{}).
 		Where("organization_id = ? AND user_id = ? AND revision = ? AND status = ?", orgID, userID, expected, biz.OrgMemberActive).
 		Updates(map[string]any{"status": biz.OrgMemberRemoved, "revision": expected + 1, "updated_at": time.Now().UTC()})
 	if res.Error != nil {
@@ -276,7 +336,7 @@ func (r *organizationRepo) RemoveMember(ctx context.Context, tx biz.Tx, orgID, u
 
 func (r *organizationRepo) CountActiveOwners(ctx context.Context, tx biz.Tx, orgID int64) (int64, error) {
 	var n int64
-	err := r.d.dbOr(tx).WithContext(ctx).Model(&organizationMemberPO{}).
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationMemberPO{}).
 		Where("organization_id = ? AND role = ? AND status = ?", orgID, biz.OrgRoleOwner, biz.OrgMemberActive).Count(&n).Error
 	return n, err
 }
@@ -285,7 +345,7 @@ func (r *organizationRepo) CountActiveOwners(ctx context.Context, tx biz.Tx, org
 // row lock two transactions could each see two owners and both commit, leaving
 // the organization without an owner. SQLite has no row locks (tests only).
 func (r *organizationRepo) CountActiveOwnersForUpdate(ctx context.Context, tx biz.Tx, orgID int64) (int64, error) {
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 	if db.Dialector == nil || db.Dialector.Name() != "sqlite" {
 		db = db.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
 	}
@@ -301,7 +361,7 @@ func (r *organizationRepo) CountActiveOwnersForUpdate(ctx context.Context, tx bi
 
 func (r *organizationRepo) CountActiveMembers(ctx context.Context, tx biz.Tx, orgID int64) (int64, error) {
 	var n int64
-	err := r.d.dbOr(tx).WithContext(ctx).Model(&organizationMemberPO{}).
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationMemberPO{}).
 		Where("organization_id = ? AND status = ?", orgID, biz.OrgMemberActive).Count(&n).Error
 	return n, err
 }
@@ -316,7 +376,7 @@ func deptToBiz(p *organizationDepartmentPO) *biz.Department {
 
 func (r *organizationRepo) ListDepartments(ctx context.Context, tx biz.Tx, orgID int64) ([]*biz.Department, error) {
 	var rows []organizationDepartmentPO
-	if err := r.d.dbOr(tx).WithContext(ctx).Where("organization_id = ? AND status = ?", orgID, "active").Order("parent_id, id").Find(&rows).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("organization_id = ? AND status = ?", orgID, "active").Order("parent_id, id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*biz.Department, 0, len(rows))
@@ -328,7 +388,7 @@ func (r *organizationRepo) ListDepartments(ctx context.Context, tx biz.Tx, orgID
 
 func (r *organizationRepo) GetDepartment(ctx context.Context, tx biz.Tx, orgID, id int64) (*biz.Department, error) {
 	var p organizationDepartmentPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("id = ? AND organization_id = ?", id, orgID).First(&p).Error
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("id = ? AND organization_id = ?", id, orgID).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -344,14 +404,14 @@ func (r *organizationRepo) CreateDepartment(ctx context.Context, tx biz.Tx, d *b
 		OrganizationID: d.OrganizationID, ParentID: d.ParentID, Code: d.Code,
 		Name: d.Name, Status: "active", Revision: 1, CreatedAt: now, UpdatedAt: now,
 	}
-	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
 	}
 	return deptToBiz(p), nil
 }
 
 func (r *organizationRepo) UpdateDepartment(ctx context.Context, tx biz.Tx, d *biz.Department, expected uint64) (*biz.Department, error) {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationDepartmentPO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationDepartmentPO{}).
 		Where("id = ? AND organization_id = ? AND revision = ?", d.ID, d.OrganizationID, expected).
 		Updates(map[string]any{
 			"parent_id": d.ParentID, "code": d.Code, "name": d.Name,
@@ -367,13 +427,13 @@ func (r *organizationRepo) UpdateDepartment(ctx context.Context, tx biz.Tx, d *b
 }
 
 func (r *organizationRepo) ClearDepartmentMembers(ctx context.Context, tx biz.Tx, orgID, deptID int64) error {
-	return r.d.dbOr(tx).WithContext(ctx).Model(&organizationMemberPO{}).
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationMemberPO{}).
 		Where("organization_id = ? AND department_id = ? AND status = ?", orgID, deptID, biz.OrgMemberActive).
 		Update("department_id", nil).Error
 }
 
 func (r *organizationRepo) ArchiveDepartment(ctx context.Context, tx biz.Tx, orgID, id int64, expected uint64) error {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationDepartmentPO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationDepartmentPO{}).
 		Where("id = ? AND organization_id = ? AND revision = ? AND status = ?", id, orgID, expected, "active").
 		Updates(map[string]any{"status": "archived", "revision": expected + 1, "updated_at": time.Now().UTC()})
 	if res.Error != nil {
@@ -429,7 +489,7 @@ func (r *organizationRepo) CreateInvitation(ctx context.Context, tx biz.Tx, inv 
 		Status: biz.OrgInvitationPending, InvitedBy: inv.InvitedBy, ExpiresAt: inv.ExpiresAt,
 		Revision: 1, CreatedAt: now, UpdatedAt: now,
 	}
-	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
 	}
 	return invitationToBiz(p), nil
@@ -437,7 +497,7 @@ func (r *organizationRepo) CreateInvitation(ctx context.Context, tx biz.Tx, inv 
 
 func (r *organizationRepo) GetInvitation(ctx context.Context, tx biz.Tx, id int64) (*biz.OrganizationInvitation, error) {
 	var p organizationInvitationPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).First(&p).Error
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("id = ?", id).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -449,7 +509,7 @@ func (r *organizationRepo) GetInvitation(ctx context.Context, tx biz.Tx, id int6
 
 func (r *organizationRepo) GetInvitationByTokenHash(ctx context.Context, tx biz.Tx, hash string) (*biz.OrganizationInvitation, error) {
 	var p organizationInvitationPO
-	err := r.d.dbOr(tx).WithContext(ctx).Where("token_hash = ?", hash).First(&p).Error
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("token_hash = ?", hash).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -461,7 +521,7 @@ func (r *organizationRepo) GetInvitationByTokenHash(ctx context.Context, tx biz.
 
 func (r *organizationRepo) GetInvitationByEmail(ctx context.Context, tx biz.Tx, orgID int64, email string) (*biz.OrganizationInvitation, error) {
 	var p organizationInvitationPO
-	err := r.d.dbOr(tx).WithContext(ctx).
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("organization_id = ? AND email_normalized = ? AND status = ?", orgID, email, biz.OrgInvitationPending).
 		Order("id DESC").First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -475,7 +535,7 @@ func (r *organizationRepo) GetInvitationByEmail(ctx context.Context, tx biz.Tx, 
 
 func (r *organizationRepo) ListInvitations(ctx context.Context, tx biz.Tx, orgID int64, status string) ([]*biz.OrganizationInvitation, error) {
 	var rows []organizationInvitationPO
-	q := r.d.dbOr(tx).WithContext(ctx).Where("organization_id = ?", orgID)
+	q := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("organization_id = ?", orgID)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -490,7 +550,7 @@ func (r *organizationRepo) ListInvitations(ctx context.Context, tx biz.Tx, orgID
 }
 
 func (r *organizationRepo) UpdateInvitation(ctx context.Context, tx biz.Tx, inv *biz.OrganizationInvitation, expected uint64) (*biz.OrganizationInvitation, error) {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&organizationInvitationPO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationInvitationPO{}).
 		Where("id = ? AND revision = ? AND status = ?", inv.ID, expected, biz.OrgInvitationPending).
 		Updates(map[string]any{
 			"status": inv.Status, "accepted_by": inv.AcceptedBy, "accepted_at": inv.AcceptedAt,
@@ -506,7 +566,7 @@ func (r *organizationRepo) UpdateInvitation(ctx context.Context, tx biz.Tx, inv 
 }
 
 func (r *organizationRepo) CountPendingInvitations(ctx context.Context, tx biz.Tx, orgID int64, now time.Time) (int64, error) {
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 	// MySQL: lock every pending invitation of this organization so two
 	// concurrent invites cannot both pass the quota check or leave two live
 	// tokens for the same address. SQLite (tests/dev) falls back to a count.
@@ -527,7 +587,7 @@ func (r *organizationRepo) CountPendingInvitations(ctx context.Context, tx biz.T
 }
 
 func (r *organizationRepo) RevokePendingInvitationsForEmail(ctx context.Context, tx biz.Tx, orgID int64, email string) error {
-	return r.d.dbOr(tx).WithContext(ctx).Model(&organizationInvitationPO{}).
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&organizationInvitationPO{}).
 		Where("organization_id = ? AND email_normalized = ? AND status = ?", orgID, email, biz.OrgInvitationPending).
 		Updates(map[string]any{
 			"status": biz.OrgInvitationRevoked, "revision": gorm.Expr("revision + 1"),
@@ -536,5 +596,43 @@ func (r *organizationRepo) RevokePendingInvitationsForEmail(ctx context.Context,
 }
 
 func (r *organizationRepo) DeleteInvitation(ctx context.Context, tx biz.Tx, id int64) error {
-	return r.d.dbOr(tx).WithContext(ctx).Where("id = ?", id).Delete(&organizationInvitationPO{}).Error
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).Where("id = ?", id).Delete(&organizationInvitationPO{}).Error
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func (r *organizationRepo) listOrganizationsForUserSQLite(ctx context.Context, tx biz.Tx, userID int64) ([]*biz.Organization, error) {
+	var members []organizationMemberPO
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).
+		Where("user_id = ? AND status = ?", userID, biz.OrgMemberActive).Find(&members).Error; err != nil {
+		return nil, err
+	}
+	if len(members) == 0 {
+		return nil, nil
+	}
+	ids := make([]int64, 0, len(members))
+	roles := map[int64]string{}
+	for _, m := range members {
+		ids = append(ids, m.OrganizationID)
+		roles[m.OrganizationID] = m.Role
+	}
+	var orgs []organizationPO
+	if err := r.d.db.WithContext(ctx).Where("id IN ? AND status = ?", ids, biz.OrgStatusActive).Find(&orgs).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*biz.Organization, 0, len(orgs))
+	for i := range orgs {
+		org := orgToBiz(&orgs[i])
+		org.Role = roles[org.ID]
+		org.MemberCount, _ = r.CountActiveMembers(ctx, tx, org.ID)
+		out = append(out, org)
+	}
+	return out, nil
 }

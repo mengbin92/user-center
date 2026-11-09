@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,9 +13,9 @@ import (
 
 	driverMySQL "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
-	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 
 	"github.com/mengbin92/user-center/internal/biz"
@@ -24,21 +25,61 @@ import (
 
 // Per-organization schema isolation.
 //
-// In MySQL a schema IS a database, so "one schema per tenant" is implemented
-// as one database per organization with its own connection pool. The platform
-// pool keeps the shared identity and cross-tenant governance tables. Routing
-// is driven solely by the organization id in the request context, which the
-// transport injects from the verified URL path or the authenticated SCIM token
-// -- never from a request body.
+// Two storage shapes, one router:
 //
-// Isolation is opt-in (Tenancy.SchemaIsolation). When it is off, TenantDB
-// returns the platform pool and the system keeps its original logical
-// isolation unchanged, including all existing tests.
+//   - MySQL has schemas, so routing rewrites the table name to
+//     `schema`.`table` and keeps the platform connection. That is what makes
+//     the isolation complete: one transaction writes platform and tenant
+//     tables atomically (InnoDB is atomic across schemas on one instance), so
+//     no usecase needs a second transaction or a compensating job.
+//   - SQLite has no schemas. Each tenant gets its own database file and its own
+//     pool. Isolation is still physical, but a tenant write is not part of the
+//     platform transaction; SQLite is dev/test only and that limitation is
+//     documented.
+//
+// Every table is created from a checked-in SQL file (tenantddl/*.sql), never by
+// GORM's Migrator, so tenant DDL is reviewable and diffable like any migration.
 
-type tenantPool struct {
-	db   *gorm.DB
-	sql  *sql.DB
-	name string
+//go:embed tenantddl/*.sql
+var tenantDDLFS embed.FS
+
+type tenantDialector struct{ gorm.Dialector }
+
+// QuoteTo splits a dotted identifier so `schema.table` is emitted as
+// `schema`.`table`. Column names that arrive as `alias.column` are already
+// valid in that form, so the rewrite is safe for JOINs too.
+func (t tenantDialector) QuoteTo(w clause.Writer, s string) {
+	if strings.Contains(s, ".") && !strings.ContainsAny(s, "`\"") {
+		parts := strings.SplitN(s, ".", 2)
+		w.WriteByte('`')
+		w.WriteString(parts[0])
+		w.WriteString("`.`")
+		w.WriteString(parts[1])
+		w.WriteByte('`')
+		return
+	}
+	t.Dialector.QuoteTo(w, s)
+}
+
+// tenantTables is the closed set of tables that belong to one organization.
+// Everything not listed here (users, organizations, event_outbox, platform IAM
+// rows, settings, sessions ...) stays on the platform schema.
+var tenantTables = map[string]bool{
+	"organization_members":     true,
+	"organization_departments": true,
+	"organization_invitations": true,
+	"iam_roles":                true,
+	"iam_role_permissions":     true,
+	"iam_role_inheritance":     true,
+	"iam_user_roles":           true,
+	"iam_role_constraints":     true,
+	"iam_delegations":          true,
+	"iam_audit_events":         true,
+	"scim_identities":          true,
+	"scim_groups":              true,
+	"scim_group_members":       true,
+	"directory_objects":        true,
+	"directory_sync_runs":      true,
 }
 
 const defaultSchemaPrefix = "usercenter_org_"
@@ -58,65 +99,103 @@ func (d *Data) TenantSchemaName(orgID int64) string {
 	return d.schemaPrefix() + strconv.FormatInt(orgID, 10)
 }
 
-// TenantDB resolves the connection pool for the organization bound to ctx.
-// An unbound (platform) request always uses the platform pool. When isolation
-// is enabled and the tenant database does not exist yet, the returned handle
-// points at a missing schema and every query fails closed: it never silently
-// falls back to the shared pool, which would mix tenant data.
+func (d *Data) isSQLite() bool {
+	return d.driver == "sqlite" || d.driver == "sqlite3"
+}
+
+// TenantDB returns the handle that should serve tenant data. On MySQL it is
+// the platform pool (routing is by table name); on SQLite it is the tenant's
+// own database file.
 func (d *Data) TenantDB(ctx context.Context) *gorm.DB {
-	if !d.IsolationEnabled() {
+	if !d.IsolationEnabled() || !d.isSQLite() {
 		return d.db
 	}
 	orgID := tenant.From(ctx)
 	if orgID <= 0 {
 		return d.db
 	}
-	db, err := d.tenantDB(orgID)
+	db, err := d.sqliteTenantDB(orgID)
 	if err != nil {
 		if d.log != nil {
-			d.log.Warn("tenant schema unavailable", zap.Int64("organization_id", orgID), zap.Error(err))
+			d.log.Warn("tenant database unavailable", zap.Int64("organization_id", orgID), zap.Error(err))
 		}
-		return d.db.Session(&gorm.Session{NewDB: true}).Table("__tenant_schema_missing__")
+		return d.db.Session(&gorm.Session{NewDB: true}).Table("__tenant_database_missing__")
 	}
-	return db
+	return db.WithContext(ctx)
 }
 
-// tenantOr is the tenant-aware equivalent of dbOr.
-//
-// With isolation OFF it must honour tx exactly like dbOr does: several repos
-// call it from inside a transaction on a single-connection SQLite/MySQL pool,
-// and borrowing a second connection there deadlocks (the caller already holds
-// the only one). With isolation ON, tenant tables live in a different database,
-// so the platform transaction cannot be reused -- the write intentionally goes
-// to the tenant pool outside that transaction.
+// tenantOr is the tenant-aware equivalent of dbOr. MySQL keeps the caller's
+// transaction so tenant writes stay atomic with platform writes; SQLite swaps
+// in the tenant file.
 func (d *Data) tenantOr(ctx context.Context, tx biz.Tx) *gorm.DB {
 	if !d.IsolationEnabled() {
 		return d.dbOr(tx)
 	}
-	return d.TenantDB(ctx)
+	if d.isSQLite() {
+		if tenant.From(ctx) <= 0 {
+			return d.dbOr(tx)
+		}
+		return d.TenantDB(ctx)
+	}
+	return d.dbOr(tx)
 }
 
-// TenantTxManager opens transactions on the connection selected by ctx.
-// Without this, a tenant repository could read from its schema but write
-// through a platform transaction, which would split one logical change across
-// two databases.
+// TenantTable returns the schema-qualified name for a tenant table when the
+// context is bound to an organization, and the bare name otherwise. Queries
+// built with Table("x AS alias") set Statement.TableExpr, which the routing
+// callback cannot rewrite, so those call sites must use this helper instead.
+func (d *Data) TenantTable(ctx context.Context, table string) string {
+	if !d.IsolationEnabled() || d.isSQLite() {
+		return table
+	}
+	orgID := tenant.From(ctx)
+	if orgID <= 0 {
+		return table
+	}
+	return d.TenantSchemaName(orgID) + "." + table
+}
+
+// TenantTxManager opens transactions on the platform pool.
 type TenantTxManager struct{ d *Data }
 
 func (m *TenantTxManager) InTx(ctx context.Context, fn func(context.Context, biz.Tx) error) error {
-	return m.d.TenantDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return m.d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return fn(ctx, tx)
 	})
 }
 
-// TenantTxManager satisfies the optional interface NewServices probes, so the
-// usecase graph gains tenant-aware transactions without changing the Wire
-// signature of every existing constructor.
 func (d *Data) TenantTxManager() biz.TxManager { return &TenantTxManager{d: d} }
+
+// registerTenantRouting installs the table rewrite on every read and write
+// path. SQLite does not use it: its tenant handle already points at the right
+// file, and rewriting the table would look for a schema that does not exist.
+func (d *Data) registerTenantRouting() {
+	if d.isSQLite() {
+		return
+	}
+	rewrite := func(tx *gorm.DB) {
+		if !d.IsolationEnabled() || tx.Statement == nil {
+			return
+		}
+		orgID := tenant.From(tx.Statement.Context)
+		if orgID <= 0 {
+			return
+		}
+		table := tx.Statement.Table
+		if table == "" || strings.Contains(table, ".") || !tenantTables[table] {
+			return
+		}
+		tx.Statement.Table = d.TenantSchemaName(orgID) + "." + table
+	}
+	d.db.Callback().Query().Before("gorm:query").Register("tenant:query", rewrite)
+	d.db.Callback().Create().Before("gorm:create").Register("tenant:create", rewrite)
+	d.db.Callback().Update().Before("gorm:update").Register("tenant:update", rewrite)
+	d.db.Callback().Delete().Before("gorm:delete").Register("tenant:delete", rewrite)
+}
 
 func (d *Data) tenantSource(orgID int64) (string, string, error) {
 	name := d.TenantSchemaName(orgID)
-	switch d.driver {
-	case "sqlite", "sqlite3":
+	if d.isSQLite() {
 		base := d.baseSource
 		if base == "" {
 			base = "file::memory:?cache=shared"
@@ -132,77 +211,80 @@ func (d *Data) tenantSource(orgID int64) (string, string, error) {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return "", name, err
 		}
-		return "file:" + filepath.Join(dir, fmt.Sprintf("tenant_%d.db", orgID)) + "?_fk=1", name, nil
-	default:
-		cfg, err := driverMySQL.ParseDSN(d.baseSource)
-		if err != nil {
-			return "", name, fmt.Errorf("parse MySQL DSN: %w", err)
-		}
-		cfg.DBName = name
-		return cfg.FormatDSN(), name, nil
+		return filepath.Join(dir, fmt.Sprintf("tenant_%d.db", orgID)), name, nil
 	}
+	cfg, err := driverMySQL.ParseDSN(d.baseSource)
+	if err != nil {
+		return "", name, fmt.Errorf("parse MySQL DSN: %w", err)
+	}
+	cfg.DBName = name
+	return cfg.FormatDSN(), name, nil
 }
 
-func (d *Data) tenantDB(orgID int64) (*gorm.DB, error) {
+func (d *Data) sqliteTenantDB(orgID int64) (*gorm.DB, error) {
 	d.tenantsMu.Lock()
 	defer d.tenantsMu.Unlock()
-	if pool, ok := d.tenants[orgID]; ok {
-		return pool.db, nil
+	if db, ok := d.tenants[orgID]; ok {
+		return db, nil
 	}
-	source, name, err := d.tenantSource(orgID)
+	source, _, err := d.tenantSource(orgID)
 	if err != nil {
 		return nil, err
 	}
-	// MySQL needs the database to exist before GORM can open a pool on it.
-	if d.driver != "sqlite" && d.driver != "sqlite3" {
-		stmt := "CREATE DATABASE IF NOT EXISTS `" + name + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-		if err := d.db.Exec(stmt).Error; err != nil {
-			return nil, fmt.Errorf("create tenant schema: %w", err)
-		}
-	}
-	var dial gorm.Dialector
-	if d.driver == "sqlite" || d.driver == "sqlite3" {
-		dial = sqlite.Open(source)
-	} else {
-		dial = mysql.Open(source)
-	}
-	db, err := gorm.Open(dial, &gorm.Config{
+	db, err := gorm.Open(sqlite.Open("file:"+source+"?_fk=1"), &gorm.Config{
 		Logger:  logger.Default.LogMode(logger.Silent),
 		NowFunc: func() time.Time { return time.Now().UTC() },
 	})
 	if err != nil {
 		return nil, err
 	}
-	// A tenant schema carries the same table set as the platform schema. This
-	// keeps tenant transactions self-contained: a provisioning write touches
-	// users, audit and the tenant tables in ONE database.
-	if err := db.AutoMigrate(models()...); err != nil {
-		return nil, fmt.Errorf("migrate tenant schema: %w", err)
+	if sqlDB, err := db.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(4)
+		sqlDB.SetMaxIdleConns(2)
 	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, err
-	}
-	maxOpen, maxIdle := 8, 4
-	if d.tenancy != nil {
-		if d.tenancy.MaxOpenConns > 0 {
-			maxOpen = int(d.tenancy.MaxOpenConns)
-		}
-		if d.tenancy.MaxIdleConns > 0 {
-			maxIdle = int(d.tenancy.MaxIdleConns)
-		}
-	}
-	sqlDB.SetMaxOpenConns(maxOpen)
-	sqlDB.SetMaxIdleConns(maxIdle)
-	sqlDB.SetConnMaxLifetime(time.Hour)
-	d.tenants[orgID] = &tenantPool{db: db, sql: sqlDB, name: name}
+	d.tenants[orgID] = db
 	return db, nil
 }
 
-// EnsureTenantSchema prepares the physical schema for one organization. It is
-// idempotent and is the entry point of cmd/tenant-schema; the static SQL
-// migrations cannot express "create one schema per organization".
-func (d *Data) EnsureTenantSchema(_ context.Context, orgID int64) (string, error) {
+// tenantStatements strips comments, substitutes the schema placeholder and
+// splits a checked-in DDL file into executable statements. The files contain no
+// semicolons inside string literals, so a plain split is safe.
+func tenantStatements(raw, schema string) []string {
+	lines := make([]string, 0, 64)
+	for _, line := range strings.Split(raw, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "--") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	out := make([]string, 0, 32)
+	for _, stmt := range strings.Split(strings.Join(lines, "\n"), ";") {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+		out = append(out, strings.ReplaceAll(stmt, "{{schema}}", schema))
+	}
+	return out
+}
+
+func (d *Data) execTenantDDL(db *gorm.DB, file, schema string) error {
+	raw, err := tenantDDLFS.ReadFile("tenantddl/" + file + ".sql")
+	if err != nil {
+		return fmt.Errorf("read tenant ddl %s: %w", file, err)
+	}
+	for _, stmt := range tenantStatements(string(raw), schema) {
+		if err := db.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("execute tenant ddl for %s: %w", schema, err)
+		}
+	}
+	return nil
+}
+
+// EnsureTenantSchema prepares the physical schema for one organization using
+// the checked-in DDL. It is idempotent and is the entry point of
+// cmd/tenant-schema and of organization creation once isolation is enabled.
+func (d *Data) EnsureTenantSchema(ctx context.Context, orgID int64) (string, error) {
 	if orgID <= 0 {
 		return "", fmt.Errorf("organization id must be positive")
 	}
@@ -213,31 +295,68 @@ func (d *Data) EnsureTenantSchema(_ context.Context, orgID int64) (string, error
 	if err != nil {
 		return "", err
 	}
-	if _, err := d.tenantDB(orgID); err != nil {
-		return "", err
+	if d.isSQLite() {
+		db, err := d.sqliteTenantDB(orgID)
+		if err != nil {
+			return "", fmt.Errorf("open tenant database: %w", err)
+		}
+		if err := d.execTenantDDL(db, "sqlite", "main"); err != nil {
+			return "", err
+		}
+	} else {
+		stmt := "CREATE DATABASE IF NOT EXISTS `" + name + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+		if err := d.db.Exec(stmt).Error; err != nil {
+			return "", fmt.Errorf("create tenant schema: %w", err)
+		}
+		if err := d.execTenantDDL(d.db, "mysql", name); err != nil {
+			return "", err
+		}
 	}
+	now := time.Now().UTC()
+	if err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "organization_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"schema_name", "status", "updated_at"}),
+	}).Create(&tenantSchemaPO{
+		OrganizationID: orgID, SchemaName: name, Status: "ready",
+		CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		return "", fmt.Errorf("record tenant schema: %w", err)
+	}
+	d.tenantsMu.Lock()
+	d.attached[name] = true
+	d.tenantsMu.Unlock()
 	return name, nil
 }
 
-// TenantSchemas lists the schemas opened on this instance. MySQL deployments
-// can also enumerate them with SHOW DATABASES; the in-process list is what the
-// router actually uses.
+// TenantSchemas lists schemas prepared on this instance.
 func (d *Data) TenantSchemas() []string {
 	d.tenantsMu.Lock()
 	defer d.tenantsMu.Unlock()
-	out := make([]string, 0, len(d.tenants))
-	for _, pool := range d.tenants {
-		out = append(out, pool.name)
+	out := make([]string, 0, len(d.attached))
+	for name := range d.attached {
+		out = append(out, name)
 	}
 	return out
+}
+
+// TenantOrganizationIDs returns every organization with a prepared schema,
+// ordered by id. Cross-tenant queries iterate this list.
+func (d *Data) TenantOrganizationIDs(ctx context.Context) ([]int64, error) {
+	if !d.IsolationEnabled() {
+		return nil, nil
+	}
+	var ids []int64
+	err := d.db.WithContext(ctx).Model(&tenantSchemaPO{}).
+		Where("status = ?", "ready").Order("organization_id ASC").Pluck("organization_id", &ids).Error
+	return ids, err
 }
 
 func (d *Data) closeTenantPools() {
 	d.tenantsMu.Lock()
 	defer d.tenantsMu.Unlock()
-	for id, pool := range d.tenants {
-		if pool.sql != nil {
-			_ = pool.sql.Close()
+	for id, db := range d.tenants {
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
 		}
 		delete(d.tenants, id)
 	}
@@ -245,3 +364,18 @@ func (d *Data) closeTenantPools() {
 
 // TenancyConfig is exposed for the CLI and readiness reporting.
 func (d *Data) TenancyConfig() *conf.Tenancy { return d.tenancy }
+
+var _ = sql.ErrNoRows
+
+// PlatformDBName is the schema that holds the shared identity and governance
+// tables. The cutover CLI needs it to copy tenant rows across schemas.
+func (d *Data) PlatformDBName() (string, error) {
+	if d.isSQLite() {
+		return "main", nil
+	}
+	cfg, err := driverMySQL.ParseDSN(d.baseSource)
+	if err != nil {
+		return "", err
+	}
+	return cfg.DBName, nil
+}

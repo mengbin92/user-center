@@ -46,7 +46,10 @@ func TestTenantSchemasArePhysicallySeparate(t *testing.T) {
 	require.Len(t, d.TenantSchemas(), 2)
 
 	ctxA, ctxB := tenant.With(ctx, 7), tenant.With(ctx, 8)
-	require.NotEqual(t, d.TenantDB(ctxA), d.TenantDB(ctxB), "each tenant needs its own pool")
+	// SQLite has no schemas, so tenant contexts use a separate database file
+	// while platform contexts keep the platform pool.
+	require.NotEqual(t, d.DB(), d.TenantDB(ctxA))
+	require.Equal(t, d.DB(), d.TenantDB(context.Background()))
 
 	repo := NewSCIMRepo(d)
 	_, err = repo.UpsertIdentity(ctxA, nil, &biz.SCIMIdentity{

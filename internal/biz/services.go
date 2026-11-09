@@ -36,10 +36,13 @@ type Services struct {
 	Settings           SettingsRepo
 	Exports            ExportRepo
 	Tx                 TxManager
-	Clock              Clock
-	IDs                IDGenerator
-	Secrets            SecretBox
-	OAuth              map[string]OAuthProvider
+	// TenantSchemas is set when the storage layer supports per-organization
+	// schemas. Nil means logical isolation only.
+	TenantSchemas TenantProvisioner
+	Clock         Clock
+	IDs           IDGenerator
+	Secrets       SecretBox
+	OAuth         map[string]OAuthProvider
 
 	SessionTTL       time.Duration
 	IdleTimeout      time.Duration
@@ -134,6 +137,12 @@ func NewServices(
 		ChallengeTTL: 10 * time.Minute, ResetTTL: 30 * time.Minute,
 		ActivationTTL: 24 * time.Hour, MaxLoginAttempts: 10, OrgInvitationTTL: 72 * time.Hour,
 		ArtifactDir: "artifacts", PublicBaseURL: "http://localhost:5173",
+	}
+	// Optional capability: a storage layer that can create per-organization
+	// schemas advertises it here, so organization creation can provision one
+	// before writing tenant rows.
+	if provisioner, ok := tx.(TenantProvisioner); ok {
+		s.TenantSchemas = provisioner
 	}
 	if cfg != nil {
 		if cfg.SessionTTL > 0 {

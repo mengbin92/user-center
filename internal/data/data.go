@@ -37,7 +37,8 @@ type Data struct {
 	tenancy    *conf.Tenancy
 	driver     string
 	baseSource string
-	tenants    map[int64]*tenantPool
+	attached   map[string]bool
+	tenants    map[int64]*gorm.DB
 	tenantsMu  sync.Mutex
 }
 
@@ -85,7 +86,7 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 		baseSource = source
 		dial = mysql.Open(source)
 	}
-	db, err := gorm.Open(dial, &gorm.Config{
+	db, err := gorm.Open(tenantDialector{Dialector: dial}, &gorm.Config{
 		Logger:  logger.Default.LogMode(logger.Silent),
 		NowFunc: func() time.Time { return time.Now().UTC() },
 	})
@@ -117,7 +118,15 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 	d := &Data{
 		db: db, log: log, conf: dataConf, secure: sec,
 		tenancy: tenancy, driver: driver, baseSource: baseSource,
-		tenants: make(map[int64]*tenantPool),
+		attached: make(map[string]bool),
+		tenants:  make(map[int64]*gorm.DB),
+	}
+	d.registerTenantRouting()
+	if d.IsolationEnabled() && (driver == "sqlite" || driver == "sqlite3") {
+		// SQLite has no schemas. Each tenant gets its own database file and its
+		// own pool instead of an ATTACH, because an ATTACH is connection-local
+		// and forcing a single connection deadlocks nested transactions.
+		sqlDB.SetMaxOpenConns(4)
 	}
 	cleanupRedis := func() {}
 	if dataConf != nil && dataConf.Redis != nil && dataConf.Redis.Addr != "" {
@@ -244,6 +253,6 @@ func models() []any {
 		&menuPO{}, &auditEventPO{}, &authSettingsPO{}, &emailSettingsPO{},
 		&exportJobPO{}, &outboxEventPO{}, &deliveryPO{}, &integrationClientPO{}, &legacyImportBatchPO{}, &organizationPO{}, &organizationMemberPO{}, &organizationDepartmentPO{}, &organizationInvitationPO{}, &oidcClientPO{}, &oidcCodePO{}, &oidcRefreshPO{}, &oidcConsentPO{}, &oidcConsentRequestPO{}, &webauthnCredentialPO{}, &legalHoldPO{},
 		&scimTokenPO{}, &scimIdentityPO{}, &scimGroupPO{}, &scimGroupMemberPO{},
-		&directorySourcePO{}, &directoryRunPO{}, &directoryObjectPO{},
+		&directorySourcePO{}, &directoryRunPO{}, &directoryObjectPO{}, &tenantSchemaPO{},
 	}
 }

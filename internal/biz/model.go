@@ -504,11 +504,15 @@ type OIDCRefreshToken struct {
 const (
 	OrgStatusActive   = "active"
 	OrgStatusArchived = "archived"
-	OrgRoleOwner      = "owner"
-	OrgRoleAdmin      = "admin"
-	OrgRoleMember     = "member"
-	OrgMemberActive   = "active"
-	OrgMemberRemoved  = "removed"
+	// OrgStatusProvisioning marks a row whose tenant schema is still being
+	// prepared. It is invisible to orgAccess, so a half-created tenant can
+	// never be used.
+	OrgStatusProvisioning = "provisioning"
+	OrgRoleOwner          = "owner"
+	OrgRoleAdmin          = "admin"
+	OrgRoleMember         = "member"
+	OrgMemberActive       = "active"
+	OrgMemberRemoved      = "removed"
 
 	DepartmentStatusActive   = "active"
 	DepartmentStatusArchived = "archived"

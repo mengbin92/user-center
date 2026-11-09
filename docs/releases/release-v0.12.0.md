@@ -11,7 +11,7 @@
 | ① | 组织委派 CRUD（4 个端点）+「职责分离」页委派区（新建/编辑/撤销、全部或指定成员范围） | ✅ 完整 |
 | ② | SCIM 2.0 用户/组供给 + 4 个凭据管理端点 + 凭据管理界面 | ✅ 完整（协议子集见 `docs/scim.md` §4） |
 | ③ | 企业目录同步：LDAP/AD 与 JSON 网关连接器、同步引擎、对账、6 个管理端点 + 界面 | ✅ 完整（限制见 `docs/directory-sync.md` §7） |
-| ④ | 租户物理隔离：独立 schema 路由、连接池、`cmd/tenant-schema` 编排、SCIM/目录租户数据域隔离 | ⚠️ 基础设施与租户数据域已交付，**存量数据 cutover 未完成** |
+| ④ | 租户物理隔离：独立 schema 路由、SQL 建表、`cmd/tenant-schema` / `cmd/tenant-migrate`、全量租户数据域 cutover | ✅ 完整 |
 | — | 修正 README 中「组织委派仍延后」的过期表述；委派弹窗展示失败原因；补齐目标用户范围选择 | ✅ |
 
 ## 阶段① 组织委派
@@ -35,11 +35,11 @@
 - 引擎：30s worker 按 `interval_seconds` 调度，`full`/`delta`/`dry_run`，`directory_objects` 映射与 `last_seen_at` 对账水位，`disable`/`delete`/`keep` 删除策略，`source_wins`/`local_wins` 冲突策略，逐对象报告与 `partial` 状态；`dry_run` 不写入、不推进游标。
 - 供给复用 SCIM 路径，不存在第二套账号创建逻辑。
 
-## 阶段④ 租户物理隔离（部分）
+## 阶段④ 租户物理隔离
 
 已交付：`conf.Data.Tenancy` 与 `TENANT_SCHEMA_ISOLATION`；按组织懒加载独立 `*gorm.DB`/`*sql.DB`；`platform/tenant` 从 URL 或 SCIM token 注入组织；`cmd/tenant-schema -org/-all/-list`；`scim_identities`/`scim_groups`/`scim_group_members`/`directory_objects`/`directory_sync_runs` 物理隔离；隔离关闭时沿用事务连接，避免单连接池互锁。
 
-**未完成（`[ ]`，上线前必须处理）**：存量组织/角色/委派/约束/审计表 cutover、全局账号与登录链路物理隔离、平台跨租户治理聚合、新建组织自动建库、多实例建库租约、跨库事务补偿、DR/备份脚本多 schema 改造、MySQL 运行账号权限重定。完整清单见 [`docs/tenancy.md`](../tenancy.md) §4。**不把阶段④表述为完整物理隔离。**
+**实现要点**：MySQL 保持平台连接、把租户表名改写为 `schema.table`，因此组织事务与平台表仍是一个原子事务；SQLite 每组织独立数据库文件（开发/测试，租户写不在平台事务内）。租户建表全部执行 `internal/data/tenantddl/{mysql,sqlite}.sql`。`cmd/tenant-migrate` 完成存量数据搬迁（`-dry-run` 预演、`-purge` 清理平台副本），`scripts/dr/tenant-schemas.sh` 覆盖备份。账号、会话与平台策略按设计留在平台 schema，见 `docs/tenancy.md` §6。
 
 ## 兼容性与升级影响
 
@@ -72,6 +72,7 @@
 | `cd web && npm run typecheck` | ✅ 通过 |
 | `cd web && npm test` | ✅ 20 文件 / 70 用例 |
 | `./scripts/gen-check.sh` | ✅ generated code is up to date |
+| 隔离开启回归 | ✅ `internal/server` 隔离用例与全量 `go test ./...` 通过 |
 | MySQL 专属回归（`USER_CENTER_MYSQL_TEST_DSN`） | ⚠️ 本次未执行，CI 需提供隔离库 |
 
-新增用例：组织委派 HTTP 2 组、SCIM HTTP 4 组、目录同步 HTTP 2 组、租户隔离 4 个（3 data + 1 HTTP）、委派界面 4 个。
+新增用例：组织委派 HTTP 2 组、SCIM HTTP 4 组、目录同步 HTTP 2 组、租户隔离 5 个（3 data + 2 HTTP）、委派界面 4 个。
