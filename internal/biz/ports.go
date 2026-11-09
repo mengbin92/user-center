@@ -200,7 +200,9 @@ type IAMRepo interface {
 	GetDelegation(context.Context, Tx, int64) (*Delegation, error)
 	CreateDelegation(context.Context, Tx, *Delegation) (*Delegation, error)
 	UpdateDelegation(context.Context, Tx, *Delegation, uint64) (*Delegation, error)
-	RevokeDelegation(context.Context, Tx, int64, uint64, int64) error
+	// RevokeDelegation is context-scoped: a tenant write must never revoke a
+	// row from another context that happens to be addressed by a guessed id.
+	RevokeDelegation(context.Context, Tx, int64, uint64, int64, authorization.Context) error
 	GetConstraint(context.Context, Tx, authorization.Context, int64) (*Constraint, error)
 	CreateConstraint(context.Context, Tx, *Constraint) (*Constraint, error)
 	UpdateConstraint(context.Context, Tx, *Constraint, uint64) (*Constraint, error)

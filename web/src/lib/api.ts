@@ -146,6 +146,7 @@ import type {
   CreateOrganizationRequest,
   CreateOrgAssignmentRequest,
   CreateOrgConstraintRequest,
+  CreateOrgDelegationRequest,
   CreateOrgRoleRequest,
   Department,
   DepartmentsReply,
@@ -154,6 +155,8 @@ import type {
   OrgAuditsReply,
   OrgConstraint,
   OrgConstraintsReply,
+  OrgDelegation,
+  OrgDelegationsReply,
   OrgPermissionsReply,
   OrgRole,
   OrgRolesReply,
@@ -167,10 +170,12 @@ import type {
   OrganizationMembersReply,
   OrganizationsReply,
   PutOrgRolePermissionsRequest,
+  RevokeOrgDelegationRequest,
   UpdateDepartmentRequest,
   UpdateOrganizationMemberRequest,
   UpdateOrganizationRequest,
   UpdateOrgConstraintRequest,
+  UpdateOrgDelegationRequest,
   UpdateOrgRoleRequest,
 } from './types'
 
@@ -507,6 +512,33 @@ export const api = {
       },
     ) =>
       del(`/api/v1/orgs/${enc(id)}/iam/constraints/${enc(constraintId)}`, params),
+
+    // Organization-scoped delegations. The server derives the ceiling from
+    // what the issuer actually holds and rejects any ceiling that exceeds it;
+    // the UI snapshots the target role's grants so a valid delegation is the
+    // default rather than something the operator has to hand-craft.
+    listDelegations: (id: string) =>
+      get<OrgDelegationsReply>(`/api/v1/orgs/${enc(id)}/iam/delegations`),
+    createDelegation: (id: string, body: CreateOrgDelegationRequest) =>
+      post<OrgDelegation>(`/api/v1/orgs/${enc(id)}/iam/delegations`, body),
+    updateDelegation: (
+      id: string,
+      delegationId: string,
+      body: UpdateOrgDelegationRequest,
+    ) =>
+      patch<OrgDelegation>(
+        `/api/v1/orgs/${enc(id)}/iam/delegations/${enc(delegationId)}`,
+        body,
+      ),
+    revokeDelegation: (
+      id: string,
+      delegationId: string,
+      body: RevokeOrgDelegationRequest,
+    ) =>
+      post<OrgDelegation>(
+        `/api/v1/orgs/${enc(id)}/iam/delegations/${enc(delegationId)}:revoke`,
+        body,
+      ),
 
     exportAudits: (id: string, body: ExportOrgAuditsRequest) =>
       post<ExportJob>(`/api/v1/orgs/${enc(id)}/audits:export`, body),

@@ -47,6 +47,10 @@ const (
 	OrganizationService_CreateOrgConstraint_FullMethodName          = "/api.usercenter.v1.OrganizationService/CreateOrgConstraint"
 	OrganizationService_UpdateOrgConstraint_FullMethodName          = "/api.usercenter.v1.OrganizationService/UpdateOrgConstraint"
 	OrganizationService_DeleteOrgConstraint_FullMethodName          = "/api.usercenter.v1.OrganizationService/DeleteOrgConstraint"
+	OrganizationService_ListOrgDelegations_FullMethodName           = "/api.usercenter.v1.OrganizationService/ListOrgDelegations"
+	OrganizationService_CreateOrgDelegation_FullMethodName          = "/api.usercenter.v1.OrganizationService/CreateOrgDelegation"
+	OrganizationService_UpdateOrgDelegation_FullMethodName          = "/api.usercenter.v1.OrganizationService/UpdateOrgDelegation"
+	OrganizationService_RevokeOrgDelegation_FullMethodName          = "/api.usercenter.v1.OrganizationService/RevokeOrgDelegation"
 	OrganizationService_ListOrgAudits_FullMethodName                = "/api.usercenter.v1.OrganizationService/ListOrgAudits"
 	OrganizationService_ExportOrgAudits_FullMethodName              = "/api.usercenter.v1.OrganizationService/ExportOrgAudits"
 	OrganizationService_ExplainOrgAuthorization_FullMethodName      = "/api.usercenter.v1.OrganizationService/ExplainOrgAuthorization"
@@ -96,6 +100,16 @@ type OrganizationServiceClient interface {
 	CreateOrgConstraint(ctx context.Context, in *CreateOrgConstraintRequest, opts ...grpc.CallOption) (*OrgConstraint, error)
 	UpdateOrgConstraint(ctx context.Context, in *UpdateOrgConstraintRequest, opts ...grpc.CallOption) (*OrgConstraint, error)
 	DeleteOrgConstraint(ctx context.Context, in *DeleteOrgConstraintRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Organization-scoped delegations. Until V2.6 the evaluator understood
+	// tenant delegations but no write path could create one, so the delegation
+	// branch of checkOrgDelegation was unreachable in production. These four
+	// endpoints are the missing entry point. They share the constraint
+	// governance permissions (design §5.1): read is owner+admin, every write is
+	// owner-only. A platform administrator has no entry point here (D7).
+	ListOrgDelegations(ctx context.Context, in *ListOrgDelegationsRequest, opts ...grpc.CallOption) (*OrgDelegationsReply, error)
+	CreateOrgDelegation(ctx context.Context, in *CreateOrgDelegationRequest, opts ...grpc.CallOption) (*OrgDelegation, error)
+	UpdateOrgDelegation(ctx context.Context, in *UpdateOrgDelegationRequest, opts ...grpc.CallOption) (*OrgDelegation, error)
+	RevokeOrgDelegation(ctx context.Context, in *RevokeOrgDelegationRequest, opts ...grpc.CallOption) (*OrgDelegation, error)
 	ListOrgAudits(ctx context.Context, in *ListOrgAuditsRequest, opts ...grpc.CallOption) (*OrgAuditsReply, error)
 	ExportOrgAudits(ctx context.Context, in *ExportOrgAuditsRequest, opts ...grpc.CallOption) (*ExportJob, error)
 	ExplainOrgAuthorization(ctx context.Context, in *ExplainOrgAuthorizationRequest, opts ...grpc.CallOption) (*ExplainOrgAuthorizationReply, error)
@@ -386,6 +400,46 @@ func (c *organizationServiceClient) DeleteOrgConstraint(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *organizationServiceClient) ListOrgDelegations(ctx context.Context, in *ListOrgDelegationsRequest, opts ...grpc.CallOption) (*OrgDelegationsReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgDelegationsReply)
+	err := c.cc.Invoke(ctx, OrganizationService_ListOrgDelegations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) CreateOrgDelegation(ctx context.Context, in *CreateOrgDelegationRequest, opts ...grpc.CallOption) (*OrgDelegation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgDelegation)
+	err := c.cc.Invoke(ctx, OrganizationService_CreateOrgDelegation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) UpdateOrgDelegation(ctx context.Context, in *UpdateOrgDelegationRequest, opts ...grpc.CallOption) (*OrgDelegation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgDelegation)
+	err := c.cc.Invoke(ctx, OrganizationService_UpdateOrgDelegation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationServiceClient) RevokeOrgDelegation(ctx context.Context, in *RevokeOrgDelegationRequest, opts ...grpc.CallOption) (*OrgDelegation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrgDelegation)
+	err := c.cc.Invoke(ctx, OrganizationService_RevokeOrgDelegation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationServiceClient) ListOrgAudits(ctx context.Context, in *ListOrgAuditsRequest, opts ...grpc.CallOption) (*OrgAuditsReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(OrgAuditsReply)
@@ -514,6 +568,16 @@ type OrganizationServiceServer interface {
 	CreateOrgConstraint(context.Context, *CreateOrgConstraintRequest) (*OrgConstraint, error)
 	UpdateOrgConstraint(context.Context, *UpdateOrgConstraintRequest) (*OrgConstraint, error)
 	DeleteOrgConstraint(context.Context, *DeleteOrgConstraintRequest) (*emptypb.Empty, error)
+	// Organization-scoped delegations. Until V2.6 the evaluator understood
+	// tenant delegations but no write path could create one, so the delegation
+	// branch of checkOrgDelegation was unreachable in production. These four
+	// endpoints are the missing entry point. They share the constraint
+	// governance permissions (design §5.1): read is owner+admin, every write is
+	// owner-only. A platform administrator has no entry point here (D7).
+	ListOrgDelegations(context.Context, *ListOrgDelegationsRequest) (*OrgDelegationsReply, error)
+	CreateOrgDelegation(context.Context, *CreateOrgDelegationRequest) (*OrgDelegation, error)
+	UpdateOrgDelegation(context.Context, *UpdateOrgDelegationRequest) (*OrgDelegation, error)
+	RevokeOrgDelegation(context.Context, *RevokeOrgDelegationRequest) (*OrgDelegation, error)
 	ListOrgAudits(context.Context, *ListOrgAuditsRequest) (*OrgAuditsReply, error)
 	ExportOrgAudits(context.Context, *ExportOrgAuditsRequest) (*ExportJob, error)
 	ExplainOrgAuthorization(context.Context, *ExplainOrgAuthorizationRequest) (*ExplainOrgAuthorizationReply, error)
@@ -614,6 +678,18 @@ func (UnimplementedOrganizationServiceServer) UpdateOrgConstraint(context.Contex
 }
 func (UnimplementedOrganizationServiceServer) DeleteOrgConstraint(context.Context, *DeleteOrgConstraintRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteOrgConstraint not implemented")
+}
+func (UnimplementedOrganizationServiceServer) ListOrgDelegations(context.Context, *ListOrgDelegationsRequest) (*OrgDelegationsReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOrgDelegations not implemented")
+}
+func (UnimplementedOrganizationServiceServer) CreateOrgDelegation(context.Context, *CreateOrgDelegationRequest) (*OrgDelegation, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOrgDelegation not implemented")
+}
+func (UnimplementedOrganizationServiceServer) UpdateOrgDelegation(context.Context, *UpdateOrgDelegationRequest) (*OrgDelegation, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateOrgDelegation not implemented")
+}
+func (UnimplementedOrganizationServiceServer) RevokeOrgDelegation(context.Context, *RevokeOrgDelegationRequest) (*OrgDelegation, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeOrgDelegation not implemented")
 }
 func (UnimplementedOrganizationServiceServer) ListOrgAudits(context.Context, *ListOrgAuditsRequest) (*OrgAuditsReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListOrgAudits not implemented")
@@ -1149,6 +1225,78 @@ func _OrganizationService_DeleteOrgConstraint_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrganizationService_ListOrgDelegations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOrgDelegationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).ListOrgDelegations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_ListOrgDelegations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).ListOrgDelegations(ctx, req.(*ListOrgDelegationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_CreateOrgDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOrgDelegationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).CreateOrgDelegation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_CreateOrgDelegation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).CreateOrgDelegation(ctx, req.(*CreateOrgDelegationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_UpdateOrgDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateOrgDelegationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).UpdateOrgDelegation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_UpdateOrgDelegation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).UpdateOrgDelegation(ctx, req.(*UpdateOrgDelegationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrganizationService_RevokeOrgDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeOrgDelegationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).RevokeOrgDelegation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_RevokeOrgDelegation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).RevokeOrgDelegation(ctx, req.(*RevokeOrgDelegationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _OrganizationService_ListOrgAudits_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListOrgAuditsRequest)
 	if err := dec(in); err != nil {
@@ -1425,6 +1573,22 @@ var OrganizationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteOrgConstraint",
 			Handler:    _OrganizationService_DeleteOrgConstraint_Handler,
+		},
+		{
+			MethodName: "ListOrgDelegations",
+			Handler:    _OrganizationService_ListOrgDelegations_Handler,
+		},
+		{
+			MethodName: "CreateOrgDelegation",
+			Handler:    _OrganizationService_CreateOrgDelegation_Handler,
+		},
+		{
+			MethodName: "UpdateOrgDelegation",
+			Handler:    _OrganizationService_UpdateOrgDelegation_Handler,
+		},
+		{
+			MethodName: "RevokeOrgDelegation",
+			Handler:    _OrganizationService_RevokeOrgDelegation_Handler,
 		},
 		{
 			MethodName: "ListOrgAudits",

@@ -120,6 +120,15 @@ export type CreateOrgConstraintRequest =
   Schemas['api.usercenter.v1.CreateOrgConstraintRequest']
 export type UpdateOrgConstraintRequest =
   Schemas['api.usercenter.v1.UpdateOrgConstraintRequest']
+export type OrgDelegation = Schemas['api.usercenter.v1.OrgDelegation']
+export type OrgDelegationsReply =
+  Schemas['api.usercenter.v1.OrgDelegationsReply']
+export type CreateOrgDelegationRequest =
+  Schemas['api.usercenter.v1.CreateOrgDelegationRequest']
+export type UpdateOrgDelegationRequest =
+  Schemas['api.usercenter.v1.UpdateOrgDelegationRequest']
+export type RevokeOrgDelegationRequest =
+  Schemas['api.usercenter.v1.RevokeOrgDelegationRequest']
 export type OrgRole = Schemas['api.usercenter.v1.OrgRole']
 export type OrgRolesReply = Schemas['api.usercenter.v1.OrgRolesReply']
 export type OrganizationsReply =

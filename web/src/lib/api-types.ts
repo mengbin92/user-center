@@ -1857,6 +1857,62 @@ export interface paths {
         patch: operations["OrganizationService_UpdateOrgConstraint"];
         trace?: never;
     };
+    "/api/v1/orgs/{id}/iam/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Organization-scoped delegations. Until V2.6 the evaluator understood
+         *      tenant delegations but no write path could create one, so the delegation
+         *      branch of checkOrgDelegation was unreachable in production. These four
+         *      endpoints are the missing entry point. They share the constraint
+         *      governance permissions (design §5.1): read is owner+admin, every write is
+         *      owner-only. A platform administrator has no entry point here (D7).
+         */
+        get: operations["OrganizationService_ListOrgDelegations"];
+        put?: never;
+        post: operations["OrganizationService_CreateOrgDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/delegations/{delegation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OrganizationService_UpdateOrgDelegation"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{id}/iam/delegations/{delegation_id}:revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrganizationService_RevokeOrgDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{id}/iam/permissions": {
         parameters: {
             query?: never;
@@ -2415,6 +2471,18 @@ export interface components {
              */
             acknowledge_violations?: boolean;
         };
+        "api.usercenter.v1.CreateOrgDelegationRequest": {
+            id?: string;
+            manager_role_id?: string;
+            target_role_id?: string;
+            actions?: string[];
+            target_user_scope?: components["schemas"]["api.usercenter.v1.Scope"];
+            grant_ceiling?: components["schemas"]["api.usercenter.v1.DelegationCeiling"][];
+            starts_at?: string;
+            expires_at?: string;
+            reason?: string;
+            expected_policy_revision?: string;
+        };
         "api.usercenter.v1.CreateOrgRoleRequest": {
             id?: string;
             code?: string;
@@ -2853,6 +2921,31 @@ export interface components {
         "api.usercenter.v1.OrgConstraintsReply": {
             items?: components["schemas"]["api.usercenter.v1.OrgConstraint"][];
         };
+        /**
+         * @description OrgDelegation is deliberately narrower than the platform Delegation:
+         *      can_redelegate is not exposed because the evaluator rejects it, and
+         *      target_kind is fixed to "role". The wire never carries a context field --
+         *      the organization in the path is the only tenant selector, so a caller cannot
+         *      smuggle a platform or another tenant's delegation in through the body.
+         */
+        "api.usercenter.v1.OrgDelegation": {
+            id?: string;
+            manager_role_id?: string;
+            target_role_id?: string;
+            target_kind?: string;
+            actions?: string[];
+            target_user_scope?: components["schemas"]["api.usercenter.v1.Scope"];
+            grant_ceiling?: components["schemas"]["api.usercenter.v1.DelegationCeiling"][];
+            starts_at?: string;
+            expires_at?: string;
+            revision?: string;
+            created_by?: string;
+            revoked?: boolean;
+            revoked_at?: string;
+        };
+        "api.usercenter.v1.OrgDelegationsReply": {
+            items?: components["schemas"]["api.usercenter.v1.OrgDelegation"][];
+        };
         "api.usercenter.v1.OrgPermissionsReply": {
             items?: components["schemas"]["api.usercenter.v1.Permission"][];
         };
@@ -3085,6 +3178,13 @@ export interface components {
         };
         "api.usercenter.v1.RevokeDelegationRequest": {
             id?: string;
+            expected_revision?: string;
+            reason?: string;
+            expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.RevokeOrgDelegationRequest": {
+            id?: string;
+            delegation_id?: string;
             expected_revision?: string;
             reason?: string;
             expected_policy_revision?: string;
@@ -3377,6 +3477,18 @@ export interface components {
             reason?: string;
             expected_policy_revision?: string;
             acknowledge_violations?: boolean;
+        };
+        "api.usercenter.v1.UpdateOrgDelegationRequest": {
+            id?: string;
+            delegation_id?: string;
+            actions?: string[];
+            target_user_scope?: components["schemas"]["api.usercenter.v1.Scope"];
+            grant_ceiling?: components["schemas"]["api.usercenter.v1.DelegationCeiling"][];
+            starts_at?: string;
+            expires_at?: string;
+            expected_revision?: string;
+            reason?: string;
+            expected_policy_revision?: string;
         };
         "api.usercenter.v1.UpdateOrgRoleRequest": {
             id?: string;
@@ -6867,6 +6979,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.OrgConstraint"];
+                };
+            };
+        };
+    };
+    OrganizationService_ListOrgDelegations: {
+        parameters: {
+            query?: {
+                /** @description active | revoked; empty returns both. */
+                status?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgDelegationsReply"];
+                };
+            };
+        };
+    };
+    OrganizationService_CreateOrgDelegation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateOrgDelegationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgDelegation"];
+                };
+            };
+        };
+    };
+    OrganizationService_UpdateOrgDelegation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                delegation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateOrgDelegationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgDelegation"];
+                };
+            };
+        };
+    };
+    OrganizationService_RevokeOrgDelegation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                delegation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.RevokeOrgDelegationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.OrgDelegation"];
                 };
             };
         };

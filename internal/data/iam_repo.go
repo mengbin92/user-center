@@ -893,7 +893,18 @@ func (r *iamRepo) UpdateDelegation(ctx context.Context, tx biz.Tx, d *biz.Delega
 	actions, _ := jsonx.Marshal(d.Actions)
 	scope, _ := jsonx.Marshal(d.TargetUserScope)
 	ceiling, _ := jsonx.Marshal(d.GrantCeiling)
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&delegationPO{}).Where("id = ? AND revision = ?", d.ID, expected).Updates(map[string]any{
+	authCtx := d.Context.Normalize()
+	contextType, contextID := authorization.ContextTypePlatform, int64(0)
+	if authCtx.IsOrganization() {
+		contextType, contextID = authorization.ContextTypeOrganization, authCtx.OrganizationID
+	}
+	// The context predicate is defence in depth. The biz layer already loaded
+	// this row through a context-scoped query, but a stale object (or a future
+	// caller that constructs one from request fields) must not be able to move
+	// or edit a delegation belonging to another tenant.
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&delegationPO{}).
+		Where("id = ? AND revision = ? AND context_type = ? AND context_id = ?",
+			d.ID, expected, contextType, contextID).Updates(map[string]any{
 		"actions": string(actions), "target_user_scope": string(scope), "grant_ceiling": string(ceiling),
 		"can_redelegate": d.CanRedelegate, "starts_at": d.StartsAt, "expires_at": d.ExpiresAt,
 		"revision": expected + 1,
@@ -907,9 +918,16 @@ func (r *iamRepo) UpdateDelegation(ctx context.Context, tx biz.Tx, d *biz.Delega
 	return r.GetDelegation(ctx, tx, d.ID)
 }
 
-func (r *iamRepo) RevokeDelegation(ctx context.Context, tx biz.Tx, id int64, expected uint64, by int64) error {
+func (r *iamRepo) RevokeDelegation(ctx context.Context, tx biz.Tx, id int64, expected uint64, by int64, authCtx authorization.Context) error {
 	now := time.Now().UTC()
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&delegationPO{}).Where("id = ? AND revision = ? AND revoked_at IS NULL", id, expected).Updates(map[string]any{
+	authCtx = authCtx.Normalize()
+	contextType, contextID := authorization.ContextTypePlatform, int64(0)
+	if authCtx.IsOrganization() {
+		contextType, contextID = authorization.ContextTypeOrganization, authCtx.OrganizationID
+	}
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&delegationPO{}).
+		Where("id = ? AND revision = ? AND revoked_at IS NULL AND context_type = ? AND context_id = ?",
+			id, expected, contextType, contextID).Updates(map[string]any{
 		"revoked_at": now, "revision": expected + 1, "created_by": by,
 	})
 	if res.Error != nil {

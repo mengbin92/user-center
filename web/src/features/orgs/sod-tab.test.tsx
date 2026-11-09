@@ -16,6 +16,10 @@ vi.mock('../../lib/api', () => ({
       listRoles: vi.fn(),
       createConstraint: vi.fn(),
       deleteConstraint: vi.fn(),
+      listDelegations: vi.fn(),
+      createDelegation: vi.fn(),
+      updateDelegation: vi.fn(),
+      revokeDelegation: vi.fn(),
     },
   },
 }))
@@ -74,6 +78,7 @@ beforeEach(() => {
   })
   vi.mocked(api.orgs.createConstraint).mockResolvedValue({ id: '1', revision: '1' })
   vi.mocked(api.orgs.deleteConstraint).mockResolvedValue(undefined)
+  vi.mocked(api.orgs.listDelegations).mockResolvedValue({ items: [] })
 })
 
 describe('organization SoD tab', () => {

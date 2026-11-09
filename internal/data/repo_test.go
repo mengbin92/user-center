@@ -232,7 +232,7 @@ func TestAssignmentListAndDelegationRepo(t *testing.T) {
 	updated, err := iam.UpdateDelegation(ctx, nil, list[0], list[0].Revision)
 	require.NoError(t, err)
 	require.NotZero(t, updated.Revision)
-	require.NoError(t, iam.RevokeDelegation(ctx, nil, delegation.ID, updated.Revision, 1))
+	require.NoError(t, iam.RevokeDelegation(ctx, nil, delegation.ID, updated.Revision, 1, authorization.Platform()))
 	revoked, err := iam.GetDelegation(ctx, nil, delegation.ID)
 	require.NoError(t, err)
 	require.NotNil(t, revoked.RevokedAt)

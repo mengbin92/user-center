@@ -14,6 +14,7 @@ import { useAuth } from '../../lib/auth'
 import { errorMessage } from '../../lib/errors'
 import { useApiMutation } from '../../lib/mutations'
 import type { Organization, OrgConstraint, OrgRole } from '../../lib/types'
+import { OrganizationDelegations } from './sod-delegations'
 
 // Organization-scoped segregation of duties.
 //
@@ -276,6 +277,8 @@ export function OrganizationSodTab({
           )}
         </QueryBoundary>
       </Card>
+
+      <OrganizationDelegations org={org} orgId={orgId} />
 
       {!canManage ? (
         <InlineAlert tone="info">

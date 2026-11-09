@@ -1810,7 +1810,7 @@ func (uc *IAMUsecase) RevokeDelegation(ctx context.Context, actor ActorContext, 
 		if d.RevokedAt != nil {
 			return Validation("委派已撤销")
 		}
-		if err := uc.IAM.RevokeDelegation(ctx, tx, id, expected, actor.User.ID); err != nil {
+		if err := uc.IAM.RevokeDelegation(ctx, tx, id, expected, actor.User.ID, d.Context); err != nil {
 			return err
 		}
 		d.RevokedAt = ptrTime(uc.Clock.Now().UTC())

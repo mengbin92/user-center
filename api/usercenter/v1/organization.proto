@@ -98,6 +98,24 @@ service OrganizationService {
   rpc DeleteOrgConstraint(DeleteOrgConstraintRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/api/v1/orgs/{id}/iam/constraints/{constraint_id}"};
   }
+  // Organization-scoped delegations. Until V2.6 the evaluator understood
+  // tenant delegations but no write path could create one, so the delegation
+  // branch of checkOrgDelegation was unreachable in production. These four
+  // endpoints are the missing entry point. They share the constraint
+  // governance permissions (design §5.1): read is owner+admin, every write is
+  // owner-only. A platform administrator has no entry point here (D7).
+  rpc ListOrgDelegations(ListOrgDelegationsRequest) returns (OrgDelegationsReply) {
+    option (google.api.http) = {get: "/api/v1/orgs/{id}/iam/delegations"};
+  }
+  rpc CreateOrgDelegation(CreateOrgDelegationRequest) returns (OrgDelegation) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/iam/delegations" body: "*"};
+  }
+  rpc UpdateOrgDelegation(UpdateOrgDelegationRequest) returns (OrgDelegation) {
+    option (google.api.http) = {patch: "/api/v1/orgs/{id}/iam/delegations/{delegation_id}" body: "*"};
+  }
+  rpc RevokeOrgDelegation(RevokeOrgDelegationRequest) returns (OrgDelegation) {
+    option (google.api.http) = {post: "/api/v1/orgs/{id}/iam/delegations/{delegation_id}:revoke" body: "*"};
+  }
   rpc ListOrgAudits(ListOrgAuditsRequest) returns (OrgAuditsReply) {
     option (google.api.http) = {get: "/api/v1/orgs/{id}/audits"};
   }
@@ -511,6 +529,71 @@ message UpdateOrgConstraintRequest {
 message DeleteOrgConstraintRequest {
   string id = 1;
   string constraint_id = 2;
+  string expected_revision = 3;
+  string reason = 4;
+  string expected_policy_revision = 5;
+}
+
+// OrgDelegation is deliberately narrower than the platform Delegation:
+// can_redelegate is not exposed because the evaluator rejects it, and
+// target_kind is fixed to "role". The wire never carries a context field --
+// the organization in the path is the only tenant selector, so a caller cannot
+// smuggle a platform or another tenant's delegation in through the body.
+message OrgDelegation {
+  string id = 1;
+  string manager_role_id = 2;
+  string target_role_id = 3;
+  string target_kind = 4;
+  repeated string actions = 5;
+  Scope target_user_scope = 6;
+  repeated DelegationCeiling grant_ceiling = 7;
+  string starts_at = 8;
+  string expires_at = 9;
+  string revision = 10;
+  string created_by = 11;
+  bool revoked = 12;
+  string revoked_at = 13;
+}
+
+message OrgDelegationsReply {
+  repeated OrgDelegation items = 1;
+}
+
+message ListOrgDelegationsRequest {
+  string id = 1;
+  // active | revoked; empty returns both.
+  string status = 2;
+}
+
+message CreateOrgDelegationRequest {
+  string id = 1;
+  string manager_role_id = 2;
+  string target_role_id = 3;
+  repeated string actions = 4;
+  Scope target_user_scope = 5;
+  repeated DelegationCeiling grant_ceiling = 6;
+  string starts_at = 7;
+  string expires_at = 8;
+  string reason = 9;
+  string expected_policy_revision = 10;
+}
+
+message UpdateOrgDelegationRequest {
+  string id = 1;
+  string delegation_id = 2;
+  repeated string actions = 3;
+  Scope target_user_scope = 4;
+  repeated DelegationCeiling grant_ceiling = 5;
+  string starts_at = 6;
+  string expires_at = 7;
+  string expected_revision = 8;
+  string reason = 9;
+  string expected_policy_revision = 10;
+}
+
+message RevokeOrgDelegationRequest {
+  string id = 1;
+  string delegation_id = 2;
   string expected_revision = 3;
   string reason = 4;
   string expected_policy_revision = 5;

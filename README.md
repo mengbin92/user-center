@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，可独立完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.11.0 — 认证与组织权限加固，手册与操作视频。** 统一并发会话签发与凭据限制，收紧组织授权的能力、委派与租户边界，修复就绪探针与限流口径；新增两份操作手册、10 段字幕视频和 19 张截图。**升级须先执行迁移 `014`**，完整范围见 [v0.11.0 发布说明](docs/releases/release-v0.11.0.md)。组织委派 CRUD 与界面仍未交付；真实上游供应商登录验收保持未验证，SCIM / 目录同步继续按后续里程碑推进。
+> **状态：v0.11.0 — 认证与组织权限加固，手册与操作视频。** 统一并发会话签发与凭据限制，收紧组织授权的能力、委派与租户边界，修复就绪探针与限流口径；新增两份操作手册、10 段字幕视频和 19 张截图。**升级须先执行迁移 `014`**，完整范围见 [v0.11.0 发布说明](docs/releases/release-v0.11.0.md)。组织委派 CRUD 与界面已交付，组织级 SoD 现已完整；真实上游供应商登录验收保持未验证。SCIM、企业目录同步与租户物理隔离正在按 V2.6 阶段推进。
 
 ## 目录
 
@@ -168,9 +168,9 @@ scripts/                  开发与检查脚本
 
 **仍延后（V2 后续里程碑）**：排期、验收标准与明确不做的项见 [V2.4 路线图](docs/roadmap-v2.4.md)。
 
-- SCIM、企业目录同步、租户物理隔离与组织级 SoD；R13/R14 已实现，见下；
+- SCIM、企业目录同步与租户物理隔离（V2.6 分阶段实现中）；组织级 SoD 已完整交付（约束 + 委派 CRUD + 界面），R13/R14 已实现，见下；
 - OAuth 真实提供方沙箱验收：代码与本地 fake provider 测试已就绪，需配置真实凭据后执行；QQ 邮箱 SMTP 已完成真实发信与 IMAP 送达验收（[记录](docs/acceptance-smtp-2026-11-03.md)）；
-- 组织委派 CRUD 与界面：求值侧已完整，但当前没有创建/撤销组织委派的 HTTP 接口与管理页面，详见 [安全设计](docs/security.md#L146-L149)。
+- 组织委派已可通过 `GET/POST /api/v1/orgs/{id}/iam/delegations`、`PATCH .../delegations/{delegation_id}` 与 `POST .../delegations/{delegation_id}:revoke` 管理，界面位于「职责分离」页；写入沿用 `organization.iam.constraint.read/.manage` 治理权限、`reason`、`expected_revision` 与 `expected_policy_revision` 两道 CAS、Step-up、组织审计与 Outbox。详见 [安全设计](docs/security.md)。
 
 **设计边界（已实现，不是待办）**：
 

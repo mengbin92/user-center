@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+**版本判定：MINOR**（新增 API 与界面，无破坏性变更）。V2.6 四项能力按阶段独立提交，完成后统一发版。
+
+### 阶段① — 组织级 SoD 补齐（组织委派 CRUD 与界面）
+
+- 新增 4 个组织委派端点：`GET/POST /api/v1/orgs/{id}/iam/delegations`、`PATCH .../delegations/{delegation_id}`、`POST .../delegations/{delegation_id}:revoke`。此前求值侧 `checkOrgDelegation` 的委派分支在生产不可达（没有写入口），现在可由 owner 通过 HTTP 创建并撤销。
+- 写入侧强制治理权限（读 owner+admin、写仅 owner）、Step-up、`reason`、`expected_revision` 与 `expected_policy_revision` 两道 CAS、组织审计、Outbox 事件与 policy revision bump；管理/目标角色必须同属本组织且 active，授权上限不得超过创建者在本组织持有的能力。
+- 仓储写入增加 `context_type/context_id` 谓词作为纵深防御；跨租户 id 一律 404，平台委派不进入组织列表。
+- 前端「职责分离」页新增委派列表、创建/编辑/撤销对话框；授权上限由目标角色的 grants 自动快照，避免手写出永不可用的委派。
+- HTTP 级测试：创建后解锁分配、撤销后重新拒绝；并覆盖缺少 `reason`、平台角色/跨租户角色引用、越权 ceiling、策略版本冲突、非 owner 写入、非成员读取、跨租户更新/撤销、revision CAS 等拒绝用例。
+- 文档状态回填：`README.md`、`docs/api.md`、`docs/security.md` §4.10、`docs/roadmap-v2.5.md`、设计文档 §12/§14（含实现期修正 F10）。
+
 ## [0.11.0] - 2026-11-09
 
 **版本判定：MINOR**（v0.10.1 → v0.11.0）。新增组织授权的委派能力边界、存量组织权限回填，以及用户手册、管理员手册和操作视频；统一凭据限制并加固并发会话与组织授权。包含 **1 个数据库迁移**（`014_password_history_backfill.sql`），升级须先迁移再启动服务。详见 [发布说明](docs/releases/release-v0.11.0.md)。
