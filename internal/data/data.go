@@ -66,6 +66,11 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 		if dataConf != nil && dataConf.Database != nil && dataConf.Database.Source != "" {
 			source = dataConf.Database.Source
 		}
+		// SQLite serialises writers. Without a busy timeout a second writer
+		// fails immediately with "database is locked", which surfaces as a 503
+		// (dependency unavailable) instead of the expected conflict. CI is
+		// slower than a laptop, so the window is wide enough to hit it.
+		source = withSQLiteBusyTimeout(source)
 		baseSource = source
 		if path := strings.TrimPrefix(source, "file:"); path != source {
 			if i := strings.IndexByte(path, '?'); i >= 0 {
@@ -255,4 +260,17 @@ func models() []any {
 		&scimTokenPO{}, &scimIdentityPO{}, &scimGroupPO{}, &scimGroupMemberPO{},
 		&directorySourcePO{}, &directoryRunPO{}, &directoryObjectPO{}, &tenantSchemaPO{},
 	}
+}
+
+// withSQLiteBusyTimeout appends mattn/go-sqlite3's busy timeout so concurrent
+// writers wait instead of failing. It is idempotent and only affects SQLite.
+func withSQLiteBusyTimeout(source string) string {
+	if strings.Contains(source, "_busy_timeout") || strings.Contains(source, "busy_timeout") {
+		return source
+	}
+	sep := "?"
+	if strings.Contains(source, "?") {
+		sep = "&"
+	}
+	return source + sep + "_busy_timeout=10000"
 }
