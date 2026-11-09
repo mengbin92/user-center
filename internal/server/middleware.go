@@ -36,6 +36,9 @@ type Middleware struct {
 	// writeLimiter bounds non-safe requests. Nil disables limiting, which is
 	// what unit tests that do not care about throttling rely on.
 	writeLimiter *WriteLimiter
+	// routes classifies slow-request log lines with the same closed label set
+	// the metric uses. Nil (tests, CLI paths) falls back to "unknown".
+	routes *obs.RouteSet
 }
 
 func NewMiddleware(sessions *biz.SessionUsecase, sec *conf.Security, log *zap.Logger) *Middleware {
@@ -67,6 +70,13 @@ func slowThresholdFromEnv() time.Duration {
 // without a limiter (tests, CLI paths).
 func (m *Middleware) WithWriteLimiter(l *WriteLimiter) *Middleware {
 	m.writeLimiter = l
+	return m
+}
+
+// WithRoutes shares the metric's route table with the slow-request log, so a
+// log line and the counter it explains never disagree about the route.
+func (m *Middleware) WithRoutes(r *obs.RouteSet) *Middleware {
+	m.routes = r
 	return m
 }
 
@@ -128,10 +138,11 @@ func (m *Middleware) observeRequest(ctx context.Context, r *http.Request, status
 	if m.slowThreshold <= 0 || elapsed < m.slowThreshold {
 		return
 	}
+	route := obs.ClassifyPath(m.routes, r.Method, r.URL.Path)
 	m.log.Warn("slow request",
 		zap.String("request_id", biz.RequestID(ctx)),
-		zap.String("route", obs.RouteLabel(ctx, r.URL.Path)),
-		zap.String("method", r.Method),
+		zap.String("route", route),
+		zap.String("method", obs.MethodLabel(r.Method)),
 		zap.Int("status", status),
 		zap.Float64("duration_ms", float64(elapsed.Microseconds())/1000),
 	)
@@ -252,7 +263,7 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 			return ctx, false
 		}
 		if actor.PasswordChangeRequired && requiresPasswordChange(r.URL.Path) {
-			writeError(w, http.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "首次登录必须先修改初始密码")
+			writeError(w, http.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "必须先修改密码后才能继续")
 			return ctx, false
 		}
 	}

@@ -31,5 +31,9 @@ RUN mkdir -p /app/artifacts && chown -R app:app /app
 USER app
 ENV CONF_PATH=/app/configs/config.yaml
 EXPOSE 8080 9090
-HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
+# Readiness, not liveness. /healthz answers "the process is up" and returns 200
+# even after the schema is gone, so a container started with plain `docker run`
+# (no compose healthcheck override) would report healthy against a dead
+# database. /readyz runs a real query against the migrated schema.
+HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD wget -qO- http://127.0.0.1:8080/readyz || exit 1
 CMD ["/app/user-center"]

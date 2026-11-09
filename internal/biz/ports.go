@@ -18,6 +18,11 @@ type TxManager interface {
 type UserRepo interface {
 	Create(context.Context, Tx, *User) (*User, error)
 	Get(context.Context, Tx, int64) (*User, error)
+	// LockUser takes a row lock on the user for the life of tx. It exists so a
+	// per-user invariant (the concurrent-session cap) is serialised across
+	// instances: counting rows and inserting one is only atomic if every writer
+	// queues on the same row first.
+	LockUser(context.Context, Tx, int64) error
 	GetByUsername(context.Context, Tx, string) (*User, error)
 	GetByEmail(context.Context, Tx, string) (*User, error)
 	Update(context.Context, Tx, *User, uint64) (*User, error)
@@ -56,6 +61,12 @@ type CredentialRepo interface {
 	// RecordPasswordHash appends a hash and folds the table back to keep rows,
 	// so history stays bounded instead of growing with every rotation.
 	RecordPasswordHash(context.Context, Tx, int64, string, int) error
+	// EnsurePasswordHistoryRecorded inserts previous when that exact digest is
+	// not in the history window yet, and reports whether it did. Used before a
+	// credential is overwritten: a password that was never recorded (history
+	// switched off at the time, or an account older than the feature) must still
+	// be protected from being set again.
+	EnsurePasswordHistoryRecorded(context.Context, Tx, int64, string, time.Time, int) (bool, error)
 }
 
 type ExternalIdentityRepo interface {
@@ -218,10 +229,10 @@ type OrgIAMRepo interface {
 	RevokeMemberAssignments(context.Context, Tx, authorization.Context, int64, []int64, int64) (int64, error)
 	CountActiveAssignments(context.Context, Tx, authorization.Context, int64) (int64, error)
 	// RevokeDelegationsForUser soft-invalidates every delegation in this context
-	// where the user is either the manager or the target. Both directions
-	// matter: dropping only the manager side would leave a channel that can
-	// still grant roles to the removed member.
-	RevokeDelegationsForUser(context.Context, Tx, authorization.Context, int64, int64) (int64, error)
+	// where the user is either the target or the person who issued it from one
+	// of managerRoleIDs. Both directions matter: dropping only one side would
+	// leave a channel that can still grant roles to the removed member.
+	RevokeDelegationsForUser(context.Context, Tx, authorization.Context, int64, []int64, int64) (int64, error)
 }
 
 type PermissionFilter struct {

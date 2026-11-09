@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/internal/biz"
@@ -82,6 +83,24 @@ func (r *userRepo) Get(ctx context.Context, tx biz.Tx, id int64) (*biz.User, err
 		return nil, err
 	}
 	return p.toBiz(), nil
+}
+
+// LockUser takes a row lock on the user row for the rest of tx.
+//
+// SQLite is skipped on purpose: it has no row locks, and the clause would be a
+// syntax error. Its write transactions are serialised by the file lock instead,
+// which is a stronger guarantee than the row lock this emulates.
+func (r *userRepo) LockUser(ctx context.Context, tx biz.Tx, id int64) error {
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if db.Dialector == nil || db.Dialector.Name() != "sqlite" {
+		db = db.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
+	}
+	var p userPO
+	err := db.Select("id").Where("id = ?", id).First(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return biz.ErrUserNotFound
+	}
+	return err
 }
 
 func (r *userRepo) GetByUsername(ctx context.Context, tx biz.Tx, normalized string) (*biz.User, error) {

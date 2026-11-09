@@ -14,6 +14,7 @@ import (
 
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/internal/conf"
+	"github.com/mengbin92/user-center/internal/obs"
 )
 
 func testMiddleware(t *testing.T, thresholdMS string) (*Middleware, *observer.ObservedLogs) {
@@ -25,6 +26,11 @@ func testMiddleware(t *testing.T, thresholdMS string) (*Middleware, *observer.Ob
 
 func TestSlowRequestLogsRouteAndDurationButNoBody(t *testing.T) {
 	mw, logs := testMiddleware(t, "1")
+	// The route label comes from the registered template table, exactly as in
+	// the real server: the log must never quote the request URL.
+	routes := obs.NewRouteSet()
+	routes.Add(http.MethodGet, "/api/v1/auth/context")
+	mw.WithRoutes(routes)
 
 	const secret = "SuperSecret-Passw0rd"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

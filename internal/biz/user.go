@@ -152,6 +152,13 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, actor ActorContext, c
 				return err
 			}
 		} else {
+			// The digest about to be overwritten must enter the window first:
+			// otherwise "A -> B, then B -> A" passes for any account whose A was
+			// never recorded (pre-012 accounts on SQLite, or history switched on
+			// later). No-op when the window already holds it.
+			if err := uc.RecordPasswordBeforeRotation(ctx, tx, actor.User.ID, cred, policy); err != nil {
+				return err
+			}
 			if _, err := uc.Credentials.UpdatePassword(ctx, tx, actor.User.ID, hash, "bcrypt", cred.Revision, false); err != nil {
 				return err
 			}

@@ -47,6 +47,22 @@ else
   KEEP_WORK=1
 fi
 COMPOSE_ENV="$WORK/compose.env"
+
+# The stack MUST live in its own compose project. The teardown below runs
+# `down -v --remove-orphans`, and compose derives the project name from the
+# directory when nothing overrides it: running this script from a checkout that
+# also hosts a real deployment (project "docker-compose") would delete that
+# deployment's containers *and* its mysql-data volume.
+#
+# The name is generated unconditionally, never inherited. `${COMPOSE_PROJECT_NAME:-...}`
+# looked safe but is not: a shell that already exports the *deployment's* project
+# name (a plausible thing to have in your environment) would put this run back in
+# the real project, and a failed build would then tear it down. An inherited name
+# is not a reuse switch here.
+#
+# It is exported so nested commands (smoke.sh and its compose calls) inherit it.
+export COMPOSE_PROJECT_NAME="uc-e2e-$(openssl rand -hex 6)"
+
 export COMPOSE_FILE COMPOSE_ENV WORK
 
 compose() { docker compose --env-file "$COMPOSE_ENV" -f "$COMPOSE_FILE" "$@"; }

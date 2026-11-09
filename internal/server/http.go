@@ -76,6 +76,19 @@ func NewHTTPServer(
 		// counted, otherwise the error-rate panels silently under-report.
 		khttp.Filter(metrics.HTTP, mw.Filter),
 	)
+	// Route classification is a closed table, not a guess: the metric label and
+	// the slow-request log both read from it. Proto routes are added by
+	// WalkRoute below; raw handlers have no method matcher and are therefore
+	// invisible to WalkRoute, so every one of them registers its template at the
+	// point it is mounted. The same RouteSet is handed to the middleware so both
+	// the counter and the log agree on one label.
+	routes := metrics.Routes()
+	mw.WithRoutes(routes)
+	handle := func(method, template string, h http.HandlerFunc) {
+		routes.Add(method, template)
+		srv.HandleFunc(template, h)
+	}
+
 	usercv1.RegisterAuthServiceHTTPServer(srv, auth)
 	usercv1.RegisterMeServiceHTTPServer(srv, me)
 	usercv1.RegisterAdminUserServiceHTTPServer(srv, admin)
@@ -86,11 +99,14 @@ func NewHTTPServer(
 	usercv1.RegisterOIDCAdminServiceHTTPServer(srv, oidcAdmin)
 	usercv1.RegisterOrganizationServiceHTTPServer(srv, organizations)
 
+	// Everything the protobuf registrations above mounted is added at the end
+	// of this function, after the raw routes are registered too.
+
 	// Liveness: the process is up and the HTTP loop is running. It deliberately
 	// does not touch the database -- a liveness check that fails when a
 	// dependency is down causes a restart loop that cannot fix the dependency
 	// and destroys the logs needed to diagnose it.
-	srv.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	handle(obs.MethodAny, "/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
@@ -100,7 +116,7 @@ func NewHTTPServer(
 	// the database is gone is exactly the failure this endpoint exists to make
 	// visible (found by the S13 restore drill: dropping the database left the
 	// container reporting healthy).
-	srv.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+	handle(obs.MethodAny, "/readyz", func(w http.ResponseWriter, r *http.Request) {
 		ready, checks := metrics.Ready(r.Context())
 		w.Header().Set("Content-Type", "application/json")
 		if !ready {
@@ -117,8 +133,8 @@ func NewHTTPServer(
 		_ = json.NewEncoder(w).Encode(payload)
 	})
 
-	mountOAuthRoutes(srv, mw, auth, publicBase)
-	mountOIDCRoutes(srv, mw, oidcAdmin.Usecase())
+	mountOAuthRoutes(handle, mw, auth, publicBase)
+	mountOIDCRoutes(handle, mw, oidcAdmin.Usecase())
 
 	// CSV artifact download is a raw stream; it re-verifies the actor, job
 	// ownership and expiry on every request. Platform and tenant downloads
@@ -156,7 +172,7 @@ func NewHTTPServer(
 		}
 		serveArtifact(w, r, job)
 	}))
-	srv.HandleFunc("/api/v1/admin/exports/{id}/download", func(w http.ResponseWriter, r *http.Request) {
+	handle(obs.MethodAny, "/api/v1/admin/exports/{id}/download", func(w http.ResponseWriter, r *http.Request) {
 		download.ServeHTTP(w, r)
 	})
 
@@ -183,7 +199,7 @@ func NewHTTPServer(
 		}
 		serveArtifact(w, r, job)
 	}))
-	srv.HandleFunc("/api/v1/orgs/{id}/audits/exports/{export_id}/download", func(w http.ResponseWriter, r *http.Request) {
+	handle(obs.MethodAny, "/api/v1/orgs/{id}/audits/exports/{export_id}/download", func(w http.ResponseWriter, r *http.Request) {
 		orgDownload.ServeHTTP(w, r)
 	})
 
@@ -192,13 +208,25 @@ func NewHTTPServer(
 		webDir = "web/dist"
 	}
 	if stat, err := os.Stat(webDir); err == nil && stat.IsDir() {
+		// The SPA is a prefix catch-all, not a template: every client-side
+		// history route shares it. obs collapses those into one "spa" label.
 		srv.HandlePrefix("/", spaHandler(webDir, log))
+	}
+
+	// Everything mounted above. WalkRoute only returns routes that carry a
+	// method matcher, which is exactly the set the generated protobuf code
+	// creates; the raw routes registered through handle() are already in.
+	if err := srv.WalkRoute(func(route khttp.RouteInfo) error {
+		routes.Add(route.Method, route.Path)
+		return nil
+	}); err != nil {
+		log.Warn("route table incomplete", zap.Error(err))
 	}
 
 	return &HTTPServer{Server: srv}
 }
 
-func mountOAuthRoutes(srv *khttp.Server, mw *Middleware, auth *service.AuthService, publicBase string) {
+func mountOAuthRoutes(handle func(string, string, http.HandlerFunc), mw *Middleware, auth *service.AuthService, publicBase string) {
 	authUC := auth.Usecase()
 	stateCookie := "uc_oauth_state"
 	start := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -268,8 +296,11 @@ func mountOAuthRoutes(srv *khttp.Server, mw *Middleware, auth *service.AuthServi
 		}
 		http.Redirect(w, r, result.Redirect, http.StatusFound)
 	})
-	srv.HandleFunc("/api/v1/auth/providers/{provider}/start", mw.Filter(start).ServeHTTP)
-	srv.HandleFunc("/api/v1/auth/providers/{provider}/callback", mw.Filter(callback).ServeHTTP)
+	// The global khttp.Filter chain (metrics + mw.Filter) already wraps the
+	// router, so these handlers must NOT be wrapped a second time: the previous
+	// mw.Filter(...) here ran prepare() and the write limiter twice per request.
+	handle(obs.MethodAny, "/api/v1/auth/providers/{provider}/start", start)
+	handle(obs.MethodAny, "/api/v1/auth/providers/{provider}/callback", callback)
 }
 
 func oauthProviderFromPath(path string) string {

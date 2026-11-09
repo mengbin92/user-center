@@ -670,11 +670,17 @@ func oidcScopesAllowed(scopes, registered []string) bool {
 
 func (uc *OIDCUsecase) authenticationRestrictions(ctx context.Context, tx Tx, user *User) error {
 	credential, err := uc.Credentials.Get(ctx, tx, user.ID)
-	if err == nil && credential.MustChangePassword {
-		return ErrPasswordChange
-	}
 	if err != nil && !errors.Is(err, ErrResourceNotFound) {
 		return ErrDependency
+	}
+	// One shared rule, not a local copy of the `MustChangePassword` check.
+	// Checking only the flag here let an expired password keep exchanging
+	// refresh tokens for new access tokens: the browser was blocked, the
+	// protocol was not.
+	if restricted, err := uc.credentialRestricted(ctx, tx, credential); err != nil {
+		return err
+	} else if restricted {
+		return ErrPasswordChange
 	}
 	roles, err := uc.Users.RolesForUser(ctx, tx, user.ID)
 	if err != nil {

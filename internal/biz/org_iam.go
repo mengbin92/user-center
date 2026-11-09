@@ -165,13 +165,28 @@ func syncOrgMembershipRole(ctx context.Context, s *Services, tx Tx, orgID, userI
 // Both directions are soft-invalidated; see OrgIAMRepo.RevokeDelegationsForUser.
 func revokeOrgMemberAssignments(ctx context.Context, s *Services, tx Tx, orgID, userID, by int64) error {
 	authCtx := authorization.Organization(orgID)
+	// Read the live assignments before they are revoked: the delegation cleanup
+	// must only consider the roles this removal actually takes away, not every
+	// role the member happened to hold in the past.
+	items, err := s.OrgIAM.ListAssignments(ctx, tx, authCtx, userID)
+	if err != nil {
+		return err
+	}
+	now := s.Clock.Now()
+	revokedRoles := make([]int64, 0, len(items))
+	for _, item := range items {
+		if item.Assignment == nil || !item.Assignment.Active(now) {
+			continue
+		}
+		revokedRoles = append(revokedRoles, item.Assignment.RoleID)
+	}
 	if _, err := s.OrgIAM.RevokeMemberAssignments(ctx, tx, authCtx, userID, nil, by); err != nil {
 		return err
 	}
 	// Best-effort on the delegation side: failing to revoke it must not abort
 	// the member removal (that would leave the tenant in a half-removed state),
 	// but the error is worth surfacing to the caller's logs.
-	_, err := s.OrgIAM.RevokeDelegationsForUser(ctx, tx, authCtx, userID, by)
+	_, err = s.OrgIAM.RevokeDelegationsForUser(ctx, tx, authCtx, userID, revokedRoles, by)
 	return err
 }
 
@@ -213,8 +228,55 @@ func (s *Services) BackfillOrganizationIAM(ctx context.Context) error {
 		if err := s.ensureOrganizationIAM(ctx, org.ID); err != nil {
 			return err
 		}
+		if err := s.reconcileOrgBuiltinGrants(ctx, org.ID); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// reconcileOrgBuiltinGrants adds grants that the current binary requires but the
+// stored built-in role does not have yet.
+//
+// ensureOrganizationIAM cannot do this: it skips an organization whose owner
+// role already exists and whose grants are non-empty, which is every tenant
+// created before the role spec grew (V2.5 added the two constraint operations).
+// Those tenants kept a 403 on their own SoD page even after the catalog was
+// seeded. Additive only -- grants an operator added or customised are preserved,
+// because this is a migration, not a reset.
+func (s *Services) reconcileOrgBuiltinGrants(ctx context.Context, orgID int64) error {
+	authCtx := authorization.Organization(orgID)
+	return s.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		for _, spec := range orgBuiltinRoleSpecs {
+			role, err := s.OrgIAM.GetRoleByCode(ctx, tx, authCtx, spec.Code)
+			if errors.Is(err, ErrResourceNotFound) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			held := make(map[string]bool, len(role.Grants))
+			for _, g := range role.Grants {
+				held[g.Operation] = true
+			}
+			added := false
+			merged := append([]Grant{}, role.Grants...)
+			for _, want := range spec.Grants {
+				if held[want.Operation] {
+					continue
+				}
+				merged = append(merged, want)
+				added = true
+			}
+			if !added {
+				continue
+			}
+			if _, err := s.OrgIAM.PutRoleGrants(ctx, tx, authCtx, role.ID, merged, role.Revision); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 type OrgRoleInput struct {
@@ -494,6 +556,46 @@ func (uc *OrgIAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, or
 	})
 }
 
+// authorizeOrgInTx re-checks an organization operation against the transaction's
+// own snapshot, immediately after the policy lock is taken.
+//
+// orgGuard runs before the transaction opens, so between "the actor holds
+// organization.iam.assignment.manage" and "the assignment is inserted" another
+// request can revoke that very permission. Everything the write then compares --
+// the target role's capabilities, the delegations -- is read inside the
+// transaction and would happily pass: the actor still holds the *audit* role, so
+// granting it looked like "handing out what I already have".
+//
+// A platform administrator keeps the governance override orgGuard already
+// grants them (D7 removed it only for the V2.5 constraint endpoints, which use
+// orgConstraintGuard instead). Without this branch the new capability check
+// silently closed the older organization-role management path for support
+// accounts.
+func (uc *OrgIAMUsecase) authorizeOrgInTx(ctx context.Context, tx Tx, actor ActorContext, orgID int64, operation string, targetUserID int64) error {
+	if isPlatformAdmin(actor) {
+		return nil
+	}
+	authCtx := authorization.Organization(orgID)
+	member, err := uc.Organizations.GetMember(ctx, tx, orgID, actor.User.ID)
+	if err != nil {
+		if errors.Is(err, ErrResourceNotFound) {
+			return ErrPermissionDenied
+		}
+		return ErrDependency
+	}
+	if member.Status != OrgMemberActive {
+		return ErrPermissionDenied
+	}
+	d, err := uc.DecideInTx(ctx, tx, actor, authCtx, operation, targetUserID, false)
+	if err != nil {
+		return ErrAuthorizationDown
+	}
+	if !d.Allowed {
+		return ErrPermissionDenied
+	}
+	return nil
+}
+
 func (uc *OrgIAMUsecase) Assignments(ctx context.Context, actor ActorContext, orgID int64) ([]*AssignmentItem, error) {
 	authCtx, err := uc.orgGuard(ctx, actor, orgID, PermOrgAssignmentRead, 0, true)
 	if err != nil {
@@ -540,6 +642,25 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 	}
 	var created *Assignment
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// One serialisation point for the whole invariant.
+		//
+		// A role-row lock is per role, but the rule being enforced ("this
+		// member must not end up holding two mutually exclusive roles") is a
+		// property of the member's role *set*. Two admins granting different
+		// roles at the same time lock different rows, read the same pre-insert
+		// set, and both pass. The policy row is the lock every constraint write
+		// already takes (orgPolicyGuard), so taking it here makes grants and
+		// policy changes mutually exclusive and gives both paths the same lock
+		// order: policy -> role.
+		if _, err := uc.Policy.PolicyRevision(ctx, tx); err != nil {
+			return ErrDependency
+		}
+		// Re-verify the operation on this snapshot. The pre-transaction check in
+		// orgGuard is a fast rejection, not the authorization decision: by the
+		// time the insert runs the actor may no longer hold the operation.
+		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, in.UserID); err != nil {
+			return err
+		}
 		// Lock the role row: the duplicate and max_members checks below must not
 		// run on a stale snapshot when two admins grant the same role at once.
 		locked, err := uc.OrgIAM.GetRoleForUpdate(ctx, tx, authCtx, role.ID)
@@ -569,6 +690,16 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 		}
 		if err := uc.checkOrgConstraints(ctx, tx, authCtx, in.UserID, locked.ID); err != nil {
 			return err
+		}
+		// Design order (§5): constraints, then the delegation boundary. An
+		// assignment operation alone never implies authority over the role's
+		// capabilities. Platform administrators keep the governance override the
+		// older organization endpoints grant them.
+		if !isPlatformAdmin(actor) {
+			if err := uc.checkOrgDelegation(ctx, tx, actor, authCtx, in.UserID, locked.ID,
+				DelegationActionAssign, authorization.Scope{All: true}, uc.Clock.Now(), in.ExpiresAt); err != nil {
+				return err
+			}
 		}
 		row, err := uc.OrgIAM.CreateAssignment(ctx, tx, authCtx, &Assignment{
 			UserID: in.UserID, RoleID: role.ID, Boundary: authorization.Scope{All: true},
@@ -615,6 +746,22 @@ func (uc *OrgIAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContex
 		}
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// Same two-step as the grant path: lock the shared policy row, then
+		// re-verify the operation on this snapshot before touching the row.
+		if _, err := uc.Policy.PolicyRevision(ctx, tx); err != nil {
+			return ErrDependency
+		}
+		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, assignment.UserID); err != nil {
+			return err
+		}
+		// The boundary: revoking authority you never had is also a way to break a
+		// tenant (someone else's audit trail disappears).
+		if !isPlatformAdmin(actor) {
+			if err := uc.checkOrgDelegation(ctx, tx, actor, authCtx, assignment.UserID, assignment.RoleID,
+				DelegationActionRevoke, assignment.Boundary, assignment.StartsAt, assignment.ExpiresAt); err != nil {
+				return err
+			}
+		}
 		if err := uc.OrgIAM.RevokeAssignment(ctx, tx, authCtx, assignmentID, expected, actor.User.ID); err != nil {
 			return err
 		}
@@ -687,9 +834,21 @@ func (uc *OrgIAMUsecase) checkOrgConstraints(ctx context.Context, tx Tx, authCtx
 	if err != nil {
 		return ErrDependency
 	}
+	roles, err := uc.OrgIAM.ListRoles(ctx, tx, authCtx)
+	if err != nil {
+		return ErrDependency
+	}
+	byID := make(map[int64]*Role, len(roles))
+	for _, r := range roles {
+		byID[r.ID] = r
+	}
+	now := uc.Clock.Now()
 	active := make([]int64, 0, len(existing)+1)
 	for _, item := range existing {
-		if item.Assignment == nil || item.Assignment.Revoked {
+		// Expired and not-yet-started assignments confer nothing, so they must
+		// not participate: otherwise an assignment that ended last month blocks
+		// the opposite role forever.
+		if !assignmentHolds(item.Assignment, byID, now) {
 			continue
 		}
 		active = append(active, item.Assignment.RoleID)

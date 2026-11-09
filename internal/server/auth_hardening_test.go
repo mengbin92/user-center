@@ -52,6 +52,34 @@ func TestPasswordHistoryRejectsTheBootstrapPassword(t *testing.T) {
 	require.Equal(t, http.StatusOK, h.login("root", "Plausible-999").Code)
 }
 
+// The upgrade shape that migration 014 cannot reach by itself: an account whose
+// current password was never recorded (created while history was off, or a
+// SQLite instance upgraded through AutoMigrate). The first rotation must put
+// that password into the window, otherwise "A -> B, then B -> A" succeeds on
+// exactly the accounts the policy is supposed to protect.
+func TestUpgradedAccountCannotReuseItsPreUpgradePassword(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+
+	// Drop the seeded row: this is the pre-012 state, where the table is empty
+	// while the credential already holds a digest.
+	res := h.d.DB().Exec(
+		"DELETE FROM password_history WHERE user_id = (SELECT id FROM users WHERE username = ?)", "root")
+	require.NoError(t, res.Error)
+	require.Equal(t, int64(1), res.RowsAffected, "the account must have had exactly one seeded history row to remove")
+
+	rec := h.changePassword("ChangeMe-12345", "Plausible-999")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	// B -> A must be refused: A entered the window during the rotation above.
+	rec = h.changePassword("Plausible-999", "ChangeMe-12345")
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "PASSWORD_POLICY_VIOLATION")
+
+	// And the rejected attempt changed nothing.
+	require.Equal(t, http.StatusOK, h.login("root", "Plausible-999").Code)
+}
+
 func TestPasswordCompositionIsEnforcedOnChange(t *testing.T) {
 	h := newHarness(t)
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)

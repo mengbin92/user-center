@@ -166,5 +166,10 @@ func (s *AuthService) CompleteMFAWithWebAuthn(ctx context.Context, req *usercv1.
 		Status: result.Status, User: userProto(result.User),
 		SessionExpiresAt:       result.Session.ExpiresAt.Format(timeLayout),
 		PasswordChangeRequired: result.PasswordChangeRequired,
+		// Shared with the password and TOTP replies: the session cap reclaims
+		// older sessions on every issuance path, so the passkey reply must be
+		// able to say so too. It was missing here, which left passkey users
+		// logged out on other devices with no explanation.
+		RecycledSessions: int32(result.RecycledSessions),
 	}, nil
 }

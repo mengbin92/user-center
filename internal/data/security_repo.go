@@ -113,6 +113,51 @@ func (r *credentialRepo) RecordPasswordHash(ctx context.Context, tx biz.Tx, user
 	}).Error; err != nil {
 		return err
 	}
+	return trimPasswordHistory(db, userID, keep)
+}
+
+// EnsurePasswordHistoryRecorded makes sure previous is inside the history window
+// before the credential is overwritten, and reports whether it inserted.
+//
+// The judgement is "is this exact digest already recorded", not "does the account
+// have any history at all". The weaker check left a real hole: with the window
+// set to 0 the change path records nothing, so turning the window back on left
+// the *current* password unrecorded while older rows were still present -- the
+// account could then rotate away and straight back to it. Migration 014 cannot
+// cover that either, because it runs once.
+//
+// Re-checking per rotation does not bloat the table: after a normal rotation the
+// current digest is the one the previous rotation appended, so nothing is
+// inserted. It only adds a row when the digest genuinely is not in the window,
+// which is exactly the case worth fixing.
+func (r *credentialRepo) EnsurePasswordHistoryRecorded(ctx context.Context, tx biz.Tx, userID int64, hash string, changedAt time.Time, keep int) (bool, error) {
+	if hash == "" || keep <= 0 {
+		return false, nil
+	}
+	db := r.d.dbOr(tx).WithContext(ctx)
+	var existing int64
+	if err := db.Model(&passwordHistoryPO{}).
+		Where("user_id = ? AND password_hash = ?", userID, hash).
+		Count(&existing).Error; err != nil {
+		return false, err
+	}
+	if existing > 0 {
+		return false, nil
+	}
+	if changedAt.IsZero() {
+		changedAt = time.Now().UTC()
+	}
+	if err := db.Create(&passwordHistoryPO{
+		UserID: userID, PasswordHash: hash, CreatedAt: changedAt.UTC(),
+	}).Error; err != nil {
+		return false, err
+	}
+	return true, trimPasswordHistory(db, userID, keep)
+}
+
+// trimPasswordHistory deletes everything beyond the newest keep rows for one
+// user. Shared by the append and the seed path so the bound is defined once.
+func trimPasswordHistory(db *gorm.DB, userID int64, keep int) error {
 	var cutoff []int64
 	if err := db.Model(&passwordHistoryPO{}).Where("user_id = ?", userID).
 		Order("id DESC").Offset(keep).Limit(1000).Pluck("id", &cutoff).Error; err != nil {

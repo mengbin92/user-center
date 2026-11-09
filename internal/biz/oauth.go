@@ -245,6 +245,10 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 	if err != nil && !errors.Is(err, ErrResourceNotFound) {
 		return nil, ErrDependency
 	}
+	restricted, err := uc.credentialRestricted(ctx, nil, cred)
+	if err != nil {
+		return nil, err
+	}
 	session, raw, err := uc.issueSession(ctx, user, ua, ip)
 	if err != nil {
 		return nil, err
@@ -256,7 +260,9 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 	if st.Next != "" {
 		result.Redirect = st.Next
 	}
-	if cred != nil && cred.MustChangePassword {
+	// Same gate as the OIDC and internal surfaces, from the same helper: an
+	// expired password must land on the change screen, not on the dashboard.
+	if restricted {
 		result.Redirect = "/account/security?password_change_required=1"
 		if st.Next != "" {
 			result.Redirect += "&next=" + url.QueryEscape(st.Next)

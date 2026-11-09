@@ -221,6 +221,33 @@ func PasswordExpired(changedAt time.Time, policy PasswordPolicy, now time.Time) 
 	return now.After(changedAt.AddDate(0, 0, policy.ExpiryDays))
 }
 
+// credentialRestricted answers the one question every credential entry point
+// has to ask: "is this account allowed to act normally, or must it set a new
+// password first".
+//
+// It exists so the answer cannot differ by protocol. The browser gate lives in
+// ValidateSession (which turns it into ActorContext.PasswordChangeRequired),
+// and the OIDC and internal gRPC surfaces call this helper. Before that split,
+// `MustChangePassword` was checked in three places and expiry in only two, so a
+// refresh token kept minting new tokens for an expired password.
+//
+// Expiry and "must change" collapse into the same gate on purpose: both mean
+// "this credential has to be replaced", and having two flags would mean two
+// enforcement paths that inevitably drift.
+func (s *Services) credentialRestricted(ctx context.Context, tx Tx, credential *Credential) (bool, error) {
+	if credential == nil {
+		return false, nil
+	}
+	if credential.MustChangePassword {
+		return true, nil
+	}
+	settings, err := s.Settings.GetAuth(ctx, tx)
+	if err != nil {
+		return false, ErrDependency
+	}
+	return PasswordExpired(credential.ChangedAt, settings.PasswordPolicy(), s.Clock.Now()), nil
+}
+
 // CheckPasswordReuse rejects a candidate that matches the account's current
 // password or anything inside the history window. current may be nil when the
 // account has no password yet (OAuth-only accounts).
@@ -255,6 +282,33 @@ func (s *Services) RecordPasswordHistory(ctx context.Context, tx Tx, userID int6
 		return nil
 	}
 	return s.Credentials.RecordPasswordHash(ctx, tx, userID, hash, policy.HistoryCount)
+}
+
+// RecordPasswordBeforeRotation puts the password that is about to be replaced
+// into the history window, unless that exact digest is already there.
+//
+// Migration 014 covers accounts that existed when it ran; this covers the shapes
+// a one-shot migration cannot:
+//
+//   - an account older than the feature (its current digest was never recorded);
+//   - a SQLite dev database upgraded through AutoMigrate;
+//   - the history window being switched off and back on at runtime. With the
+//     window at 0 the rotation records nothing, so re-enabling it left the
+//     current password unrecorded while older rows were still present.
+//
+// In all three "A -> B, then B -> A" would succeed, which is exactly the reuse
+// the policy promises to reject.
+//
+// It must run inside the rotation's transaction and before UpdatePassword:
+// afterwards the old digest is gone and unrecoverable.
+func (s *Services) RecordPasswordBeforeRotation(ctx context.Context, tx Tx, userID int64, previous *Credential, policy PasswordPolicy) error {
+	if previous == nil || previous.PasswordHash == "" || policy.HistoryCount <= 0 {
+		return nil
+	}
+	if _, err := s.Credentials.EnsurePasswordHistoryRecorded(ctx, tx, userID, previous.PasswordHash, previous.ChangedAt, policy.HistoryCount); err != nil {
+		return ErrDependency
+	}
+	return nil
 }
 
 func HashPassword(pw string) (string, error) {

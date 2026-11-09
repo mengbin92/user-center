@@ -32,7 +32,10 @@ var (
 	ErrRootProtected      = kerrors.Forbidden("ROOT_PROTECTED", "不能移除最后一个最高治理账号")
 	ErrMFARequired        = kerrors.New(401, "MFA_REQUIRED", "需要完成多因素验证")
 	ErrNotImplemented     = errors.New("not implemented")
-	ErrPasswordChange     = kerrors.Forbidden("PASSWORD_CHANGE_REQUIRED", "首次登录必须先修改初始密码")
+	// One reason code for both shapes of "this credential has to be
+	// replaced": an initial password that was never changed and a password
+	// that outlived the policy. Two codes would mean two enforcement paths.
+	ErrPasswordChange     = kerrors.Forbidden("PASSWORD_CHANGE_REQUIRED", "必须先修改密码后才能继续")
 	ErrDelegationRequired = kerrors.Forbidden("DELEGATION_REQUIRED", "缺少覆盖该操作的委派授权")
 	ErrOAuthNotBound      = kerrors.Conflict("OAUTH_NOT_BOUND", "该第三方账号尚未绑定用户中心账号")
 	ErrOAuthState         = kerrors.BadRequest("OAUTH_STATE_INVALID", "第三方登录状态无效或已过期")

@@ -25,7 +25,7 @@ type SessionFacts struct {
 // ValidateSession is the internal RPC entry point. It returns only the
 // minimum facts a business system needs; credentials never cross the wire.
 func (uc *IntegrationUsecase) ValidateSession(ctx context.Context, raw, applicationCode string) (*SessionFacts, *User, error) {
-	s, err := uc.SessionUsecase().ValidateSession(ctx, raw)
+	s, err := uc.requireUsableSession(ctx, raw)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -38,6 +38,26 @@ func (uc *IntegrationUsecase) ValidateSession(ctx context.Context, raw, applicat
 		IdentityVersion: s.User.IdentityVersion,
 		IssuedAt:        s.Session.IssuedAt, ExpiresAt: s.Session.ExpiresAt,
 	}, uc.minimalUser(s.User), nil
+}
+
+// requireUsableSession resolves a session and refuses one whose account still
+// owes a credential change (initial password or expired password).
+//
+// The internal API deliberately rejects rather than reporting a restricted
+// status: IntegrationAuthResult and SessionFacts are consumed by business
+// systems that would have to implement their own enforcement, and "an
+// integration forgot to check the flag" is exactly how a password-expiry policy
+// becomes advisory. The browser keeps its restricted session because the
+// self-service change endpoint needs it; a machine caller has no such path.
+func (uc *IntegrationUsecase) requireUsableSession(ctx context.Context, raw string) (ActorContext, error) {
+	actor, err := uc.SessionUsecase().ValidateSession(ctx, raw)
+	if err != nil {
+		return ActorContext{}, err
+	}
+	if actor.PasswordChangeRequired {
+		return ActorContext{}, ErrPasswordChange
+	}
+	return actor, nil
 }
 
 func (uc *IntegrationUsecase) SessionUsecase() *SessionUsecase {
@@ -93,7 +113,7 @@ func (uc *IntegrationUsecase) BatchGetUsers(ctx context.Context, userIDs []int64
 }
 
 func (uc *IntegrationUsecase) SessionAuthorization(ctx context.Context, raw, applicationCode string) ([]AuthorizationGrant, []string, uint64, error) {
-	actor, err := uc.SessionUsecase().ValidateSession(ctx, raw)
+	actor, err := uc.requireUsableSession(ctx, raw)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -205,7 +225,7 @@ func (uc *IntegrationUsecase) ResourceAuthorization(ctx context.Context, raw, ex
 	if !owned {
 		return false, "RESOURCE_OWNER_MISMATCH", authorization.Scope{}, 0, nil, ErrPermissionDenied
 	}
-	actor, err := uc.SessionUsecase().ValidateSession(ctx, raw)
+	actor, err := uc.requireUsableSession(ctx, raw)
 	if err != nil {
 		return false, "SESSION_INVALID", authorization.Scope{}, 0, nil, err
 	}

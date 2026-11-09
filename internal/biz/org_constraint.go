@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mengbin92/user-center/domain/authorization"
 )
@@ -46,8 +47,46 @@ type OrgConstraintChange struct {
 	Violations int64
 }
 
+// orgConstraintGuard is the tenant boundary for the segregation-of-duties
+// endpoints, and it is deliberately NOT orgGuard.
+//
+// D7 decided that platform administrators have no entry point into a tenant's
+// constraints -- not even read-only -- because every such path is a new
+// cross-tenant channel with no requirement behind it (organization audit
+// already covers governance). orgGuard returns early for isPlatformAdmin, so
+// reusing it here silently re-opens exactly that channel: a platform account can
+// enumerate every tenant's rules and write a policy that immediately locks the
+// tenant's own members out.
+//
+// A non-member is answered with "not found", the same answer a cross-tenant id
+// gets: 403 would confirm the organization exists and that the caller is
+// outside it.
+func (uc *OrgIAMUsecase) orgConstraintGuard(ctx context.Context, actor ActorContext, orgID int64, operation string) (authorization.Context, error) {
+	authCtx := authorization.Organization(orgID)
+	if orgID <= 0 {
+		return authCtx, ErrResourceNotFound
+	}
+	org, err := uc.Organizations.GetOrganization(ctx, nil, orgID)
+	if err != nil || org.Status != OrgStatusActive {
+		return authCtx, ErrResourceNotFound
+	}
+	member, err := uc.Organizations.GetMember(ctx, nil, orgID, actor.User.ID)
+	if err != nil || member.Status != OrgMemberActive {
+		return authCtx, ErrResourceNotFound
+	}
+	// Materialize built-in roles for a legacy organization: an empty role list
+	// would make every constraint look like it references nothing.
+	if err := uc.ensureOrganizationIAM(ctx, orgID); err != nil {
+		return authCtx, err
+	}
+	if _, err := uc.AuthorizeIn(ctx, actor, authCtx, operation, 0, true); err != nil {
+		return authCtx, err
+	}
+	return authCtx, nil
+}
+
 func (uc *OrgIAMUsecase) Constraints(ctx context.Context, actor ActorContext, orgID int64) ([]*Constraint, error) {
-	authCtx, err := uc.orgGuard(ctx, actor, orgID, PermOrgConstraintRead, 0, true)
+	authCtx, err := uc.orgConstraintGuard(ctx, actor, orgID, PermOrgConstraintRead)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +98,7 @@ func (uc *OrgIAMUsecase) Constraints(ctx context.Context, actor ActorContext, or
 }
 
 func (uc *OrgIAMUsecase) CreateConstraint(ctx context.Context, actor ActorContext, orgID int64, in OrgConstraintInput, reason string, expectedPolicy uint64) (*OrgConstraintChange, error) {
-	authCtx, err := uc.orgGuard(ctx, actor, orgID, PermOrgConstraintManage, 0, true)
+	authCtx, err := uc.orgConstraintGuard(ctx, actor, orgID, PermOrgConstraintManage)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +156,7 @@ func (uc *OrgIAMUsecase) CreateConstraint(ctx context.Context, actor ActorContex
 }
 
 func (uc *OrgIAMUsecase) UpdateConstraint(ctx context.Context, actor ActorContext, orgID, id int64, in OrgConstraintInput, expected uint64, reason string, expectedPolicy uint64) (*OrgConstraintChange, error) {
-	authCtx, err := uc.orgGuard(ctx, actor, orgID, PermOrgConstraintManage, 0, true)
+	authCtx, err := uc.orgConstraintGuard(ctx, actor, orgID, PermOrgConstraintManage)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +221,7 @@ func (uc *OrgIAMUsecase) UpdateConstraint(ctx context.Context, actor ActorContex
 }
 
 func (uc *OrgIAMUsecase) DeleteConstraint(ctx context.Context, actor ActorContext, orgID, id int64, expected uint64, reason string, expectedPolicy uint64) error {
-	authCtx, err := uc.orgGuard(ctx, actor, orgID, PermOrgConstraintManage, 0, true)
+	authCtx, err := uc.orgConstraintGuard(ctx, actor, orgID, PermOrgConstraintManage)
 	if err != nil {
 		return err
 	}
@@ -260,10 +299,23 @@ func (uc *OrgIAMUsecase) countViolations(ctx context.Context, tx Tx, authCtx aut
 	if !c.Enabled {
 		return 0, nil
 	}
-	members, err := uc.Organizations.ListMembers(ctx, nil, orgIDOf(authCtx))
+	// tx, not nil: the caller already holds this transaction's connection, and
+	// the dev profile runs max_open_conns=1. Borrowing a second connection here
+	// waits for the pool to release the one the same goroutine is holding, so
+	// every constraint write timed out under load.
+	members, err := uc.Organizations.ListMembers(ctx, tx, orgIDOf(authCtx))
 	if err != nil {
 		return 0, ErrDependency
 	}
+	roles, err := uc.OrgIAM.ListRoles(ctx, tx, authCtx)
+	if err != nil {
+		return 0, ErrDependency
+	}
+	byID := make(map[int64]*Role, len(roles))
+	for _, r := range roles {
+		byID[r.ID] = r
+	}
+	now := uc.Clock.Now()
 	var violations int64
 	for _, m := range members {
 		if m.Status != OrgMemberActive {
@@ -275,7 +327,10 @@ func (uc *OrgIAMUsecase) countViolations(ctx context.Context, tx Tx, authCtx aut
 		}
 		held := make([]int64, 0, len(items))
 		for _, item := range items {
-			if item.Assignment == nil || item.Assignment.Revoked {
+			// Only assignments that actually confer the role count. Counting
+			// revoked or expired history would report violations for members who
+			// hold nothing, and the acknowledgement prompt would be a lie.
+			if !assignmentHolds(item.Assignment, byID, now) {
 				continue
 			}
 			held = append(held, item.Assignment.RoleID)
@@ -293,6 +348,25 @@ func orgIDOf(c authorization.Context) int64 {
 		return c.OrganizationID
 	}
 	return 0
+}
+
+// assignmentHolds reports whether an assignment actually confers its role at
+// `now`: not revoked, already started, not yet expired, and pointing at a role
+// that is still active within the same context.
+//
+// Every segregation-of-duties path must use this same predicate. The previous
+// three copies each stopped at `Revoked`, so an assignment that had naturally
+// expired still counted as held: granting the other half of a mutually
+// exclusive pair was refused forever, and a member whose only "conflict" was
+// years-old history was locked out of the whole organization.
+func assignmentHolds(a *Assignment, roles map[int64]*Role, now time.Time) bool {
+	if a == nil || !a.Active(now) {
+		return false
+	}
+	if role, ok := roles[a.RoleID]; ok && role != nil && role.Status != RoleStatusActive {
+		return false
+	}
+	return true
 }
 
 // orgPolicyGuard mirrors IAMUsecase.policyGuard. It is duplicated rather than

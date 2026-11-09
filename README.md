@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.10.1 — 运维就绪与可复验的灾难恢复。** v0.6.x 完成 V2.4 全部功能；v0.7.x 补运行期能力（Prometheus 指标与 SLO 告警、慢请求日志与全链路 `request_id`、MySQL 负载基线、CI 三道门禁）；v0.8.0 加固认证与访问（可配置密码策略、并发会话上限、统一写接口限流）；v0.9.0 把职责分离与委派补到租户域；v0.10.0 新增就绪探针 `/readyz`（修复数据库不可用时容器仍报 healthy）、把备份恢复与升级回滚做成可复现演练脚本，并写明"能回滚到哪一步"。v0.10.1 修复限流命中计数器冷启动无时间序列的指标缺陷。S14 真实 OAuth 验收因缺凭据按约定标 N/A。SCIM、目录同步继续按 V2 后续里程碑推进。设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
+> **状态：v0.11.0 — 认证与组织权限加固，手册与操作视频。** 统一并发会话签发与凭据限制，收紧组织授权的能力、委派与租户边界，修复就绪探针与限流口径；新增两份操作手册、10 段字幕视频和 19 张截图。**升级须先执行迁移 `014`**，完整范围见 [v0.11.0 发布说明](docs/releases/release-v0.11.0.md)。组织委派 CRUD 与界面仍未交付；真实上游供应商登录验收保持未验证，SCIM / 目录同步继续按后续里程碑推进。
 
 ## 目录
 
@@ -15,6 +15,7 @@
 - [实现范围与已知差异](#实现范围与已知差异)
 - [测试](#测试)
 - [部署](#部署)
+- [操作视频](#操作视频)
 - [文档](#文档)
 
 ## 快速开始
@@ -216,8 +217,30 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 
 覆盖健康检查、未登录 401、CSRF、登录、自服务面、Step-up、组织与租户边界、审计导出、登出失效。compose 环境的账号夹具与参数说明见 [scripts/e2e/README.md](scripts/e2e/README.md)。
 
+## 操作视频
+
+以下 10 段为真实页面录屏，配中文字幕与关键截图，无配音。全部使用独立演示数据，密码、MFA 二维码、恢复码与客户端密钥已遮挡。
+
+| 操作视频 | 内容 |
+|---|---|
+| [登录用户中心](docs/videos/login.webm) | 账号密码、第二因素验证与个人资料 |
+| [首次登录改密与 MFA](docs/videos/first-login.webm) | 修改初始密码、绑定 TOTP、保存恢复码 |
+| [会话管理与登录记录](docs/videos/sessions.webm) | 检查设备、撤销其他会话、查看安全事件 |
+| [创建组织](docs/videos/org-create.webm) | 创建组织并核对组织空间 |
+| [创建用户](docs/videos/user-create.webm) | 填写资料、初始密码与原因，提交并核对详情 |
+| [角色与授权分配](docs/videos/iam-grant.webm) | 创建角色、预览资格、实际提交分配；示例角色未配置业务权限 |
+| [委派与职责分离](docs/videos/delegation-sod.webm) | 查看配置表单，**未提交规则** |
+| [审计与 CSV 导出](docs/videos/audit-export.webm) | 筛选审计、创建导出任务并下载 CSV |
+| [创建 OIDC 应用](docs/videos/oidc-app.webm) | 配置回调与查看一次性密钥保存提示 |
+| [认证配置](docs/videos/settings-auth.webm) | 查看策略与会话设置，**未保存配置** |
+
+视频与截图随仓库提交；可直接打开或下载上述文件。克隆仓库后，可在浏览器打开 [本地播放目录](docs/videos/index.html) 集中观看。配套步骤见 [用户手册](docs/user-guide.md) 和 [管理员操作手册](docs/admin-guide.md)，覆盖范围及重新录制方法见 [录制说明](docs/videos/README.md)。
+
 ## 文档
 
+- [用户手册](docs/user-guide.md)
+- [管理员操作手册](docs/admin-guide.md)
+- [操作视频清单与录制说明](docs/videos/README.md) / [本地播放目录](docs/videos/index.html)
 - [架构与分层](docs/architecture.md)
 - [API 契约与错误码](docs/api.md)
 - [数据模型](docs/data-model.md)
@@ -229,6 +252,7 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
 - [V2.5 路线图](docs/roadmap-v2.5.md)
+- [v0.11.0 发布说明](docs/releases/release-v0.11.0.md)
 - [v0.10.1 发布说明](docs/releases/release-v0.10.1.md)
 - [v0.10.0 发布说明](docs/releases/release-v0.10.0.md)
 - [v0.9.0 发布说明](docs/releases/release-v0.9.0.md)

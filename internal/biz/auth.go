@@ -347,9 +347,6 @@ func (uc *AuthUsecase) login(ctx context.Context, in LoginInput, appID string) (
 	if settings, serr := uc.Settings.GetAuth(ctx, nil); serr == nil {
 		changeRequired = changeRequired || PasswordExpired(cred.ChangedAt, settings.PasswordPolicy(), uc.Clock.Now())
 	}
-	if session.EvictedSessions > 0 {
-		uc.recordSecurity(ctx, user.ID, session.ID, "session_evict", "success", in.IP, in.UserAgent, "")
-	}
 	return &LoginResult{
 		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session,
 		RawToken: raw, PasswordChangeRequired: changeRequired,
@@ -435,6 +432,18 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 	var session *Session
 	var raw string
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// Lock the user before the transaction performs ANY consistent read.
+		//
+		// MySQL's default REPEATABLE READ pins the snapshot at the transaction's
+		// first consistent read, which here is the challenge completion or the
+		// passkey credential lookup. Locking afterwards would take the row lock
+		// on a snapshot that already excludes a session another transaction
+		// committed in the meantime, so the cap check could still miss it. The
+		// inner issueSessionLocked call re-locks the same row, which is a no-op
+		// inside the same transaction.
+		if err := uc.Users.LockUser(ctx, tx, user.ID); err != nil {
+			return ErrDependency
+		}
 		if err := uc.Flows.Complete(ctx, tx, challengeID, "mfa", user.ID, "session"); err != nil {
 			return err
 		}
@@ -453,6 +462,12 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 		return nil, err
 	}
 	uc.recordSecurity(ctx, user.ID, session.ID, "login", "success", payload.IP, payload.UA, "")
+	// This path holds its own transaction (the challenge must be consumed
+	// atomically with the session), so the post-commit events that
+	// issueSessionTxFor writes for the direct paths are written here instead.
+	if session.EvictedSessions > 0 {
+		uc.recordSecurity(ctx, user.ID, session.ID, "session_evict", "success", payload.IP, payload.UA, "")
+	}
 	_ = uc.Challenges.Delete(ctx, challengeID)
 	result := &LoginResult{
 		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw,
@@ -479,8 +494,57 @@ func (uc *AuthUsecase) issueSessionTx(ctx context.Context, tx Tx, user *User, ua
 	return uc.issueSessionTxFor(ctx, tx, user, ua, ip, ApplicationCode)
 }
 
+// issueSessionTxFor creates the session and reports how to return it.
+//
+// The per-user session cap is "count live sessions, revoke the excess, insert".
+// That sequence is only an invariant if it is serialised per user: with two
+// callers reading the pre-insert count at the same time -- which is exactly what
+// happens with tx=nil, because the count and the insert were separate
+// transactions -- both see room and both commit, leaving cap+1 live sessions.
+//
+// So the whole sequence always runs inside one transaction that first locks the
+// user row, and every entry point shares it: password login, MFA/passkey
+// completion, OAuth callback, internal gRPC login. A caller that already holds a
+// transaction (MFA completion) reuses it rather than nesting.
 func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User, ua, ip, appID string) (*Session, string, error) {
-	settings, err := uc.Settings.GetAuth(ctx, nil)
+	if tx != nil {
+		return uc.issueSessionLocked(ctx, tx, user, ua, ip, appID)
+	}
+	var (
+		session *Session
+		raw     string
+	)
+	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		var err error
+		session, raw, err = uc.issueSessionLocked(ctx, tx, user, ua, ip, appID)
+		return err
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	// Recorded after the commit: the security events live in their own table and
+	// must not be part of the session transaction (they would need a second
+	// connection while this goroutine holds the only one).
+	//
+	// Both events are here rather than at the call sites so every entry point
+	// that hands out a session gets them: password login, OAuth callback and the
+	// internal gRPC login all reach this branch, and MFA completion shares the
+	// helper above. Before that, session_evict was written only by the password
+	// path, so a user evicted during an MFA login left no trace.
+	uc.recordSecurity(ctx, user.ID, session.ID, "login", "success", ip, ua, "")
+	if session.EvictedSessions > 0 {
+		uc.recordSecurity(ctx, user.ID, session.ID, "session_evict", "success", ip, ua, "")
+	}
+	return session, raw, nil
+}
+
+func (uc *AuthUsecase) issueSessionLocked(ctx context.Context, tx Tx, user *User, ua, ip, appID string) (*Session, string, error) {
+	// The lock comes first, before anything is read: a snapshot taken before the
+	// lock is exactly the stale count this is here to prevent.
+	if err := uc.Users.LockUser(ctx, tx, user.ID); err != nil {
+		return nil, "", ErrDependency
+	}
+	settings, err := uc.Settings.GetAuth(ctx, tx)
 	if err != nil {
 		return nil, "", ErrDependency
 	}
@@ -497,7 +561,7 @@ func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User,
 	if settings.IdleTimeoutMinutes > 0 {
 		idle = time.Duration(settings.IdleTimeoutMinutes) * time.Minute
 	}
-	activeRoles, err := uc.activeRoleSubset(ctx, user.ID)
+	activeRoles, err := uc.activeRoleSubset(ctx, tx, user.ID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -526,9 +590,6 @@ func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User,
 	}
 	if err := uc.Sessions.Create(ctx, tx, s); err != nil {
 		return nil, "", ErrDependency
-	}
-	if tx == nil {
-		uc.recordSecurity(ctx, user.ID, s.ID, "login", "success", ip, ua, "")
 	}
 	return s, raw, nil
 }
@@ -566,18 +627,18 @@ func (uc *AuthUsecase) evictExcessSessions(ctx context.Context, tx Tx, userID in
 	return excess, nil
 }
 
-func (uc *AuthUsecase) activeRoleSubset(ctx context.Context, userID int64) ([]int64, error) {
-	assignments, err := uc.IAM.ListAssignmentsForUser(ctx, nil, userID)
+func (uc *AuthUsecase) activeRoleSubset(ctx context.Context, tx Tx, userID int64) ([]int64, error) {
+	assignments, err := uc.IAM.ListAssignmentsForUser(ctx, tx, userID)
 	if err != nil {
 		return nil, err
 	}
 	// Platform context only: session role activation is a platform concept, and
 	// organization roles are active on their own (see LoadAuthzFactsIn).
-	constraints, err := uc.IAM.ListConstraints(ctx, nil, authorization.Platform())
+	constraints, err := uc.IAM.ListConstraints(ctx, tx, authorization.Platform())
 	if err != nil {
 		return nil, err
 	}
-	roles, err := uc.IAM.ListRoles(ctx, nil, RoleFilter{})
+	roles, err := uc.IAM.ListRoles(ctx, tx, RoleFilter{})
 	if err != nil {
 		return nil, err
 	}
@@ -692,6 +753,11 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 		credential, err := uc.Credentials.Get(ctx, tx, user.ID)
 		if err != nil {
 			return ErrDependency
+		}
+		// Same rule as a self-service change: a reset must not let the account
+		// walk back to the password that was in place before the window existed.
+		if err := uc.RecordPasswordBeforeRotation(ctx, tx, user.ID, credential, policy); err != nil {
+			return err
 		}
 		version, err := uc.Credentials.UpdatePassword(ctx, tx, user.ID, hash, "bcrypt", credential.Revision, false)
 		if err != nil {

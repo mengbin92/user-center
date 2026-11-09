@@ -288,6 +288,59 @@ func TestOIDCReviewEnforcesCurrentAccountSecurityPolicy(t *testing.T) {
 	require.Empty(t, location.Query().Get("code"))
 }
 
+// The credential restriction has to travel with the credential, not with one
+// protocol. Before this was fixed, enabling expiry blocked the browser (the
+// middleware gate) while an existing refresh token kept exchanging for fresh
+// access tokens, and the internal gRPC API still reported a usable session.
+func TestOIDCReviewRejectsExpiredPasswordOnEverySurface(t *testing.T) {
+	h := newHarness(t)
+	oidcReviewClient(t, h, []string{"openid", "offline_access"})
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	code, verifier := oidcReviewAuthorization(t, h, "openid offline_access")
+	rec := oidcReviewExchange(h, code, verifier)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	tokens := decode[map[string]any](t, rec)
+
+	// One day of validity, and a password set 48 hours ago.
+	h.setAuthSettings(func(s *biz.AuthSettings) { s.PasswordExpiryDays = 1 })
+	require.NoError(t, h.d.DB().Exec(
+		"UPDATE user_credentials SET password_changed_at = ?", time.Now().UTC().Add(-48*time.Hour)).Error)
+
+	// Refresh and UserInfo run through authenticationRestrictions.
+	rec = h.doForm("/oidc/token", url.Values{"grant_type": {"refresh_token"},
+		"refresh_token": {tokens["refresh_token"].(string)}}, "review_client", "review-secret")
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "invalid_grant")
+	require.Equal(t, http.StatusUnauthorized, oidcReviewUserInfo(h, tokens["access_token"].(string)).Code)
+
+	// A brand-new authorization parks the user on the change-password screen
+	// instead of issuing another code.
+	verifier = strings.Repeat("v", 64)
+	sum := sha256.Sum256([]byte(verifier))
+	q := url.Values{"client_id": {"review_client"}, "redirect_uri": {"https://app.example.com/callback"},
+		"response_type": {"code"}, "scope": {"openid"}, "code_challenge_method": {"S256"},
+		"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}}
+	rec = h.do(http.MethodGet, "/oidc/authorize?"+q.Encode(), nil, "", false)
+	require.Equal(t, http.StatusFound, rec.Code)
+	location, err := url.Parse(rec.Header().Get("Location"))
+	require.NoError(t, err)
+	require.Equal(t, "/account/security", location.Path)
+	require.Equal(t, "1", location.Query().Get("password_change_required"))
+
+	// The internal API refuses the session outright: an integration cannot be
+	// trusted to enforce a flag it was merely told about.
+	login, err := h.auth.LoginForApplication(context.Background(), biz.LoginInput{
+		Username: "root", Password: "ChangeMe-12345", IP: "10.1.2.3", UserAgent: "integration",
+	}, "review-app")
+	require.NoError(t, err, "login itself still succeeds; the restriction is applied per use")
+	require.True(t, login.PasswordChangeRequired)
+	integration := biz.NewIntegrationUsecase(h.svc)
+	_, _, err = integration.ValidateSession(context.Background(), login.RawToken, "review-app")
+	require.ErrorIs(t, err, biz.ErrPasswordChange)
+	_, _, _, err = integration.SessionAuthorization(context.Background(), login.RawToken, "review-app")
+	require.ErrorIs(t, err, biz.ErrPasswordChange)
+}
+
 func TestOIDCReviewValidatesPromptMaxAgeAndPKCE(t *testing.T) {
 	h := newHarness(t)
 	oidcReviewClient(t, h, []string{"openid"})

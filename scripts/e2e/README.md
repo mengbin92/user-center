@@ -15,10 +15,11 @@ scripts/e2e/compose-e2e.sh --skip-build --keep
 `compose-e2e.sh` 默认在结束时 `down -v`；`--keep` 保留栈便于排查。它不接受复用的 `.env`，
 每次都生成一次性密钥与 OIDC 私钥。
 
-⚠️ **不要与另一个 `--keep` 栈同时跑**：项目名默认取目录名 `docker-compose`，
-第二次执行会复用第一个栈的容器但换上新的 `.env`，MySQL 密码随即不匹配，
-`migrate` 直接以 exit 1 失败。用 `--keep` 排查完先 `down -v` 再跑下一次；
-需要并行时用 `COMPOSE_PROJECT_NAME` 显式区分。
+每次执行都会生成独立的 compose 项目名（`uc-e2e-<随机>`），`down -v` 因此只可能清理本次
+执行创建的容器与数据卷。这个名字**无条件生成**：即使当前 shell 里已经导出
+`COMPOSE_PROJECT_NAME=docker-compose`（例如你正对着按 README 启动的默认栈操作），E2E 也不会
+沿用它——否则一次构建失败就会把那个栈连同 mysql-data 卷一起删掉。需要固定名字时改脚本，不要
+靠环境变量覆盖。
 
 ```bash
 # 开发实例（SQLite）

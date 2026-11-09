@@ -96,6 +96,17 @@ export function LoginPage() {
     )
   }
 
+  // The per-user session cap reclaims older sessions on every issuance path
+  // (password, TOTP, passkey). All three branches share one announcement so a
+  // passkey login cannot quietly log the user out of another device.
+  const announceRecycledSessions = (reply: { recycled_sessions?: number }) => {
+    if (!reply.recycled_sessions) return
+    toast.info(
+      '已退出其他设备',
+      `同时在线会话已达上限，已自动退出 ${reply.recycled_sessions} 个最久未使用的会话。`,
+    )
+  }
+
   const submitPassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
@@ -115,15 +126,7 @@ export function LoginPage() {
         setPhase('mfa')
         return
       }
-      if (reply.recycled_sessions) {
-        // The per-user session cap reclaimed older sessions while signing in.
-        // Say so: otherwise the user finds another device logged out with no
-        // explanation and assumes the account was compromised.
-        toast.info(
-          '已退出其他设备',
-          `同时在线会话已达上限，已自动退出 ${reply.recycled_sessions} 个最久未使用的会话。`,
-        )
-      }
+      announceRecycledSessions(reply)
       if (reply.password_change_required) {
         setPostLoginPath(`/account/security?password_change_required=1${oidcNext ? `&next=${encodeURIComponent(oidcNext)}` : ''}`)
       }
@@ -149,6 +152,7 @@ export function LoginPage() {
         challenge_id: challengeId,
         code: code.trim(),
       })
+      announceRecycledSessions(reply)
       if (reply.password_change_required) {
         setPostLoginPath(`/account/security?password_change_required=1${oidcNext ? `&next=${encodeURIComponent(oidcNext)}` : ''}`)
       }
@@ -172,6 +176,7 @@ export function LoginPage() {
         challengeId,
       )
       const reply = await api.auth.completeMfa(assertion)
+      announceRecycledSessions(reply)
       if (reply.password_change_required) {
         setPostLoginPath(`/account/security?password_change_required=1${oidcNext ? `&next=${encodeURIComponent(oidcNext)}` : ''}`)
       }

@@ -1,0 +1,57 @@
+{
+  "recorded_at": "2026年11月9日 09:26:00（北京时间）",
+  "viewport": "1440×1000",
+  "mobile": "390×844",
+  "clips": [
+    {
+      "name": "delegation-sod",
+      "title": "查看委派与职责分离配置",
+      "video": "delegation-sod.webm"
+    },
+    {
+      "name": "oidc-app",
+      "title": "创建 OIDC 应用",
+      "video": "oidc-app.webm"
+    },
+    {
+      "name": "settings-auth",
+      "title": "查看认证策略与会话配置",
+      "video": "settings-auth.webm"
+    },
+    {
+      "name": "login",
+      "title": "账号登录与个人资料",
+      "video": "login.webm"
+    },
+    {
+      "name": "user-create",
+      "title": "创建用户并核对资料",
+      "video": "user-create.webm"
+    },
+    {
+      "name": "audit-export",
+      "title": "筛选审计并导出 CSV",
+      "video": "audit-export.webm"
+    },
+    {
+      "name": "first-login",
+      "title": "首次登录改密与启用 MFA",
+      "video": "first-login.webm"
+    },
+    {
+      "name": "sessions",
+      "title": "查看会话并撤销其他设备",
+      "video": "sessions.webm"
+    },
+    {
+      "name": "org-create",
+      "title": "创建组织与查看组织空间",
+      "video": "org-create.webm"
+    },
+    {
+      "name": "iam-grant",
+      "title": "创建角色并预览、提交授权",
+      "video": "iam-grant.webm"
+    }
+  ]
+}
