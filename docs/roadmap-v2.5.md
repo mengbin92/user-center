@@ -58,9 +58,9 @@
 
 | 项 | 不纳入的理由 | 去向 |
 |---|---|---|
-| SCIM 2.0 / 目录同步 | 需完整 schema、过滤语法、PATCH 语义与 IdP 兼容矩阵，等于独立里程碑；V2.4 已定 V2.6 | V2.6 单独立项 |
+| SCIM 2.0 / 目录同步 | 需完整 schema、过滤语法、PATCH 语义与 IdP 兼容矩阵，等于独立里程碑；V2.4 已定 V2.6 | **V2.6 已交付**：SCIM 2.0 在阶段②（见 `docs/scim.md`），企业目录同步在阶段③（见 `docs/directory-sync.md`） |
 | SAML 2.0 SP/IdP | 设计文档未要求；企业客户若提需求需先做产品决策，不与 SCIM 混做 | 待产品输入 |
-| 租户物理隔离（独立库 / RLS / 分区） | 当前逻辑隔离满足单库多租户；取决于部署规模与合规合同 | 按需评估 |
+| 租户物理隔离（独立库 / RLS / 分区） | 当前逻辑隔离满足单库多租户；取决于部署规模与合规合同 | **V2.6 阶段④已完整交付**：独立 schema 路由、SQL 建表、存量 cutover 工具、跨租户聚合（`docs/tenancy.md`） |
 | `ExchangeLegacySession` | 设计标注"可选、默认关闭" | 明确不做 |
 | 组织成员批量导入（CSV） | 与 SCIM 能力重叠，做一次会白做 | 并入 SCIM 评估 |
 | 管理端可视化审计大屏 | 收益低于可观测性，无合规驱动 | 不排期 |
@@ -317,7 +317,7 @@
 验收（设计阶段）：
 
 - [x] `docs/design/org-sod-delegation.md`：作用域模型（约束/委派沿用角色的 `context_type/context_id`）、与平台约束的关系、冲突判定顺序（6 步）、越权边界、迁移 `013` 与"默认值即回填"方案
-- [x] 明确"组织约束不能放宽平台约束"的合并规则：逐集合独立求值 + AND 合并（交集），组织侧无任何"禁用平台约束"字段
+- [x] 明确"组织约束不能放宽平台约束"的合并规则：**结构性隔离**（评审 F1 推翻了初稿的"逐集合独立求值 + AND 合并（交集）"）——角色在单表里全局自增，平台约束的 role id 永不匹配组织角色，隔离由 `ListConstraints(ctx, tx, authCtx)` 的显式 context 过滤保证；组织侧无任何"禁用平台约束"字段
 - [x] 决策矩阵覆盖 platform admin / 组织 owner / 组织自定义 `iam.role.write` 三类角色的 9 类操作
 - [x] 设计评审完成：8 条发现（F1–F8），推翻 §4 论证与 §7 后果描述，砍掉平台管理员跨租户只读，D6–D10 定案，结论"通过，可进入实现"。评审记录见 `docs/design/org-sod-delegation.md` §0
 - [x] **设计期发现并已修复**：组织 `AssignRole` 原本既不校验 `CheckConstraints` 也不校验委派边界，平台 SoD 在组织域可被绕过。现已在事务内接入约束校验，并补上"不能给自己授权"（`ORGANIZATION_SELF_GRANT`）
@@ -325,9 +325,11 @@
 验收（实现阶段，评审通过后展开）：
 
 - [x] 组织内 `mutual_exclusion` 与 `max_roles` 生效。**与设计原稿的偏差**：不是"与平台约束求交"，而是结构性隔离 —— 角色在单表里全局自增，平台约束的 role id 永不匹配组织角色；隔离由 `ListConstraints(ctx, tx, authCtx)` 的显式 context 过滤保证，不依赖 ID 分配。`max_roles` 按 `role_ids` 范围计数（实现期发现原设计对语义理解有误，见设计文档 F9）
-- [x] 组织内委派：`DelegationFilter.Context` 强制过滤；`CreateDelegation` 写 `(context_type, context_id)`；平台委派无法批准组织分配，反向亦然
-      **求值侧已实现，入口未交付**：设计 §12 的 P4（组织委派 CRUD API）与 P5（界面）不在本阶段范围内，
-      因此当前只能授予自己已持有的能力；语义比设计更严格，不放宽任何权限。见 `docs/security.md` §4.10
+- [x] 组织内委派：`DelegationFilter.Context` 强制过滤；`CreateDelegation` 写 `(context_type, context_id)`；平台委派无法批准组织分配，反向亦然。
+      V2.5 阶段仅交付求值侧，写入入口当时标注为「未交付」；**该缺口已在 V2.6 阶段①补齐**：设计 §12 的
+      P4（4 个组织委派 CRUD API）与 P5（「职责分离」页委派区）均已上线，`checkOrgDelegation` 的委派分支
+      在生产可达，并有 HTTP 用例证明「创建后解锁分配、撤销后重新拒绝」。见 `docs/security.md` §4.10 与
+      `internal/server/org_delegation_crud_test.go`
 - [x] 分配与撤销路径执行**能力边界**（`checkOrgDelegation`）：仅有 `organization.iam.assignment.manage`
       不再足以授予任意角色；要么自己持有目标角色的全部 operation，要么存在本组织内覆盖目标用户/角色/动作/有效期/授权上限的有效委派，
       否则 `DELEGATION_REQUIRED`。上下文由 `DelegationFilter.Context` 保证，平台委派与其他租户的委派无法匹配

@@ -15,6 +15,14 @@ type TxManager interface {
 	InTx(context.Context, func(context.Context, Tx) error) error
 }
 
+// TenantProvisioner prepares the physical schema of one organization. It lives
+// behind an interface so biz never imports the data layer; the data
+// implementation returns an error when schema isolation is disabled.
+type TenantProvisioner interface {
+	IsolationEnabled() bool
+	EnsureTenantSchema(context.Context, int64) (string, error)
+}
+
 type UserRepo interface {
 	Create(context.Context, Tx, *User) (*User, error)
 	Get(context.Context, Tx, int64) (*User, error)
@@ -200,7 +208,9 @@ type IAMRepo interface {
 	GetDelegation(context.Context, Tx, int64) (*Delegation, error)
 	CreateDelegation(context.Context, Tx, *Delegation) (*Delegation, error)
 	UpdateDelegation(context.Context, Tx, *Delegation, uint64) (*Delegation, error)
-	RevokeDelegation(context.Context, Tx, int64, uint64, int64) error
+	// RevokeDelegation is context-scoped: a tenant write must never revoke a
+	// row from another context that happens to be addressed by a guessed id.
+	RevokeDelegation(context.Context, Tx, int64, uint64, int64, authorization.Context) error
 	GetConstraint(context.Context, Tx, authorization.Context, int64) (*Constraint, error)
 	CreateConstraint(context.Context, Tx, *Constraint) (*Constraint, error)
 	UpdateConstraint(context.Context, Tx, *Constraint, uint64) (*Constraint, error)

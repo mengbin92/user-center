@@ -164,16 +164,17 @@ func envOr(key, def string) string {
 
 // App owns the transports, the metrics listener and the one-time bootstrap hook.
 type App struct {
-	http    *server.HTTPServer
-	grpc    *server.GRPCServer
-	metrics *server.MetricsServer
-	svc     *biz.Services
-	worker  *biz.IntegrationAdminUsecase
-	log     *zap.Logger
+	http      *server.HTTPServer
+	grpc      *server.GRPCServer
+	metrics   *server.MetricsServer
+	svc       *biz.Services
+	worker    *biz.IntegrationAdminUsecase
+	directory *biz.DirectoryUsecase
+	log       *zap.Logger
 }
 
-func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, metricsSrv *server.MetricsServer, svc *biz.Services, worker *biz.IntegrationAdminUsecase, log *zap.Logger) *App {
-	return &App{http: httpSrv, grpc: grpcSrv, metrics: metricsSrv, svc: svc, worker: worker, log: log}
+func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, metricsSrv *server.MetricsServer, svc *biz.Services, worker *biz.IntegrationAdminUsecase, directory *biz.DirectoryUsecase, log *zap.Logger) *App {
+	return &App{http: httpSrv, grpc: grpcSrv, metrics: metricsSrv, svc: svc, worker: worker, directory: directory, log: log}
 }
 
 func (a *App) Run() error {
@@ -185,6 +186,10 @@ func (a *App) Run() error {
 		kratos.BeforeStart(a.bootstrap),
 		kratos.BeforeStart(func(ctx context.Context) error {
 			go a.worker.StartWorker(ctx)
+			return nil
+		}),
+		kratos.BeforeStart(func(ctx context.Context) error {
+			go a.directory.StartWorker(ctx)
 			return nil
 		}),
 	}

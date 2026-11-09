@@ -1,6 +1,6 @@
 # 组织上下文内的职责分离与委派（S12 设计）
 
-> 状态：**设计待评审**。按 V2.5 §4 W5 的约定，评审通过前不改代码。
+> 状态：**评审通过并已实现**（§13）。组织约束部分随 v0.9.0 交付；P4/P5 的组织委派 CRUD 与界面在 V2.6 阶段①补齐，至此组织级 SoD 完整落地。
 > 基线：`v0.7.1`（`main`）· 编写日期：2026-11-06
 > 上游：[V2.5 路线图](../roadmap-v2.5.md) §4 W5；[V2.4 路线图](../roadmap-v2.4.md) §3.2（本条为 V2.4 明确欠下的设计债）
 
@@ -256,7 +256,8 @@ DELETE /api/v1/orgs/{org_id}/iam/constraints/{id}
 平台委派回答的是"谁能代替我把某个角色授予别人"。组织域需要同一件事，但有两条额外限制：
 
 1. **只能在组织上下文内授予**：`manager_role_id` 与 `target_role_id` 必须同属该组织。跨上下文委派直接拒绝（写入校验，§3.2 的同一套逻辑）。
-2. **只能委托自己持有的角色**：`manager_role_id` 必须在委派创建者的活跃角色集合内 —— 这条与平台的 `checkDelegation` 一致。
+2. **只能委托自己持有的角色**：`manager_role_id` 必须在委派**使用者**的活跃角色集合内 —— 与平台的 `checkDelegation` 一致。
+   > **实现期修正 F10**：本条初稿写的是「创建者」，已在 V2.6 阶段①更正为「使用者」，见 §14。求值侧 `checkOrgDelegation` Branch 2 强制使用者持有 manager 角色；写入侧若也要求创建者持有，会导致 owner 只能选 `org_owner`、委派分支恒不可达。
 
 ### 9.1 与平台委派的关系
 
@@ -332,14 +333,14 @@ ALTER TABLE iam_delegations
 
 ## 12. 实施拆分（评审通过后）
 
-| 阶段 | 内容 | 规模 |
-|---|---|---|
-| P1 | 迁移 013 + `Constraint`/`Delegation` 模型加 context + 仓储按 context 过滤 | M |
-| P2 | `CheckConstraints` / `checkDelegation` 加 context 参数；组织分配两条路径接入；**自授权拦截**（§8） | M |
-| P3 | 组织约束 CRUD API（proto + service + biz）+ 跨作用域引用校验 + 违规确认（§7） | M |
-| P4 | 组织委派 CRUD API + 撤销成员时双向级联软失效（§9.2） | M |
-| P5 | Web 组织设置页（约束列表、委派列表、违规确认对话框） | M |
-| P6 | 文档（`docs/security.md` 的 SoD 章节、`docs/architecture.md` 的授权模型图） | S |
+| 阶段 | 内容 | 规模 | 状态 |
+|---|---|---|---|
+| P1 | 迁移 013 + `Constraint`/`Delegation` 模型加 context + 仓储按 context 过滤 | M | ✅ v0.9.0 |
+| P2 | `CheckConstraints` / `checkDelegation` 加 context 参数；组织分配两条路径接入；**自授权拦截**（§8） | M | ✅ v0.9.0 |
+| P3 | 组织约束 CRUD API（proto + service + biz）+ 跨作用域引用校验 + 违规确认（§7） | M | ✅ v0.9.0 |
+| P4 | 组织委派 CRUD API + 撤销成员时双向级联软失效（§9.2） | M | 级联部分 ✅ v0.9.0；CRUD API ✅ V2.6 阶段① |
+| P5 | Web 组织设置页（约束列表、委派列表、违规确认对话框） | M | 约束/违规确认 ✅ v0.9.0；委派区 ✅ V2.6 阶段① |
+| P6 | 文档（`docs/security.md` 的 SoD 章节、`docs/architecture.md` 的授权模型图） | S | ✅ 已同步 |
 
 拆分原则与发版：
 
@@ -369,4 +370,6 @@ ALTER TABLE iam_delegations
 |---|---|
 | 2026-11-06 | 初稿 |
 | 2026-11-07 | 实现期修正（F9）：`max_roles` 语义两次写错，改为完全复用平台校验，删除 `checkOrgConstraints` 中的自定义角色过滤 |
+| 2026-11-09 | 实现期修正（F10）：§9 要求 `manager_role_id` 在**创建者**的活跃角色集合内。写入侧不重复该检查——求值侧 `checkOrgDelegation` Branch 2 已按使用者身份强制；平台 `CreateDelegation` 亦无此写入侧检查。若在写入侧再要求，owner 因 `refuseSelfGrant` 无法持有自定义管理角色，只能以 `org_owner` 为 manager，而该角色已持有全部组织能力、恒命中 Branch 1，新交付的委派分支将永远不可达。写入侧改为强制「两个角色同属本组织且 active」+「授权上限不超过创建者能力」；求值侧仍强制「使用者必须持有 manager 角色」。 |
+| 2026-11-09 | P4/P5 交付：4 个组织委派 HTTP 端点 + 管理界面 + HTTP 级拒绝用例；文档状态由「设计待评审」更正为「评审通过并已实现」 |
 | 2026-11-06 | 评审：8 条发现（F1–F8），推翻 §4 论证与 §7 后果描述，砍掉平台管理员跨租户只读，补 §5.1/§6.1/§9.2，D6–D10 定案，删除两条不可能发生的测试用例，结论为"通过，可进入实现" |

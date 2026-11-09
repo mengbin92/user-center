@@ -28,6 +28,7 @@ const OperationOrganizationServiceArchiveOrganization = "/api.usercenter.v1.Orga
 const OperationOrganizationServiceCreateDepartment = "/api.usercenter.v1.OrganizationService/CreateDepartment"
 const OperationOrganizationServiceCreateOrgAssignment = "/api.usercenter.v1.OrganizationService/CreateOrgAssignment"
 const OperationOrganizationServiceCreateOrgConstraint = "/api.usercenter.v1.OrganizationService/CreateOrgConstraint"
+const OperationOrganizationServiceCreateOrgDelegation = "/api.usercenter.v1.OrganizationService/CreateOrgDelegation"
 const OperationOrganizationServiceCreateOrgRole = "/api.usercenter.v1.OrganizationService/CreateOrgRole"
 const OperationOrganizationServiceCreateOrganization = "/api.usercenter.v1.OrganizationService/CreateOrganization"
 const OperationOrganizationServiceCreateOrganizationInvitation = "/api.usercenter.v1.OrganizationService/CreateOrganizationInvitation"
@@ -41,6 +42,7 @@ const OperationOrganizationServiceListMyOrganizations = "/api.usercenter.v1.Orga
 const OperationOrganizationServiceListOrgAssignments = "/api.usercenter.v1.OrganizationService/ListOrgAssignments"
 const OperationOrganizationServiceListOrgAudits = "/api.usercenter.v1.OrganizationService/ListOrgAudits"
 const OperationOrganizationServiceListOrgConstraints = "/api.usercenter.v1.OrganizationService/ListOrgConstraints"
+const OperationOrganizationServiceListOrgDelegations = "/api.usercenter.v1.OrganizationService/ListOrgDelegations"
 const OperationOrganizationServiceListOrgPermissions = "/api.usercenter.v1.OrganizationService/ListOrgPermissions"
 const OperationOrganizationServiceListOrgRoles = "/api.usercenter.v1.OrganizationService/ListOrgRoles"
 const OperationOrganizationServiceListOrganizationInvitations = "/api.usercenter.v1.OrganizationService/ListOrganizationInvitations"
@@ -48,9 +50,11 @@ const OperationOrganizationServiceListOrganizationMembers = "/api.usercenter.v1.
 const OperationOrganizationServicePutOrgRolePermissions = "/api.usercenter.v1.OrganizationService/PutOrgRolePermissions"
 const OperationOrganizationServiceRemoveOrganizationMember = "/api.usercenter.v1.OrganizationService/RemoveOrganizationMember"
 const OperationOrganizationServiceRevokeOrgAssignment = "/api.usercenter.v1.OrganizationService/RevokeOrgAssignment"
+const OperationOrganizationServiceRevokeOrgDelegation = "/api.usercenter.v1.OrganizationService/RevokeOrgDelegation"
 const OperationOrganizationServiceRevokeOrganizationInvitation = "/api.usercenter.v1.OrganizationService/RevokeOrganizationInvitation"
 const OperationOrganizationServiceUpdateDepartment = "/api.usercenter.v1.OrganizationService/UpdateDepartment"
 const OperationOrganizationServiceUpdateOrgConstraint = "/api.usercenter.v1.OrganizationService/UpdateOrgConstraint"
+const OperationOrganizationServiceUpdateOrgDelegation = "/api.usercenter.v1.OrganizationService/UpdateOrgDelegation"
 const OperationOrganizationServiceUpdateOrgRole = "/api.usercenter.v1.OrganizationService/UpdateOrgRole"
 const OperationOrganizationServiceUpdateOrganization = "/api.usercenter.v1.OrganizationService/UpdateOrganization"
 const OperationOrganizationServiceUpdateOrganizationMember = "/api.usercenter.v1.OrganizationService/UpdateOrganizationMember"
@@ -67,6 +71,7 @@ type OrganizationServiceHTTPServer interface {
 	CreateDepartment(context.Context, *CreateDepartmentRequest) (*Department, error)
 	CreateOrgAssignment(context.Context, *CreateOrgAssignmentRequest) (*OrgAssignment, error)
 	CreateOrgConstraint(context.Context, *CreateOrgConstraintRequest) (*OrgConstraint, error)
+	CreateOrgDelegation(context.Context, *CreateOrgDelegationRequest) (*OrgDelegation, error)
 	CreateOrgRole(context.Context, *CreateOrgRoleRequest) (*OrgRole, error)
 	CreateOrganization(context.Context, *CreateOrganizationRequest) (*Organization, error)
 	CreateOrganizationInvitation(context.Context, *CreateOrganizationInvitationRequest) (*OrganizationInvitation, error)
@@ -82,6 +87,13 @@ type OrganizationServiceHTTPServer interface {
 	// ListOrgConstraints Organization-scoped segregation of duties. Constraints defined here apply
 	// only inside this tenant and can never relax platform policy.
 	ListOrgConstraints(context.Context, *GetOrganizationRequest) (*OrgConstraintsReply, error)
+	// ListOrgDelegations Organization-scoped delegations. Until V2.6 the evaluator understood
+	// tenant delegations but no write path could create one, so the delegation
+	// branch of checkOrgDelegation was unreachable in production. These four
+	// endpoints are the missing entry point. They share the constraint
+	// governance permissions (design §5.1): read is owner+admin, every write is
+	// owner-only. A platform administrator has no entry point here (D7).
+	ListOrgDelegations(context.Context, *ListOrgDelegationsRequest) (*OrgDelegationsReply, error)
 	ListOrgPermissions(context.Context, *GetOrganizationRequest) (*OrgPermissionsReply, error)
 	// ListOrgRoles Organization-scoped IAM (V2.3). Every request is evaluated in the
 	// organization:{id} context; identifiers of another tenant are not found.
@@ -91,9 +103,11 @@ type OrganizationServiceHTTPServer interface {
 	PutOrgRolePermissions(context.Context, *PutOrgRolePermissionsRequest) (*OrgRole, error)
 	RemoveOrganizationMember(context.Context, *RemoveOrganizationMemberRequest) (*emptypb.Empty, error)
 	RevokeOrgAssignment(context.Context, *RevokeOrgAssignmentRequest) (*emptypb.Empty, error)
+	RevokeOrgDelegation(context.Context, *RevokeOrgDelegationRequest) (*OrgDelegation, error)
 	RevokeOrganizationInvitation(context.Context, *RevokeOrganizationInvitationRequest) (*emptypb.Empty, error)
 	UpdateDepartment(context.Context, *UpdateDepartmentRequest) (*Department, error)
 	UpdateOrgConstraint(context.Context, *UpdateOrgConstraintRequest) (*OrgConstraint, error)
+	UpdateOrgDelegation(context.Context, *UpdateOrgDelegationRequest) (*OrgDelegation, error)
 	UpdateOrgRole(context.Context, *UpdateOrgRoleRequest) (*OrgRole, error)
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*Organization, error)
 	UpdateOrganizationMember(context.Context, *UpdateOrganizationMemberRequest) (*OrganizationMember, error)
@@ -128,6 +142,10 @@ func RegisterOrganizationServiceHTTPServer(s *http.Server, srv OrganizationServi
 	r.Handle("POST", "/api/v1/orgs/{id}/iam/constraints", _OrganizationService_CreateOrgConstraint0_HTTP_Handler(srv))
 	r.Handle("PATCH", "/api/v1/orgs/{id}/iam/constraints/{constraint_id}", _OrganizationService_UpdateOrgConstraint0_HTTP_Handler(srv))
 	r.Handle("DELETE", "/api/v1/orgs/{id}/iam/constraints/{constraint_id}", _OrganizationService_DeleteOrgConstraint0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/orgs/{id}/iam/delegations", _OrganizationService_ListOrgDelegations0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/orgs/{id}/iam/delegations", _OrganizationService_CreateOrgDelegation0_HTTP_Handler(srv))
+	r.Handle("PATCH", "/api/v1/orgs/{id}/iam/delegations/{delegation_id}", _OrganizationService_UpdateOrgDelegation0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/orgs/{id}/iam/delegations/{delegation_id}:revoke", _OrganizationService_RevokeOrgDelegation0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/orgs/{id}/audits", _OrganizationService_ListOrgAudits0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/orgs/{id}/audits:export", _OrganizationService_ExportOrgAudits0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/orgs/{id}/iam/authorization:explain", _OrganizationService_ExplainOrgAuthorization0_HTTP_Handler(srv))
@@ -727,6 +745,94 @@ func _OrganizationService_DeleteOrgConstraint0_HTTP_Handler(srv OrganizationServ
 	}
 }
 
+func _OrganizationService_ListOrgDelegations0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ListOrgDelegationsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceListOrgDelegations)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListOrgDelegations(ctx, req.(*ListOrgDelegationsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrgDelegationsReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _OrganizationService_CreateOrgDelegation0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CreateOrgDelegationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceCreateOrgDelegation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CreateOrgDelegation(ctx, req.(*CreateOrgDelegationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrgDelegation)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _OrganizationService_UpdateOrgDelegation0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateOrgDelegationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceUpdateOrgDelegation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateOrgDelegation(ctx, req.(*UpdateOrgDelegationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrgDelegation)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _OrganizationService_RevokeOrgDelegation0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in RevokeOrgDelegationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationOrganizationServiceRevokeOrgDelegation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.RevokeOrgDelegation(ctx, req.(*RevokeOrgDelegationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*OrgDelegation)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _OrganizationService_ListOrgAudits0_HTTP_Handler(srv OrganizationServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in ListOrgAuditsRequest
@@ -931,6 +1037,7 @@ type OrganizationServiceHTTPClient interface {
 	CreateDepartment(ctx context.Context, req *CreateDepartmentRequest, opts ...http.CallOption) (rsp *Department, err error)
 	CreateOrgAssignment(ctx context.Context, req *CreateOrgAssignmentRequest, opts ...http.CallOption) (rsp *OrgAssignment, err error)
 	CreateOrgConstraint(ctx context.Context, req *CreateOrgConstraintRequest, opts ...http.CallOption) (rsp *OrgConstraint, err error)
+	CreateOrgDelegation(ctx context.Context, req *CreateOrgDelegationRequest, opts ...http.CallOption) (rsp *OrgDelegation, err error)
 	CreateOrgRole(ctx context.Context, req *CreateOrgRoleRequest, opts ...http.CallOption) (rsp *OrgRole, err error)
 	CreateOrganization(ctx context.Context, req *CreateOrganizationRequest, opts ...http.CallOption) (rsp *Organization, err error)
 	CreateOrganizationInvitation(ctx context.Context, req *CreateOrganizationInvitationRequest, opts ...http.CallOption) (rsp *OrganizationInvitation, err error)
@@ -946,6 +1053,13 @@ type OrganizationServiceHTTPClient interface {
 	// ListOrgConstraints Organization-scoped segregation of duties. Constraints defined here apply
 	// only inside this tenant and can never relax platform policy.
 	ListOrgConstraints(ctx context.Context, req *GetOrganizationRequest, opts ...http.CallOption) (rsp *OrgConstraintsReply, err error)
+	// ListOrgDelegations Organization-scoped delegations. Until V2.6 the evaluator understood
+	// tenant delegations but no write path could create one, so the delegation
+	// branch of checkOrgDelegation was unreachable in production. These four
+	// endpoints are the missing entry point. They share the constraint
+	// governance permissions (design §5.1): read is owner+admin, every write is
+	// owner-only. A platform administrator has no entry point here (D7).
+	ListOrgDelegations(ctx context.Context, req *ListOrgDelegationsRequest, opts ...http.CallOption) (rsp *OrgDelegationsReply, err error)
 	ListOrgPermissions(ctx context.Context, req *GetOrganizationRequest, opts ...http.CallOption) (rsp *OrgPermissionsReply, err error)
 	// ListOrgRoles Organization-scoped IAM (V2.3). Every request is evaluated in the
 	// organization:{id} context; identifiers of another tenant are not found.
@@ -955,9 +1069,11 @@ type OrganizationServiceHTTPClient interface {
 	PutOrgRolePermissions(ctx context.Context, req *PutOrgRolePermissionsRequest, opts ...http.CallOption) (rsp *OrgRole, err error)
 	RemoveOrganizationMember(ctx context.Context, req *RemoveOrganizationMemberRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	RevokeOrgAssignment(ctx context.Context, req *RevokeOrgAssignmentRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
+	RevokeOrgDelegation(ctx context.Context, req *RevokeOrgDelegationRequest, opts ...http.CallOption) (rsp *OrgDelegation, err error)
 	RevokeOrganizationInvitation(ctx context.Context, req *RevokeOrganizationInvitationRequest, opts ...http.CallOption) (rsp *emptypb.Empty, err error)
 	UpdateDepartment(ctx context.Context, req *UpdateDepartmentRequest, opts ...http.CallOption) (rsp *Department, err error)
 	UpdateOrgConstraint(ctx context.Context, req *UpdateOrgConstraintRequest, opts ...http.CallOption) (rsp *OrgConstraint, err error)
+	UpdateOrgDelegation(ctx context.Context, req *UpdateOrgDelegationRequest, opts ...http.CallOption) (rsp *OrgDelegation, err error)
 	UpdateOrgRole(ctx context.Context, req *UpdateOrgRoleRequest, opts ...http.CallOption) (rsp *OrgRole, err error)
 	UpdateOrganization(ctx context.Context, req *UpdateOrganizationRequest, opts ...http.CallOption) (rsp *Organization, err error)
 	UpdateOrganizationMember(ctx context.Context, req *UpdateOrganizationMemberRequest, opts ...http.CallOption) (rsp *OrganizationMember, err error)
@@ -1132,6 +1248,23 @@ func (c *OrganizationServiceHTTPClientImpl) CreateOrgConstraint(ctx context.Cont
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationOrganizationServiceCreateOrgConstraint),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *OrganizationServiceHTTPClientImpl) CreateOrgDelegation(ctx context.Context, in *CreateOrgDelegationRequest, opts ...http.CallOption) (*OrgDelegation, error) {
+	var out OrgDelegation
+	pattern := "/api/v1/orgs/{id}/iam/delegations"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationOrganizationServiceCreateOrgDelegation),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
@@ -1356,6 +1489,28 @@ func (c *OrganizationServiceHTTPClientImpl) ListOrgConstraints(ctx context.Conte
 	return &out, nil
 }
 
+// ListOrgDelegations Organization-scoped delegations. Until V2.6 the evaluator understood
+// tenant delegations but no write path could create one, so the delegation
+// branch of checkOrgDelegation was unreachable in production. These four
+// endpoints are the missing entry point. They share the constraint
+// governance permissions (design §5.1): read is owner+admin, every write is
+// owner-only. A platform administrator has no entry point here (D7).
+func (c *OrganizationServiceHTTPClientImpl) ListOrgDelegations(ctx context.Context, in *ListOrgDelegationsRequest, opts ...http.CallOption) (*OrgDelegationsReply, error) {
+	var out OrgDelegationsReply
+	pattern := "/api/v1/orgs/{id}/iam/delegations"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationOrganizationServiceListOrgDelegations),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *OrganizationServiceHTTPClientImpl) ListOrgPermissions(ctx context.Context, in *GetOrganizationRequest, opts ...http.CallOption) (*OrgPermissionsReply, error) {
 	var out OrgPermissionsReply
 	pattern := "/api/v1/orgs/{id}/iam/permissions"
@@ -1471,6 +1626,23 @@ func (c *OrganizationServiceHTTPClientImpl) RevokeOrgAssignment(ctx context.Cont
 	return &out, nil
 }
 
+func (c *OrganizationServiceHTTPClientImpl) RevokeOrgDelegation(ctx context.Context, in *RevokeOrgDelegationRequest, opts ...http.CallOption) (*OrgDelegation, error) {
+	var out OrgDelegation
+	pattern := "/api/v1/orgs/{id}/iam/delegations/{delegation_id}:revoke"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationOrganizationServiceRevokeOrgDelegation),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *OrganizationServiceHTTPClientImpl) RevokeOrganizationInvitation(ctx context.Context, in *RevokeOrganizationInvitationRequest, opts ...http.CallOption) (*emptypb.Empty, error) {
 	var out emptypb.Empty
 	pattern := "/api/v1/orgs/{id}/invitations/{invitation_id}"
@@ -1512,6 +1684,23 @@ func (c *OrganizationServiceHTTPClientImpl) UpdateOrgConstraint(ctx context.Cont
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationOrganizationServiceUpdateOrgConstraint),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "PATCH", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *OrganizationServiceHTTPClientImpl) UpdateOrgDelegation(ctx context.Context, in *UpdateOrgDelegationRequest, opts ...http.CallOption) (*OrgDelegation, error) {
+	var out OrgDelegation
+	pattern := "/api/v1/orgs/{id}/iam/delegations/{delegation_id}"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationOrganizationServiceUpdateOrgDelegation),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "PATCH", path, in, &out, opts...)

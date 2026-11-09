@@ -120,6 +120,38 @@ export type CreateOrgConstraintRequest =
   Schemas['api.usercenter.v1.CreateOrgConstraintRequest']
 export type UpdateOrgConstraintRequest =
   Schemas['api.usercenter.v1.UpdateOrgConstraintRequest']
+export type OrgDelegation = Schemas['api.usercenter.v1.OrgDelegation']
+export type OrgDelegationsReply =
+  Schemas['api.usercenter.v1.OrgDelegationsReply']
+export type CreateOrgDelegationRequest =
+  Schemas['api.usercenter.v1.CreateOrgDelegationRequest']
+export type UpdateOrgDelegationRequest =
+  Schemas['api.usercenter.v1.UpdateOrgDelegationRequest']
+export type RevokeOrgDelegationRequest =
+  Schemas['api.usercenter.v1.RevokeOrgDelegationRequest']
+export type SCIMToken = Schemas['api.usercenter.v1.SCIMToken']
+export type SCIMTokensReply = Schemas['api.usercenter.v1.SCIMTokensReply']
+export type SCIMTokenCredentialReply =
+  Schemas['api.usercenter.v1.SCIMTokenCredentialReply']
+export type CreateSCIMTokenRequest =
+  Schemas['api.usercenter.v1.CreateSCIMTokenRequest']
+export type RotateSCIMTokenRequest =
+  Schemas['api.usercenter.v1.RotateSCIMTokenRequest']
+export type DisableSCIMTokenRequest =
+  Schemas['api.usercenter.v1.DisableSCIMTokenRequest']
+export type DirectorySource = Schemas['api.usercenter.v1.DirectorySource']
+export type DirectorySourcesReply =
+  Schemas['api.usercenter.v1.DirectorySourcesReply']
+export type DirectorySyncRun =
+  Schemas['api.usercenter.v1.DirectorySyncRun']
+export type DirectorySyncRunsReply =
+  Schemas['api.usercenter.v1.DirectorySyncRunsReply']
+export type CreateDirectorySourceRequest =
+  Schemas['api.usercenter.v1.CreateDirectorySourceRequest']
+export type UpdateDirectorySourceRequest =
+  Schemas['api.usercenter.v1.UpdateDirectorySourceRequest']
+export type TriggerDirectorySyncRequest =
+  Schemas['api.usercenter.v1.TriggerDirectorySyncRequest']
 export type OrgRole = Schemas['api.usercenter.v1.OrgRole']
 export type OrgRolesReply = Schemas['api.usercenter.v1.OrgRolesReply']
 export type OrganizationsReply =

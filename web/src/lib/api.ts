@@ -143,9 +143,22 @@ import type {
   ArchiveOrgRoleRequest,
   CreateDepartmentRequest,
   CreateOrganizationInvitationRequest,
+  CreateDirectorySourceRequest,
   CreateOrganizationRequest,
   CreateOrgAssignmentRequest,
+  CreateSCIMTokenRequest,
+  DisableSCIMTokenRequest,
+  DirectorySource,
+  DirectorySourcesReply,
+  DirectorySyncRun,
+  DirectorySyncRunsReply,
+  TriggerDirectorySyncRequest,
+  RotateSCIMTokenRequest,
+  SCIMToken,
+  SCIMTokenCredentialReply,
+  SCIMTokensReply,
   CreateOrgConstraintRequest,
+  CreateOrgDelegationRequest,
   CreateOrgRoleRequest,
   Department,
   DepartmentsReply,
@@ -154,6 +167,8 @@ import type {
   OrgAuditsReply,
   OrgConstraint,
   OrgConstraintsReply,
+  OrgDelegation,
+  OrgDelegationsReply,
   OrgPermissionsReply,
   OrgRole,
   OrgRolesReply,
@@ -167,10 +182,12 @@ import type {
   OrganizationMembersReply,
   OrganizationsReply,
   PutOrgRolePermissionsRequest,
+  RevokeOrgDelegationRequest,
   UpdateDepartmentRequest,
   UpdateOrganizationMemberRequest,
   UpdateOrganizationRequest,
   UpdateOrgConstraintRequest,
+  UpdateOrgDelegationRequest,
   UpdateOrgRoleRequest,
 } from './types'
 
@@ -508,6 +525,33 @@ export const api = {
     ) =>
       del(`/api/v1/orgs/${enc(id)}/iam/constraints/${enc(constraintId)}`, params),
 
+    // Organization-scoped delegations. The server derives the ceiling from
+    // what the issuer actually holds and rejects any ceiling that exceeds it;
+    // the UI snapshots the target role's grants so a valid delegation is the
+    // default rather than something the operator has to hand-craft.
+    listDelegations: (id: string) =>
+      get<OrgDelegationsReply>(`/api/v1/orgs/${enc(id)}/iam/delegations`),
+    createDelegation: (id: string, body: CreateOrgDelegationRequest) =>
+      post<OrgDelegation>(`/api/v1/orgs/${enc(id)}/iam/delegations`, body),
+    updateDelegation: (
+      id: string,
+      delegationId: string,
+      body: UpdateOrgDelegationRequest,
+    ) =>
+      patch<OrgDelegation>(
+        `/api/v1/orgs/${enc(id)}/iam/delegations/${enc(delegationId)}`,
+        body,
+      ),
+    revokeDelegation: (
+      id: string,
+      delegationId: string,
+      body: RevokeOrgDelegationRequest,
+    ) =>
+      post<OrgDelegation>(
+        `/api/v1/orgs/${enc(id)}/iam/delegations/${enc(delegationId)}:revoke`,
+        body,
+      ),
+
     exportAudits: (id: string, body: ExportOrgAuditsRequest) =>
       post<ExportJob>(`/api/v1/orgs/${enc(id)}/audits:export`, body),
     downloadAuditExport: (id: string, jobId: string) =>
@@ -540,6 +584,44 @@ export const api = {
   },
 
   admin: {
+    // SCIM bearer tokens are tenant-bound, so the organization id is always a
+    // query filter rather than a body field the caller could override.
+    listSCIMTokens: (organizationId: string) =>
+      get<SCIMTokensReply>('/api/v1/admin/scim/tokens', {
+        organization_id: organizationId,
+      }),
+    createSCIMToken: (body: CreateSCIMTokenRequest) =>
+      post<SCIMTokenCredentialReply>('/api/v1/admin/scim/tokens', body),
+    rotateSCIMToken: (id: string, body: RotateSCIMTokenRequest) =>
+      post<SCIMTokenCredentialReply>(
+        `/api/v1/admin/scim/tokens/${enc(id)}:rotate`,
+        body,
+      ),
+    disableSCIMToken: (id: string, body: DisableSCIMTokenRequest) =>
+      post<SCIMToken>(`/api/v1/admin/scim/tokens/${enc(id)}:disable`, body),
+    listDirectorySources: (organizationId: string) =>
+      get<DirectorySourcesReply>('/api/v1/admin/directory-sources', {
+        organization_id: organizationId,
+      }),
+    createDirectorySource: (body: CreateDirectorySourceRequest) =>
+      post<DirectorySource>('/api/v1/admin/directory-sources', body),
+    rotateDirectorySourceSecret: (id: string, body: {
+      secret: string
+      expected_revision: string
+      reason: string
+    }) =>
+      post<DirectorySource>(
+        `/api/v1/admin/directory-sources/${enc(id)}:rotate-secret`,
+        { id, ...body },
+      ),
+    triggerDirectorySync: (id: string, body: TriggerDirectorySyncRequest) =>
+      post<DirectorySyncRun>(`/api/v1/admin/directory-sources/${enc(id)}:sync`, {
+        id, ...body,
+      }),
+    listDirectorySyncRuns: (sourceId: string) =>
+      get<DirectorySyncRunsReply>('/api/v1/admin/directory-sync-runs', {
+        source_id: sourceId,
+      }),
     overview: () => get<OverviewReply>('/api/v1/admin/overview'),
     listOrganizations: (params?: ListOrganizationsParams) =>
       get<OrganizationsReply>('/api/v1/admin/organizations', params),

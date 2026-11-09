@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，可独立完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.11.0 — 认证与组织权限加固，手册与操作视频。** 统一并发会话签发与凭据限制，收紧组织授权的能力、委派与租户边界，修复就绪探针与限流口径；新增两份操作手册、10 段字幕视频和 19 张截图。**升级须先执行迁移 `014`**，完整范围见 [v0.11.0 发布说明](docs/releases/release-v0.11.0.md)。组织委派 CRUD 与界面仍未交付；真实上游供应商登录验收保持未验证，SCIM / 目录同步继续按后续里程碑推进。
+> **状态：v0.12.0 — 组织委派、SCIM 2.0、企业目录同步与租户 schema 隔离。** 补齐组织级 SoD 的委派写入入口与界面；新增 SCIM 2.0 用户/组供给与凭据管理（[文档](docs/scim.md)）；新增企业目录同步（LDAP/AD 与 JSON 网关，[文档](docs/directory-sync.md)）；交付可选的按组织独立 schema 路由与租户数据域隔离（[文档](docs/tenancy.md)，**存量数据 cutover 未完成**）。**升级须先执行迁移 `015` 与 `016`**，完整范围见 [v0.12.0 发布说明](docs/releases/release-v0.12.0.md)。真实上游供应商登录验收保持未验证。
 
 ## 目录
 
@@ -168,13 +168,13 @@ scripts/                  开发与检查脚本
 
 **仍延后（V2 后续里程碑）**：排期、验收标准与明确不做的项见 [V2.4 路线图](docs/roadmap-v2.4.md)。
 
-- SCIM、企业目录同步、租户物理隔离与组织级 SoD；R13/R14 已实现，见下；
+- **无待办**：V2.6 四项能力已全部交付；SCIM 2.0 供给、企业目录同步、租户物理隔离与组织级 SoD 均已落地（约束 + 委派 CRUD + 界面），R13/R14 已实现，见下；
 - OAuth 真实提供方沙箱验收：代码与本地 fake provider 测试已就绪，需配置真实凭据后执行；QQ 邮箱 SMTP 已完成真实发信与 IMAP 送达验收（[记录](docs/acceptance-smtp-2026-11-03.md)）；
-- 组织委派 CRUD 与界面：求值侧已完整，但当前没有创建/撤销组织委派的 HTTP 接口与管理页面，详见 [安全设计](docs/security.md#L146-L149)。
+- 组织委派已可通过 `GET/POST /api/v1/orgs/{id}/iam/delegations`、`PATCH .../delegations/{delegation_id}` 与 `POST .../delegations/{delegation_id}:revoke` 管理，界面位于「职责分离」页，支持新建/编辑/撤销，目标用户范围可选「全部成员」或「指定成员」；写入沿用 `organization.iam.constraint.read/.manage` 治理权限、`reason`、`expected_revision` 与 `expected_policy_revision` 两道 CAS、Step-up、组织审计与 Outbox。详见 [安全设计](docs/security.md)。
 
 **设计边界（已实现，不是待办）**：
 
-- 委派只放宽“把目标角色分配给目标用户 / 从目标用户撤销”的能力校验；管理角色、目标角色、目标用户范围、动作（`assign`/`revoke`）、有效期与 `grant_ceiling` 必须同时覆盖，管理角色还必须仍在调用者的活跃会话中。平台委派已交付 CRUD 与页面；组织委派见上方“仍延后”。
+- 委派只放宽“把目标角色分配给目标用户 / 从目标用户撤销”的能力校验；管理角色、目标角色、目标用户范围、动作（`assign`/`revoke`）、有效期与 `grant_ceiling` 必须同时覆盖，管理角色还必须仍在调用者的活跃会话中。平台委派与组织委派均已交付 CRUD 与页面（组织委派位于「职责分离」页，4 个 `/api/v1/orgs/{id}/iam/delegations` 端点）。
 - 角色 Grant/继承的变更仍要求**直接权限**（平台 `iam.role.update` + 授权上限校验；组织角色走 `organization.iam.role.manage`，且没有继承概念）。委派不能创建/修改角色、Grant、继承，也不能修改委派本身；HTTP 拒绝用例见 [delegation_boundary_test.go](internal/server/delegation_boundary_test.go)。
 
 这些差异不会把权限退化回 `role >= 10`：未实现的模块不暴露菜单/接口，而不是用空实现伪装完成。
@@ -222,7 +222,7 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 
 ## 操作视频
 
-以下 10 段为真实页面录屏，配中文字幕与关键截图，无配音。全部使用独立演示数据，密码、MFA 二维码、恢复码与客户端密钥已遮挡。
+以下 12 段为真实页面录屏，配中文字幕与关键截图，无配音。全部使用独立演示数据，密码、MFA 二维码、恢复码与客户端密钥已遮挡。
 
 | 操作视频 | 内容 |
 |---|---|
@@ -230,12 +230,14 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 | [首次登录改密与 MFA](docs/videos/first-login.webm) | 修改初始密码、绑定 TOTP、保存恢复码 |
 | [会话管理与登录记录](docs/videos/sessions.webm) | 检查设备、撤销其他会话、查看安全事件 |
 | [创建组织](docs/videos/org-create.webm) | 创建组织并核对组织空间 |
+| [组织委派](docs/videos/org-delegation.webm) | 在组织内创建并撤销委派，限定目标角色与成员范围 |
 | [创建用户](docs/videos/user-create.webm) | 填写资料、初始密码与原因，提交并核对详情 |
 | [角色与授权分配](docs/videos/iam-grant.webm) | 创建角色、预览资格、实际提交分配；示例角色未配置业务权限 |
 | [委派与职责分离](docs/videos/delegation-sod.webm) | 查看配置表单，**未提交规则** |
 | [审计与 CSV 导出](docs/videos/audit-export.webm) | 筛选审计、创建导出任务并下载 CSV |
 | [创建 OIDC 应用](docs/videos/oidc-app.webm) | 配置回调与查看一次性密钥保存提示 |
 | [认证配置](docs/videos/settings-auth.webm) | 查看策略与会话设置，**未保存配置** |
+| [SCIM 与目录同步](docs/videos/provisioning.webm) | 签发一次性 SCIM 凭据（已遮挡）、查看目录源表单，**未提交** |
 
 视频与截图随仓库提交；可直接打开或下载上述文件。克隆仓库后，可在浏览器打开 [本地播放目录](docs/videos/index.html) 集中观看。配套步骤见 [用户手册](docs/user-guide.md) 和 [管理员操作手册](docs/admin-guide.md)，覆盖范围及重新录制方法见 [录制说明](docs/videos/README.md)。
 

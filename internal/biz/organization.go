@@ -3,11 +3,14 @@ package biz
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/pkg/jsonx"
+	"github.com/mengbin92/user-center/platform/tenant"
 )
 
 var orgCodePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,63}$`)
@@ -118,6 +121,13 @@ func (uc *OrganizationUsecase) Create(ctx context.Context, actor ActorContext, i
 		return nil, ErrDependency
 	}
 	now := uc.Clock.Now().UTC()
+	// With physical isolation the tenant schema must exist before any tenant
+	// row is written, and DDL cannot run inside the transaction. Creation
+	// therefore reserves the platform row, prepares the schema, then bootstraps
+	// the tenant in a second transaction.
+	if uc.TenantSchemas != nil && uc.TenantSchemas.IsolationEnabled() {
+		return uc.createIsolated(ctx, actor, in, now)
+	}
 	var created *Organization
 	var quotaDenial map[string]any
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
@@ -147,7 +157,7 @@ func (uc *OrganizationUsecase) Create(ctx context.Context, actor ActorContext, i
 			return err
 		}
 		if err := uc.auditIn(ctx, tx, actor, org.ID, "organization.create", itoa(org.ID), "self-service organization creation"); err != nil {
-			return err
+			return fmt.Errorf("audit: %w", err)
 		}
 		payload, _ := jsonx.Marshal(map[string]any{"organization_id": org.ID, "code": org.Code, "created_at": now})
 		return uc.emit(ctx, tx, "organization", org.ID, org.Revision, "organization.created", string(payload))
@@ -162,6 +172,99 @@ func (uc *OrganizationUsecase) Create(ctx context.Context, actor ActorContext, i
 			})
 		}
 		return nil, err
+	}
+	created.Role = OrgRoleOwner
+	created.MemberCount = 1
+	return created, nil
+}
+
+// createIsolated implements the three-phase create used when tenant data lives
+// in its own schema. A failure after phase 1 leaves the row in
+// OrgStatusProvisioning, which orgAccess hides; retrying the same code resumes
+// provisioning instead of failing on the unique constraint.
+func (uc *OrganizationUsecase) createIsolated(ctx context.Context, actor ActorContext, in OrganizationInput, now time.Time) (*Organization, error) {
+	if existing, err := uc.Organizations.GetOrganizationByCode(ctx, nil, in.Code); err == nil {
+		if existing.Status != OrgStatusProvisioning {
+			return nil, ConflictCode("ORGANIZATION_CODE_EXISTS", "组织 code 已存在")
+		}
+		return uc.bootstrapTenant(ctx, actor, existing)
+	} else if !errors.Is(err, ErrResourceNotFound) {
+		return nil, ErrDependency
+	}
+	var created *Organization
+	var quotaDenial map[string]any
+	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if details, err := uc.organizationQuotaGuard(ctx, tx, actor); err != nil {
+			quotaDenial = details
+			return err
+		}
+		org, err := uc.Organizations.CreateOrganization(ctx, tx, &Organization{
+			Code: in.Code, Name: in.Name, CreatedBy: actor.User.ID, Status: OrgStatusProvisioning,
+		})
+		if err != nil {
+			if isUniqueViolation(err) {
+				return ConflictCode("ORGANIZATION_CODE_EXISTS", "组织 code 已存在")
+			}
+			return err
+		}
+		created = org
+		return nil
+	})
+	if err != nil {
+		if quotaDenial != nil {
+			_ = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+				return uc.audit(ctx, tx, actor, "organization.create.denied", "quota", "{}", "{}",
+					string(mustJSON(quotaDenial)), "organization quota exceeded", "denied")
+			})
+		}
+		return nil, err
+	}
+	return uc.bootstrapTenant(ctx, actor, created)
+}
+
+// bootstrapTenant prepares the schema and then writes every tenant row in one
+// transaction. It is idempotent: a provisioning row can be retried.
+func (uc *OrganizationUsecase) bootstrapTenant(ctx context.Context, actor ActorContext, org *Organization) (*Organization, error) {
+	if _, err := uc.TenantSchemas.EnsureTenantSchema(ctx, org.ID); err != nil {
+		return nil, fmt.Errorf("prepare tenant schema %d: %w", org.ID, err)
+	}
+	tenantCtx := tenant.With(ctx, org.ID)
+	var created *Organization
+	err := uc.Tx.InTx(tenantCtx, func(ctx context.Context, tx Tx) error {
+		member, err := uc.Organizations.GetMember(ctx, tx, org.ID, actor.User.ID)
+		if err != nil || member.Status != OrgMemberActive {
+			if _, err := uc.Organizations.AddMember(ctx, tx, &OrganizationMember{
+				OrganizationID: org.ID, UserID: actor.User.ID, Role: OrgRoleOwner, InvitedBy: actor.User.ID,
+			}); err != nil {
+				return fmt.Errorf("add owner: %w", err)
+			}
+		}
+		// The built-in roles must exist before the membership role is synced.
+		if err := provisionOrgIAM(ctx, uc.Services, tx, org.ID); err != nil {
+			return fmt.Errorf("provision iam: %w", err)
+		}
+		if member, err := uc.Organizations.GetMember(ctx, tx, org.ID, actor.User.ID); err == nil && member.Role == OrgRoleOwner {
+			if err := syncOrgMembershipRole(ctx, uc.Services, tx, org.ID, actor.User.ID, OrgRoleOwner, actor.User.ID); err != nil {
+				return fmt.Errorf("sync membership role: %w", err)
+			}
+		}
+		if err := uc.auditIn(ctx, tx, actor, org.ID, "organization.create", itoa(org.ID), "self-service organization creation"); err != nil {
+			return fmt.Errorf("audit: %w", err)
+		}
+		payload, _ := jsonx.Marshal(map[string]any{"organization_id": org.ID, "code": org.Code})
+		if err := uc.emit(ctx, tx, "organization", org.ID, org.Revision, "organization.created", string(payload)); err != nil {
+			return fmt.Errorf("emit: %w", err)
+		}
+		org.Status = OrgStatusActive
+		row, err := uc.Organizations.UpdateOrganization(ctx, tx, org, org.Revision)
+		if err != nil {
+			return fmt.Errorf("activate: %w", err)
+		}
+		created = row
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("bootstrap tenant %d: %w", org.ID, err)
 	}
 	created.Role = OrgRoleOwner
 	created.MemberCount = 1

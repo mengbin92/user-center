@@ -6,13 +6,67 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-09
+
+**版本判定：MINOR（v0.11.0 → v0.12.0）。** V2.6 四项能力按阶段独立提交并统一发版；新增 14 个 RPC、9 条 SCIM 原始路由、3 个迁移（`015`、`016`、`017`）与相应界面。租户物理隔离默认关闭，阶段④已完整交付（含存量 cutover 工具），详见 [发布说明](docs/releases/release-v0.12.0.md)。
+
+### 阶段① — 组织级 SoD 补齐（组织委派 CRUD 与界面）
+
+- 新增 4 个组织委派端点：`GET/POST /api/v1/orgs/{id}/iam/delegations`、`PATCH .../delegations/{delegation_id}`、`POST .../delegations/{delegation_id}:revoke`。此前求值侧 `checkOrgDelegation` 的委派分支在生产不可达（没有写入口），现在可由 owner 通过 HTTP 创建并撤销。
+- 写入侧强制治理权限（读 owner+admin、写仅 owner）、Step-up、`reason`、`expected_revision` 与 `expected_policy_revision` 两道 CAS、组织审计、Outbox 事件与 policy revision bump；管理/目标角色必须同属本组织且 active，授权上限不得超过创建者在本组织持有的能力。
+- 仓储写入增加 `context_type/context_id` 谓词作为纵深防御；跨租户 id 一律 404，平台委派不进入组织列表。
+- 前端「职责分离」页新增委派列表、创建/编辑/撤销对话框；授权上限由目标角色的 grants 自动快照，避免手写出永不可用的委派；目标用户范围可选「全部成员」或「指定成员」，失败原因在对话框内展示。组件测试覆盖列表、创建（含 ceiling 与 user_ids 断言）与撤销。
+- HTTP 级测试：创建后解锁分配、撤销后重新拒绝；并覆盖缺少 `reason`、平台角色/跨租户角色引用、越权 ceiling、策略版本冲突、非 owner 写入、非成员读取、跨租户更新/撤销、revision CAS 等拒绝用例。
+- 文档状态回填：`README.md`、`docs/api.md`、`docs/security.md` §4.10、`docs/roadmap-v2.5.md`、设计文档 §12/§14（含实现期修正 F10）。
+
+### 阶段② — SCIM 2.0 用户与组供给
+
+- 新增 `/scim/v2/{ServiceProviderConfig,ResourceTypes,Schemas,Users,Groups}` 协议面：SCIM schema、ListResponse 分页、闭合 filter 语法、PATCH、ETag/`If-Match`、标准 Error 消息与 `scimType`。原始路由位于 `/api/v1/` 之外，不受浏览器 CSRF 约束，但每个请求都由处理器自行做 Bearer 鉴权。
+- 新增 4 个平台管理端点签发/列出/轮换/停用 SCIM 凭据；凭据**绑定唯一组织**，只存 SHA-256 摘要、明文只返回一次，停用立即生效。管理写入要求平台管理员 + Step-up + `reason` + `expected_revision` + 平台审计。
+- 迁移 `015`：`scim_tokens`、`scim_identities`、`scim_groups`、`scim_group_members`。**升级须先执行迁移 015 再启动服务。**
+- 供给写路径：`externalId` 权威匹配、跨租户邮箱拒绝（409）、`active=false` 只停用本组织成员资格并撤销其角色/委派、`DELETE` 保留全局账号与审计、组成员只允许本组织已供给用户；全部写组织审计。
+- 前端组织设置页新增平台管理员可见的凭据管理（签发/轮换/停用 + 一次性展示）。
+- HTTP 级测试 4 组：发现与鉴权、供给生命周期、租户边界与组成员、凭据治理拒绝；覆盖无/错/停用 token、缺 schemas、非法 filter/path、跨租户 id、跨租户邮箱绑定、组成员越权、`If-Match` 412、唯一性冲突、非平台管理员签发、凭据不回显。
+- 新增 `docs/scim.md`（含明确不支持的子集与已知限制），回填 `README.md`、`docs/api.md`、`docs/security.md`、`docs/data-model.md`、两份路线图的追踪状态。
+
+### 阶段③ — 企业目录同步
+
+- 新增两类连接器：`ldap`（go-ldap，Simple Bind、分页搜索、`whenChanged>=cursor` 增量、`userAccountControl` 判定停用、属性映射可配）与 `jsonfeed`（HTTP JSON 网关，`since` 游标、显式 `deleted` 与 `full` 标记）。连接器实现统一 `Fetch` 接口，新增源不改引擎。
+- 外部凭据按 `docs/api.md` 原有前置落地加密入库（`SecretBox`/AES-GCM）、只写不读、轮换（`expected_revision` + `reason` + Step-up）与平台审计；明文协议仅允许回环地址并禁用重定向（SSRF 防护）。
+- 同步引擎：独立 30s worker 按 `interval_seconds` 调度、`full` / `delta` / `dry_run` 三种模式、增量游标、`directory_objects` 映射、tombstone 对账（`disable` / `delete` / `keep`）、`source_wins` / `local_wins` 冲突策略、逐对象报告与 `partial` 状态；`dry_run` 不写入也不推进游标。供给复用 SCIM 路径，不存在第二套账号创建逻辑。
+- 迁移 `016`：`directory_sources`、`directory_sync_runs`、`directory_objects`。**升级须先执行迁移 016 再启动服务。**
+- 新增 6 个平台管理端点与组织设置页（仅平台管理员可见）；全部写操作要求平台管理员 + Step-up + `reason`。
+- HTTP 级测试 2 组：供给/对账生命周期（dry-run、全量、增量停用、全量 tombstone、运行记录留存）与治理拒绝（缺 reason、明文非回环 URL、未知连接器、非法 config、非平台账号读写、凭据不回显、过期 revision）。
+- 新增 `docs/directory-sync.md`（含未实现项：组/部门层级同步、非 AD LDAP 增量、原生 Entra/飞书连接器、多实例分布式租约、写回），回填 README、API/安全/数据模型文档与两份路线图。
+
+### 阶段④ — 租户物理隔离（独立 schema，完整交付）
+
+**状态：已完整交付。**
+
+- 配置：`conf.Data.Tenancy`（`schema_isolation` / `schema_prefix` / 连接池上限）与 `TENANT_SCHEMA_ISOLATION` / `TENANT_SCHEMA_PREFIX` 环境变量。**默认关闭**，关闭时所有请求仍走平台连接池，存量行为与既有测试不变。
+- 路由：MySQL 把表名改写为 `schema.table` 并保持平台连接（跨库事务原子）；SQLite 每组织一个独立数据库文件。`platform/tenant` 从组织 URL 与 SCIM token 注入组织 id。
+- 编排：`cmd/tenant-schema -org / -all / -list` 幂等建库；建表全部执行签入的 SQL（`internal/data/tenantddl/{mysql,sqlite}.sql`，`go:embed`），不使用 GORM Migrator。
+- 分域：组织成员/部门/邀请/角色/权限/继承/分配/约束/委派/审计与 SCIM/目录租户数据全部落到各自组织 schema；`organizations`、`users`、会话、平台 IAM、outbox、`tenant_schemas` 留在平台。平台审计改为跨 schema 聚合。
+- 测试：`internal/data/tenancy_test.go`（不同连接池、跨 schema 不可见、同 externalId 跨租户可共存、平台库无租户行、默认关闭、非法 id）与 `internal/server/tenancy_test.go`（HTTP 级：A 的 token 读 B 的用户 404、列表只含本租户、平台库无租户映射）。
+- 迁移 `017`：`tenant_schemas`（平台侧租户 schema 注册表，跨租户查询的唯一边界）。**启用隔离前须先执行 017，再运行 `cmd/tenant-schema` 与 `cmd/tenant-migrate`。**
+- 新增 `docs/tenancy.md`；回填 `README.md`、`docs/api.md`、`docs/security.md` §4.5、`docs/data-model.md`、`docs/operations.md` 与两份路线图的追踪状态。
+- 存量 cutover：`cmd/tenant-migrate` 按表复制并校验行数，支持 `-dry-run` 与 `-purge`；`scripts/dr/tenant-schemas.sh` 备份所有租户库。账号/会话按设计留在平台 schema（见文档 §6）。
+
+### 文档与操作视频
+
+- 用户手册新增 §9.3「角色由谁分配（组织委派）」，说明被授权成员视角的两条影响：分配者不一定持有该角色、撤销委派不回滚已授出的角色。
+- 管理员手册新增 §8.1「组织委派」（字段、授权上限自动带出、写入要求、撤销语义）与 §18.1「SCIM 2.0 用户供给」、§18.2「企业目录同步」（预演、对账、删除策略与已知限制）。
+- 录屏从 10 段扩到 12 段：新增 `org-delegation.webm`（在演示组织中实际创建并撤销一条委派）与 `provisioning.webm`（签发一次性 SCIM 凭据并查看目录源表单，目录源未提交）；关键截图 19 → 23 张。
+- 视频目录页重排为 12 段连续编号并更新为 v0.12.0；`docs/videos/README.md` 同步清单、遮挡边界与验证记录。录制脚本去掉每章重复的 Step-up（按会话生效，重复验证会耗尽恢复码）。
+
+
 ## [0.11.0] - 2026-11-09
 
 **版本判定：MINOR**（v0.10.1 → v0.11.0）。新增组织授权的委派能力边界、存量组织权限回填，以及用户手册、管理员手册和操作视频；统一凭据限制并加固并发会话与组织授权。包含 **1 个数据库迁移**（`014_password_history_backfill.sql`），升级须先迁移再启动服务。详见 [发布说明](docs/releases/release-v0.11.0.md)。
 
 ### Added
 
-- 组织角色分配与撤销执行目标角色、用户范围、动作、有效期及授权上限的委派边界；存量组织内置角色增量补齐职责分离权限。组织委派 CRUD API 与界面仍未交付，不将求值能力表述为完整委派产品入口。
+- 组织角色分配与撤销执行目标角色、用户范围、动作、有效期及授权上限的委派边界；存量组织内置角色增量补齐职责分离权限。组织委派 CRUD API 与界面仍未交付，不将求值能力表述为完整委派产品入口。（该缺口已在 v0.12.0 补齐，见上方。）
 - 迁移 `014` 回填旧账号当前密码摘要；密码轮换事务补录未进入历史窗口的旧摘要，覆盖 SQLite 升级和关闭后重新开启历史策略的账号。
 - 用户手册、管理员操作手册、10 段脱敏字幕录屏、19 张截图、本地视频目录与可复现录制脚本；README 提供视频直链，媒体随仓库提交。
 - MySQL HTTP 并发回归纳入 CI，覆盖并发会话、组织授权、约束与租户边界。

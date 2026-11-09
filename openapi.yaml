@@ -84,6 +84,129 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.ExportJob'
+    /api/v1/admin/directory-sources:
+        get:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_ListDirectorySources
+            parameters:
+                - name: organization_id
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySourcesReply'
+        post:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_CreateDirectorySource
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateDirectorySourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySource'
+    /api/v1/admin/directory-sources/{id}:
+        patch:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_UpdateDirectorySource
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateDirectorySourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySource'
+    /api/v1/admin/directory-sources/{id}:rotate-secret:
+        post:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_RotateDirectorySourceSecret
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RotateDirectorySourceSecretRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySource'
+    /api/v1/admin/directory-sources/{id}:sync:
+        post:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_TriggerDirectorySync
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.TriggerDirectorySyncRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySyncRun'
+    /api/v1/admin/directory-sync-runs:
+        get:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_ListDirectorySyncRuns
+            parameters:
+                - name: source_id
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySyncRunsReply'
     /api/v1/admin/event-deliveries:
         get:
             tags:
@@ -1282,6 +1405,88 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.OverviewReply'
+    /api/v1/admin/scim/tokens:
+        get:
+            tags:
+                - SCIMAdminService
+            operationId: SCIMAdminService_ListSCIMTokens
+            parameters:
+                - name: organization_id
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SCIMTokensReply'
+        post:
+            tags:
+                - SCIMAdminService
+            operationId: SCIMAdminService_CreateSCIMToken
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateSCIMTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SCIMTokenCredentialReply'
+    /api/v1/admin/scim/tokens/{id}:disable:
+        post:
+            tags:
+                - SCIMAdminService
+            operationId: SCIMAdminService_DisableSCIMToken
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.DisableSCIMTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SCIMToken'
+    /api/v1/admin/scim/tokens/{id}:rotate:
+        post:
+            tags:
+                - SCIMAdminService
+            operationId: SCIMAdminService_RotateSCIMToken
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RotateSCIMTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SCIMTokenCredentialReply'
     /api/v1/admin/settings/auth:
         get:
             tags:
@@ -2803,6 +3008,117 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.OrgConstraint'
+    /api/v1/orgs/{id}/iam/delegations:
+        get:
+            tags:
+                - OrganizationService
+            description: |-
+                Organization-scoped delegations. Until V2.6 the evaluator understood
+                 tenant delegations but no write path could create one, so the delegation
+                 branch of checkOrgDelegation was unreachable in production. These four
+                 endpoints are the missing entry point. They share the constraint
+                 governance permissions (design §5.1): read is owner+admin, every write is
+                 owner-only. A platform administrator has no entry point here (D7).
+            operationId: OrganizationService_ListOrgDelegations
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  description: active | revoked; empty returns both.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgDelegationsReply'
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_CreateOrgDelegation
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateOrgDelegationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgDelegation'
+    /api/v1/orgs/{id}/iam/delegations/{delegation_id}:
+        patch:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_UpdateOrgDelegation
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: delegation_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateOrgDelegationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgDelegation'
+    /api/v1/orgs/{id}/iam/delegations/{delegation_id}:revoke:
+        post:
+            tags:
+                - OrganizationService
+            operationId: OrganizationService_RevokeOrgDelegation
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: delegation_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RevokeOrgDelegationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.OrgDelegation'
     /api/v1/orgs/{id}/iam/permissions:
         get:
             tags:
@@ -3732,6 +4048,21 @@ components:
                     type: string
                 name:
                     type: string
+        api.usercenter.v1.CreateDirectorySourceRequest:
+            type: object
+            properties:
+                organization_id:
+                    type: string
+                kind:
+                    type: string
+                name:
+                    type: string
+                config_json:
+                    type: string
+                secret:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.CreateEmailChallengeRequest:
             type: object
             properties:
@@ -3873,6 +4204,33 @@ components:
                     description: |-
                         Required when the new constraint would invalidate existing assignments:
                          the caller must acknowledge that those members lose access immediately.
+        api.usercenter.v1.CreateOrgDelegationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                manager_role_id:
+                    type: string
+                target_role_id:
+                    type: string
+                actions:
+                    type: array
+                    items:
+                        type: string
+                target_user_scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                grant_ceiling:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DelegationCeiling'
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.CreateOrgRoleRequest:
             type: object
             properties:
@@ -3984,6 +4342,15 @@ components:
                 reason:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.CreateSCIMTokenRequest:
+            type: object
+            properties:
+                organization_id:
+                    type: string
+                name:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.CreateUserRequest:
             type: object
@@ -4112,6 +4479,95 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Department'
+        api.usercenter.v1.DirectorySource:
+            type: object
+            properties:
+                id:
+                    type: string
+                organization_id:
+                    type: string
+                kind:
+                    type: string
+                    description: ldap | jsonfeed
+                name:
+                    type: string
+                config_json:
+                    type: string
+                status:
+                    type: string
+                    description: active | paused
+                cursor:
+                    type: string
+                revision:
+                    type: string
+                created_at:
+                    type: string
+                updated_at:
+                    type: string
+                last_run_at:
+                    type: string
+            description: |-
+                secret is never part of any reply. config_json holds only non-sensitive
+                 connection settings (URL, base DN, filters, attribute map, interval, policies).
+        api.usercenter.v1.DirectorySourcesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DirectorySource'
+        api.usercenter.v1.DirectorySyncRun:
+            type: object
+            properties:
+                id:
+                    type: string
+                source_id:
+                    type: string
+                organization_id:
+                    type: string
+                mode:
+                    type: string
+                    description: full | delta | dry_run
+                status:
+                    type: string
+                    description: running | succeeded | partial | failed
+                started_at:
+                    type: string
+                finished_at:
+                    type: string
+                fetched:
+                    type: integer
+                    format: int32
+                created_count:
+                    type: integer
+                    format: int32
+                updated_count:
+                    type: integer
+                    format: int32
+                disabled_count:
+                    type: integer
+                    format: int32
+                unchanged_count:
+                    type: integer
+                    format: int32
+                failed_count:
+                    type: integer
+                    format: int32
+                cursor_before:
+                    type: string
+                cursor_after:
+                    type: string
+                report_json:
+                    type: string
+                error_text:
+                    type: string
+        api.usercenter.v1.DirectorySyncRunsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DirectorySyncRun'
         api.usercenter.v1.DisableIntegrationClientRequest:
             type: object
             properties:
@@ -4138,6 +4594,15 @@ components:
                 expected_revision:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.DisableSCIMTokenRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.EffectivePermission:
             type: object
@@ -4733,6 +5198,52 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.OrgConstraint'
+        api.usercenter.v1.OrgDelegation:
+            type: object
+            properties:
+                id:
+                    type: string
+                manager_role_id:
+                    type: string
+                target_role_id:
+                    type: string
+                target_kind:
+                    type: string
+                actions:
+                    type: array
+                    items:
+                        type: string
+                target_user_scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                grant_ceiling:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DelegationCeiling'
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                revision:
+                    type: string
+                created_by:
+                    type: string
+                revoked:
+                    type: boolean
+                revoked_at:
+                    type: string
+            description: |-
+                OrgDelegation is deliberately narrower than the platform Delegation:
+                 can_redelegate is not exposed because the evaluator rejects it, and
+                 target_kind is fixed to "role". The wire never carries a context field --
+                 the organization in the path is the only tenant selector, so a caller cannot
+                 smuggle a platform or another tenant's delegation in through the body.
+        api.usercenter.v1.OrgDelegationsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.OrgDelegation'
         api.usercenter.v1.OrgPermissionsReply:
             type: object
             properties:
@@ -5207,6 +5718,19 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.RevokeOrgDelegationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                delegation_id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.RevokeOtherSessionsRequest:
             type: object
             properties: {}
@@ -5313,6 +5837,17 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Role'
+        api.usercenter.v1.RotateDirectorySourceSecretRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                secret:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.RotateIntegrationClientCredentialRequest:
             type: object
             properties:
@@ -5340,6 +5875,56 @@ components:
                     type: string
                 code:
                     type: string
+        api.usercenter.v1.RotateSCIMTokenRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.SCIMToken:
+            type: object
+            properties:
+                id:
+                    type: string
+                organization_id:
+                    type: string
+                name:
+                    type: string
+                status:
+                    type: string
+                    description: active | disabled
+                credential_version:
+                    type: string
+                revision:
+                    type: string
+                created_by:
+                    type: string
+                created_at:
+                    type: string
+                last_used_at:
+                    type: string
+                disabled_at:
+                    type: string
+        api.usercenter.v1.SCIMTokenCredentialReply:
+            type: object
+            properties:
+                token:
+                    $ref: '#/components/schemas/api.usercenter.v1.SCIMToken'
+                token_value:
+                    type: string
+            description: |-
+                Returned exactly once. Only a SHA-256 digest is stored, so a lost token
+                 cannot be recovered -- rotate it instead.
+        api.usercenter.v1.SCIMTokensReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.SCIMToken'
         api.usercenter.v1.Scope:
             type: object
             properties:
@@ -5545,6 +6130,16 @@ components:
                     type: string
                 owner_user_id:
                     type: string
+        api.usercenter.v1.TriggerDirectorySyncRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                mode:
+                    type: string
+                    description: full | delta | dry_run
+                reason:
+                    type: string
         api.usercenter.v1.UpdateAuthSettingsRequest:
             type: object
             properties:
@@ -5649,6 +6244,19 @@ components:
                 code:
                     type: string
                 name:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateDirectorySourceRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                config_json:
+                    type: string
+                status:
                     type: string
                 expected_revision:
                     type: string
@@ -5793,6 +6401,33 @@ components:
                     type: string
                 acknowledge_violations:
                     type: boolean
+        api.usercenter.v1.UpdateOrgDelegationRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                delegation_id:
+                    type: string
+                actions:
+                    type: array
+                    items:
+                        type: string
+                target_user_scope:
+                    $ref: '#/components/schemas/api.usercenter.v1.Scope'
+                grant_ceiling:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DelegationCeiling'
+                starts_at:
+                    type: string
+                expires_at:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+                expected_policy_revision:
+                    type: string
         api.usercenter.v1.UpdateOrgRoleRequest:
             type: object
             properties:
@@ -6079,6 +6714,10 @@ tags:
         AuthService owns public, unauthenticated authentication entry points.
          Browser sessions are established with HttpOnly cookies; no bearer token is
          ever returned to a browser caller.
+    - name: DirectoryAdminService
+      description: |-
+        DirectoryAdminService manages enterprise directory connectors for one
+         organization and their reconciliation runs. Credentials are write-only.
     - name: IAMService
       description: |-
         IAMService is the platform authorization governance surface. Every write
@@ -6096,6 +6735,12 @@ tags:
       description: |-
         OrganizationService owns organization, membership and department management.
          Organization roles (owner/admin/member) are separate from platform IAM roles.
+    - name: SCIMAdminService
+      description: |-
+        SCIMAdminService manages the bearer tokens an IdP uses to provision users
+         and groups into one organization. The SCIM protocol endpoints themselves are
+         raw HTTP (/scim/v2/...) because SCIM is a JSON schema of its own; this
+         service is the browser-facing governance surface for their credentials.
     - name: SettingsService
       description: |-
         SettingsService owns non-secret authentication policy. Secret material is
