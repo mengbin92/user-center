@@ -10,7 +10,7 @@
 - 平台 IAM（资源、权限、角色、继承、分配、约束、菜单、审计）；
 - 认证配置、导出任务、事务 Outbox。
 
-它**不拥有**：模型 API Key、余额/流水/支付/订阅、路由组、渠道、公告、日志检索。原系统通过用户 ID 关联这些数据，通过 gRPC 读取最小身份事实。
+它**不拥有**业务数据；调用方通过用户 ID 关联这些数据，通过 gRPC 读取最小身份事实。
 
 ## 2. 组件
 
@@ -21,7 +21,7 @@
 | `cmd/admin-rescue` | 离线 root 创建/凭据恢复，必须拥有数据库与主机权限 |
 | MySQL | 权威身份、IAM、审计、Outbox；账号隔离，运行账号无建表权限（生产建议） |
 | Redis | 注册/重置/换绑验证码、登录限流、Step-up 证明、OAuth state；配置后不可用则启动失败，未配置时使用开发内存存储 |
-| 邮件适配器 | `console`（开发）或 SMTP；配置可在管理端热更新；不依赖原 `notify-worker` |
+| 邮件适配器 | `console`（开发）或 SMTP；配置可在管理端热更新 |
 | 第三方身份 | GitHub/Google OAuth2，服务端 code 交换；浏览器不接触 provider token |
 | Outbox worker | 随主进程启动，订阅客户端 Webhook 投递，HMAC 签名 + 指数退避 |
 | OIDC Provider | 标准 discovery/JWKS/authorization code+PKCE/token/userinfo；RSA 签名密钥由部署提供 |

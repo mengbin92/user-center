@@ -2,6 +2,16 @@
 
 契约来源：`api/usercenter/v1/*.proto`，生成物包括 `*.pb.go`、`*_grpc.pb.go`、`*_http.pb.go` 与根目录 `openapi.yaml`。前端类型从 OpenAPI 生成，不手写第二套响应结构。
 
+## 0. OpenAPI 边界
+
+`openapi.yaml` 由 proto 经 `protoc-gen-openapi` 生成，只覆盖 ProtoJSON 接口。以下内容不在生成物中，以本文为准：
+
+- Cookie/CSRF 安全方案（`uc_session`、`uc_csrf`、`X-CSRF-Token`），见 §2；
+- OAuth start/callback 与 OIDC discovery/JWKS/authorize/token/userinfo/logout 等 raw route；
+- CSV 导出下载（平台与组织审计），见 §5 与 §V2.4。
+
+这些路由由 `internal/server/http.go` / `internal/server/oidc.go` 直接注册，不是 proto HTTP 规则，因此 `openapi.yaml` 没有对应的 `securitySchemes` 或 path。前端类型生成只依赖 JSON API，不受影响；若要把 OpenAPI 作为对外契约发布，需要补生成后处理或更换生成器，不能手改生成物（`make api` 会覆盖）。
+
 ## 1. 通用约定
 
 - 前缀：`/api/v1`；公开认证在 `/api/v1/auth/*`。
@@ -181,7 +191,7 @@ GET  /oidc/userinfo                      Bearer access token
 | RPC | 语义 |
 |---|---|
 | `ValidateSession` | 校验原始会话令牌、应用、身份版本、状态、有效期；application_code 必填且等于签发值（V1 为 user-center） |
-| `ValidateSubject` | 只读用户启停与身份版本，供 API Key owner 组合本地状态 |
+| `ValidateSubject` | 只读用户启停与身份版本，供调用方组合本地凭据状态 |
 | `GetUser` / `BatchGetUsers` | 最小核心资料，批量 ≤100 |
 | `GetSessionAuthorization` | 校验应用后，仅返回调用方 service_owner 拥有资源的权限投影 + 菜单键 |
 | `GetResourceAuthorization` | execution_point 等于 operation；提供真实 owner_user_id/resource_id；调用方匹配资源 owner；返回该对象最小范围与 valid_until |
