@@ -17,6 +17,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 - HTTP 级测试：创建后解锁分配、撤销后重新拒绝；并覆盖缺少 `reason`、平台角色/跨租户角色引用、越权 ceiling、策略版本冲突、非 owner 写入、非成员读取、跨租户更新/撤销、revision CAS 等拒绝用例。
 - 文档状态回填：`README.md`、`docs/api.md`、`docs/security.md` §4.10、`docs/roadmap-v2.5.md`、设计文档 §12/§14（含实现期修正 F10）。
 
+### 阶段② — SCIM 2.0 用户与组供给
+
+- 新增 `/scim/v2/{ServiceProviderConfig,ResourceTypes,Schemas,Users,Groups}` 协议面：SCIM schema、ListResponse 分页、闭合 filter 语法、PATCH、ETag/`If-Match`、标准 Error 消息与 `scimType`。原始路由位于 `/api/v1/` 之外，不受浏览器 CSRF 约束，但每个请求都由处理器自行做 Bearer 鉴权。
+- 新增 4 个平台管理端点签发/列出/轮换/停用 SCIM 凭据；凭据**绑定唯一组织**，只存 SHA-256 摘要、明文只返回一次，停用立即生效。管理写入要求平台管理员 + Step-up + `reason` + `expected_revision` + 平台审计。
+- 迁移 `015`：`scim_tokens`、`scim_identities`、`scim_groups`、`scim_group_members`（SQLite 同步纳入 `AutoMigrate`）。**升级须先执行迁移 015 再启动服务。**
+- 供给写路径：`externalId` 权威匹配、跨租户邮箱拒绝（409）、`active=false` 只停用本组织成员资格并撤销其角色/委派、`DELETE` 保留全局账号与审计、组成员只允许本组织已供给用户；全部写组织审计。
+- 前端组织设置页新增平台管理员可见的凭据管理（签发/轮换/停用 + 一次性展示）。
+- HTTP 级测试 4 组：发现与鉴权、供给生命周期、租户边界与组成员、凭据治理拒绝；覆盖无/错/停用 token、缺 schemas、非法 filter/path、跨租户 id、跨租户邮箱绑定、组成员越权、`If-Match` 412、唯一性冲突、非平台管理员签发、凭据不回显。
+- 新增 `docs/scim.md`（含明确不支持的子集与已知限制），回填 `README.md`、`docs/api.md`、`docs/security.md`、`docs/data-model.md`、两份路线图的追踪状态。
+
 ## [0.11.0] - 2026-11-09
 
 **版本判定：MINOR**（v0.10.1 → v0.11.0）。新增组织授权的委派能力边界、存量组织权限回填，以及用户手册、管理员手册和操作视频；统一凭据限制并加固并发会话与组织授权。包含 **1 个数据库迁移**（`014_password_history_backfill.sql`），升级须先迁移再启动服务。详见 [发布说明](docs/releases/release-v0.11.0.md)。

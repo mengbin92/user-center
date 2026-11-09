@@ -129,6 +129,16 @@ export type UpdateOrgDelegationRequest =
   Schemas['api.usercenter.v1.UpdateOrgDelegationRequest']
 export type RevokeOrgDelegationRequest =
   Schemas['api.usercenter.v1.RevokeOrgDelegationRequest']
+export type SCIMToken = Schemas['api.usercenter.v1.SCIMToken']
+export type SCIMTokensReply = Schemas['api.usercenter.v1.SCIMTokensReply']
+export type SCIMTokenCredentialReply =
+  Schemas['api.usercenter.v1.SCIMTokenCredentialReply']
+export type CreateSCIMTokenRequest =
+  Schemas['api.usercenter.v1.CreateSCIMTokenRequest']
+export type RotateSCIMTokenRequest =
+  Schemas['api.usercenter.v1.RotateSCIMTokenRequest']
+export type DisableSCIMTokenRequest =
+  Schemas['api.usercenter.v1.DisableSCIMTokenRequest']
 export type OrgRole = Schemas['api.usercenter.v1.OrgRole']
 export type OrgRolesReply = Schemas['api.usercenter.v1.OrgRolesReply']
 export type OrganizationsReply =

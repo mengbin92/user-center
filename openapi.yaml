@@ -1282,6 +1282,88 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.OverviewReply'
+    /api/v1/admin/scim/tokens:
+        get:
+            tags:
+                - SCIMAdminService
+            operationId: SCIMAdminService_ListSCIMTokens
+            parameters:
+                - name: organization_id
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SCIMTokensReply'
+        post:
+            tags:
+                - SCIMAdminService
+            operationId: SCIMAdminService_CreateSCIMToken
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateSCIMTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SCIMTokenCredentialReply'
+    /api/v1/admin/scim/tokens/{id}:disable:
+        post:
+            tags:
+                - SCIMAdminService
+            operationId: SCIMAdminService_DisableSCIMToken
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.DisableSCIMTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SCIMToken'
+    /api/v1/admin/scim/tokens/{id}:rotate:
+        post:
+            tags:
+                - SCIMAdminService
+            operationId: SCIMAdminService_RotateSCIMToken
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RotateSCIMTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.SCIMTokenCredentialReply'
     /api/v1/admin/settings/auth:
         get:
             tags:
@@ -4123,6 +4205,15 @@ components:
                     type: string
                 expected_policy_revision:
                     type: string
+        api.usercenter.v1.CreateSCIMTokenRequest:
+            type: object
+            properties:
+                organization_id:
+                    type: string
+                name:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.CreateUserRequest:
             type: object
             properties:
@@ -4276,6 +4367,15 @@ components:
                 expected_revision:
                     type: string
                 expected_policy_revision:
+                    type: string
+        api.usercenter.v1.DisableSCIMTokenRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
                     type: string
         api.usercenter.v1.EffectivePermission:
             type: object
@@ -5537,6 +5637,56 @@ components:
                     type: string
                 code:
                     type: string
+        api.usercenter.v1.RotateSCIMTokenRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.SCIMToken:
+            type: object
+            properties:
+                id:
+                    type: string
+                organization_id:
+                    type: string
+                name:
+                    type: string
+                status:
+                    type: string
+                    description: active | disabled
+                credential_version:
+                    type: string
+                revision:
+                    type: string
+                created_by:
+                    type: string
+                created_at:
+                    type: string
+                last_used_at:
+                    type: string
+                disabled_at:
+                    type: string
+        api.usercenter.v1.SCIMTokenCredentialReply:
+            type: object
+            properties:
+                token:
+                    $ref: '#/components/schemas/api.usercenter.v1.SCIMToken'
+                token_value:
+                    type: string
+            description: |-
+                Returned exactly once. Only a SHA-256 digest is stored, so a lost token
+                 cannot be recovered -- rotate it instead.
+        api.usercenter.v1.SCIMTokensReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.SCIMToken'
         api.usercenter.v1.Scope:
             type: object
             properties:
@@ -6320,6 +6470,12 @@ tags:
       description: |-
         OrganizationService owns organization, membership and department management.
          Organization roles (owner/admin/member) are separate from platform IAM roles.
+    - name: SCIMAdminService
+      description: |-
+        SCIMAdminService manages the bearer tokens an IdP uses to provision users
+         and groups into one organization. The SCIM protocol endpoints themselves are
+         raw HTTP (/scim/v2/...) because SCIM is a JSON schema of its own; this
+         service is the browser-facing governance surface for their credentials.
     - name: SettingsService
       description: |-
         SettingsService owns non-secret authentication policy. Secret material is

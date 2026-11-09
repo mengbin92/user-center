@@ -145,6 +145,12 @@ import type {
   CreateOrganizationInvitationRequest,
   CreateOrganizationRequest,
   CreateOrgAssignmentRequest,
+  CreateSCIMTokenRequest,
+  DisableSCIMTokenRequest,
+  RotateSCIMTokenRequest,
+  SCIMToken,
+  SCIMTokenCredentialReply,
+  SCIMTokensReply,
   CreateOrgConstraintRequest,
   CreateOrgDelegationRequest,
   CreateOrgRoleRequest,
@@ -572,6 +578,21 @@ export const api = {
   },
 
   admin: {
+    // SCIM bearer tokens are tenant-bound, so the organization id is always a
+    // query filter rather than a body field the caller could override.
+    listSCIMTokens: (organizationId: string) =>
+      get<SCIMTokensReply>('/api/v1/admin/scim/tokens', {
+        organization_id: organizationId,
+      }),
+    createSCIMToken: (body: CreateSCIMTokenRequest) =>
+      post<SCIMTokenCredentialReply>('/api/v1/admin/scim/tokens', body),
+    rotateSCIMToken: (id: string, body: RotateSCIMTokenRequest) =>
+      post<SCIMTokenCredentialReply>(
+        `/api/v1/admin/scim/tokens/${enc(id)}:rotate`,
+        body,
+      ),
+    disableSCIMToken: (id: string, body: DisableSCIMTokenRequest) =>
+      post<SCIMToken>(`/api/v1/admin/scim/tokens/${enc(id)}:disable`, body),
     overview: () => get<OverviewReply>('/api/v1/admin/overview'),
     listOrganizations: (params?: ListOrganizationsParams) =>
       get<OrganizationsReply>('/api/v1/admin/organizations', params),

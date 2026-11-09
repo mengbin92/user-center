@@ -283,7 +283,7 @@ GET  /oidc/userinfo                      Bearer access token
 - **凭据来源单一化**：外部 provider 凭据只从环境变量读取（`OAUTH_GITHUB_*` / `OAUTH_GOOGLE_*`），不入库、不回显；`/admin/settings/providers` 只做只读可视化与启停，启停仍走 `/admin/settings/auth` 的 `providers` 字段（写审计并推进 policy revision）。若未来入库，需要加密、轮换与审计设计，并先移除环境变量来源，避免两处同时生效。
 - **用户名只能自助修改**：`UpdateUsername` 只暴露在 `/api/v1/me`，管理端没有改名 RPC，避免审计主体歧义。规则（格式、归一化、保留字）与注册路径共用同一函数。
 - **组织配额默认关闭**：开启后每用户默认 5 个（可配 1–1000），平台管理员（root/admin）豁免；归档组织默认不计入。
-- **不纳入**：`ExchangeLegacySession`、SCIM、企业目录同步、租户物理隔离（V2.6 分阶段实现中，理由见路线图 §3.2）。**组织级 SoD 已完整交付**：约束 CRUD（V2.5）与组织委派 CRUD（本轮）均已上线，不再属于不纳入项。WebAuthn/Passkey（R13）与个人信息清理（R14）按路线图分别滑动到 V2.5 / 未排期，当前未实现。
+- **不纳入**：`ExchangeLegacySession`、企业目录同步、租户物理隔离（V2.6 阶段③④，理由见路线图 §3.2）。**SCIM 2.0 与组织级 SoD 已交付**，不再属于不纳入项：SCIM 端点与凭据管理见 [SCIM 文档](scim.md) 与下文组织委派 API。WebAuthn/Passkey（R13）与个人信息清理（R14）按路线图分别滑动到 V2.5 / 未排期，当前未实现。
 
 ### 组织委派 API
 

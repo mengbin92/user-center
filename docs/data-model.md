@@ -101,6 +101,9 @@ V2.3 起角色/分配合法上下文为 `platform` 与 `organization:{id}`：零
 | `export_jobs` | 导出任务；`scope_snapshot`、字段、状态、制品名、过期时间；下载时重新鉴权 |
 | `schema_migrations` | `cmd/migrate` 维护的已执行版本 |
 | `legacy_import_batches` | `cmd/import-legacy` 的批次记录；保留源提交、位点、计数、指纹与终态 |
+| `scim_tokens` | SCIM bearer 凭据摘要、`organization_id` 绑定、状态、凭据版本与 `last_used_at`；明文永不入库 |
+| `scim_identities` | `(organization_id, kind, external_id)` ↔ `local_id` 映射；IdP 稳定标识是供给匹配的权威 |
+| `scim_groups` / `scim_group_members` | SCIM 组与成员；与 `organization_departments` 独立，见 `docs/scim.md` |
 
 ## 5. Revision 语义
 

@@ -128,7 +128,7 @@
 ## 4. 已知限制（必须在上线评审中确认）
 
 1. **OAuth 真实提供方尚未做生产沙箱验收**：GitHub/Google 适配器、state、绑定与登录流程已实现并有 mock 测试；上线前必须用真实 Client ID/Secret、HTTPS 回调和账号完成一轮验收。
-2. **委派只约束角色分配/撤销**：委派校验覆盖目标角色、目标用户范围、动作、有效期与授权上限（`grant_ceiling`）；通过委派不能修改角色 Grant、继承或创建角色，策略变更仍要求直接权限。平台侧拒绝路径的 HTTP 用例见 `internal/server/delegation_boundary_test.go`。**组织域目前只有委派的求值，没有委派的读写入口**（见 §4.10 第 4 条）。
+2. **委派只约束角色分配/撤销**：委派校验覆盖目标角色、目标用户范围、动作、有效期与授权上限（`grant_ceiling`）；通过委派不能修改角色 Grant、继承或创建角色，策略变更仍要求直接权限。平台侧拒绝路径的 HTTP 用例见 `internal/server/delegation_boundary_test.go`。组织域的委派读写入口已在 V2.6 阶段①交付（见 §4.10）；委派仍不能修改角色 Grant、继承或创建角色。
 3. **Outbox 为至少一次投递**：消费端按 `event_id` 去重；有订阅客户端时必须配置 `OUTBOX_SIGNING_SECRET`，为空则拒绝投递。队列按订阅方读取未入队历史事件，并使用可过期领取租约，进程中断后可恢复。
 4. **审计读取本身不写审计**：当前只记录写操作与安全事件；有读取审计需求时需增加相应实现。
 5. **组织域隔离的边界**：V2.3 已把角色、分配、审计收敛到 `organization:{id}` 上下文，组织查询在 SQL 层强制携带上下文。平台 `root/admin` 仍保留跨租户治理覆盖（这是设计选择，不是绕过），**但 V2.5 的职责分离约束端点除外**（D7：非成员一律 404，平台约束列表也只返回平台规则）。组织成员列表、成员角色和部门仍以 `organization_id` 逻辑分区，未做独立库/表分区或行级安全（RLS）。
@@ -154,7 +154,8 @@
 11. **密码策略只作用于"设置密码"这一刻**：存量弱密码不会在升级后被强制更换，也无法在登录时
     识别（无法在不持有明文的前提下判断强度）。需要强制轮换时只能开启有效期，且有效期从下一次
     改密开始计时 —— 存量账号的 `password_changed_at` 为空，不会被计入过期。
-12. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。
+12. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。`/scim/v2/*` 同样是原始路由，其 Bearer 方案在 `docs/scim.md` 中约定。
+13. **SCIM 只隔离成员资格，不隔离全局账号**：`users` 表仍是全局共享的，SCIM 的 `active=false` 与 `DELETE /Users/{id}` 只影响该组织的成员资格与外部标识映射，不动全局账号。因此一个租户的 IdP 停用某账号不会波及其他租户；反过来，账号级别的物理隔离也不由 SCIM 提供（属 V2.6 阶段④）。邮箱已存在但不属于本组织时供给被拒为 `409`，避免跨租户静默绑定。SCIM 协议子集、`/Bulk` 与 `sort` 等未支持能力见 `docs/scim.md` §4。
 
 ## 5. 上线检查
 

@@ -41,5 +41,6 @@ var ProviderSet = wire.NewSet(
 	NewOIDCSigner,
 	NewOrganizationRepo,
 	NewOrgIAMRepo,
+	NewSCIMRepo,
 	NewOAuthRegistry,
 )

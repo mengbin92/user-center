@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// SCIMAdminService manages the bearer tokens an IdP uses to provision users
+// and groups into one organization. The SCIM protocol endpoints themselves are
+// raw HTTP (/scim/v2/...) because SCIM is a JSON schema of its own; this
+// service is the browser-facing governance surface for their credentials.
+service SCIMAdminService {
+  rpc ListSCIMTokens(ListSCIMTokensRequest) returns (SCIMTokensReply) {
+    option (google.api.http) = {get: "/api/v1/admin/scim/tokens"};
+  }
+  rpc CreateSCIMToken(CreateSCIMTokenRequest) returns (SCIMTokenCredentialReply) {
+    option (google.api.http) = {post: "/api/v1/admin/scim/tokens" body: "*"};
+  }
+  rpc RotateSCIMToken(RotateSCIMTokenRequest) returns (SCIMTokenCredentialReply) {
+    option (google.api.http) = {post: "/api/v1/admin/scim/tokens/{id}:rotate" body: "*"};
+  }
+  rpc DisableSCIMToken(DisableSCIMTokenRequest) returns (SCIMToken) {
+    option (google.api.http) = {post: "/api/v1/admin/scim/tokens/{id}:disable" body: "*"};
+  }
+}
+
+message SCIMToken {
+  string id = 1;
+  string organization_id = 2;
+  string name = 3;
+  // active | disabled
+  string status = 4;
+  string credential_version = 5;
+  string revision = 6;
+  string created_by = 7;
+  string created_at = 8;
+  string last_used_at = 9;
+  string disabled_at = 10;
+}
+
+message SCIMTokensReply {
+  repeated SCIMToken items = 1;
+}
+
+// Returned exactly once. Only a SHA-256 digest is stored, so a lost token
+// cannot be recovered -- rotate it instead.
+message SCIMTokenCredentialReply {
+  SCIMToken token = 1;
+  string token_value = 2;
+}
+
+message ListSCIMTokensRequest {
+  string organization_id = 1;
+}
+
+message CreateSCIMTokenRequest {
+  string organization_id = 1;
+  string name = 2;
+  string reason = 3;
+}
+
+message RotateSCIMTokenRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}
+
+message DisableSCIMTokenRequest {
+  string id = 1;
+  string expected_revision = 2;
+  string reason = 3;
+}

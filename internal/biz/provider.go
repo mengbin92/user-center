@@ -18,4 +18,5 @@ var ProviderSet = wire.NewSet(
 	NewWebAuthnUsecase,
 	NewOrganizationUsecase,
 	NewOrgIAMUsecase,
+	NewSCIMUsecase,
 )

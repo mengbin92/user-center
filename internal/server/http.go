@@ -49,6 +49,7 @@ func NewHTTPServer(
 	integrationAdmin *service.IntegrationAdminService,
 	oidcAdmin *service.OIDCAdminService,
 	organizations *service.OrganizationService,
+	scim *service.SCIMService,
 	users *biz.UserUsecase,
 	artifactDir ArtifactDir,
 ) *HTTPServer {
@@ -98,6 +99,26 @@ func NewHTTPServer(
 	usercv1.RegisterIntegrationAdminServiceHTTPServer(srv, integrationAdmin)
 	usercv1.RegisterOIDCAdminServiceHTTPServer(srv, oidcAdmin)
 	usercv1.RegisterOrganizationServiceHTTPServer(srv, organizations)
+	usercv1.RegisterSCIMAdminServiceHTTPServer(srv, scim)
+
+	// SCIM 2.0 is a raw JSON protocol with its own schemas and error shape.
+	// These routes are deliberately outside /api/v1/: the browser CSRF rule in
+	// the middleware is scoped to that prefix, and an IdP authenticates with a
+	// bearer token rather than a session cookie. The handler authenticates every
+	// request itself, so there is no unauthenticated branch here.
+	for _, pattern := range []string{
+		"/scim/v2/ServiceProviderConfig",
+		"/scim/v2/ResourceTypes",
+		"/scim/v2/ResourceTypes/{id}",
+		"/scim/v2/Schemas",
+		"/scim/v2/Schemas/{id}",
+		"/scim/v2/Users",
+		"/scim/v2/Users/{id}",
+		"/scim/v2/Groups",
+		"/scim/v2/Groups/{id}",
+	} {
+		handle(obs.MethodAny, pattern, scim.ServeSCIM)
+	}
 
 	// Everything the protobuf registrations above mounted is added at the end
 	// of this function, after the raw routes are registered too.

@@ -773,6 +773,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/scim/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SCIMAdminService_ListSCIMTokens"];
+        put?: never;
+        post: operations["SCIMAdminService_CreateSCIMToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/scim/tokens/{id}:disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SCIMAdminService_DisableSCIMToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/scim/tokens/{id}:rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SCIMAdminService_RotateSCIMToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/settings/auth": {
         parameters: {
             query?: never;
@@ -2539,6 +2587,11 @@ export interface components {
             reason?: string;
             expected_policy_revision?: string;
         };
+        "api.usercenter.v1.CreateSCIMTokenRequest": {
+            organization_id?: string;
+            name?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.CreateUserRequest": {
             username?: string;
             email?: string;
@@ -2618,6 +2671,11 @@ export interface components {
             reason?: string;
             expected_revision?: string;
             expected_policy_revision?: string;
+        };
+        "api.usercenter.v1.DisableSCIMTokenRequest": {
+            id?: string;
+            expected_revision?: string;
+            reason?: string;
         };
         "api.usercenter.v1.EffectivePermission": {
             operation?: string;
@@ -3253,6 +3311,35 @@ export interface components {
         "api.usercenter.v1.RotateRecoveryCodesRequest": {
             current_password?: string;
             code?: string;
+        };
+        "api.usercenter.v1.RotateSCIMTokenRequest": {
+            id?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.SCIMToken": {
+            id?: string;
+            organization_id?: string;
+            name?: string;
+            /** @description active | disabled */
+            status?: string;
+            credential_version?: string;
+            revision?: string;
+            created_by?: string;
+            created_at?: string;
+            last_used_at?: string;
+            disabled_at?: string;
+        };
+        /**
+         * @description Returned exactly once. Only a SHA-256 digest is stored, so a lost token
+         *      cannot be recovered -- rotate it instead.
+         */
+        "api.usercenter.v1.SCIMTokenCredentialReply": {
+            token?: components["schemas"]["api.usercenter.v1.SCIMToken"];
+            token_value?: string;
+        };
+        "api.usercenter.v1.SCIMTokensReply": {
+            items?: components["schemas"]["api.usercenter.v1.SCIMToken"][];
         };
         "api.usercenter.v1.Scope": {
             all?: boolean;
@@ -5113,6 +5200,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.OverviewReply"];
+                };
+            };
+        };
+    };
+    SCIMAdminService_ListSCIMTokens: {
+        parameters: {
+            query?: {
+                organization_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.SCIMTokensReply"];
+                };
+            };
+        };
+    };
+    SCIMAdminService_CreateSCIMToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateSCIMTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.SCIMTokenCredentialReply"];
+                };
+            };
+        };
+    };
+    SCIMAdminService_DisableSCIMToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.DisableSCIMTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.SCIMToken"];
+                };
+            };
+        };
+    };
+    SCIMAdminService_RotateSCIMToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.RotateSCIMTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.SCIMTokenCredentialReply"];
                 };
             };
         };

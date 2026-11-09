@@ -22,6 +22,7 @@ import {
   ArchiveOrganizationButton,
   OrganizationRoleBadge,
 } from './org-shared'
+import { OrganizationSCIMTokens } from './scim-tokens'
 
 export function OrganizationSettingsTab({
   org,
@@ -129,6 +130,8 @@ export function OrganizationSettingsTab({
           )}
         </CardContent>
       </Card>
+
+      <OrganizationSCIMTokens orgId={orgId} />
 
       <Card>
         <CardHeader
