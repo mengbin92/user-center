@@ -37,6 +37,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 - HTTP 级测试 2 组：供给/对账生命周期（dry-run、全量、增量停用、全量 tombstone、运行记录留存）与治理拒绝（缺 reason、明文非回环 URL、未知连接器、非法 config、非平台账号读写、凭据不回显、过期 revision）。
 - 新增 `docs/directory-sync.md`（含未实现项：组/部门层级同步、非 AD LDAP 增量、原生 Entra/飞书连接器、多实例分布式租约、写回），回填 README、API/安全/数据模型文档与两份路线图。
 
+### 阶段④ — 租户物理隔离（独立 schema 基础设施）
+
+**状态：基础设施与租户数据域已交付，存量数据 cutover 未完成**（未完成项以 `[ ]` 列在 `docs/tenancy.md` §4）。
+
+- 配置：`conf.Data.Tenancy`（`schema_isolation` / `schema_prefix` / 连接池上限）与 `TENANT_SCHEMA_ISOLATION` / `TENANT_SCHEMA_PREFIX` 环境变量。**默认关闭**，关闭时所有请求仍走平台连接池，存量行为与既有测试不变。
+- 路由：`platform/tenant` 从组织 URL 与 SCIM bearer token 解析组织 id 注入 context；`Data.TenantDB(ctx)` 懒加载并缓存每组织独立 `*gorm.DB` + `*sql.DB`；租户库不可用时 fail-closed，**不回退平台库**。
+- 编排：`cmd/tenant-schema -org / -all / -list` 幂等建库并建表（静态 SQL 迁移无法表达每组织一套 schema）。启用顺序：先迁移 → 再建租户 schema → 最后开开关。
+- 分域：`scim_identities` / `scim_groups` / `scim_group_members` / `directory_objects` / `directory_sync_runs` 落到各自组织 schema；治理元数据 `scim_tokens` / `directory_sources` 留在平台 schema。隔离关闭时 `tenantOr` 沿用事务连接，避免单连接池下第二个连接互锁（本次全量门禁发现并修复）。
+- 测试：`internal/data/tenancy_test.go`（不同连接池、跨 schema 不可见、同 externalId 跨租户可共存、平台库无租户行、默认关闭、非法 id）与 `internal/server/tenancy_test.go`（HTTP 级：A 的 token 读 B 的用户 404、列表只含本租户、平台库无租户映射）。
+- 新增 `docs/tenancy.md`；回填 `README.md`、`docs/api.md`、`docs/security.md` §4.5、`docs/data-model.md`、`docs/operations.md` 与两份路线图的追踪状态。
+- **未完成 `[ ]`**：存量组织/角色/委派/约束/审计表 cutover、全局账号与登录链路物理隔离、平台跨租户治理聚合、新建组织自动建库、多实例建库租约、跨库事务补偿、DR/备份脚本多 schema 改造、MySQL 运行账号权限模型重定。
+
 ## [0.11.0] - 2026-11-09
 
 **版本判定：MINOR**（v0.10.1 → v0.11.0）。新增组织授权的委派能力边界、存量组织权限回填，以及用户手册、管理员手册和操作视频；统一凭据限制并加固并发会话与组织授权。包含 **1 个数据库迁移**（`014_password_history_backfill.sql`），升级须先迁移再启动服务。详见 [发布说明](docs/releases/release-v0.11.0.md)。

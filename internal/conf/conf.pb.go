@@ -394,9 +394,12 @@ func (x *Metrics) GetRefreshSeconds() int32 {
 }
 
 type Data struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Database      *Database              `protobuf:"bytes,1,opt,name=database,proto3" json:"database,omitempty"`
-	Redis         *Redis                 `protobuf:"bytes,2,opt,name=redis,proto3" json:"redis,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Database *Database              `protobuf:"bytes,1,opt,name=database,proto3" json:"database,omitempty"`
+	Redis    *Redis                 `protobuf:"bytes,2,opt,name=redis,proto3" json:"redis,omitempty"`
+	// Per-organization schema isolation. Disabled by default: turning it on is
+	// a deployment decision that requires running cmd/tenant-schema first.
+	Tenancy       *Tenancy `protobuf:"bytes,3,opt,name=tenancy,proto3" json:"tenancy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -445,6 +448,85 @@ func (x *Data) GetRedis() *Redis {
 	return nil
 }
 
+func (x *Data) GetTenancy() *Tenancy {
+	if x != nil {
+		return x.Tenancy
+	}
+	return nil
+}
+
+// Tenancy routes tenant-owned data to a dedicated MySQL schema (which in MySQL
+// is a database) per organization, with its own connection pool. The platform
+// schema keeps the shared identity and cross-tenant governance tables.
+type Tenancy struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SchemaIsolation bool                   `protobuf:"varint,1,opt,name=schema_isolation,json=schemaIsolation,proto3" json:"schema_isolation,omitempty"`
+	// Default "usercenter_org_"; the organization id is appended verbatim.
+	SchemaPrefix  string `protobuf:"bytes,2,opt,name=schema_prefix,json=schemaPrefix,proto3" json:"schema_prefix,omitempty"`
+	MaxOpenConns  int32  `protobuf:"varint,3,opt,name=max_open_conns,json=maxOpenConns,proto3" json:"max_open_conns,omitempty"`
+	MaxIdleConns  int32  `protobuf:"varint,4,opt,name=max_idle_conns,json=maxIdleConns,proto3" json:"max_idle_conns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Tenancy) Reset() {
+	*x = Tenancy{}
+	mi := &file_internal_conf_conf_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Tenancy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Tenancy) ProtoMessage() {}
+
+func (x *Tenancy) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_conf_conf_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Tenancy.ProtoReflect.Descriptor instead.
+func (*Tenancy) Descriptor() ([]byte, []int) {
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Tenancy) GetSchemaIsolation() bool {
+	if x != nil {
+		return x.SchemaIsolation
+	}
+	return false
+}
+
+func (x *Tenancy) GetSchemaPrefix() string {
+	if x != nil {
+		return x.SchemaPrefix
+	}
+	return ""
+}
+
+func (x *Tenancy) GetMaxOpenConns() int32 {
+	if x != nil {
+		return x.MaxOpenConns
+	}
+	return 0
+}
+
+func (x *Tenancy) GetMaxIdleConns() int32 {
+	if x != nil {
+		return x.MaxIdleConns
+	}
+	return 0
+}
+
 type Database struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// mysql | sqlite
@@ -458,7 +540,7 @@ type Database struct {
 
 func (x *Database) Reset() {
 	*x = Database{}
-	mi := &file_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_internal_conf_conf_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -470,7 +552,7 @@ func (x *Database) String() string {
 func (*Database) ProtoMessage() {}
 
 func (x *Database) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_internal_conf_conf_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -483,7 +565,7 @@ func (x *Database) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Database.ProtoReflect.Descriptor instead.
 func (*Database) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{7}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Database) GetDriver() string {
@@ -525,7 +607,7 @@ type Redis struct {
 
 func (x *Redis) Reset() {
 	*x = Redis{}
-	mi := &file_internal_conf_conf_proto_msgTypes[8]
+	mi := &file_internal_conf_conf_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -537,7 +619,7 @@ func (x *Redis) String() string {
 func (*Redis) ProtoMessage() {}
 
 func (x *Redis) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[8]
+	mi := &file_internal_conf_conf_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -550,7 +632,7 @@ func (x *Redis) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Redis.ProtoReflect.Descriptor instead.
 func (*Redis) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{8}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Redis) GetAddr() string {
@@ -591,7 +673,7 @@ type Security struct {
 
 func (x *Security) Reset() {
 	*x = Security{}
-	mi := &file_internal_conf_conf_proto_msgTypes[9]
+	mi := &file_internal_conf_conf_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -603,7 +685,7 @@ func (x *Security) String() string {
 func (*Security) ProtoMessage() {}
 
 func (x *Security) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[9]
+	mi := &file_internal_conf_conf_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -616,7 +698,7 @@ func (x *Security) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Security.ProtoReflect.Descriptor instead.
 func (*Security) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{9}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Security) GetSessionSecret() string {
@@ -694,7 +776,7 @@ type Mail struct {
 
 func (x *Mail) Reset() {
 	*x = Mail{}
-	mi := &file_internal_conf_conf_proto_msgTypes[10]
+	mi := &file_internal_conf_conf_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -706,7 +788,7 @@ func (x *Mail) String() string {
 func (*Mail) ProtoMessage() {}
 
 func (x *Mail) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[10]
+	mi := &file_internal_conf_conf_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -719,7 +801,7 @@ func (x *Mail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Mail.ProtoReflect.Descriptor instead.
 func (*Mail) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{10}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Mail) GetDriver() string {
@@ -755,7 +837,7 @@ type SMTP struct {
 
 func (x *SMTP) Reset() {
 	*x = SMTP{}
-	mi := &file_internal_conf_conf_proto_msgTypes[11]
+	mi := &file_internal_conf_conf_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -767,7 +849,7 @@ func (x *SMTP) String() string {
 func (*SMTP) ProtoMessage() {}
 
 func (x *SMTP) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_conf_conf_proto_msgTypes[11]
+	mi := &file_internal_conf_conf_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -780,7 +862,7 @@ func (x *SMTP) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SMTP.ProtoReflect.Descriptor instead.
 func (*SMTP) Descriptor() ([]byte, []int) {
-	return file_internal_conf_conf_proto_rawDescGZIP(), []int{11}
+	return file_internal_conf_conf_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SMTP) GetHost() string {
@@ -840,10 +922,16 @@ const file_internal_conf_conf_proto_rawDesc = "" +
 	"\x0ftimeout_seconds\x18\x02 \x01(\x05R\x0etimeoutSeconds\"F\n" +
 	"\aMetrics\x12\x12\n" +
 	"\x04addr\x18\x01 \x01(\tR\x04addr\x12'\n" +
-	"\x0frefresh_seconds\x18\x02 \x01(\x05R\x0erefreshSeconds\"k\n" +
+	"\x0frefresh_seconds\x18\x02 \x01(\x05R\x0erefreshSeconds\"\x9f\x01\n" +
 	"\x04Data\x125\n" +
 	"\bdatabase\x18\x01 \x01(\v2\x19.usercenter.conf.DatabaseR\bdatabase\x12,\n" +
-	"\x05redis\x18\x02 \x01(\v2\x16.usercenter.conf.RedisR\x05redis\"\x86\x01\n" +
+	"\x05redis\x18\x02 \x01(\v2\x16.usercenter.conf.RedisR\x05redis\x122\n" +
+	"\atenancy\x18\x03 \x01(\v2\x18.usercenter.conf.TenancyR\atenancy\"\xa5\x01\n" +
+	"\aTenancy\x12)\n" +
+	"\x10schema_isolation\x18\x01 \x01(\bR\x0fschemaIsolation\x12#\n" +
+	"\rschema_prefix\x18\x02 \x01(\tR\fschemaPrefix\x12$\n" +
+	"\x0emax_open_conns\x18\x03 \x01(\x05R\fmaxOpenConns\x12$\n" +
+	"\x0emax_idle_conns\x18\x04 \x01(\x05R\fmaxIdleConns\"\x86\x01\n" +
 	"\bDatabase\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x12$\n" +
@@ -886,7 +974,7 @@ func file_internal_conf_conf_proto_rawDescGZIP() []byte {
 	return file_internal_conf_conf_proto_rawDescData
 }
 
-var file_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_internal_conf_conf_proto_goTypes = []any{
 	(*Bootstrap)(nil), // 0: usercenter.conf.Bootstrap
 	(*Server)(nil),    // 1: usercenter.conf.Server
@@ -895,29 +983,31 @@ var file_internal_conf_conf_proto_goTypes = []any{
 	(*GRPC)(nil),      // 4: usercenter.conf.GRPC
 	(*Metrics)(nil),   // 5: usercenter.conf.Metrics
 	(*Data)(nil),      // 6: usercenter.conf.Data
-	(*Database)(nil),  // 7: usercenter.conf.Database
-	(*Redis)(nil),     // 8: usercenter.conf.Redis
-	(*Security)(nil),  // 9: usercenter.conf.Security
-	(*Mail)(nil),      // 10: usercenter.conf.Mail
-	(*SMTP)(nil),      // 11: usercenter.conf.SMTP
+	(*Tenancy)(nil),   // 7: usercenter.conf.Tenancy
+	(*Database)(nil),  // 8: usercenter.conf.Database
+	(*Redis)(nil),     // 9: usercenter.conf.Redis
+	(*Security)(nil),  // 10: usercenter.conf.Security
+	(*Mail)(nil),      // 11: usercenter.conf.Mail
+	(*SMTP)(nil),      // 12: usercenter.conf.SMTP
 }
 var file_internal_conf_conf_proto_depIdxs = []int32{
 	1,  // 0: usercenter.conf.Bootstrap.server:type_name -> usercenter.conf.Server
 	6,  // 1: usercenter.conf.Bootstrap.data:type_name -> usercenter.conf.Data
-	9,  // 2: usercenter.conf.Bootstrap.security:type_name -> usercenter.conf.Security
-	10, // 3: usercenter.conf.Bootstrap.mail:type_name -> usercenter.conf.Mail
+	10, // 2: usercenter.conf.Bootstrap.security:type_name -> usercenter.conf.Security
+	11, // 3: usercenter.conf.Bootstrap.mail:type_name -> usercenter.conf.Mail
 	3,  // 4: usercenter.conf.Server.http:type_name -> usercenter.conf.HTTP
 	4,  // 5: usercenter.conf.Server.grpc:type_name -> usercenter.conf.GRPC
 	5,  // 6: usercenter.conf.Server.metrics:type_name -> usercenter.conf.Metrics
 	2,  // 7: usercenter.conf.Server.rate_limit:type_name -> usercenter.conf.RateLimit
-	7,  // 8: usercenter.conf.Data.database:type_name -> usercenter.conf.Database
-	8,  // 9: usercenter.conf.Data.redis:type_name -> usercenter.conf.Redis
-	11, // 10: usercenter.conf.Mail.smtp:type_name -> usercenter.conf.SMTP
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	8,  // 8: usercenter.conf.Data.database:type_name -> usercenter.conf.Database
+	9,  // 9: usercenter.conf.Data.redis:type_name -> usercenter.conf.Redis
+	7,  // 10: usercenter.conf.Data.tenancy:type_name -> usercenter.conf.Tenancy
+	12, // 11: usercenter.conf.Mail.smtp:type_name -> usercenter.conf.SMTP
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_internal_conf_conf_proto_init() }
@@ -931,7 +1021,7 @@ func file_internal_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_conf_conf_proto_rawDesc), len(file_internal_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

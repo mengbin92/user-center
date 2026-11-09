@@ -23,6 +23,7 @@ import (
 	"github.com/mengbin92/user-center/internal/obs"
 	"github.com/mengbin92/user-center/internal/service"
 	"github.com/mengbin92/user-center/platform/httpx"
+	"github.com/mengbin92/user-center/platform/tenant"
 )
 
 type Middleware struct {
@@ -219,6 +220,9 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 	}
 	ctx = httpx.With(ctx, info)
 	ctx = biz.WithRequestID(ctx, requestID)
+	// Schema routing is driven by the verified URL shape, never by a body
+	// field. Platform paths resolve to 0 and always use the platform pool.
+	ctx = tenant.With(ctx, tenant.FromPath(r.URL.Path))
 	r = r.WithContext(ctx)
 
 	if isUnsafe(r.Method) && strings.HasPrefix(r.URL.Path, "/api/v1/") {

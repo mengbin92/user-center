@@ -4,7 +4,16 @@
 
 - MySQL 8.x（生产唯一验收数据库）、Redis 7.x（多实例部署必需；仅未配置 Redis 的单进程开发环境可使用内存存储）。
 - HTTPS 反向代理（Nginx/Caddy/网关），负责 TLS、请求体上限、基础 WAF。
-- 独立数据库账号；生产账号不应具备跨库读取或 DDL 权限（DDL 由 `migrate` 专用账号执行）。
+- 独立数据库账号；生产账号不应具备跨库读取或 DDL 权限（DDL 由 `migrate` 专用账号执行）。**例外**：启用租户独立 schema 后，`cmd/tenant-schema` 需要 `CREATE DATABASE` 与跨库 DDL 权限，须由专用迁移账号执行，且必须先定权再上线（见 `docs/tenancy.md` §4 未完成项）。
+
+### 1.1 启用租户独立 schema（可选，默认关闭）
+
+1. 先执行常规迁移（`cmd/migrate`，含 `015` / `016`）。
+2. `go run ./cmd/tenant-schema -all` 为所有活跃组织创建 schema 与表结构。
+3. 设置 `TENANT_SCHEMA_ISOLATION=1` 后滚动重启；`go run ./cmd/tenant-schema -list` 核对。
+4. 新建组织后需再执行 `-org <id>`（自动建库尚未接入）。
+
+**默认关闭**。当前只有 SCIM / 目录同步的租户数据域真正落在独立 schema，存量组织数据、全局账号与 DR 脚本仍按单库处理；完整 cutover 清单见 `docs/tenancy.md` §4。备份/恢复演练在多 schema 下尚未验证。
 
 ## 2. 密钥
 

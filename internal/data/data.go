@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +30,15 @@ type Data struct {
 	log    *zap.Logger
 	conf   *conf.Data
 	secure *conf.Security
+
+	// Per-organization schema routing. Tenant pools are opened lazily and
+	// cached; the platform pool above stays the default for every request that
+	// is not bound to a tenant. See tenancy.go.
+	tenancy    *conf.Tenancy
+	driver     string
+	baseSource string
+	tenants    map[int64]*tenantPool
+	tenantsMu  sync.Mutex
 }
 
 func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, func(), error) {
@@ -48,12 +58,14 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 		}
 	}
 	var dial gorm.Dialector
+	baseSource := ""
 	switch driver {
 	case "sqlite", "sqlite3":
 		source := "file::memory:?cache=shared"
 		if dataConf != nil && dataConf.Database != nil && dataConf.Database.Source != "" {
 			source = dataConf.Database.Source
 		}
+		baseSource = source
 		if path := strings.TrimPrefix(source, "file:"); path != source {
 			if i := strings.IndexByte(path, '?'); i >= 0 {
 				path = path[:i]
@@ -70,6 +82,7 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 		if dataConf != nil && dataConf.Database != nil && dataConf.Database.Source != "" {
 			source = dataConf.Database.Source
 		}
+		baseSource = source
 		dial = mysql.Open(source)
 	}
 	db, err := gorm.Open(dial, &gorm.Config{
@@ -97,7 +110,15 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 	sqlDB.SetMaxIdleConns(maxIdle)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	d := &Data{db: db, log: log, conf: dataConf, secure: sec}
+	var tenancy *conf.Tenancy
+	if dataConf != nil {
+		tenancy = dataConf.Tenancy
+	}
+	d := &Data{
+		db: db, log: log, conf: dataConf, secure: sec,
+		tenancy: tenancy, driver: driver, baseSource: baseSource,
+		tenants: make(map[int64]*tenantPool),
+	}
 	cleanupRedis := func() {}
 	if dataConf != nil && dataConf.Redis != nil && dataConf.Redis.Addr != "" {
 		rc := redis.NewClient(&redis.Options{
@@ -118,6 +139,7 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 	}
 	cleanup := func() {
 		cleanupRedis()
+		d.closeTenantPools()
 		_ = sqlDB.Close()
 	}
 	return d, cleanup, nil

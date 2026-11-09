@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mengbin92/user-center/platform/tenant"
 )
 
 // Enterprise directory synchronization.
@@ -306,6 +308,9 @@ func (uc *DirectoryUsecase) TriggerSync(ctx context.Context, actor ActorContext,
 	if err != nil {
 		return nil, ErrResourceNotFound
 	}
+	// Runs and object mappings are tenant-owned; bind the context before the
+	// engine starts so they land in this organization's schema.
+	ctx = tenant.With(ctx, source.OrganizationID)
 	if err := uc.audit(ctx, nil, actor, "directory.sync.triggered", itoa(sourceID), "{}", "{}", "{}", reason, "success"); err != nil {
 		return nil, err
 	}
@@ -504,7 +509,7 @@ func (uc *DirectoryUsecase) Dispatch(ctx context.Context) {
 			return
 		default:
 		}
-		_, _ = uc.syncOnce(ctx, source, DirectoryModeDelta)
+		_, _ = uc.syncOnce(tenant.With(ctx, source.OrganizationID), source, DirectoryModeDelta)
 	}
 }
 

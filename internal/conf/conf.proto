@@ -55,6 +55,20 @@ message Metrics {
 message Data {
   Database database = 1;
   Redis redis = 2;
+  // Per-organization schema isolation. Disabled by default: turning it on is
+  // a deployment decision that requires running cmd/tenant-schema first.
+  Tenancy tenancy = 3;
+}
+
+// Tenancy routes tenant-owned data to a dedicated MySQL schema (which in MySQL
+// is a database) per organization, with its own connection pool. The platform
+// schema keeps the shared identity and cross-tenant governance tables.
+message Tenancy {
+  bool schema_isolation = 1;
+  // Default "usercenter_org_"; the organization id is appended verbatim.
+  string schema_prefix = 2;
+  int32 max_open_conns = 3;
+  int32 max_idle_conns = 4;
 }
 
 message Database {

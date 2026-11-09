@@ -151,7 +151,7 @@ func (r *directoryRepo) CreateRun(ctx context.Context, tx biz.Tx, run *biz.Direc
 		Mode: run.Mode, Status: run.Status, StartedAt: run.StartedAt,
 		CursorBefore: run.CursorBefore,
 	}
-	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
 	}
 	return directoryRunToBiz(*p)
@@ -162,7 +162,7 @@ func (r *directoryRepo) FinishRun(ctx context.Context, tx biz.Tx, run *biz.Direc
 	if err != nil {
 		return err
 	}
-	return r.d.dbOr(tx).WithContext(ctx).Model(&directoryRunPO{}).
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&directoryRunPO{}).
 		Where("id = ?", run.ID).Updates(map[string]any{
 		"status": run.Status, "finished_at": run.FinishedAt,
 		"fetched": run.Fetched, "created_count": run.Created, "updated_count": run.Updated,
@@ -174,7 +174,7 @@ func (r *directoryRepo) FinishRun(ctx context.Context, tx biz.Tx, run *biz.Direc
 
 func (r *directoryRepo) ListRuns(ctx context.Context, tx biz.Tx, sourceID int64, limit int) ([]*biz.DirectoryRun, error) {
 	var rows []directoryRunPO
-	if err := r.d.dbOr(tx).WithContext(ctx).
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("source_id = ?", sourceID).Order("id DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (r *directoryRepo) ListRuns(ctx context.Context, tx biz.Tx, sourceID int64,
 
 func (r *directoryRepo) GetObject(ctx context.Context, tx biz.Tx, sourceID int64, externalID string) (*biz.DirectoryObject, error) {
 	var p directoryObjectPO
-	err := r.d.dbOr(tx).WithContext(ctx).
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("source_id = ? AND external_id = ?", sourceID, externalID).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
@@ -207,7 +207,7 @@ func (r *directoryRepo) GetObject(ctx context.Context, tx biz.Tx, sourceID int64
 }
 
 func (r *directoryRepo) UpsertObject(ctx context.Context, tx biz.Tx, o *biz.DirectoryObject) error {
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 	var existing directoryObjectPO
 	err := db.Where("source_id = ? AND external_id = ?", o.SourceID, o.ExternalID).First(&existing).Error
 	if err == nil {
@@ -226,7 +226,7 @@ func (r *directoryRepo) UpsertObject(ctx context.Context, tx biz.Tx, o *biz.Dire
 
 func (r *directoryRepo) ListObjects(ctx context.Context, tx biz.Tx, sourceID int64) ([]*biz.DirectoryObject, error) {
 	var rows []directoryObjectPO
-	if err := r.d.dbOr(tx).WithContext(ctx).
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("source_id = ?", sourceID).Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func (r *directoryRepo) ListObjects(ctx context.Context, tx biz.Tx, sourceID int
 }
 
 func (r *directoryRepo) DeleteObject(ctx context.Context, tx biz.Tx, sourceID int64, externalID string) error {
-	return r.d.dbOr(tx).WithContext(ctx).
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("source_id = ? AND external_id = ?", sourceID, externalID).
 		Delete(&directoryObjectPO{}).Error
 }

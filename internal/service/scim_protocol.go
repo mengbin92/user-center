@@ -10,6 +10,7 @@ import (
 
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/pkg/jsonx"
+	"github.com/mengbin92/user-center/platform/tenant"
 )
 
 // SCIM 2.0 protocol surface (RFC 7643 / 7644).
@@ -410,6 +411,10 @@ func (s *SCIMService) ServeSCIM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	orgID := token.OrganizationID
+	// Bind every downstream query to the token's organization so tenant-owned
+	// tables resolve to that organization's physical schema. The token itself
+	// was looked up on the platform schema above.
+	r = r.WithContext(tenant.With(r.Context(), orgID))
 	baseURL := strings.TrimSuffix(s.uc.PublicBaseURL, "/")
 	path := strings.Trim(r.URL.Path, "/")
 

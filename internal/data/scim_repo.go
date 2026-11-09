@@ -106,7 +106,7 @@ func scimIdentityToBiz(p scimIdentityPO) *biz.SCIMIdentity {
 
 func (r *scimRepo) GetIdentityByExternal(ctx context.Context, tx biz.Tx, orgID int64, kind, externalID string) (*biz.SCIMIdentity, error) {
 	var p scimIdentityPO
-	err := r.d.dbOr(tx).WithContext(ctx).
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("organization_id = ? AND kind = ? AND external_id = ?", orgID, kind, externalID).
 		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -120,7 +120,7 @@ func (r *scimRepo) GetIdentityByExternal(ctx context.Context, tx biz.Tx, orgID i
 
 func (r *scimRepo) GetIdentityByLocal(ctx context.Context, tx biz.Tx, orgID int64, kind string, localID int64) (*biz.SCIMIdentity, error) {
 	var p scimIdentityPO
-	err := r.d.dbOr(tx).WithContext(ctx).
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("organization_id = ? AND kind = ? AND local_id = ?", orgID, kind, localID).
 		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -134,7 +134,7 @@ func (r *scimRepo) GetIdentityByLocal(ctx context.Context, tx biz.Tx, orgID int6
 
 func (r *scimRepo) ListIdentities(ctx context.Context, tx biz.Tx, orgID int64, kind string) ([]*biz.SCIMIdentity, error) {
 	var rows []scimIdentityPO
-	if err := r.d.dbOr(tx).WithContext(ctx).
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("organization_id = ? AND kind = ?", orgID, kind).Order("id ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (r *scimRepo) ListIdentities(ctx context.Context, tx biz.Tx, orgID int64, k
 }
 
 func (r *scimRepo) UpsertIdentity(ctx context.Context, tx biz.Tx, in *biz.SCIMIdentity) (*biz.SCIMIdentity, error) {
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 	now := time.Now().UTC()
 	var existing scimIdentityPO
 	err := db.Where("organization_id = ? AND kind = ? AND local_id = ?", in.OrganizationID, in.Kind, in.LocalID).
@@ -176,7 +176,7 @@ func (r *scimRepo) UpsertIdentity(ctx context.Context, tx biz.Tx, in *biz.SCIMId
 }
 
 func (r *scimRepo) DeleteIdentity(ctx context.Context, tx biz.Tx, orgID int64, kind string, localID int64) error {
-	return r.d.dbOr(tx).WithContext(ctx).
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("organization_id = ? AND kind = ? AND local_id = ?", orgID, kind, localID).
 		Delete(&scimIdentityPO{}).Error
 }
@@ -193,7 +193,7 @@ func (r *scimRepo) CreateGroup(ctx context.Context, tx biz.Tx, g *biz.SCIMGroup)
 		OrganizationID: g.OrganizationID, DisplayName: g.DisplayName,
 		Revision: 1, CreatedAt: now, UpdatedAt: now,
 	}
-	if err := r.d.dbOr(tx).WithContext(ctx).Create(p).Error; err != nil {
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error; err != nil {
 		return nil, err
 	}
 	return scimGroupToBiz(*p), nil
@@ -201,7 +201,7 @@ func (r *scimRepo) CreateGroup(ctx context.Context, tx biz.Tx, g *biz.SCIMGroup)
 
 func (r *scimRepo) GetGroup(ctx context.Context, tx biz.Tx, orgID, id int64) (*biz.SCIMGroup, error) {
 	var p scimGroupPO
-	err := r.d.dbOr(tx).WithContext(ctx).
+	err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("id = ? AND organization_id = ?", id, orgID).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
@@ -214,7 +214,7 @@ func (r *scimRepo) GetGroup(ctx context.Context, tx biz.Tx, orgID, id int64) (*b
 
 func (r *scimRepo) ListGroups(ctx context.Context, tx biz.Tx, orgID int64) ([]*biz.SCIMGroup, error) {
 	var rows []scimGroupPO
-	if err := r.d.dbOr(tx).WithContext(ctx).
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("organization_id = ?", orgID).Order("id ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (r *scimRepo) ListGroups(ctx context.Context, tx biz.Tx, orgID int64) ([]*b
 }
 
 func (r *scimRepo) UpdateGroup(ctx context.Context, tx biz.Tx, g *biz.SCIMGroup, expected uint64) (*biz.SCIMGroup, error) {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&scimGroupPO{}).
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&scimGroupPO{}).
 		Where("id = ? AND organization_id = ? AND revision = ?", g.ID, g.OrganizationID, expected).
 		Updates(map[string]any{
 			"display_name": g.DisplayName, "revision": expected + 1, "updated_at": time.Now().UTC(),
@@ -241,12 +241,12 @@ func (r *scimRepo) UpdateGroup(ctx context.Context, tx biz.Tx, g *biz.SCIMGroup,
 }
 
 func (r *scimRepo) DeleteGroup(ctx context.Context, tx biz.Tx, orgID, id int64) error {
-	return r.d.dbOr(tx).WithContext(ctx).
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("id = ? AND organization_id = ?", id, orgID).Delete(&scimGroupPO{}).Error
 }
 
 func (r *scimRepo) SetGroupMembers(ctx context.Context, tx biz.Tx, groupID int64, ids []int64) error {
-	db := r.d.dbOr(tx).WithContext(ctx)
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 	if err := db.Where("group_id = ?", groupID).Delete(&scimGroupMemberPO{}).Error; err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func (r *scimRepo) SetGroupMembers(ctx context.Context, tx biz.Tx, groupID int64
 
 func (r *scimRepo) GroupMembers(ctx context.Context, tx biz.Tx, groupID int64) ([]int64, error) {
 	var rows []scimGroupMemberPO
-	if err := r.d.dbOr(tx).WithContext(ctx).
+	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).
 		Where("group_id = ?", groupID).Order("user_id ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}

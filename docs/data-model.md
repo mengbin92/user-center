@@ -108,6 +108,18 @@ V2.3 起角色/分配合法上下文为 `platform` 与 `organization:{id}`：零
 | `directory_sync_runs` | 每次同步的计数、逐对象报告、错误与游标前后值 |
 | `directory_objects` | `(source_id, external_id)` ↔ `local_id` 与对账水位 |
 
+## 4.1 租户 schema 分域（V2.6 阶段④，默认关闭）
+
+启用 `data.tenancy.schema_isolation` 后，按组织路由到 `usercenter_org_<id>` 的独立 schema 与连接池：
+
+| 数据 | 所在 schema |
+|---|---|
+| `scim_identities`、`scim_groups`、`scim_group_members`、`directory_objects`、`directory_sync_runs` | 各组织的独立 schema |
+| `scim_tokens`、`directory_sources`（治理凭据与配置） | 平台 schema，仍带 `organization_id` |
+| `users`、`organization_members`、`iam_*`、`iam_audit_events`、`iam_policy_state` 等存量表 | 平台 schema，继续逻辑隔离 |
+
+分域边界、已交付能力与**未完成的 cutover 清单**见 `docs/tenancy.md`。
+
 ## 5. Revision 语义
 
 | Revision | 作用域 | 冲突响应 |

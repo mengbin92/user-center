@@ -67,6 +67,21 @@ func applyEnv(b *conf.Bootstrap) {
 	if v := os.Getenv("DB_DSN"); v != "" {
 		dataConf.Database.Source = v
 	}
+	// Tenant schema isolation is opt-in. Enabling it in config without running
+	// cmd/tenant-schema first leaves tenant databases missing, so the CLI is
+	// part of the rollout rather than an optional extra.
+	if v := os.Getenv("TENANT_SCHEMA_ISOLATION"); v != "" {
+		if dataConf.Tenancy == nil {
+			dataConf.Tenancy = &conf.Tenancy{}
+		}
+		dataConf.Tenancy.SchemaIsolation = v == "1" || v == "true" || v == "TRUE" || v == "yes"
+	}
+	if v := os.Getenv("TENANT_SCHEMA_PREFIX"); v != "" {
+		if dataConf.Tenancy == nil {
+			dataConf.Tenancy = &conf.Tenancy{}
+		}
+		dataConf.Tenancy.SchemaPrefix = v
+	}
 	if v := os.Getenv("REDIS_ADDR"); v != "" {
 		dataConf.Redis.Addr = v
 	}
