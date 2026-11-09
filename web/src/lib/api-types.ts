@@ -52,6 +52,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/directory-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DirectoryAdminService_ListDirectorySources"];
+        put?: never;
+        post: operations["DirectoryAdminService_CreateDirectorySource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/directory-sources/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["DirectoryAdminService_UpdateDirectorySource"];
+        trace?: never;
+    };
+    "/api/v1/admin/directory-sources/{id}:rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DirectoryAdminService_RotateDirectorySourceSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/directory-sources/{id}:sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DirectoryAdminService_TriggerDirectorySync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/directory-sync-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DirectoryAdminService_ListDirectorySyncRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/event-deliveries": {
         parameters: {
             query?: never;
@@ -2449,6 +2529,14 @@ export interface components {
             code?: string;
             name?: string;
         };
+        "api.usercenter.v1.CreateDirectorySourceRequest": {
+            organization_id?: string;
+            kind?: string;
+            name?: string;
+            config_json?: string;
+            secret?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.CreateEmailChallengeRequest": {
             new_email?: string;
             current_password?: string;
@@ -2656,6 +2744,58 @@ export interface components {
         };
         "api.usercenter.v1.DepartmentsReply": {
             items?: components["schemas"]["api.usercenter.v1.Department"][];
+        };
+        /**
+         * @description secret is never part of any reply. config_json holds only non-sensitive
+         *      connection settings (URL, base DN, filters, attribute map, interval, policies).
+         */
+        "api.usercenter.v1.DirectorySource": {
+            id?: string;
+            organization_id?: string;
+            /** @description ldap | jsonfeed */
+            kind?: string;
+            name?: string;
+            config_json?: string;
+            /** @description active | paused */
+            status?: string;
+            cursor?: string;
+            revision?: string;
+            created_at?: string;
+            updated_at?: string;
+            last_run_at?: string;
+        };
+        "api.usercenter.v1.DirectorySourcesReply": {
+            items?: components["schemas"]["api.usercenter.v1.DirectorySource"][];
+        };
+        "api.usercenter.v1.DirectorySyncRun": {
+            id?: string;
+            source_id?: string;
+            organization_id?: string;
+            /** @description full | delta | dry_run */
+            mode?: string;
+            /** @description running | succeeded | partial | failed */
+            status?: string;
+            started_at?: string;
+            finished_at?: string;
+            /** Format: int32 */
+            fetched?: number;
+            /** Format: int32 */
+            created_count?: number;
+            /** Format: int32 */
+            updated_count?: number;
+            /** Format: int32 */
+            disabled_count?: number;
+            /** Format: int32 */
+            unchanged_count?: number;
+            /** Format: int32 */
+            failed_count?: number;
+            cursor_before?: string;
+            cursor_after?: string;
+            report_json?: string;
+            error_text?: string;
+        };
+        "api.usercenter.v1.DirectorySyncRunsReply": {
+            items?: components["schemas"]["api.usercenter.v1.DirectorySyncRun"][];
         };
         "api.usercenter.v1.DisableIntegrationClientRequest": {
             id?: string;
@@ -3297,6 +3437,12 @@ export interface components {
         "api.usercenter.v1.RolesReply": {
             items?: components["schemas"]["api.usercenter.v1.Role"][];
         };
+        "api.usercenter.v1.RotateDirectorySourceSecretRequest": {
+            id?: string;
+            secret?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.RotateIntegrationClientCredentialRequest": {
             id?: string;
             reason?: string;
@@ -3443,6 +3589,12 @@ export interface components {
             operation?: string;
             owner_user_id?: string;
         };
+        "api.usercenter.v1.TriggerDirectorySyncRequest": {
+            id?: string;
+            /** @description full | delta | dry_run */
+            mode?: string;
+            reason?: string;
+        };
         "api.usercenter.v1.UpdateAuthSettingsRequest": {
             registration_enabled?: boolean;
             email_verification_required?: boolean;
@@ -3495,6 +3647,13 @@ export interface components {
             parent_id?: string;
             code?: string;
             name?: string;
+            expected_revision?: string;
+            reason?: string;
+        };
+        "api.usercenter.v1.UpdateDirectorySourceRequest": {
+            id?: string;
+            config_json?: string;
+            status?: string;
             expected_revision?: string;
             reason?: string;
         };
@@ -3799,6 +3958,152 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["api.usercenter.v1.ExportJob"];
+                };
+            };
+        };
+    };
+    DirectoryAdminService_ListDirectorySources: {
+        parameters: {
+            query?: {
+                organization_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DirectorySourcesReply"];
+                };
+            };
+        };
+    };
+    DirectoryAdminService_CreateDirectorySource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CreateDirectorySourceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DirectorySource"];
+                };
+            };
+        };
+    };
+    DirectoryAdminService_UpdateDirectorySource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.UpdateDirectorySourceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DirectorySource"];
+                };
+            };
+        };
+    };
+    DirectoryAdminService_RotateDirectorySourceSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.RotateDirectorySourceSecretRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DirectorySource"];
+                };
+            };
+        };
+    };
+    DirectoryAdminService_TriggerDirectorySync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.TriggerDirectorySyncRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DirectorySyncRun"];
+                };
+            };
+        };
+    };
+    DirectoryAdminService_ListDirectorySyncRuns: {
+        parameters: {
+            query?: {
+                source_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.DirectorySyncRunsReply"];
                 };
             };
         };

@@ -19,4 +19,6 @@ var ProviderSet = wire.NewSet(
 	NewOrganizationUsecase,
 	NewOrgIAMUsecase,
 	NewSCIMUsecase,
+	NewDirectoryConnectors,
+	NewDirectoryUsecase,
 )

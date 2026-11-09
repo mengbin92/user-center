@@ -94,4 +94,4 @@ SQLite（开发/测试）由 `AutoMigrate` 建表，MySQL 由 `migrations/mysql/
 - SCIM Group 不改变组织内置角色或部门归属，只是供给视图。
 - 不支持 SCIM 密码写入（`password` 属性被忽略）；需要本地密码时走管理员重置。
 - 未实现 SCIM `/Bulk`，大批量供给需由 IdP 逐条调用；`count` 与分页可避免单次响应过大。
-- 没有内置企业目录连接器；从 LDAP/AD/Entra/飞书等源拉取数据是阶段③的独立能力。
+- 企业目录同步是另一个独立能力（V2.6 阶段③，见 `docs/directory-sync.md`），它复用本页的供给路径，但由本系统主动拉取，不是 IdP 推送。

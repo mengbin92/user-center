@@ -84,6 +84,129 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.ExportJob'
+    /api/v1/admin/directory-sources:
+        get:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_ListDirectorySources
+            parameters:
+                - name: organization_id
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySourcesReply'
+        post:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_CreateDirectorySource
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CreateDirectorySourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySource'
+    /api/v1/admin/directory-sources/{id}:
+        patch:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_UpdateDirectorySource
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.UpdateDirectorySourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySource'
+    /api/v1/admin/directory-sources/{id}:rotate-secret:
+        post:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_RotateDirectorySourceSecret
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.RotateDirectorySourceSecretRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySource'
+    /api/v1/admin/directory-sources/{id}:sync:
+        post:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_TriggerDirectorySync
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.TriggerDirectorySyncRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySyncRun'
+    /api/v1/admin/directory-sync-runs:
+        get:
+            tags:
+                - DirectoryAdminService
+            operationId: DirectoryAdminService_ListDirectorySyncRuns
+            parameters:
+                - name: source_id
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.DirectorySyncRunsReply'
     /api/v1/admin/event-deliveries:
         get:
             tags:
@@ -3925,6 +4048,21 @@ components:
                     type: string
                 name:
                     type: string
+        api.usercenter.v1.CreateDirectorySourceRequest:
+            type: object
+            properties:
+                organization_id:
+                    type: string
+                kind:
+                    type: string
+                name:
+                    type: string
+                config_json:
+                    type: string
+                secret:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.CreateEmailChallengeRequest:
             type: object
             properties:
@@ -4341,6 +4479,95 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Department'
+        api.usercenter.v1.DirectorySource:
+            type: object
+            properties:
+                id:
+                    type: string
+                organization_id:
+                    type: string
+                kind:
+                    type: string
+                    description: ldap | jsonfeed
+                name:
+                    type: string
+                config_json:
+                    type: string
+                status:
+                    type: string
+                    description: active | paused
+                cursor:
+                    type: string
+                revision:
+                    type: string
+                created_at:
+                    type: string
+                updated_at:
+                    type: string
+                last_run_at:
+                    type: string
+            description: |-
+                secret is never part of any reply. config_json holds only non-sensitive
+                 connection settings (URL, base DN, filters, attribute map, interval, policies).
+        api.usercenter.v1.DirectorySourcesReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DirectorySource'
+        api.usercenter.v1.DirectorySyncRun:
+            type: object
+            properties:
+                id:
+                    type: string
+                source_id:
+                    type: string
+                organization_id:
+                    type: string
+                mode:
+                    type: string
+                    description: full | delta | dry_run
+                status:
+                    type: string
+                    description: running | succeeded | partial | failed
+                started_at:
+                    type: string
+                finished_at:
+                    type: string
+                fetched:
+                    type: integer
+                    format: int32
+                created_count:
+                    type: integer
+                    format: int32
+                updated_count:
+                    type: integer
+                    format: int32
+                disabled_count:
+                    type: integer
+                    format: int32
+                unchanged_count:
+                    type: integer
+                    format: int32
+                failed_count:
+                    type: integer
+                    format: int32
+                cursor_before:
+                    type: string
+                cursor_after:
+                    type: string
+                report_json:
+                    type: string
+                error_text:
+                    type: string
+        api.usercenter.v1.DirectorySyncRunsReply:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.usercenter.v1.DirectorySyncRun'
         api.usercenter.v1.DisableIntegrationClientRequest:
             type: object
             properties:
@@ -5610,6 +5837,17 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.Role'
+        api.usercenter.v1.RotateDirectorySourceSecretRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                secret:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
         api.usercenter.v1.RotateIntegrationClientCredentialRequest:
             type: object
             properties:
@@ -5892,6 +6130,16 @@ components:
                     type: string
                 owner_user_id:
                     type: string
+        api.usercenter.v1.TriggerDirectorySyncRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                mode:
+                    type: string
+                    description: full | delta | dry_run
+                reason:
+                    type: string
         api.usercenter.v1.UpdateAuthSettingsRequest:
             type: object
             properties:
@@ -5996,6 +6244,19 @@ components:
                 code:
                     type: string
                 name:
+                    type: string
+                expected_revision:
+                    type: string
+                reason:
+                    type: string
+        api.usercenter.v1.UpdateDirectorySourceRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                config_json:
+                    type: string
+                status:
                     type: string
                 expected_revision:
                     type: string
@@ -6453,6 +6714,10 @@ tags:
         AuthService owns public, unauthenticated authentication entry points.
          Browser sessions are established with HttpOnly cookies; no bearer token is
          ever returned to a browser caller.
+    - name: DirectoryAdminService
+      description: |-
+        DirectoryAdminService manages enterprise directory connectors for one
+         organization and their reconciliation runs. Credentials are write-only.
     - name: IAMService
       description: |-
         IAMService is the platform authorization governance surface. Every write

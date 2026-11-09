@@ -436,6 +436,7 @@ func (uc *SCIMUsecase) CreateUser(ctx context.Context, orgID int64, in SCIMUserI
 			}
 			if err := uc.Credentials.Create(ctx, tx, &Credential{
 				UserID: user.ID, PasswordHash: hash, Algorithm: "bcrypt", Revision: 1,
+				UpdatedAt: now,
 			}); err != nil {
 				return ErrDependency
 			}

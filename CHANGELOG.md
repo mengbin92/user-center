@@ -27,6 +27,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 - HTTP 级测试 4 组：发现与鉴权、供给生命周期、租户边界与组成员、凭据治理拒绝；覆盖无/错/停用 token、缺 schemas、非法 filter/path、跨租户 id、跨租户邮箱绑定、组成员越权、`If-Match` 412、唯一性冲突、非平台管理员签发、凭据不回显。
 - 新增 `docs/scim.md`（含明确不支持的子集与已知限制），回填 `README.md`、`docs/api.md`、`docs/security.md`、`docs/data-model.md`、两份路线图的追踪状态。
 
+### 阶段③ — 企业目录同步
+
+- 新增两类连接器：`ldap`（go-ldap，Simple Bind、分页搜索、`whenChanged>=cursor` 增量、`userAccountControl` 判定停用、属性映射可配）与 `jsonfeed`（HTTP JSON 网关，`since` 游标、显式 `deleted` 与 `full` 标记）。连接器实现统一 `Fetch` 接口，新增源不改引擎。
+- 外部凭据按 `docs/api.md` 原有前置落地加密入库（`SecretBox`/AES-GCM）、只写不读、轮换（`expected_revision` + `reason` + Step-up）与平台审计；明文协议仅允许回环地址并禁用重定向（SSRF 防护）。
+- 同步引擎：独立 30s worker 按 `interval_seconds` 调度、`full` / `delta` / `dry_run` 三种模式、增量游标、`directory_objects` 映射、tombstone 对账（`disable` / `delete` / `keep`）、`source_wins` / `local_wins` 冲突策略、逐对象报告与 `partial` 状态；`dry_run` 不写入也不推进游标。供给复用 SCIM 路径，不存在第二套账号创建逻辑。
+- 迁移 `016`：`directory_sources`、`directory_sync_runs`、`directory_objects`（SQLite 同步纳入 `AutoMigrate`）。**升级须先执行迁移 016 再启动服务。**
+- 新增 6 个平台管理端点与组织设置页（仅平台管理员可见）；全部写操作要求平台管理员 + Step-up + `reason`。
+- HTTP 级测试 2 组：供给/对账生命周期（dry-run、全量、增量停用、全量 tombstone、运行记录留存）与治理拒绝（缺 reason、明文非回环 URL、未知连接器、非法 config、非平台账号读写、凭据不回显、过期 revision）。
+- 新增 `docs/directory-sync.md`（含未实现项：组/部门层级同步、非 AD LDAP 增量、原生 Entra/飞书连接器、多实例分布式租约、写回），回填 README、API/安全/数据模型文档与两份路线图。
+
 ## [0.11.0] - 2026-11-09
 
 **版本判定：MINOR**（v0.10.1 → v0.11.0）。新增组织授权的委派能力边界、存量组织权限回填，以及用户手册、管理员手册和操作视频；统一凭据限制并加固并发会话与组织授权。包含 **1 个数据库迁移**（`014_password_history_backfill.sql`），升级须先迁移再启动服务。详见 [发布说明](docs/releases/release-v0.11.0.md)。

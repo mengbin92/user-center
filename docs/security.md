@@ -156,6 +156,7 @@
     改密开始计时 —— 存量账号的 `password_changed_at` 为空，不会被计入过期。
 12. **OpenAPI 不包含浏览器安全方案与原始路由**：Cookie/CSRF、OAuth start/callback、CSV 下载在 `docs/api.md` 中约定，不在 `openapi.yaml` 的 securitySchemes 中。`/scim/v2/*` 同样是原始路由，其 Bearer 方案在 `docs/scim.md` 中约定。
 13. **SCIM 只隔离成员资格，不隔离全局账号**：`users` 表仍是全局共享的，SCIM 的 `active=false` 与 `DELETE /Users/{id}` 只影响该组织的成员资格与外部标识映射，不动全局账号。因此一个租户的 IdP 停用某账号不会波及其他租户；反过来，账号级别的物理隔离也不由 SCIM 提供（属 V2.6 阶段④）。邮箱已存在但不属于本组织时供给被拒为 `409`，避免跨租户静默绑定。SCIM 协议子集、`/Bulk` 与 `sort` 等未支持能力见 `docs/scim.md` §4。
+14. **目录同步的限制**：外部凭据虽已加密入库并可轮换/审计，但同步 worker 只在单进程内串行，**多实例部署没有分布式租约**，同一目录源可能被两个实例同时拉取；上线多副本前必须补跨实例锁。明文 `http` / `ldap` 只允许回环地址，生产应使用 `https` / `ldaps`。只同步用户、不同步组/部门层级；LDAP 增量依赖 AD 的 `whenChanged`；Entra/飞书/企业微信需通过 JSON 网关对接。完整清单见 `docs/directory-sync.md` §7。
 
 ## 5. 上线检查
 

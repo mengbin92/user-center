@@ -158,7 +158,10 @@ func newHarnessFor(t *testing.T, dataConf *conf.Data, opts ...harnessOption) *ha
 	integrationAdmin := biz.NewIntegrationAdminUsecase(svc)
 	oidcAdmin := service.NewOIDCAdminService(biz.NewOIDCUsecase(svc))
 	organizations := service.NewOrganizationService(biz.NewOrganizationUsecase(svc), biz.NewOrgIAMUsecase(svc))
-	scim := service.NewSCIMService(biz.NewSCIMUsecase(svc, data.NewSCIMRepo(d)))
+	scimUC := biz.NewSCIMUsecase(svc, data.NewSCIMRepo(d))
+	scim := service.NewSCIMService(scimUC)
+	directory := service.NewDirectoryAdminService(
+		biz.NewDirectoryUsecase(svc, data.NewDirectoryRepo(d), biz.NewDirectoryConnectors(), scimUC))
 
 	_, err = svc.BootstrapRoot(context.Background(), "root", "root@example.com", "ChangeMe-12345")
 	if err != nil && dataConf.Database.Driver == "mysql" {
@@ -194,6 +197,7 @@ func newHarnessFor(t *testing.T, dataConf *conf.Data, opts ...harnessOption) *ha
 		oidcAdmin,
 		organizations,
 		scim,
+		directory,
 		users,
 		server.ArtifactDir(runtime.ArtifactDir),
 	)

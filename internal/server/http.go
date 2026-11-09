@@ -50,6 +50,7 @@ func NewHTTPServer(
 	oidcAdmin *service.OIDCAdminService,
 	organizations *service.OrganizationService,
 	scim *service.SCIMService,
+	directoryAdmin *service.DirectoryAdminService,
 	users *biz.UserUsecase,
 	artifactDir ArtifactDir,
 ) *HTTPServer {
@@ -100,6 +101,7 @@ func NewHTTPServer(
 	usercv1.RegisterOIDCAdminServiceHTTPServer(srv, oidcAdmin)
 	usercv1.RegisterOrganizationServiceHTTPServer(srv, organizations)
 	usercv1.RegisterSCIMAdminServiceHTTPServer(srv, scim)
+	usercv1.RegisterDirectoryAdminServiceHTTPServer(srv, directoryAdmin)
 
 	// SCIM 2.0 is a raw JSON protocol with its own schemas and error shape.
 	// These routes are deliberately outside /api/v1/: the browser CSRF rule in

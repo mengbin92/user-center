@@ -143,10 +143,16 @@ import type {
   ArchiveOrgRoleRequest,
   CreateDepartmentRequest,
   CreateOrganizationInvitationRequest,
+  CreateDirectorySourceRequest,
   CreateOrganizationRequest,
   CreateOrgAssignmentRequest,
   CreateSCIMTokenRequest,
   DisableSCIMTokenRequest,
+  DirectorySource,
+  DirectorySourcesReply,
+  DirectorySyncRun,
+  DirectorySyncRunsReply,
+  TriggerDirectorySyncRequest,
   RotateSCIMTokenRequest,
   SCIMToken,
   SCIMTokenCredentialReply,
@@ -593,6 +599,29 @@ export const api = {
       ),
     disableSCIMToken: (id: string, body: DisableSCIMTokenRequest) =>
       post<SCIMToken>(`/api/v1/admin/scim/tokens/${enc(id)}:disable`, body),
+    listDirectorySources: (organizationId: string) =>
+      get<DirectorySourcesReply>('/api/v1/admin/directory-sources', {
+        organization_id: organizationId,
+      }),
+    createDirectorySource: (body: CreateDirectorySourceRequest) =>
+      post<DirectorySource>('/api/v1/admin/directory-sources', body),
+    rotateDirectorySourceSecret: (id: string, body: {
+      secret: string
+      expected_revision: string
+      reason: string
+    }) =>
+      post<DirectorySource>(
+        `/api/v1/admin/directory-sources/${enc(id)}:rotate-secret`,
+        { id, ...body },
+      ),
+    triggerDirectorySync: (id: string, body: TriggerDirectorySyncRequest) =>
+      post<DirectorySyncRun>(`/api/v1/admin/directory-sources/${enc(id)}:sync`, {
+        id, ...body,
+      }),
+    listDirectorySyncRuns: (sourceId: string) =>
+      get<DirectorySyncRunsReply>('/api/v1/admin/directory-sync-runs', {
+        source_id: sourceId,
+      }),
     overview: () => get<OverviewReply>('/api/v1/admin/overview'),
     listOrganizations: (params?: ListOrganizationsParams) =>
       get<OrganizationsReply>('/api/v1/admin/organizations', params),

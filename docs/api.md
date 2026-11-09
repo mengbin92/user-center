@@ -283,7 +283,7 @@ GET  /oidc/userinfo                      Bearer access token
 - **凭据来源单一化**：外部 provider 凭据只从环境变量读取（`OAUTH_GITHUB_*` / `OAUTH_GOOGLE_*`），不入库、不回显；`/admin/settings/providers` 只做只读可视化与启停，启停仍走 `/admin/settings/auth` 的 `providers` 字段（写审计并推进 policy revision）。若未来入库，需要加密、轮换与审计设计，并先移除环境变量来源，避免两处同时生效。
 - **用户名只能自助修改**：`UpdateUsername` 只暴露在 `/api/v1/me`，管理端没有改名 RPC，避免审计主体歧义。规则（格式、归一化、保留字）与注册路径共用同一函数。
 - **组织配额默认关闭**：开启后每用户默认 5 个（可配 1–1000），平台管理员（root/admin）豁免；归档组织默认不计入。
-- **不纳入**：`ExchangeLegacySession`、企业目录同步、租户物理隔离（V2.6 阶段③④，理由见路线图 §3.2）。**SCIM 2.0 与组织级 SoD 已交付**，不再属于不纳入项：SCIM 端点与凭据管理见 [SCIM 文档](scim.md) 与下文组织委派 API。WebAuthn/Passkey（R13）与个人信息清理（R14）按路线图分别滑动到 V2.5 / 未排期，当前未实现。
+- **不纳入**：`ExchangeLegacySession`、租户物理隔离（V2.6 阶段④，理由见路线图 §3.2）。**SCIM 2.0、企业目录同步与组织级 SoD 已交付**，不再属于不纳入项：SCIM 端点与凭据管理见 [SCIM 文档](scim.md) 与下文组织委派 API。WebAuthn/Passkey（R13）与个人信息清理（R14）按路线图分别滑动到 V2.5 / 未排期，当前未实现。
 
 ### 组织委派 API
 
@@ -295,6 +295,12 @@ GET  /oidc/userinfo                      Bearer access token
 | POST | `/api/v1/orgs/{id}/iam/delegations/{delegation_id}:revoke` | 同上 | 软失效，已授出的分配不回滚 |
 
 所有写操作强制 `reason`，并要求 `expected_revision`（更新/撤销）与 `expected_policy_revision` 两道 CAS；路径 `{id}` 是唯一租户选择器，请求体没有上下文字段，跨租户 id 一律按 `RESOURCE_NOT_FOUND` 处理。平台管理员按 D7 没有组织委派入口。
+
+### SCIM 与企业目录同步
+
+`/scim/v2/*` 协议端点、SCIM 凭据管理、企业目录同步源与同步运行记录的完整契约分别见 [SCIM 文档](scim.md) 与 [目录同步文档](directory-sync.md)；管理端 RPC 同时收录在 `openapi.yaml`（`SCIMAdminService` / `DirectoryAdminService`）。原始 SCIM 协议端点不在 OpenAPI 中。
+
+**凭据来源单一化决策的更新**：原有约定是外部 provider 凭据只从环境变量读取、不入库。目录同步按该条自带的前置落地了加密入库（`SecretBox` / AES-GCM）、轮换与审计，且不使用 OAuth provider 的环境变量凭据，因此不存在两处同时生效。OAuth 登录 provider 仍维持只读配置 + 环境变量凭据。
 
 ## V2.4 W4/W5 契约
 

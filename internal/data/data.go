@@ -222,5 +222,6 @@ func models() []any {
 		&menuPO{}, &auditEventPO{}, &authSettingsPO{}, &emailSettingsPO{},
 		&exportJobPO{}, &outboxEventPO{}, &deliveryPO{}, &integrationClientPO{}, &legacyImportBatchPO{}, &organizationPO{}, &organizationMemberPO{}, &organizationDepartmentPO{}, &organizationInvitationPO{}, &oidcClientPO{}, &oidcCodePO{}, &oidcRefreshPO{}, &oidcConsentPO{}, &oidcConsentRequestPO{}, &webauthnCredentialPO{}, &legalHoldPO{},
 		&scimTokenPO{}, &scimIdentityPO{}, &scimGroupPO{}, &scimGroupMemberPO{},
+		&directorySourcePO{}, &directoryRunPO{}, &directoryObjectPO{},
 	}
 }

@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package api.usercenter.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/mengbin92/user-center/api/usercenter/v1;usercv1";
+
+// DirectoryAdminService manages enterprise directory connectors for one
+// organization and their reconciliation runs. Credentials are write-only.
+service DirectoryAdminService {
+  rpc ListDirectorySources(ListDirectorySourcesRequest) returns (DirectorySourcesReply) {
+    option (google.api.http) = {get: "/api/v1/admin/directory-sources"};
+  }
+  rpc CreateDirectorySource(CreateDirectorySourceRequest) returns (DirectorySource) {
+    option (google.api.http) = {post: "/api/v1/admin/directory-sources" body: "*"};
+  }
+  rpc UpdateDirectorySource(UpdateDirectorySourceRequest) returns (DirectorySource) {
+    option (google.api.http) = {patch: "/api/v1/admin/directory-sources/{id}" body: "*"};
+  }
+  rpc RotateDirectorySourceSecret(RotateDirectorySourceSecretRequest) returns (DirectorySource) {
+    option (google.api.http) = {post: "/api/v1/admin/directory-sources/{id}:rotate-secret" body: "*"};
+  }
+  rpc TriggerDirectorySync(TriggerDirectorySyncRequest) returns (DirectorySyncRun) {
+    option (google.api.http) = {post: "/api/v1/admin/directory-sources/{id}:sync" body: "*"};
+  }
+  rpc ListDirectorySyncRuns(ListDirectorySyncRunsRequest) returns (DirectorySyncRunsReply) {
+    option (google.api.http) = {get: "/api/v1/admin/directory-sync-runs"};
+  }
+}
+
+// secret is never part of any reply. config_json holds only non-sensitive
+// connection settings (URL, base DN, filters, attribute map, interval, policies).
+message DirectorySource {
+  string id = 1;
+  string organization_id = 2;
+  // ldap | jsonfeed
+  string kind = 3;
+  string name = 4;
+  string config_json = 5;
+  // active | paused
+  string status = 6;
+  string cursor = 7;
+  string revision = 8;
+  string created_at = 9;
+  string updated_at = 10;
+  string last_run_at = 11;
+}
+
+message DirectorySourcesReply {
+  repeated DirectorySource items = 1;
+}
+
+message DirectorySyncRun {
+  string id = 1;
+  string source_id = 2;
+  string organization_id = 3;
+  // full | delta | dry_run
+  string mode = 4;
+  // running | succeeded | partial | failed
+  string status = 5;
+  string started_at = 6;
+  string finished_at = 7;
+  int32 fetched = 8;
+  int32 created_count = 9;
+  int32 updated_count = 10;
+  int32 disabled_count = 11;
+  int32 unchanged_count = 12;
+  int32 failed_count = 13;
+  string cursor_before = 14;
+  string cursor_after = 15;
+  string report_json = 16;
+  string error_text = 17;
+}
+
+message DirectorySyncRunsReply {
+  repeated DirectorySyncRun items = 1;
+}
+
+message ListDirectorySourcesRequest {
+  string organization_id = 1;
+}
+
+message CreateDirectorySourceRequest {
+  string organization_id = 1;
+  string kind = 2;
+  string name = 3;
+  string config_json = 4;
+  string secret = 5;
+  string reason = 6;
+}
+
+message UpdateDirectorySourceRequest {
+  string id = 1;
+  string config_json = 2;
+  string status = 3;
+  string expected_revision = 4;
+  string reason = 5;
+}
+
+message RotateDirectorySourceSecretRequest {
+  string id = 1;
+  string secret = 2;
+  string expected_revision = 3;
+  string reason = 4;
+}
+
+message TriggerDirectorySyncRequest {
+  string id = 1;
+  // full | delta | dry_run
+  string mode = 2;
+  string reason = 3;
+}
+
+message ListDirectorySyncRunsRequest {
+  string source_id = 1;
+}

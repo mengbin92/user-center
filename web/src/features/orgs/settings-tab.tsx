@@ -23,6 +23,7 @@ import {
   OrganizationRoleBadge,
 } from './org-shared'
 import { OrganizationSCIMTokens } from './scim-tokens'
+import { OrganizationDirectorySync } from './directory-sync'
 
 export function OrganizationSettingsTab({
   org,
@@ -132,6 +133,7 @@ export function OrganizationSettingsTab({
       </Card>
 
       <OrganizationSCIMTokens orgId={orgId} />
+      <OrganizationDirectorySync orgId={orgId} />
 
       <Card>
         <CardHeader
