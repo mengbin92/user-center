@@ -222,7 +222,7 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 
 ## 操作视频
 
-以下 10 段为真实页面录屏，配中文字幕与关键截图，无配音。全部使用独立演示数据，密码、MFA 二维码、恢复码与客户端密钥已遮挡。
+以下 12 段为真实页面录屏，配中文字幕与关键截图，无配音。全部使用独立演示数据，密码、MFA 二维码、恢复码与客户端密钥已遮挡。
 
 | 操作视频 | 内容 |
 |---|---|
@@ -230,12 +230,14 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 | [首次登录改密与 MFA](docs/videos/first-login.webm) | 修改初始密码、绑定 TOTP、保存恢复码 |
 | [会话管理与登录记录](docs/videos/sessions.webm) | 检查设备、撤销其他会话、查看安全事件 |
 | [创建组织](docs/videos/org-create.webm) | 创建组织并核对组织空间 |
+| [组织委派](docs/videos/org-delegation.webm) | 在组织内创建并撤销委派，限定目标角色与成员范围 |
 | [创建用户](docs/videos/user-create.webm) | 填写资料、初始密码与原因，提交并核对详情 |
 | [角色与授权分配](docs/videos/iam-grant.webm) | 创建角色、预览资格、实际提交分配；示例角色未配置业务权限 |
 | [委派与职责分离](docs/videos/delegation-sod.webm) | 查看配置表单，**未提交规则** |
 | [审计与 CSV 导出](docs/videos/audit-export.webm) | 筛选审计、创建导出任务并下载 CSV |
 | [创建 OIDC 应用](docs/videos/oidc-app.webm) | 配置回调与查看一次性密钥保存提示 |
 | [认证配置](docs/videos/settings-auth.webm) | 查看策略与会话设置，**未保存配置** |
+| [SCIM 与目录同步](docs/videos/provisioning.webm) | 签发一次性 SCIM 凭据（已遮挡）、查看目录源表单，**未提交** |
 
 视频与截图随仓库提交；可直接打开或下载上述文件。克隆仓库后，可在浏览器打开 [本地播放目录](docs/videos/index.html) 集中观看。配套步骤见 [用户手册](docs/user-guide.md) 和 [管理员操作手册](docs/admin-guide.md)，覆盖范围及重新录制方法见 [录制说明](docs/videos/README.md)。
 

@@ -70,7 +70,7 @@ const env = {
   SESSION_SECRET: crypto.randomBytes(32).toString('hex'), CSRF_SECRET: crypto.randomBytes(32).toString('hex'),
   MFA_ENCRYPTION_KEY: crypto.randomBytes(32).toString('hex'),
 }
-let server, browser, activeContext, rootState, userState, rootCodes, userCodes
+let server, browser, activeContext, rootState, userState, rootCodes, userCodes, labOrgId
 const manifest = []
 
 async function api(context, method, path, data) {
@@ -143,9 +143,10 @@ async function record(name, title, state, action) {
       denied.push({ path: new URL(response.url()).pathname, status: response.status(), reason: body.reason })
     }
   })
-  if (state === rootState && state) {
-    await api(context, 'POST', '/api/v1/me/security:verify', { current_password: password, code: takeRecoveryCode(rootCodes) })
-  }
+  // Step-up is bound to the session, and rootState was verified once during
+  // setup. Re-verifying per chapter burned a recovery code each time and left
+  // the last chapter without one.
+  assert(!(state === rootState && state) || rootCodes.length >= 0)
   try {
     await action(page, context)
   } catch (error) {
@@ -354,8 +355,74 @@ try {
     await page.waitForURL(/\/orgs\/\d+$/)
     await page.getByRole('heading', { name: '演示实验室', exact: true }).waitFor()
     await page.waitForLoadState('networkidle')
+    const match = page.url().match(/\/orgs\/(\d+)/)
+    assert(match, 'Organization id missing from URL')
+    labOrgId = match[1]
     await caption(page, '02 / 组织空间', '在页签中管理成员、部门、组织角色、职责分离、审计与设置。')
     await screenshot(page, 'organization')
+  })
+
+  // A delegation write needs a recent step-up; the shared user session has
+  // none yet, so verify once and reuse the resulting storage state.
+  const delegationCtx = await browser.newContext({ baseURL, storageState: userState })
+  await api(delegationCtx, 'GET', '/api/v1/auth/context')
+  await api(delegationCtx, 'POST', '/api/v1/me/security:verify', { current_password: newPassword, code: takeRecoveryCode(userCodes) })
+  const delegationState = await delegationCtx.storageState()
+  await delegationCtx.close()
+
+  await record('org-delegation', '组织委派：创建与撤销', delegationState, async (page) => {
+    await visit(page, '/orgs/' + labOrgId, '演示实验室')
+    await page.getByRole('tab', { name: '职责分离' }).click()
+    await page.getByRole('heading', { name: '组织内委派', exact: true }).waitFor()
+    await page.getByRole('button', { name: '新建委派', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByLabel('管理角色').selectOption({ index: 1 })
+    await dialog.getByLabel('目标角色').selectOption({ index: 2 })
+    await caption(page, '01 / 选择管理角色与目标角色', '管理角色是委派的使用者，目标角色是能被授出的角色；授权上限自动取目标角色当前权限。')
+    await screenshot(page, 'org-delegation-form')
+    await dialog.getByRole('button', { name: '下一步', exact: true }).click()
+    await page.getByLabel(/操作原因/).fill(reason)
+    const created = page.waitForResponse((res) => res.url().includes('/iam/delegations') && res.request().method() === 'POST')
+    await page.getByRole('button', { name: '创建', exact: true }).click()
+    assert((await created).ok(), 'Organization delegation creation failed')
+    await page.getByText('生效中', { exact: true }).first().waitFor()
+    await caption(page, '02 / 委派已生效', '委派只放宽目标角色的分配能力，不授予角色或策略修改权。')
+    await screenshot(page, 'org-delegation')
+    const revoked = page.waitForResponse((res) => res.url().includes(':revoke') && res.request().method() === 'POST')
+    await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+    await page.getByLabel(/操作原因/).fill('演示结束，撤销委派')
+    await page.getByRole('button', { name: '撤销', exact: true }).last().click()
+    assert((await revoked).ok(), 'Organization delegation revoke failed')
+    await page.getByText('已撤销', { exact: true }).first().waitFor()
+    await caption(page, '03 / 撤销后立即失效', '撤销写入组织审计并推进策略版本；已授出的分配不会自动回滚。')
+  })
+
+  await record('provisioning', 'SCIM 凭据与目录同步', rootState, async (page) => {
+    await visit(page, '/orgs/' + labOrgId, '演示实验室')
+    await page.getByRole('tab', { name: '设置' }).click()
+    await page.getByRole('heading', { name: 'SCIM 2.0 用户供给', exact: true }).waitFor()
+    await page.getByRole('button', { name: '新建凭据', exact: true }).click()
+    await page.getByLabel('凭据名称').fill('演示 IdP')
+    await page.getByRole('button', { name: '下一步', exact: true }).click()
+    await page.getByLabel(/操作原因/).fill(reason)
+    const token = page.waitForResponse((res) => res.url().includes('/admin/scim/tokens') && res.request().method() === 'POST')
+    await page.getByRole('button', { name: '确认', exact: true }).click()
+    assert((await token).ok(), 'SCIM token creation failed')
+    await page.getByRole('heading', { name: '请立即保存凭据', exact: true }).waitFor()
+    await assertMaskedCodes(page)
+    await caption(page, '01 / 凭据只显示一次', '凭据绑定本组织，服务端只保存摘要；关闭后只能轮换。录制中已遮挡。')
+    await screenshot(page, 'scim-token')
+    await page.getByRole('button', { name: '我已保存', exact: true }).click()
+    await page.getByRole('button', { name: '新建目录源', exact: true }).click()
+    const sourceDialog = page.getByRole('dialog')
+    await sourceDialog.getByLabel('名称').fill('corp-ad')
+    await sourceDialog.getByLabel(/连接配置/).fill(JSON.stringify({
+      url: 'https://directory.example.com/users', interval_seconds: 300,
+      deletion_policy: 'disable', conflict_policy: 'source_wins',
+    }, null, 2))
+    await caption(page, '02 / 目录同步配置', '支持 LDAP / AD 与 JSON 网关；外部凭据加密入库，同步支持预演与对账。本段只查看，不提交。')
+    await screenshot(page, 'directory-sync')
+    await sourceDialog.getByRole('button', { name: '取消', exact: true }).click()
   })
 
   await record('iam-grant', '创建角色并预览、提交授权', rootState, async (page) => {
@@ -395,10 +462,10 @@ try {
     await screenshot(page, name)
   }
   await mobile.close()
-  assert.equal(manifest.length, 10)
+  assert.equal(manifest.length, 12)
   const recordedAt = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'long', timeStyle: 'medium', hour12: false }).format(new Date()) + '（北京时间）'
   await writeFile(join(output, 'manifest.json'), JSON.stringify({ recorded_at: recordedAt, viewport: '1440×1000', mobile: '390×844', clips: manifest }, null, 2) + '\n')
-  console.log('PASS: 10 videos, key screenshots, mobile overflow assertions and CSV download')
+  console.log('PASS: 12 videos, key screenshots, mobile overflow assertions and CSV download')
 } finally {
   await activeContext?.close().catch(() => {})
   await browser?.close().catch(() => {})

@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026年11月9日 09:26:00（北京时间）",
+  "recorded_at": "2026年11月9日 19:11:33（北京时间）",
   "viewport": "1440×1000",
   "mobile": "390×844",
   "clips": [
@@ -47,6 +47,16 @@
       "name": "org-create",
       "title": "创建组织与查看组织空间",
       "video": "org-create.webm"
+    },
+    {
+      "name": "org-delegation",
+      "title": "组织委派：创建与撤销",
+      "video": "org-delegation.webm"
+    },
+    {
+      "name": "provisioning",
+      "title": "SCIM 凭据与目录同步",
+      "video": "provisioning.webm"
     },
     {
       "name": "iam-grant",

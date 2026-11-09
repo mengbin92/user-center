@@ -51,6 +51,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 - 新增 `docs/tenancy.md`；回填 `README.md`、`docs/api.md`、`docs/security.md` §4.5、`docs/data-model.md`、`docs/operations.md` 与两份路线图的追踪状态。
 - 存量 cutover：`cmd/tenant-migrate` 按表复制并校验行数，支持 `-dry-run` 与 `-purge`；`scripts/dr/tenant-schemas.sh` 备份所有租户库。账号/会话按设计留在平台 schema（见文档 §6）。
 
+### 文档与操作视频
+
+- 用户手册新增 §9.3「角色由谁分配（组织委派）」，说明被授权成员视角的两条影响：分配者不一定持有该角色、撤销委派不回滚已授出的角色。
+- 管理员手册新增 §8.1「组织委派」（字段、授权上限自动带出、写入要求、撤销语义）与 §18.1「SCIM 2.0 用户供给」、§18.2「企业目录同步」（预演、对账、删除策略与已知限制）。
+- 录屏从 10 段扩到 12 段：新增 `org-delegation.webm`（在演示组织中实际创建并撤销一条委派）与 `provisioning.webm`（签发一次性 SCIM 凭据并查看目录源表单，目录源未提交）；关键截图 19 → 23 张。
+- 视频目录页重排为 12 段连续编号并更新为 v0.12.0；`docs/videos/README.md` 同步清单、遮挡边界与验证记录。录制脚本去掉每章重复的 Step-up（按会话生效，重复验证会耗尽恢复码）。
+
+
 ## [0.11.0] - 2026-11-09
 
 **版本判定：MINOR**（v0.10.1 → v0.11.0）。新增组织授权的委派能力边界、存量组织权限回填，以及用户手册、管理员手册和操作视频；统一凭据限制并加固并发会话与组织授权。包含 **1 个数据库迁移**（`014_password_history_backfill.sql`），升级须先迁移再启动服务。详见 [发布说明](docs/releases/release-v0.11.0.md)。

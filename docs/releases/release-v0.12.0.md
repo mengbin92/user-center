@@ -41,6 +41,12 @@
 
 **实现要点**：MySQL 保持平台连接、把租户表名改写为 `schema.table`，因此组织事务与平台表仍是一个原子事务；SQLite 每组织独立数据库文件（开发/测试，租户写不在平台事务内）。租户建表全部执行 `internal/data/tenantddl/{mysql,sqlite}.sql`。`cmd/tenant-migrate` 完成存量数据搬迁（`-dry-run` 预演、`-purge` 清理平台副本），`scripts/dr/tenant-schemas.sh` 覆盖备份。账号、会话与平台策略按设计留在平台 schema，见 `docs/tenancy.md` §6。
 
+## 文档与操作视频
+
+- 用户手册 §9.3「角色由谁分配（组织委派）」；管理员手册 §8.1「组织委派」、§18.1「SCIM 2.0 用户供给」、§18.2「企业目录同步」。
+- 录屏 10 → 12 段：新增 `org-delegation.webm`（实际创建并撤销一条组织委派）与 `provisioning.webm`（签发一次性 SCIM 凭据、查看目录源表单，未提交）；截图 19 → 23 张；目录页重排为 12 段连续编号。
+- 录制脚本去掉每章重复的 Step-up（按会话生效，重复验证会耗尽恢复码），并在 SCIM/目录章节加入凭据遮挡断言。
+
 ## 兼容性与升级影响
 
 | 项目 | 说明 |
