@@ -15,6 +15,7 @@
 - [实现范围与已知差异](#实现范围与已知差异)
 - [测试](#测试)
 - [部署](#部署)
+- [操作视频](#操作视频)
 - [文档](#文档)
 
 ## 快速开始
@@ -216,8 +217,30 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 
 覆盖健康检查、未登录 401、CSRF、登录、自服务面、Step-up、组织与租户边界、审计导出、登出失效。compose 环境的账号夹具与参数说明见 [scripts/e2e/README.md](scripts/e2e/README.md)。
 
+## 操作视频
+
+以下 10 段为真实页面录屏，配中文字幕与关键截图，无配音。全部使用独立演示数据，密码、MFA 二维码、恢复码与客户端密钥已遮挡。
+
+| 操作视频 | 内容 |
+|---|---|
+| [登录用户中心](docs/videos/login.webm) | 账号密码、第二因素验证与个人资料 |
+| [首次登录改密与 MFA](docs/videos/first-login.webm) | 修改初始密码、绑定 TOTP、保存恢复码 |
+| [会话管理与登录记录](docs/videos/sessions.webm) | 检查设备、撤销其他会话、查看安全事件 |
+| [创建组织](docs/videos/org-create.webm) | 创建组织并核对组织空间 |
+| [创建用户](docs/videos/user-create.webm) | 填写资料、初始密码与原因，提交并核对详情 |
+| [角色与授权分配](docs/videos/iam-grant.webm) | 创建角色、预览资格、实际提交分配；示例角色未配置业务权限 |
+| [委派与职责分离](docs/videos/delegation-sod.webm) | 查看配置表单，**未提交规则** |
+| [审计与 CSV 导出](docs/videos/audit-export.webm) | 筛选审计、创建导出任务并下载 CSV |
+| [创建 OIDC 应用](docs/videos/oidc-app.webm) | 配置回调与查看一次性密钥保存提示 |
+| [认证配置](docs/videos/settings-auth.webm) | 查看策略与会话设置，**未保存配置** |
+
+视频与截图随仓库提交；可直接打开或下载上述文件。克隆仓库后，可在浏览器打开 [本地播放目录](docs/videos/index.html) 集中观看。配套步骤见 [用户手册](docs/user-guide.md) 和 [管理员操作手册](docs/admin-guide.md)，覆盖范围及重新录制方法见 [录制说明](docs/videos/README.md)。
+
 ## 文档
 
+- [用户手册](docs/user-guide.md)
+- [管理员操作手册](docs/admin-guide.md)
+- [操作视频清单与录制说明](docs/videos/README.md) / [本地播放目录](docs/videos/index.html)
 - [架构与分层](docs/architecture.md)
 - [API 契约与错误码](docs/api.md)
 - [数据模型](docs/data-model.md)
