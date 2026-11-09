@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，不依赖 Relay / Channel / Billing / Log / Config / Monitor / Notify 即可完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.10.1 — 运维就绪与可复验的灾难恢复。** v0.6.x 完成 V2.4 全部功能；v0.7.x 补运行期能力（Prometheus 指标与 SLO 告警、慢请求日志与全链路 `request_id`、MySQL 负载基线、CI 三道门禁）；v0.8.0 加固认证与访问（可配置密码策略、并发会话上限、统一写接口限流）；v0.9.0 把职责分离与委派补到租户域；v0.10.0 新增就绪探针 `/readyz`（修复数据库不可用时容器仍报 healthy）、把备份恢复与升级回滚做成可复现演练脚本，并写明"能回滚到哪一步"。v0.10.1 修复限流命中计数器冷启动无时间序列的指标缺陷。S14 真实 OAuth 验收因缺凭据按约定标 N/A。SCIM、目录同步继续按 V2 后续里程碑推进。设计依据：`用户中心独立项目设计文档.md`（2026-11-02）。
+> **状态：v0.11.0 — 认证与组织权限加固，手册与操作视频。** 统一并发会话签发与凭据限制，收紧组织授权的能力、委派与租户边界，修复就绪探针与限流口径；新增两份操作手册、10 段字幕视频和 19 张截图。**升级须先执行迁移 `014`**，完整范围见 [v0.11.0 发布说明](docs/releases/release-v0.11.0.md)。组织委派 CRUD 与界面仍未交付；真实上游供应商登录验收保持未验证，SCIM / 目录同步继续按后续里程碑推进。
 
 ## 目录
 
@@ -252,6 +252,7 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
 - [V2.5 路线图](docs/roadmap-v2.5.md)
+- [v0.11.0 发布说明](docs/releases/release-v0.11.0.md)
 - [v0.10.1 发布说明](docs/releases/release-v0.10.1.md)
 - [v0.10.0 发布说明](docs/releases/release-v0.10.0.md)
 - [v0.9.0 发布说明](docs/releases/release-v0.9.0.md)
