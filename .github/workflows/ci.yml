@@ -71,12 +71,18 @@ jobs:
         with:
           go-version: "1.27"
           cache: true
-      - uses: bufbuild/buf-setup-action@v1
-        with:
-          version: "1.72.0"
-          # Without a token the action fetches its release anonymously and is
-          # subject to stricter rate limiting.
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      # The official setup action still declares a Node 20 runtime, which
+      # GitHub now force-runs on Node 24 and reports as a deprecation on every
+      # run. Download the pinned CLI instead and verify the asset digest.
+      - name: Install buf
+        run: |
+          mkdir -p "$RUNNER_TEMP/buf-bin"
+          curl -fsSL -o "$RUNNER_TEMP/buf-bin/buf" \
+            "https://github.com/bufbuild/buf/releases/download/v1.72.0/buf-Linux-x86_64"
+          echo "8720830e26a733da55bb89bcd3cb44849c0965fc0c44fb5d691cccdc64dca5af  $RUNNER_TEMP/buf-bin/buf" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/buf-bin/buf"
+          echo "$RUNNER_TEMP/buf-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/buf-bin/buf" --version
       # Versions are pinned to the ones that produced the committed files:
       # a plugin bump rewrites the header comment and turns this job red.
       - name: Install protoc plugins and wire
