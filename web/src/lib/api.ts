@@ -16,9 +16,11 @@ import type {
   BatchAssignReply,
   BatchAssignRequest,
   BatchPreviewReply,
+  BeginPasskeyLoginRequest,
   ChallengeReply,
   ChangePasswordRequest,
   CompleteMFARequest,
+  CompletePasskeyLoginRequest,
   ConfirmEmailRequest,
   ConfirmMFARequest,
   DecideOIDCConsentReply,
@@ -54,6 +56,7 @@ import type {
   OIDCConsentsReply,
   OrganizationSettings,
   OverviewReply,
+  PasskeyLoginChallengeReply,
   PasswordResetTaskReply,
   Permission,
   PermissionsReply,
@@ -312,6 +315,10 @@ export const api = {
     login: (body: LoginRequest) => post<LoginReply>('/api/v1/auth/login', body),
     completeMfa: (body: CompleteMFARequest) =>
       post<LoginReply>('/api/v1/auth/mfa/complete', body),
+    beginPasskeyLogin: (body: BeginPasskeyLoginRequest) =>
+      post<PasskeyLoginChallengeReply>('/api/v1/auth/passkey/login:begin', body),
+    completePasskeyLogin: (body: CompletePasskeyLoginRequest) =>
+      post<LoginReply>('/api/v1/auth/passkey/login:complete', body),
     logout: () => post<void>('/api/v1/auth/logout', {}),
     createRegistrationChallenge: (body: CreateRegistrationChallengeRequest) =>
       post<ChallengeReply>('/api/v1/auth/registration-challenges', body),

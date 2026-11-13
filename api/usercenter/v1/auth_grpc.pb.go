@@ -25,6 +25,8 @@ const (
 	AuthService_Register_FullMethodName                     = "/api.usercenter.v1.AuthService/Register"
 	AuthService_Login_FullMethodName                        = "/api.usercenter.v1.AuthService/Login"
 	AuthService_CompleteMFA_FullMethodName                  = "/api.usercenter.v1.AuthService/CompleteMFA"
+	AuthService_BeginPasskeyLogin_FullMethodName            = "/api.usercenter.v1.AuthService/BeginPasskeyLogin"
+	AuthService_CompletePasskeyLogin_FullMethodName         = "/api.usercenter.v1.AuthService/CompletePasskeyLogin"
 	AuthService_Logout_FullMethodName                       = "/api.usercenter.v1.AuthService/Logout"
 	AuthService_CreatePasswordResetChallenge_FullMethodName = "/api.usercenter.v1.AuthService/CreatePasswordResetChallenge"
 	AuthService_ResetPassword_FullMethodName                = "/api.usercenter.v1.AuthService/ResetPassword"
@@ -43,6 +45,11 @@ type AuthServiceClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterReply, error)
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginReply, error)
 	CompleteMFA(ctx context.Context, in *CompleteMFARequest, opts ...grpc.CallOption) (*LoginReply, error)
+	// Passwordless passkey login. `begin` is deliberately indistinguishable
+	// for unknown, disabled and passkey-less accounts: it always answers with a
+	// challenge, so the public endpoint cannot enumerate accounts.
+	BeginPasskeyLogin(ctx context.Context, in *BeginPasskeyLoginRequest, opts ...grpc.CallOption) (*PasskeyLoginChallengeReply, error)
+	CompletePasskeyLogin(ctx context.Context, in *CompletePasskeyLoginRequest, opts ...grpc.CallOption) (*LoginReply, error)
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CreatePasswordResetChallenge(ctx context.Context, in *CreatePasswordResetChallengeRequest, opts ...grpc.CallOption) (*ChallengeReply, error)
 	ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -106,6 +113,26 @@ func (c *authServiceClient) CompleteMFA(ctx context.Context, in *CompleteMFARequ
 	return out, nil
 }
 
+func (c *authServiceClient) BeginPasskeyLogin(ctx context.Context, in *BeginPasskeyLoginRequest, opts ...grpc.CallOption) (*PasskeyLoginChallengeReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PasskeyLoginChallengeReply)
+	err := c.cc.Invoke(ctx, AuthService_BeginPasskeyLogin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) CompletePasskeyLogin(ctx context.Context, in *CompletePasskeyLoginRequest, opts ...grpc.CallOption) (*LoginReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LoginReply)
+	err := c.cc.Invoke(ctx, AuthService_CompletePasskeyLogin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authServiceClient) Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -149,6 +176,11 @@ type AuthServiceServer interface {
 	Register(context.Context, *RegisterRequest) (*RegisterReply, error)
 	Login(context.Context, *LoginRequest) (*LoginReply, error)
 	CompleteMFA(context.Context, *CompleteMFARequest) (*LoginReply, error)
+	// Passwordless passkey login. `begin` is deliberately indistinguishable
+	// for unknown, disabled and passkey-less accounts: it always answers with a
+	// challenge, so the public endpoint cannot enumerate accounts.
+	BeginPasskeyLogin(context.Context, *BeginPasskeyLoginRequest) (*PasskeyLoginChallengeReply, error)
+	CompletePasskeyLogin(context.Context, *CompletePasskeyLoginRequest) (*LoginReply, error)
 	Logout(context.Context, *LogoutRequest) (*emptypb.Empty, error)
 	CreatePasswordResetChallenge(context.Context, *CreatePasswordResetChallengeRequest) (*ChallengeReply, error)
 	ResetPassword(context.Context, *ResetPasswordRequest) (*emptypb.Empty, error)
@@ -176,6 +208,12 @@ func (UnimplementedAuthServiceServer) Login(context.Context, *LoginRequest) (*Lo
 }
 func (UnimplementedAuthServiceServer) CompleteMFA(context.Context, *CompleteMFARequest) (*LoginReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method CompleteMFA not implemented")
+}
+func (UnimplementedAuthServiceServer) BeginPasskeyLogin(context.Context, *BeginPasskeyLoginRequest) (*PasskeyLoginChallengeReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method BeginPasskeyLogin not implemented")
+}
+func (UnimplementedAuthServiceServer) CompletePasskeyLogin(context.Context, *CompletePasskeyLoginRequest) (*LoginReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompletePasskeyLogin not implemented")
 }
 func (UnimplementedAuthServiceServer) Logout(context.Context, *LogoutRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method Logout not implemented")
@@ -297,6 +335,42 @@ func _AuthService_CompleteMFA_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_BeginPasskeyLogin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BeginPasskeyLoginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).BeginPasskeyLogin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_BeginPasskeyLogin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).BeginPasskeyLogin(ctx, req.(*BeginPasskeyLoginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_CompletePasskeyLogin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompletePasskeyLoginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).CompletePasskeyLogin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_CompletePasskeyLogin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).CompletePasskeyLogin(ctx, req.(*CompletePasskeyLoginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AuthService_Logout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LogoutRequest)
 	if err := dec(in); err != nil {
@@ -377,6 +451,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CompleteMFA",
 			Handler:    _AuthService_CompleteMFA_Handler,
+		},
+		{
+			MethodName: "BeginPasskeyLogin",
+			Handler:    _AuthService_BeginPasskeyLogin_Handler,
+		},
+		{
+			MethodName: "CompletePasskeyLogin",
+			Handler:    _AuthService_CompletePasskeyLogin_Handler,
 		},
 		{
 			MethodName: "Logout",

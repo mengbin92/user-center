@@ -21,8 +21,8 @@
 | CSRF | 双提交 Cookie + 中间件强制 header 校验（所有非 GET `/api/v1`） |
 | 会话固定 | 登录/完成 MFA 均生成新会话，不复用匿名标识 |
 | 暴力破解 | 登录 IP/用户限流；MFA 5 次失败锁定 5 分钟；挑战验证码 10 次尝试上限 |
-| 账号枚举 | 登录统一“用户名或密码错误”；密码重置统一成功响应；注册邮箱冲突返回挑战失败 |
-| 验证码重放 | 单次消费 + DB `(challenge_id,purpose)` 唯一完成记录 |
+| 账号枚举 | 登录统一“用户名或密码错误”；密码重置统一成功响应；注册邮箱冲突返回挑战失败；Passkey 登录 begin 对未知/停用/未绑定账号返回同形状诱饵 |
+| 验证码重放 | 单次消费 + DB `(challenge_id,purpose)` 唯一完成记录；Passkey 登录挑战同样以 `webauthn_login` 落完成记录 |
 | TOTP 重放 | 持久化 `last_step`，拒绝已使用时间步 |
 | 恢复码泄露 | 仅展示一次；SHA-256 存储；使用即删除 |
 | 越权 | 操作权限 + Scope 边界 + 显式 deny + 有效期 + 约束；资源 owner 执行点校验 |
@@ -124,6 +124,15 @@
   请求永久判为违规。
 - 收紧约束会让现有违规分配**立即失效**（组织权限每次请求重算，不读会话激活角色），因此写入前必须回传 `violating_assignments` 并要求 `acknowledge_violations`；不自动撤销任何分配。
 - 移除成员时，其在本组织的角色分配与**双向**委派（作为 manager 与作为 target）一并软失效。只处理 manager 侧会留下一条仍可向该成员授权的通道。target 侧按 JSON 中的**精确用户 ID**匹配（不是子串），manager 侧只失效该用户**亲自创建**的委派并保留 `created_by`——共享角色的其他持有者不会因某人退出而失去自己的委派。
+
+### 3.4 无密码 Passkey 登录（迁移自 micro-one-api v0.41）
+
+- `POST /api/v1/auth/passkey/login:begin` 是公开端点。未知账号、停用账号与未绑定 Passkey 的账号都返回与真实账号同形状的 challenge + `allow_credential_ids`；假凭据 ID 由 `CodeSecret` 对归一化标识做 HMAC-SHA256 派生，因此同一标识重复探测结果稳定，客户端也无法自行重算来识别诱饵。
+- `complete` 对诱饵 ceremony（user 0）在任何账号查询或断言解析之前直接返回 `CHALLENGE_INVALID`；真实账号的无效断言、停用状态与身份版本变化返回同一 reason，避免通过错误码枚举账号或 Passkey 归属。
+- 断言验证复用第二因素的 COSE/ES256/RS256 验签与 RP ID/origin 校验；`sign_count` 回退仍返回 `WEBAUTHN_SIGN_COUNT_REGRESSION` 并写安全事件与告警审计。
+- 挑战在 `auth_flow_completions` 以 `(challenge_id, purpose='webauthn_login')` 单次消费，与签名计数器更新、会话签发处于同一事务，并先对用户行加锁；并发完成同一挑战只有一个能成功。
+- Passkey 只是**第一因素**：账号仍启用 TOTP 时必须继续调用 `/api/v1/auth/mfa/complete`，该阶段不签发会话，也不把 Passkey 再次作为第二因素提供。
+- 仍保留用户名 + 密码登录；Passkey 绑定/删除继续要求当前密码，删除最后一枚且未启用 TOTP 时返回 `LAST_SECOND_FACTOR`。
 
 ## 4. 已知限制（必须在上线评审中确认）
 

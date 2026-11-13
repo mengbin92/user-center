@@ -22,8 +22,17 @@ function toBase64Url(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+export function passkeySupported(): boolean {
+  return (
+    typeof navigator !== 'undefined' &&
+    typeof PublicKeyCredential !== 'undefined' &&
+    !!navigator.credentials?.get &&
+    !!navigator.credentials?.create
+  )
+}
+
 function browserSupported(): boolean {
-  return typeof navigator !== 'undefined' && !!navigator.credentials && typeof PublicKeyCredential !== 'undefined'
+  return passkeySupported()
 }
 
 export async function createPasskey(

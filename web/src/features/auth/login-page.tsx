@@ -1,4 +1,4 @@
-import { ArrowLeft, KeyRound, Loader2, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Fingerprint, KeyRound, Loader2, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -17,7 +17,7 @@ import { errorMessage, isApiError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import { oauthErrorMessage } from '../../lib/oauth'
 import { oidcAuthorizationPath, safeNext } from '../../lib/paths'
-import { getLoginAssertion } from '../../lib/webauthn'
+import { getLoginAssertion, passkeySupported } from '../../lib/webauthn'
 import type { WebAuthnChallenge } from '../../lib/types'
 
 function describeAuthError(error: unknown): string {
@@ -39,6 +39,20 @@ function describeAuthError(error: unknown): string {
     return error.message
   }
   return errorMessage(error)
+}
+
+function describePasskeyError(error: unknown): string {
+  if (
+    typeof DOMException !== 'undefined' &&
+    error instanceof DOMException &&
+    (error.name === 'NotAllowedError' || error.name === 'AbortError')
+  ) {
+    return '未找到可用的通行密钥，或操作已取消。可改用密码登录。'
+  }
+  if (isApiError(error) && error.reason === 'CHALLENGE_INVALID') {
+    return '通行密钥验证失败，请重试或改用密码登录。'
+  }
+  return describeAuthError(error)
 }
 
 export function LoginPage() {
@@ -188,6 +202,50 @@ export function LoginPage() {
     }
   }
 
+  const submitPasskeyLogin = async () => {
+    if (busy) return
+    const identifier = username.trim()
+    if (!identifier) {
+      setError('请先输入用户名或邮箱，再使用通行密钥登录')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const challenge = await api.auth.beginPasskeyLogin({ username: identifier })
+      const assertion = await getLoginAssertion(
+        challenge.challenge ?? '',
+        challenge.rp_id ?? '',
+        challenge.allow_credential_ids ?? [],
+        challenge.challenge_id ?? '',
+      )
+      const reply = await api.auth.completePasskeyLogin({ ...assertion, remember })
+      if (reply.status === 'mfa_required') {
+        if (!reply.challenge_id) {
+          setError('服务端未返回 MFA challenge，请重新登录')
+          return
+        }
+        setChallengeId(reply.challenge_id)
+        setChallengeExpiresAt(reply.challenge_expires_at ?? '')
+        // The passkey was the first factor; the remaining factor is TOTP or a
+        // recovery code, so the MFA screen must not offer the passkey again.
+        setWebAuthn(null)
+        setCode('')
+        setPhase('mfa')
+        return
+      }
+      announceRecycledSessions(reply)
+      if (reply.password_change_required) {
+        setPostLoginPath(`/account/security?password_change_required=1${oidcNext ? `&next=${encodeURIComponent(oidcNext)}` : ''}`)
+      }
+      await signIn()
+    } catch (passkeyError) {
+      setError(describePasskeyError(passkeyError))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const resetMfa = () => {
     setPhase('password')
     setChallengeId('')
@@ -288,6 +346,24 @@ export function LoginPage() {
           >
             登录
           </Button>
+
+          {passkeySupported() ? (
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                disabled={busy}
+                onClick={() => void submitPasskeyLogin()}
+                icon={<Fingerprint className="h-4 w-4" />}
+              >
+                使用通行密钥
+              </Button>
+              <p className="text-center text-[10px] text-slate-400">
+                用已绑定的 Passkey 免密码登录；未绑定时请先用密码登录，再到安全中心添加。
+              </p>
+            </div>
+          ) : null}
 
           {contextQuery.data?.providers?.length ? (
             <div className="space-y-2 border-t border-slate-100 pt-3">

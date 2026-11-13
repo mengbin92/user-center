@@ -1980,6 +1980,46 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.usercenter.v1.LoginReply'
+    /api/v1/auth/passkey/login:begin:
+        post:
+            tags:
+                - AuthService
+            description: |-
+                Passwordless passkey login. `begin` is deliberately indistinguishable
+                 for unknown, disabled and passkey-less accounts: it always answers with a
+                 challenge, so the public endpoint cannot enumerate accounts.
+            operationId: AuthService_BeginPasskeyLogin
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.BeginPasskeyLoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.PasskeyLoginChallengeReply'
+    /api/v1/auth/passkey/login:complete:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_CompletePasskeyLogin
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.usercenter.v1.CompletePasskeyLoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.usercenter.v1.LoginReply'
     /api/v1/auth/password-reset:
         post:
             tags:
@@ -3857,6 +3897,12 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.usercenter.v1.BatchFailure'
+        api.usercenter.v1.BeginPasskeyLoginRequest:
+            type: object
+            properties:
+                username:
+                    type: string
+                    description: Username or email, matching the password login identifier.
         api.usercenter.v1.ChallengeReply:
             type: object
             properties:
@@ -3887,6 +3933,21 @@ components:
                     type: string
                 signature:
                     type: string
+        api.usercenter.v1.CompletePasskeyLoginRequest:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                credential_id:
+                    type: string
+                authenticator_data:
+                    type: string
+                client_data_json:
+                    type: string
+                signature:
+                    type: string
+                remember:
+                    type: boolean
         api.usercenter.v1.ConfirmEmailChangeRequest:
             type: object
             properties:
@@ -5409,6 +5470,23 @@ components:
                 logins_24h:
                     type: string
                 failed_logins_24h:
+                    type: string
+        api.usercenter.v1.PasskeyLoginChallengeReply:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                challenge:
+                    type: string
+                    description: base64url challenge for navigator.credentials.get().
+                rp_id:
+                    type: string
+                allow_credential_ids:
+                    type: array
+                    items:
+                        type: string
+                    description: Always populated, including for the anti-enumeration decoy ceremony.
+                expires_at:
                     type: string
         api.usercenter.v1.PasswordResetTaskReply:
             type: object

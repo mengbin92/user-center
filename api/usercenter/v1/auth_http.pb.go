@@ -18,7 +18,9 @@ var _ = new(context.Context)
 
 const _ = http.SupportPackageIsVersion3
 
+const OperationAuthServiceBeginPasskeyLogin = "/api.usercenter.v1.AuthService/BeginPasskeyLogin"
 const OperationAuthServiceCompleteMFA = "/api.usercenter.v1.AuthService/CompleteMFA"
+const OperationAuthServiceCompletePasskeyLogin = "/api.usercenter.v1.AuthService/CompletePasskeyLogin"
 const OperationAuthServiceCreatePasswordResetChallenge = "/api.usercenter.v1.AuthService/CreatePasswordResetChallenge"
 const OperationAuthServiceCreateRegistrationChallenge = "/api.usercenter.v1.AuthService/CreateRegistrationChallenge"
 const OperationAuthServiceGetAuthContext = "/api.usercenter.v1.AuthService/GetAuthContext"
@@ -28,7 +30,12 @@ const OperationAuthServiceRegister = "/api.usercenter.v1.AuthService/Register"
 const OperationAuthServiceResetPassword = "/api.usercenter.v1.AuthService/ResetPassword"
 
 type AuthServiceHTTPServer interface {
+	// BeginPasskeyLogin Passwordless passkey login. `begin` is deliberately indistinguishable
+	// for unknown, disabled and passkey-less accounts: it always answers with a
+	// challenge, so the public endpoint cannot enumerate accounts.
+	BeginPasskeyLogin(context.Context, *BeginPasskeyLoginRequest) (*PasskeyLoginChallengeReply, error)
 	CompleteMFA(context.Context, *CompleteMFARequest) (*LoginReply, error)
+	CompletePasskeyLogin(context.Context, *CompletePasskeyLoginRequest) (*LoginReply, error)
 	CreatePasswordResetChallenge(context.Context, *CreatePasswordResetChallengeRequest) (*ChallengeReply, error)
 	CreateRegistrationChallenge(context.Context, *CreateRegistrationChallengeRequest) (*ChallengeReply, error)
 	GetAuthContext(context.Context, *GetAuthContextRequest) (*AuthContext, error)
@@ -45,6 +52,8 @@ func RegisterAuthServiceHTTPServer(s *http.Server, srv AuthServiceHTTPServer) {
 	r.Handle("POST", "/api/v1/auth/register", _AuthService_Register0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/auth/login", _AuthService_Login0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/auth/mfa/complete", _AuthService_CompleteMFA0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/auth/passkey/login:begin", _AuthService_BeginPasskeyLogin0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/auth/passkey/login:complete", _AuthService_CompletePasskeyLogin0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/auth/logout", _AuthService_Logout0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/auth/password-reset-challenges", _AuthService_CreatePasswordResetChallenge0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/auth/password-reset", _AuthService_ResetPassword0_HTTP_Handler(srv))
@@ -145,6 +154,44 @@ func _AuthService_CompleteMFA0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx 
 	}
 }
 
+func _AuthService_BeginPasskeyLogin0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in BeginPasskeyLoginRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationAuthServiceBeginPasskeyLogin)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.BeginPasskeyLogin(ctx, req.(*BeginPasskeyLoginRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*PasskeyLoginChallengeReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _AuthService_CompletePasskeyLogin0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CompletePasskeyLoginRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationAuthServiceCompletePasskeyLogin)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CompletePasskeyLogin(ctx, req.(*CompletePasskeyLoginRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*LoginReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _AuthService_Logout0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in LogoutRequest
@@ -203,7 +250,12 @@ func _AuthService_ResetPassword0_HTTP_Handler(srv AuthServiceHTTPServer) func(ct
 }
 
 type AuthServiceHTTPClient interface {
+	// BeginPasskeyLogin Passwordless passkey login. `begin` is deliberately indistinguishable
+	// for unknown, disabled and passkey-less accounts: it always answers with a
+	// challenge, so the public endpoint cannot enumerate accounts.
+	BeginPasskeyLogin(ctx context.Context, req *BeginPasskeyLoginRequest, opts ...http.CallOption) (rsp *PasskeyLoginChallengeReply, err error)
 	CompleteMFA(ctx context.Context, req *CompleteMFARequest, opts ...http.CallOption) (rsp *LoginReply, err error)
+	CompletePasskeyLogin(ctx context.Context, req *CompletePasskeyLoginRequest, opts ...http.CallOption) (rsp *LoginReply, err error)
 	CreatePasswordResetChallenge(ctx context.Context, req *CreatePasswordResetChallengeRequest, opts ...http.CallOption) (rsp *ChallengeReply, err error)
 	CreateRegistrationChallenge(ctx context.Context, req *CreateRegistrationChallengeRequest, opts ...http.CallOption) (rsp *ChallengeReply, err error)
 	GetAuthContext(ctx context.Context, req *GetAuthContextRequest, opts ...http.CallOption) (rsp *AuthContext, err error)
@@ -221,6 +273,26 @@ func NewAuthServiceHTTPClient(client *http.Client) AuthServiceHTTPClient {
 	return &AuthServiceHTTPClientImpl{client}
 }
 
+// BeginPasskeyLogin Passwordless passkey login. `begin` is deliberately indistinguishable
+// for unknown, disabled and passkey-less accounts: it always answers with a
+// challenge, so the public endpoint cannot enumerate accounts.
+func (c *AuthServiceHTTPClientImpl) BeginPasskeyLogin(ctx context.Context, in *BeginPasskeyLoginRequest, opts ...http.CallOption) (*PasskeyLoginChallengeReply, error) {
+	var out PasskeyLoginChallengeReply
+	pattern := "/api/v1/auth/passkey/login:begin"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationAuthServiceBeginPasskeyLogin),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *AuthServiceHTTPClientImpl) CompleteMFA(ctx context.Context, in *CompleteMFARequest, opts ...http.CallOption) (*LoginReply, error) {
 	var out LoginReply
 	pattern := "/api/v1/auth/mfa/complete"
@@ -229,6 +301,23 @@ func (c *AuthServiceHTTPClientImpl) CompleteMFA(ctx context.Context, in *Complet
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationAuthServiceCompleteMFA),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *AuthServiceHTTPClientImpl) CompletePasskeyLogin(ctx context.Context, in *CompletePasskeyLoginRequest, opts ...http.CallOption) (*LoginReply, error) {
+	var out LoginReply
+	pattern := "/api/v1/auth/passkey/login:complete"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationAuthServiceCompletePasskeyLogin),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)

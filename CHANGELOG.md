@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — 无密码 Passkey 登录（迁移自 micro-one-api v0.41）
+
+- 新增公开端点 `POST /api/v1/auth/passkey/login:begin` 与 `POST /api/v1/auth/passkey/login:complete`：用户名或邮箱换取 WebAuthn 断言挑战，验签通过后签发与密码登录相同的 HttpOnly 会话 Cookie。Passkey 从这里起是**第一因素**，密码登录保持不变。
+- 防枚举：未知账号、停用账号与未绑定 Passkey 的账号在 `begin` 得到同形状的诱饵 ceremony；假凭据 ID 由服务端 `CodeSecret` 做 HMAC 派生（同一标识重复探测稳定，客户端无法自行重算识别诱饵）。`complete` 对诱饵与真实账号的无效断言统一返回 `CHALLENGE_INVALID`，不暴露账号是否存在。
+- 一次性与并发：挑战经 `auth_flow_completions` 单次消费，签名计数器更新与会话签发在同一事务、先锁用户行；重放同一挑战返回 `CHALLENGE_INVALID`，克隆认证器的计数器回退仍返回 `WEBAUTHN_SIGN_COUNT_REGRESSION`。
+- 第二因素不被绕过：仍启用 TOTP 的账号在 Passkey 通过后返回 `mfa_required` + challenge，复用 `/api/v1/auth/mfa/complete`，此时不签发会话。
+- 登录页新增「使用通行密钥」入口：未填标识先提示；浏览器取消/超时映射为可读提示；MFA 待决阶段不再重复提供 Passkey 作为第二因素。
+- 无数据库迁移：复用 `webauthn_credentials`、挑战存储与现有安全事件/审计路径；`make api` 与 `npm run generate:api` 已更新生成物。
+- 测试：Go HTTP 级覆盖真实 P-256 断言登录、MFA 仍待验证、挑战重放、未知/停用/未绑定账号的诱饵 parity；前端覆盖成功登录、MFA 分流与空标识拒绝。
+
 ## [0.12.1] - 2026-11-09
 
 **版本判定：PATCH。** 修复 CI 上 `TestConcurrentTOTPReplayOnlyCreatesOneSession` 偶发 503：SQLite 串行化写入，第二个并发写者未配置 busy timeout 时立即返回 `database is locked`，被映射为「依赖服务不可用」。为 SQLite DSN 追加 `_busy_timeout=10000`（仅测试与开发；生产 MySQL 不受影响），并让该用例在失败时输出两个响应体，便于下次直接区分锁冲突与重放拒绝。新增 DSN 单元测试。

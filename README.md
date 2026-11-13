@@ -119,6 +119,7 @@ scripts/                  开发与检查脚本
 | CSRF | 双提交 Cookie：非 HttpOnly 的 `uc_csrf` + 写请求 `X-CSRF-Token`；中间件对全部 `/api/v1` 非安全方法强制校验 |
 | 密码 | bcrypt；最小字符数可配置（默认 10），最多 72 字节；修改密码后提升 `identity_version` 并撤销其他会话 |
 | MFA | TOTP（RFC 6238）+ 8 个一次性恢复码；秘钥 AES-GCM 加密；`last_step` 防重放；5 次失败锁定 5 分钟 |
+| Passkey | WebAuthn 通行密钥可作第二因素，也可**无密码登录**：公开 begin/complete 断言、防枚举诱饵、挑战单次消费、签名计数器克隆检测；已启用 TOTP 的账号仍须第二因素 |
 | Step-up | 高风险操作要求近期主认证 + 第二因素验证，证明绑定当前 session 与身份版本、5 分钟过期 |
 | 邮箱 | 注册/换绑使用一次性验证码；验证码 HMAC 后存 Redis（无 Redis 时内存），单次消费 + 数据库完成记录幂等 |
 | 审计 | 所有敏感写入在业务事务内写 `iam_audit_events`；登录与安全事件写 `security_events`；CSV 导出重新校验权限与范围 |
@@ -138,7 +139,7 @@ scripts/                  开发与检查脚本
 
 | 接口族 | 路径 |
 |---|---|
-| 公开认证 | `/auth/context`、`/auth/registration-challenges`、`/auth/register`、`/auth/login`、`/auth/mfa/complete`、`/auth/logout`、`/auth/password-reset-challenges`、`/auth/password-reset` |
+| 公开认证 | `/auth/context`、`/auth/registration-challenges`、`/auth/register`、`/auth/login`、`/auth/mfa/complete`、`/auth/passkey/login:begin`、`/auth/passkey/login:complete`、`/auth/logout`、`/auth/password-reset-challenges`、`/auth/password-reset` |
 | 第三方登录 | `GET /auth/providers/{provider}/start`、`GET /auth/providers/{provider}/callback`（GitHub / Google；绑定使用 `?mode=bind`） |
 | 本人 | `/me`、`/me/password:change`、`/me/email-challenges`、`/me/email:confirm`、`/me/security`、`/me/mfa:*`、`/me/sessions`、`/me/session-roles`、`/me/authorization`、`/me/security-events` |
 | 用户管理 | `/admin/overview`、`/admin/users`、`/admin/users/{id}`、`{id}:set-status`、`{id}:archive`、`{id}/password-reset-requests`、`{id}/mfa:reset`、`{id}/email-changes*`、`{id}/sessions*`、`{id}/effective-permissions`、`/admin/users:export`、`/admin/exports/{id}`、`/admin/exports/{id}/download` |
@@ -154,6 +155,8 @@ scripts/                  开发与检查脚本
 ## 实现范围与已知差异
 
 **已实现（V1）**：用户生命周期（创建/资料/启停/归档）、密码与邮箱变更、管理员邮箱变更、强制首次改密、TOTP + 恢复码、管理员强制 MFA、Step-up、会话治理、角色/会话角色、权限目录、角色继承、授权分配（含列表与批量，事务内整批拒绝）、委派、职责分离、菜单投影、授权解释/模拟、审计与导出、认证配置、GitHub/Google 登录与绑定、接入客户端管理、gRPC 客户端鉴权、Outbox Webhook 投递、`cmd/import-legacy` 离线导入。
+
+**已实现（待发版）**：无密码 Passkey 登录（迁移自 micro-one-api v0.41），Passkey 第二因素与 TOTP 第二步保持不变；详见 [CHANGELOG](CHANGELOG.md)。
 
 **V2 已交付**：
 - v0.7.0：Prometheus 指标（独立回环监听）、7 条 SLO 告警规则、慢请求日志与全链路 `request_id`、MySQL 负载基线与索引审计、CI 的 MySQL/生成物/compose 门禁；`admin` 列表单请求 SELECT 92 → 20。

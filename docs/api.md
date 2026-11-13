@@ -304,7 +304,7 @@ GET  /oidc/userinfo                      Bearer access token
 
 ## V2.4 W4/W5 契约
 
-### R13 WebAuthn / Passkey（第二因素）
+### R13 WebAuthn / Passkey（第二因素 + 无密码登录）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -314,8 +314,10 @@ GET  /oidc/userinfo                      Bearer access token
 | POST | `/api/v1/me/webauthn/credentials/{id}:delete` | 删除；无 TOTP 且仅剩一枚凭据时返回 `LAST_SECOND_FACTOR` |
 | POST | `/api/v1/me/webauthn/assertions:challenge` | Step-up 断言挑战 |
 | POST | `/api/v1/me/webauthn/assertions:verify` | 验签 + 计数器单调 + Step-up（与 TOTP 同等效力） |
+| POST | `/api/v1/auth/passkey/login:begin` | 公开；用户名或邮箱换取断言挑战；未知/停用/未绑定账号返回同形状诱饵 |
+| POST | `/api/v1/auth/passkey/login:complete` | 公开；验签后签发会话；仍启用 TOTP 时返回 `mfa_required` + challenge |
 
-登录 `LoginReply.webauthn` 在账号绑定 Passkey 时下发挑战；`/api/v1/auth/mfa/complete` 可改用 `credential_id/authenticator_data/client_data_json/signature` 完成登录。`sign_count` 回退返回 `WEBAUTHN_SIGN_COUNT_REGRESSION` 并写告警审计。用户名 + 密码始终是第一因素。
+登录 `LoginReply.webauthn` 在账号绑定 Passkey 时下发挑战；`/api/v1/auth/mfa/complete` 可改用 `credential_id/authenticator_data/client_data_json/signature` 完成登录。Passkey 也可作为第一因素通过 `passkey/login:begin` + `:complete` 免密码登录；挑战一次性消费，未知/停用/未绑定账号由服务端密钥派生的诱饵 ceremony 覆盖，无效断言统一返回 `CHALLENGE_INVALID`。`sign_count` 回退返回 `WEBAUTHN_SIGN_COUNT_REGRESSION` 并写告警审计。用户名 + 密码登录继续保留。
 
 ### R14 个人信息保留与清理
 

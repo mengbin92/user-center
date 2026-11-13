@@ -27,6 +27,15 @@ service AuthService {
   rpc CompleteMFA(CompleteMFARequest) returns (LoginReply) {
     option (google.api.http) = {post: "/api/v1/auth/mfa/complete" body: "*"};
   }
+  // Passwordless passkey login. `begin` is deliberately indistinguishable
+  // for unknown, disabled and passkey-less accounts: it always answers with a
+  // challenge, so the public endpoint cannot enumerate accounts.
+  rpc BeginPasskeyLogin(BeginPasskeyLoginRequest) returns (PasskeyLoginChallengeReply) {
+    option (google.api.http) = {post: "/api/v1/auth/passkey/login:begin" body: "*"};
+  }
+  rpc CompletePasskeyLogin(CompletePasskeyLoginRequest) returns (LoginReply) {
+    option (google.api.http) = {post: "/api/v1/auth/passkey/login:complete" body: "*"};
+  }
   rpc Logout(LogoutRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {post: "/api/v1/auth/logout" body: "*"};
   }
@@ -106,6 +115,30 @@ message CompleteMFARequest {
   string authenticator_data = 4;
   string client_data_json = 5;
   string signature = 6;
+}
+
+message BeginPasskeyLoginRequest {
+  // Username or email, matching the password login identifier.
+  string username = 1;
+}
+
+message PasskeyLoginChallengeReply {
+  string challenge_id = 1;
+  // base64url challenge for navigator.credentials.get().
+  string challenge = 2;
+  string rp_id = 3;
+  // Always populated, including for the anti-enumeration decoy ceremony.
+  repeated string allow_credential_ids = 4;
+  string expires_at = 5;
+}
+
+message CompletePasskeyLoginRequest {
+  string challenge_id = 1;
+  string credential_id = 2;
+  string authenticator_data = 3;
+  string client_data_json = 4;
+  string signature = 5;
+  bool remember = 6;
 }
 
 message LogoutRequest {}

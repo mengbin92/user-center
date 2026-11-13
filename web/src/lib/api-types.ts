@@ -1237,6 +1237,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/passkey/login:begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Passwordless passkey login. `begin` is deliberately indistinguishable
+         *      for unknown, disabled and passkey-less accounts: it always answers with a
+         *      challenge, so the public endpoint cannot enumerate accounts.
+         */
+        post: operations["AuthService_BeginPasskeyLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/passkey/login:complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthService_CompletePasskeyLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/password-reset": {
         parameters: {
             query?: never;
@@ -2431,6 +2468,10 @@ export interface components {
             eligible_user_ids?: string[];
             failures?: components["schemas"]["api.usercenter.v1.BatchFailure"][];
         };
+        "api.usercenter.v1.BeginPasskeyLoginRequest": {
+            /** @description Username or email, matching the password login identifier. */
+            username?: string;
+        };
         "api.usercenter.v1.ChallengeReply": {
             challenge_id?: string;
             expires_at?: string;
@@ -2447,6 +2488,14 @@ export interface components {
             authenticator_data?: string;
             client_data_json?: string;
             signature?: string;
+        };
+        "api.usercenter.v1.CompletePasskeyLoginRequest": {
+            challenge_id?: string;
+            credential_id?: string;
+            authenticator_data?: string;
+            client_data_json?: string;
+            signature?: string;
+            remember?: boolean;
         };
         "api.usercenter.v1.ConfirmEmailChangeRequest": {
             id?: string;
@@ -3229,6 +3278,15 @@ export interface components {
             active_sessions?: string;
             logins_24h?: string;
             failed_logins_24h?: string;
+        };
+        "api.usercenter.v1.PasskeyLoginChallengeReply": {
+            challenge_id?: string;
+            /** @description base64url challenge for navigator.credentials.get(). */
+            challenge?: string;
+            rp_id?: string;
+            /** @description Always populated, including for the anti-enumeration decoy ceremony. */
+            allow_credential_ids?: string[];
+            expires_at?: string;
         };
         "api.usercenter.v1.PasswordResetTaskReply": {
             queued?: boolean;
@@ -6203,6 +6261,54 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["api.usercenter.v1.CompleteMFARequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.LoginReply"];
+                };
+            };
+        };
+    };
+    AuthService_BeginPasskeyLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.BeginPasskeyLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api.usercenter.v1.PasskeyLoginChallengeReply"];
+                };
+            };
+        };
+    };
+    AuthService_CompletePasskeyLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api.usercenter.v1.CompletePasskeyLoginRequest"];
             };
         };
         responses: {
