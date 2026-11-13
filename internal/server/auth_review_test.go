@@ -88,6 +88,7 @@ func TestChallengeAttemptLimitDeniesCorrectCodeAfterTenFailures(t *testing.T) {
 func TestLoginAccountLimitCountsWrongPasswordsAcrossAddresses(t *testing.T) {
 	h := newHarness(t)
 	h.svc.MaxLoginAttempts = 2
+	waitForFreshRateLimitWindow(t, 5*time.Minute)
 	require.Equal(t, http.StatusUnauthorized, h.login("root", "wrong-password").Code)
 	// Username and email share the same authoritative account limit.
 	require.Equal(t, http.StatusUnauthorized, h.login("root@example.com", "wrong-password").Code)

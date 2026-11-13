@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -18,6 +19,7 @@ func TestWriteBudgetRejectsBurstButNotReads(t *testing.T) {
 		Enabled: true, WritePerMinute: 3, HeavyPerMinute: 1,
 	}))
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	waitForFreshRateLimitWindow(t, time.Minute)
 
 	// Wrong current password: the handler rejects these, but they still spend
 	// budget, which is the point — a limiter that only counts successful calls
@@ -46,6 +48,8 @@ func TestRawOIDCRouteSpendsOneBudgetUnitPerRequest(t *testing.T) {
 		Enabled: true, WritePerMinute: 3, HeavyPerMinute: 2,
 	}))
 
+	waitForFreshRateLimitWindow(t, time.Minute)
+
 	// An anonymous /oidc/token POST is keyed by IP. The endpoint itself rejects
 	// it (unknown client, so 401) -- irrelevant here: the assertion is that
 	// three attempts fit a budget of three and the fourth is refused.
@@ -66,6 +70,7 @@ func TestHeavyEndpointsHaveTheirOwnStricterBudget(t *testing.T) {
 		Enabled: true, WritePerMinute: 100, HeavyPerMinute: 1,
 	}))
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	waitForFreshRateLimitWindow(t, time.Minute)
 
 	body := map[string]any{"format": "csv"}
 	first := h.do(http.MethodPost, "/api/v1/admin/users:export", body, "", true)
