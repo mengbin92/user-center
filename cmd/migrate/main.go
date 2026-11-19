@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -64,6 +67,29 @@ func main() {
 }
 
 func runSQLMigrations(db *gorm.DB, dir string, log *zap.Logger) error {
+	const lockName = "SHA2(CONCAT('user-center:migrations:', LOWER(DATABASE())), 256)"
+	return db.Connection(func(conn *gorm.DB) (err error) {
+		conn = conn.Session(&gorm.Session{NewDB: true})
+		var locked sql.NullInt64
+		if err := conn.Raw("SELECT GET_LOCK(" + lockName + ", 30)").Row().Scan(&locked); err != nil {
+			return fmt.Errorf("acquire migration lock: %w", err)
+		}
+		if !locked.Valid || locked.Int64 != 1 {
+			return errors.New("could not acquire migration lock")
+		}
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(conn.Statement.Context), 5*time.Second)
+			defer cancel()
+			releaseErr := conn.WithContext(ctx).Exec("DO RELEASE_LOCK(" + lockName + ")").Error
+			if releaseErr != nil {
+				err = errors.Join(err, fmt.Errorf("release migration lock: %w", releaseErr))
+			}
+		}()
+		return applySQLMigrations(conn, dir, log)
+	})
+}
+
+func applySQLMigrations(db *gorm.DB, dir string, log *zap.Logger) error {
 	if err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version VARCHAR(191) NOT NULL PRIMARY KEY,
 		applied_at DATETIME(3) NOT NULL
@@ -101,7 +127,7 @@ func runSQLMigrations(db *gorm.DB, dir string, log *zap.Logger) error {
 			}
 			// MySQL commits DDL implicitly, so a file-level transaction cannot
 			// roll back a partially applied migration. Record every statement
-			// instead, which lets a rerun resume after the last successful one.
+			// instead, which lets a rerun resume from the last recorded statement.
 			key := fmt.Sprintf("%s#%02d", version, i+1)
 			done, err := migrationApplied(db, key)
 			if err != nil {

@@ -14,6 +14,31 @@ import (
 	"github.com/mengbin92/user-center/internal/biz"
 )
 
+func TestUserListEmailSearchRequiresWholeDirectoryContactRead(t *testing.T) {
+	h := newHarness(t)
+	actor := iamFixtureUser(t, h, "contact_search_reader")
+	target := fixtureUserWithEmail(t, h, "contact_search_member", "contact-search@example.test")
+	reader := iamFixtureRole(t, h, "contact_search", biz.Grant{
+		Operation: "identity.user.list", Effect: authorization.Allow, Scope: authorization.Scope{All: true},
+	}, biz.Grant{
+		Operation: "identity.user.contact.read", Effect: authorization.Allow, Scope: authorization.Scope{All: true},
+	})
+	masked := iamFixtureRole(t, h, "contact_mask", biz.Grant{
+		Operation: "identity.user.contact.read", Effect: authorization.Deny, Scope: authorization.Scope{UserIDs: []int64{target.ID}},
+	})
+	iamFixtureAssign(t, h, actor.ID, reader.ID, authorization.Scope{All: true})
+	iamFixtureAssign(t, h, actor.ID, masked.ID, authorization.Scope{All: true})
+	require.Equal(t, http.StatusOK, h.login(actor.Username, "FixturePass-123").Code)
+
+	rec := h.do(http.MethodGet, "/api/v1/admin/users?keyword="+url.QueryEscape(target.Username), nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), target.Username)
+	require.NotContains(t, rec.Body.String(), target.Email)
+	rec = h.do(http.MethodGet, "/api/v1/admin/users?keyword="+url.QueryEscape(target.Email), nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Empty(t, decode[map[string]any](t, rec)["items"])
+}
+
 func TestCreateUserCannotAssignPrivilegedRolesOrSetPasswordWithoutCredentialAuthority(t *testing.T) {
 	h := newHarness(t)
 	actor := iamFixtureUser(t, h, "user_creator")

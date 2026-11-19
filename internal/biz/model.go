@@ -60,9 +60,10 @@ type User struct {
 }
 
 type RoleRef struct {
-	ID   int64
-	Code string
-	Name string
+	ID           int64
+	Code         string
+	Name         string
+	Unrestricted bool
 }
 
 type Credential struct {

@@ -30,7 +30,7 @@ func NewLogger() *zap.Logger {
 
 func ProvideServer(b *conf.Bootstrap) *conf.Server {
 	if b.Server == nil {
-		return &conf.Server{Http: &conf.HTTP{Addr: ":8080"}, Grpc: &conf.GRPC{Addr: ":9090"}, Metrics: defaultMetrics(), RateLimit: defaultRateLimit()}
+		b.Server = &conf.Server{}
 	}
 	if b.Server.Http == nil {
 		b.Server.Http = &conf.HTTP{Addr: ":8080"}
@@ -63,7 +63,7 @@ func defaultMetrics() *conf.Metrics {
 
 func ProvideData(b *conf.Bootstrap) *conf.Data {
 	if b.Data == nil {
-		return &conf.Data{Database: &conf.Database{Driver: "mysql"}, Redis: &conf.Redis{}}
+		b.Data = &conf.Data{}
 	}
 	if b.Data.Database == nil {
 		b.Data.Database = &conf.Database{Driver: "mysql"}
@@ -76,7 +76,7 @@ func ProvideData(b *conf.Bootstrap) *conf.Data {
 
 func ProvideSecurity(b *conf.Bootstrap) *conf.Security {
 	if b.Security == nil {
-		return &conf.Security{}
+		b.Security = &conf.Security{}
 	}
 	return b.Security
 }
@@ -177,10 +177,10 @@ func NewApp(httpSrv *server.HTTPServer, grpcSrv *server.GRPCServer, metricsSrv *
 	return &App{http: httpSrv, grpc: grpcSrv, metrics: metricsSrv, svc: svc, worker: worker, directory: directory, log: log}
 }
 
-func (a *App) Run() error {
+func (a *App) Run(version string) error {
 	opts := []kratos.Option{
 		kratos.Name("user-center"),
-		kratos.Version("0.6.1"),
+		kratos.Version(version),
 		kratos.Logger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))),
 		kratos.Server(a.http.Server, a.grpc.Server, a.metrics),
 		kratos.BeforeStart(a.bootstrap),

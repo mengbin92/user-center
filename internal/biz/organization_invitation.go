@@ -2,12 +2,14 @@ package biz
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/mengbin92/user-center/pkg/jsonx"
+	"github.com/mengbin92/user-center/platform/tenant"
 )
 
 // Organization invitations (V2.4 R3).
@@ -213,7 +215,10 @@ func (uc *OrganizationUsecase) RevokeInvitation(ctx context.Context, actor Actor
 // stable shape so the token cannot be used to enumerate invitations or users.
 func (uc *OrganizationUsecase) AcceptInvitation(ctx context.Context, actor ActorContext, raw string) (*OrganizationMember, error) {
 	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	if !actor.User.EmailVerified || len(raw) != base64.RawURLEncoding.EncodedLen(32) {
+		return nil, ErrResourceNotFound
+	}
+	if _, err := base64.RawURLEncoding.DecodeString(raw); err != nil {
 		return nil, ErrResourceNotFound
 	}
 	now := uc.Clock.Now().UTC()
@@ -226,9 +231,10 @@ func (uc *OrganizationUsecase) AcceptInvitation(ctx context.Context, actor Actor
 	}
 	// The account e-mail must match exactly; the response is deliberately the
 	// same as for a token that does not exist.
-	if NormalizeEmail(actor.User.Email) != invitation.EmailNormalized || !actor.User.EmailVerified {
+	if NormalizeEmail(actor.User.Email) != invitation.EmailNormalized {
 		return nil, ErrResourceNotFound
 	}
+	ctx = tenant.With(ctx, invitation.OrganizationID)
 	switch invitation.Status {
 	case OrgInvitationAccepted:
 		return nil, ConflictCode(InvitationErrUsed, "邀请已被接受")

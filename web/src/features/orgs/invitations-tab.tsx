@@ -154,7 +154,7 @@ export function OrganizationInvitationsTab({
               variant="primary"
               loading={create.isPending}
               disabled={!email.trim() || reason.trim().length < 2}
-              onClick={() => void create.mutateAsync()}
+              onClick={() => create.mutate()}
             >
               发送邀请
             </Button>
@@ -190,7 +190,7 @@ export function OrganizationInvitationsTab({
             <Button
               variant="danger"
               loading={revoke.isPending}
-              onClick={() => target && void revoke.mutateAsync(target)}
+              onClick={() => { if (target) revoke.mutate(target) }}
             >
               确认撤销
             </Button>

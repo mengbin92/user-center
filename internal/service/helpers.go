@@ -148,12 +148,16 @@ func requestMeta(ctx context.Context) biz.ActorContext {
 	return actor
 }
 
-func setSessionCookie(ctx context.Context, deps Deps, token string, expires time.Time) {
-	khttp.SetCookie(ctx, &http.Cookie{
-		Name: SessionCookie, Value: token, Path: "/", HttpOnly: true,
+func setSessionCookie(ctx context.Context, deps Deps, result *biz.LoginResult) {
+	cookie := &http.Cookie{
+		Name: SessionCookie, Value: result.RawToken, Path: "/", HttpOnly: true,
 		Secure: deps.Cookies.Secure, SameSite: http.SameSiteLaxMode,
-		Domain: deps.Cookies.Domain, Expires: expires,
-	})
+		Domain: deps.Cookies.Domain,
+	}
+	if result.Remember {
+		cookie.Expires = result.Session.ExpiresAt
+	}
+	khttp.SetCookie(ctx, cookie)
 }
 
 func clearSessionCookie(ctx context.Context, deps Deps) {

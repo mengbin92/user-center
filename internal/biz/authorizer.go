@@ -331,6 +331,10 @@ func (s *Services) AuthorizeIn(ctx context.Context, actor ActorContext, authCtx 
 // A root/admin can still authenticate and enroll MFA, but management calls are
 // refused until a second factor is active.
 func (s *Services) requireAdminMFA(ctx context.Context, actor ActorContext) error {
+	return s.requireAdminMFAInTx(ctx, nil, actor)
+}
+
+func (s *Services) requireAdminMFAInTx(ctx context.Context, tx Tx, actor ActorContext) error {
 	if actor.User == nil {
 		return nil
 	}
@@ -344,14 +348,14 @@ func (s *Services) requireAdminMFA(ctx context.Context, actor ActorContext) erro
 	if !isAdmin {
 		return nil
 	}
-	settings, err := s.Settings.GetAuth(ctx, nil)
+	settings, err := s.Settings.GetAuth(ctx, tx)
 	if err != nil {
 		return ErrDependency
 	}
 	if !settings.MFARequiredForAdmins {
 		return nil
 	}
-	if s.HasSecondFactor(ctx, actor.User.ID) {
+	if s.hasSecondFactorInTx(ctx, tx, actor.User.ID) {
 		return nil
 	}
 	return ErrMFAEnrollmentReq
@@ -379,21 +383,7 @@ func (s *Services) stepUpUntil(ctx context.Context, actor ActorContext) time.Tim
 	return until
 }
 
-// ScopeFor returns the union of allow scopes for an operation, used to push
-// the coarse filter into SQL. Deny scopes and self predicates are still
-// evaluated per item by Decide.
-func (s *Services) ScopeFor(ctx context.Context, actor ActorContext, operation string) (authorization.Scope, error) {
-	return s.ScopeForIn(ctx, actor, authorization.Platform(), operation)
-}
-
-func (s *Services) ScopeForIn(ctx context.Context, actor ActorContext, authCtx authorization.Context, operation string) (authorization.Scope, error) {
-	facts, err := s.LoadAuthzFactsIn(ctx, authCtx, actor.User.ID, actor.Session.ActiveRoleIDs)
-	if err != nil {
-		return authorization.Scope{}, err
-	}
-	return scopeForFacts(facts, actor, operation, s.Clock.Now()), nil
-}
-
+// scopeForFacts computes the coarse allow filter for per-user decisions.
 func scopeForFacts(facts *AuthzFacts, actor ActorContext, operation string, now time.Time) authorization.Scope {
 	out := authorization.Scope{}
 	for _, src := range facts.Sources {
@@ -524,8 +514,8 @@ func CheckConstraints(roleIDs []int64, constraints []*Constraint) error {
 // checkDelegation requires either direct authority over both the assignment
 // operation and the role capabilities, or a valid delegation with a matching
 // grant ceiling. An assignment operation alone never implies grant authority.
-func (s *Services) checkDelegation(ctx context.Context, actor ActorContext, targetUserID, targetRoleID int64, action string, boundary authorization.Scope, starts time.Time, expires *time.Time) error {
-	currentActor, err := s.currentIAMActor(ctx, actor)
+func (s *Services) checkDelegation(ctx context.Context, tx Tx, actor ActorContext, targetUserID, targetRoleID int64, action string, boundary authorization.Scope, starts time.Time, expires *time.Time) error {
+	currentActor, err := s.currentIAMActorInTx(ctx, tx, actor)
 	if err != nil {
 		return err
 	}
@@ -534,15 +524,15 @@ func (s *Services) checkDelegation(ctx context.Context, actor ActorContext, targ
 	if action == "revoke" {
 		operation = "iam.assignment.revoke"
 	}
-	scope, err := s.ScopeFor(ctx, actor, operation)
+	decision, err := s.DecideInTx(ctx, tx, actor, authorization.Platform(), operation, 0, true)
 	if err != nil {
 		return ErrAuthorizationDown
 	}
-	delegations, derr := s.IAM.ListDelegations(ctx, nil, DelegationFilter{Status: "active", TargetRoleID: targetRoleID})
+	delegations, derr := s.IAM.ListDelegations(ctx, tx, DelegationFilter{Status: "active", TargetRoleID: targetRoleID})
 	if derr != nil {
 		return ErrDelegationRequired
 	}
-	roles, err := s.IAM.ListAllRolesWithGrants(ctx, nil)
+	roles, err := s.IAM.ListAllRolesWithGrants(ctx, tx)
 	if err != nil {
 		return ErrAuthorizationDown
 	}
@@ -551,7 +541,7 @@ func (s *Services) checkDelegation(ctx context.Context, actor ActorContext, targ
 	for _, r := range roles {
 		byID[r.ID], edges[r.ID] = r, r.Inherits
 	}
-	assignments, err := s.IAM.ListAssignmentsForUser(ctx, nil, actor.User.ID)
+	assignments, err := s.IAM.ListAssignmentsForUser(ctx, tx, actor.User.ID)
 	if err != nil {
 		return ErrAuthorizationDown
 	}
@@ -581,7 +571,7 @@ func (s *Services) checkDelegation(ctx context.Context, actor ActorContext, targ
 			}
 		}
 	}
-	if scope.All && s.checkGrantAuthority(ctx, actor, targetGrants) == nil {
+	if decision.Allowed && s.checkGrantAuthority(ctx, tx, actor, targetGrants) == nil {
 		return nil
 	}
 	for _, d := range delegations {

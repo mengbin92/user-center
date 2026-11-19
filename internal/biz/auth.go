@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -36,6 +37,7 @@ type LoginResult struct {
 	User                   *User
 	Session                *Session
 	RawToken               string
+	Remember               bool
 	PasswordChangeRequired bool
 	// RecycledSessions is how many older sessions the per-user cap reclaimed
 	// while issuing this one. Non-zero means another device was signed out.
@@ -231,7 +233,7 @@ func (uc *AuthUsecase) Register(ctx context.Context, in RegisterInput) (*User, e
 		return nil, err
 	}
 	if challenge != nil {
-		_ = uc.Challenges.Delete(ctx, challenge.ID)
+		_ = uc.Challenges.Delete(ctx, challenge.Purpose, challenge.ID)
 	}
 	return created, nil
 }
@@ -285,55 +287,8 @@ func (uc *AuthUsecase) login(ctx context.Context, in LoginInput, appID string) (
 		uc.recordSecurity(ctx, user.ID, "", "login", "denied", in.IP, in.UserAgent, "")
 		return nil, ErrUnauthenticated
 	}
-	mfa, err := uc.MFA.Get(ctx, nil, user.ID)
-	if err != nil && !errors.Is(err, ErrResourceNotFound) {
-		return nil, ErrDependency
-	}
-	var webAuthnCreds []*WebAuthnCredential
-	if uc.WebAuthn != nil {
-		var werr error
-		webAuthnCreds, werr = uc.WebAuthn.ListByUser(ctx, nil, user.ID)
-		if werr != nil {
-			return nil, ErrDependency
-		}
-	}
-	if (mfa != nil && mfa.Enabled()) || len(webAuthnCreds) > 0 {
-		challengeID := uc.IDs.NewID()
-		expires := uc.Clock.Now().Add(5 * time.Minute)
-		challengeApp := ""
-		if appID != ApplicationCode {
-			challengeApp = appID
-		}
-		waChallenge := ""
-		rpID := ""
-		allow := []string{}
-		if len(webAuthnCreds) > 0 {
-			var err error
-			waChallenge, err = newToken(32)
-			if err != nil {
-				return nil, ErrDependency
-			}
-			rpID, _, err = uc.webAuthnRP()
-			if err != nil {
-				return nil, err
-			}
-			for _, cred := range webAuthnCreds {
-				allow = append(allow, cred.CredentialID)
-			}
-		}
-		payload, _ := jsonx.Marshal(map[string]any{
-			"identity_version": user.IdentityVersion, "ip": in.IP,
-			"ua": SummizeAgent(in.UserAgent), "remember": in.Remember,
-			"app_id": challengeApp, "webauthn_challenge": waChallenge,
-		})
-		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
-			return nil, ErrDependency
-		}
-		return &LoginResult{
-			Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires,
-			User: uc.publicUser(ctx, user), WebAuthnChallenge: waChallenge,
-			WebAuthnRPID: rpID, WebAuthnCredentialIDs: allow,
-		}, nil
+	if mfa, err := uc.beginLoginMFA(ctx, user, in, appID); mfa != nil || err != nil {
+		return mfa, err
 	}
 
 	session, raw, err := uc.issueSessionFor(ctx, user, in.UserAgent, in.IP, appID)
@@ -349,8 +304,66 @@ func (uc *AuthUsecase) login(ctx context.Context, in LoginInput, appID string) (
 	}
 	return &LoginResult{
 		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session,
-		RawToken: raw, PasswordChangeRequired: changeRequired,
+		RawToken: raw, Remember: in.Remember, PasswordChangeRequired: changeRequired,
 		RecycledSessions: session.EvictedSessions,
+	}, nil
+}
+
+func (uc *AuthUsecase) beginLoginMFA(ctx context.Context, user *User, in LoginInput, appID string) (*LoginResult, error) {
+	mfa, err := uc.MFA.Get(ctx, nil, user.ID)
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
+		return nil, ErrDependency
+	}
+	var webAuthnCreds []*WebAuthnCredential
+	if uc.WebAuthn != nil {
+		var werr error
+		webAuthnCreds, werr = uc.WebAuthn.ListByUser(ctx, nil, user.ID)
+		if werr != nil {
+			return nil, ErrDependency
+		}
+	}
+	if (mfa != nil && mfa.Enabled()) || len(webAuthnCreds) > 0 {
+		return uc.newLoginMFAChallenge(ctx, user, in, appID, webAuthnCreds)
+	}
+	return nil, nil
+}
+
+func (uc *AuthUsecase) newLoginMFAChallenge(ctx context.Context, user *User, in LoginInput, appID string, webAuthnCreds []*WebAuthnCredential) (*LoginResult, error) {
+	challengeID := uc.IDs.NewID()
+	expires := uc.Clock.Now().Add(5 * time.Minute)
+	challengeApp := ""
+	if appID != ApplicationCode {
+		challengeApp = appID
+	}
+	waChallenge := ""
+	rpID := ""
+	allow := []string{}
+	if len(webAuthnCreds) > 0 {
+		var err error
+		waChallenge, err = newToken(32)
+		if err != nil {
+			return nil, ErrDependency
+		}
+		rpID, _, err = uc.webAuthnRP()
+		if err != nil {
+			return nil, err
+		}
+		for _, cred := range webAuthnCreds {
+			allow = append(allow, cred.CredentialID)
+		}
+	}
+	payload, _ := jsonx.Marshal(map[string]any{
+		"identity_version": user.IdentityVersion, "ip": in.IP,
+		"ua": SummizeAgent(in.UserAgent), "remember": in.Remember,
+		"app_id": challengeApp, "webauthn_challenge": waChallenge,
+	})
+	if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
+		return nil, ErrDependency
+	}
+	return &LoginResult{
+		Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires,
+		User: uc.publicUser(ctx, user), WebAuthnChallenge: waChallenge,
+		WebAuthnRPID: rpID, WebAuthnCredentialIDs: allow,
 	}, nil
 }
 
@@ -413,12 +426,6 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 	if assertion != nil && (requireApp || payload.WebAuthnChallenge == "") {
 		return nil, ErrChallengeInvalid
 	}
-	if assertion == nil {
-		if err := uc.verifyMFA(ctx, user.ID, code); err != nil {
-			uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
-			return nil, err
-		}
-	}
 	if payload.IP == "" {
 		payload.IP = ip
 	}
@@ -431,6 +438,7 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 	}
 	var session *Session
 	var raw string
+	var factorErr error
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		// Lock the user before the transaction performs ANY consistent read.
 		//
@@ -438,39 +446,56 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 		// first consistent read, which here is the challenge completion or the
 		// passkey credential lookup. Locking afterwards would take the row lock
 		// on a snapshot that already excludes a session another transaction
-		// committed in the meantime, so the cap check could still miss it. The
-		// inner issueSessionLocked call re-locks the same row, which is a no-op
-		// inside the same transaction.
-		if err := uc.Users.LockUser(ctx, tx, user.ID); err != nil {
-			return ErrDependency
+		// committed in the meantime, so the cap check could still miss it.
+		if err := uc.lockUserGeneration(ctx, tx, user.ID, user.IdentityVersion); err != nil {
+			if errors.Is(err, ErrSessionRevoked) {
+				return ErrChallengeInvalid
+			}
+			return err
+		}
+		if assertion == nil {
+			factorErr = uc.verifyMFA(ctx, tx, user.ID, code)
+			// Failed attempts still need to commit their lockout counters.
+			if errors.Is(factorErr, ErrMFAInvalid) || errors.Is(factorErr, ErrMFALocked) || errors.Is(factorErr, ErrMFADisabled) {
+				return nil
+			}
+			if factorErr != nil {
+				return factorErr
+			}
 		}
 		if err := uc.Flows.Complete(ctx, tx, challengeID, "mfa", user.ID, "session"); err != nil {
 			return err
 		}
 		if assertion != nil {
-			factorActor := ActorContext{User: user, Session: &Session{ID: "login", UserID: user.ID}}
-			if err := uc.verifyWebAuthnAssertion(ctx, tx, factorActor, payload.WebAuthnChallenge, *assertion, uc.Clock.Now().UTC()); err != nil {
-				uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
-				return err
+			factorErr = uc.verifyWebAuthnAssertion(ctx, tx, user.ID, payload.WebAuthnChallenge, *assertion, uc.Clock.Now().UTC(), false)
+			if factorErr != nil {
+				return factorErr
 			}
 		}
 		var err error
-		session, raw, err = uc.issueSessionTxFor(ctx, tx, user, payload.UA, payload.IP, appID)
+		session, raw, err = uc.issueSessionLocked(ctx, tx, user, payload.UA, payload.IP, appID)
 		return err
 	})
+	if err == nil {
+		err = factorErr
+	}
 	if err != nil {
+		if factorErr != nil {
+			uc.recordSecurity(ctx, user.ID, "", "mfa", "failure", ip, ua, "")
+			err = uc.webAuthnAssertionError(ctx, ActorContext{User: user, IP: ip, UserAgent: ua}, err)
+		}
 		return nil, err
 	}
 	uc.recordSecurity(ctx, user.ID, session.ID, "login", "success", payload.IP, payload.UA, "")
 	// This path holds its own transaction (the challenge must be consumed
 	// atomically with the session), so the post-commit events that
-	// issueSessionTxFor writes for the direct paths are written here instead.
+	// issueSessionFor writes for the direct paths are written here instead.
 	if session.EvictedSessions > 0 {
 		uc.recordSecurity(ctx, user.ID, session.ID, "session_evict", "success", payload.IP, payload.UA, "")
 	}
-	_ = uc.Challenges.Delete(ctx, challengeID)
+	_ = uc.Challenges.Delete(ctx, "mfa", challengeID)
 	result := &LoginResult{
-		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw,
+		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session, RawToken: raw, Remember: payload.Remember,
 		RecycledSessions: session.EvictedSessions,
 	}
 	if cred != nil {
@@ -482,19 +507,8 @@ func (uc *AuthUsecase) completeMFA(ctx context.Context, challengeID, code, ip, u
 	return result, nil
 }
 
-func (uc *AuthUsecase) issueSession(ctx context.Context, user *User, ua, ip string) (*Session, string, error) {
-	return uc.issueSessionTx(ctx, nil, user, ua, ip)
-}
-
-func (uc *AuthUsecase) issueSessionFor(ctx context.Context, user *User, ua, ip, appID string) (*Session, string, error) {
-	return uc.issueSessionTxFor(ctx, nil, user, ua, ip, appID)
-}
-
-func (uc *AuthUsecase) issueSessionTx(ctx context.Context, tx Tx, user *User, ua, ip string) (*Session, string, error) {
-	return uc.issueSessionTxFor(ctx, tx, user, ua, ip, ApplicationCode)
-}
-
-// issueSessionTxFor creates the session and reports how to return it.
+// issueSessionFor creates a session after checking that the authentication
+// proof still matches the current account.
 //
 // The per-user session cap is "count live sessions, revoke the excess, insert".
 // That sequence is only an invariant if it is serialised per user: with two
@@ -504,17 +518,16 @@ func (uc *AuthUsecase) issueSessionTx(ctx context.Context, tx Tx, user *User, ua
 //
 // So the whole sequence always runs inside one transaction that first locks the
 // user row, and every entry point shares it: password login, MFA/passkey
-// completion, OAuth callback, internal gRPC login. A caller that already holds a
-// transaction (MFA completion) reuses it rather than nesting.
-func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User, ua, ip, appID string) (*Session, string, error) {
-	if tx != nil {
-		return uc.issueSessionLocked(ctx, tx, user, ua, ip, appID)
-	}
+// completion, OAuth callback, internal gRPC login.
+func (uc *AuthUsecase) issueSessionFor(ctx context.Context, user *User, ua, ip, appID string) (*Session, string, error) {
 	var (
 		session *Session
 		raw     string
 	)
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.lockUserGeneration(ctx, tx, user.ID, user.IdentityVersion); err != nil {
+			return err
+		}
 		var err error
 		session, raw, err = uc.issueSessionLocked(ctx, tx, user, ua, ip, appID)
 		return err
@@ -539,11 +552,6 @@ func (uc *AuthUsecase) issueSessionTxFor(ctx context.Context, tx Tx, user *User,
 }
 
 func (uc *AuthUsecase) issueSessionLocked(ctx context.Context, tx Tx, user *User, ua, ip, appID string) (*Session, string, error) {
-	// The lock comes first, before anything is read: a snapshot taken before the
-	// lock is exactly the stale count this is here to prevent.
-	if err := uc.Users.LockUser(ctx, tx, user.ID); err != nil {
-		return nil, "", ErrDependency
-	}
 	settings, err := uc.Settings.GetAuth(ctx, tx)
 	if err != nil {
 		return nil, "", ErrDependency
@@ -592,6 +600,20 @@ func (uc *AuthUsecase) issueSessionLocked(ctx context.Context, tx Tx, user *User
 		return nil, "", ErrDependency
 	}
 	return s, raw, nil
+}
+
+func (s *Services) lockUserGeneration(ctx context.Context, tx Tx, id int64, version uint64) error {
+	if err := s.Users.LockUser(ctx, tx, id); err != nil {
+		return ErrDependency
+	}
+	user, err := s.Users.Get(ctx, tx, id)
+	if err != nil {
+		return ErrDependency
+	}
+	if user.Status != UserStatusEnabled || user.IdentityVersion != version {
+		return ErrSessionRevoked
+	}
+	return nil
 }
 
 // evictExcessSessions keeps at most limit live sessions per user by revoking
@@ -694,24 +716,46 @@ func (uc *AuthUsecase) CreatePasswordResetChallenge(ctx context.Context, identif
 		return "", time.Time{}, ErrDependency
 	}
 	// Always return a challenge-shaped response to avoid account enumeration.
-	id := uc.IDs.NewID()
-	expires := uc.Clock.Now().Add(uc.ResetTTL)
-	if err != nil || user == nil || user.Status == UserStatusArchived || user.Email == "" {
-		return id, expires, nil
+	if err != nil || user == nil || user.Status == UserStatusArchived || user.Email == "" || !user.EmailVerified {
+		return uc.IDs.NewID(), uc.Clock.Now().Add(uc.ResetTTL), nil
 	}
-	code, err := GenerateCode()
+	id, code, expires, err := uc.storePasswordResetChallenge(ctx, user, uc.ResetTTL)
 	if err != nil {
-		return "", time.Time{}, ErrDependency
+		return "", time.Time{}, err
 	}
-	if err := uc.Challenges.Put(ctx, Challenge{
-		ID: id, Purpose: "password_reset",
-		CodeHash: HMACCode(uc.CodeSecret, "password_reset", code),
-		UserID:   user.ID, Email: user.Email, ExpiresAt: expires,
-	}); err != nil {
-		return "", time.Time{}, ErrDependency
+	link := uc.passwordResetLink(id, code)
+	body := fmt.Sprintf("你的密码重置验证码是 %s。请通过以下链接重置密码：\n\n%s\n\n链接 %d 分钟内有效。如非本人操作请忽略。", code, link, int(uc.ResetTTL.Minutes()))
+	if err := uc.Mail.Send(ctx, user.Email, "用户中心密码重置", body); err != nil {
+		_ = uc.Challenges.Delete(ctx, "password_reset", id)
 	}
-	_ = uc.Mail.Send(ctx, user.Email, "用户中心密码重置验证码", fmt.Sprintf("你的密码重置验证码是 %s，%d 分钟内有效。如非本人操作请忽略。", code, int(uc.ResetTTL.Minutes())))
 	return id, expires, nil
+}
+
+func (s *Services) passwordResetLink(id, code string) string {
+	params := url.Values{"challenge": {id}, "code": {code}}
+	return strings.TrimRight(s.PublicBaseURL, "/") + "/reset-password#" + params.Encode()
+}
+
+func (s *Services) storePasswordResetChallenge(ctx context.Context, user *User, ttl time.Duration) (id, code string, expires time.Time, err error) {
+	code, err = GenerateCode()
+	if err != nil {
+		return "", "", time.Time{}, ErrDependency
+	}
+	id = s.IDs.NewID()
+	expires = s.Clock.Now().Add(ttl)
+	if err := s.Challenges.Put(ctx, Challenge{
+		ID: id, Purpose: "password_reset",
+		CodeHash: HMACCode(s.CodeSecret, "password_reset", code),
+		UserID:   user.ID, IdentityVersion: user.IdentityVersion, Email: user.Email, ExpiresAt: expires,
+	}); err != nil {
+		return "", "", time.Time{}, ErrDependency
+	}
+	return id, code, expires, nil
+}
+
+func passwordResetMatchesUser(c Challenge, u *User) bool {
+	return u.Status != UserStatusArchived && c.IdentityVersion != 0 && c.IdentityVersion == u.IdentityVersion &&
+		u.EmailNormalized != "" && NormalizeEmail(c.Email) == u.EmailNormalized
 }
 
 func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, newPassword string) error {
@@ -728,8 +772,11 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 		return err
 	}
 	user, err := uc.Users.Get(ctx, nil, challenge.UserID)
-	if err != nil {
+	if errors.Is(err, ErrUserNotFound) || err == nil && !passwordResetMatchesUser(challenge, user) {
 		return ErrChallengeInvalid
+	}
+	if err != nil {
+		return ErrDependency
 	}
 	// Reuse is checked before the challenge is consumed: a rejected password
 	// must not burn the one-time code, otherwise the user has to wait for a new
@@ -747,6 +794,16 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 	}
 	now := uc.Clock.Now().UTC()
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.Users.LockUser(ctx, tx, user.ID); err != nil {
+			return ErrDependency
+		}
+		current, err := uc.Users.Get(ctx, tx, user.ID)
+		if err != nil {
+			return ErrDependency
+		}
+		if !passwordResetMatchesUser(challenge, current) {
+			return ErrChallengeInvalid
+		}
 		if err := uc.Flows.Complete(ctx, tx, challenge.ID, "password_reset", user.ID, "password_reset"); err != nil {
 			return err
 		}
@@ -759,11 +816,9 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 		if err := uc.RecordPasswordBeforeRotation(ctx, tx, user.ID, credential, policy); err != nil {
 			return err
 		}
-		version, err := uc.Credentials.UpdatePassword(ctx, tx, user.ID, hash, "bcrypt", credential.Revision, false)
-		if err != nil {
+		if _, err := uc.Credentials.UpdatePassword(ctx, tx, user.ID, hash, "bcrypt", credential.Revision, false); err != nil {
 			return err
 		}
-		_ = version
 		if err := uc.RecordPasswordHistory(ctx, tx, user.ID, hash, policy); err != nil {
 			return ErrDependency
 		}
@@ -783,7 +838,7 @@ func (uc *AuthUsecase) ResetPassword(ctx context.Context, challengeID, code, new
 	if err != nil {
 		return err
 	}
-	_ = uc.Challenges.Delete(ctx, challengeID)
+	_ = uc.Challenges.Delete(ctx, "password_reset", challengeID)
 	uc.recordSecurity(ctx, user.ID, "", "password_reset", "success", "", "", "")
 	return nil
 }

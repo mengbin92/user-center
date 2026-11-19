@@ -2,9 +2,6 @@ package biz
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
 	"strconv"
 	"strings"
@@ -19,9 +16,8 @@ import (
 // password path.
 //
 // The public begin endpoint must not reveal whether an account exists, is
-// enabled, or owns a passkey. Every one of those cases receives a challenge
-// with the same shape; decoys are bound to user 0 and fail at complete with
-// the same reason as a real account's invalid assertion.
+// enabled, or owns a passkey. Discoverable credentials keep account-specific
+// credential IDs out of the public reply.
 const (
 	PasskeyLoginPurpose = "webauthn_login"
 
@@ -31,11 +27,10 @@ const (
 )
 
 type PasskeyLoginChallenge struct {
-	ChallengeID        string
-	Challenge          string
-	RPID               string
-	AllowCredentialIDs []string
-	ExpiresAt          time.Time
+	ChallengeID string
+	Challenge   string
+	RPID        string
+	ExpiresAt   time.Time
 }
 
 type PasskeyLoginInput struct {
@@ -56,6 +51,9 @@ func (uc *AuthUsecase) BeginPasskeyLogin(ctx context.Context, identifier, ip str
 	if identifier == "" {
 		return nil, Validation("请输入用户名或邮箱")
 	}
+	if uc.WebAuthn == nil {
+		return nil, ErrDependency
+	}
 	rpID, origin, err := uc.webAuthnRP()
 	if err != nil {
 		return nil, ErrDependency
@@ -67,55 +65,20 @@ func (uc *AuthUsecase) BeginPasskeyLogin(ctx context.Context, identifier, ip str
 	} else {
 		user, err = uc.Users.GetByUsername(ctx, nil, NormalizeUsername(identifier))
 	}
-	if err != nil {
-		if !errors.Is(err, ErrUserNotFound) {
-			return nil, ErrDependency
-		}
-		return uc.decoyPasskeyLoginChallenge(ctx, identifier, rpID, origin)
-	}
-	if user == nil || user.Status != UserStatusEnabled {
-		return uc.decoyPasskeyLoginChallenge(ctx, identifier, rpID, origin)
-	}
-	if uc.WebAuthn == nil {
+	if err != nil && !errors.Is(err, ErrUserNotFound) {
 		return nil, ErrDependency
 	}
-	creds, err := uc.WebAuthn.ListByUser(ctx, nil, user.ID)
-	if err != nil {
-		return nil, ErrDependency
+	var userID int64
+	var version uint64
+	if user != nil && user.Status == UserStatusEnabled {
+		userID, version = user.ID, user.IdentityVersion
 	}
-	if len(creds) == 0 {
-		return uc.decoyPasskeyLoginChallenge(ctx, identifier, rpID, origin)
-	}
-	allow := make([]string, 0, len(creds))
-	for _, cred := range creds {
-		allow = append(allow, cred.CredentialID)
-	}
-	id, raw, expires, err := uc.putPasskeyLoginChallenge(ctx, user.ID, user.IdentityVersion, rpID, origin)
+	id, raw, expires, err := uc.putPasskeyLoginChallenge(ctx, userID, version, rpID, origin)
 	if err != nil {
 		return nil, ErrDependency
 	}
 	return &PasskeyLoginChallenge{
-		ChallengeID: id, Challenge: raw, RPID: rpID,
-		AllowCredentialIDs: allow, ExpiresAt: expires,
-	}, nil
-}
-
-// decoyPasskeyLoginChallenge mirrors a real challenge. The single fake
-// credential is deterministic per identifier, so probing the same account
-// twice sees a stable list instead of an empty one. It is keyed with the
-// server secret rather than the raw identifier so a client cannot recompute
-// the fake ID and tell a decoy from a real credential.
-func (uc *AuthUsecase) decoyPasskeyLoginChallenge(ctx context.Context, identifier, rpID, origin string) (*PasskeyLoginChallenge, error) {
-	mac := hmac.New(sha256.New, []byte(uc.CodeSecret))
-	_, _ = mac.Write([]byte(strings.ToLower(strings.TrimSpace(identifier))))
-	allow := []string{base64.RawURLEncoding.EncodeToString(mac.Sum(nil))}
-	id, raw, expires, err := uc.putPasskeyLoginChallenge(ctx, 0, 0, rpID, origin)
-	if err != nil {
-		return nil, ErrDependency
-	}
-	return &PasskeyLoginChallenge{
-		ChallengeID: id, Challenge: raw, RPID: rpID,
-		AllowCredentialIDs: allow, ExpiresAt: expires,
+		ChallengeID: id, Challenge: raw, RPID: rpID, ExpiresAt: expires,
 	}, nil
 }
 
@@ -175,7 +138,7 @@ func (uc *AuthUsecase) CompletePasskeyLogin(ctx context.Context, in PasskeyLogin
 	// lookup so their failure is indistinguishable from a real account's
 	// invalid assertion.
 	if userID == 0 {
-		_ = uc.Challenges.Delete(ctx, in.ChallengeID)
+		_ = uc.Challenges.Delete(ctx, PasskeyLoginPurpose, in.ChallengeID)
 		return nil, ErrChallengeInvalid
 	}
 	user, err := uc.Users.Get(ctx, nil, userID)
@@ -203,17 +166,16 @@ func (uc *AuthUsecase) CompletePasskeyLogin(ctx context.Context, in PasskeyLogin
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		// Lock first: issueSessionLocked counts and inserts sessions under the
 		// same row lock every other login path uses.
-		if err := uc.Users.LockUser(ctx, tx, user.ID); err != nil {
-			return ErrDependency
+		if err := uc.lockUserGeneration(ctx, tx, user.ID, user.IdentityVersion); err != nil {
+			if errors.Is(err, ErrSessionRevoked) {
+				return ErrChallengeInvalid
+			}
+			return err
 		}
 		if err := uc.Flows.Complete(ctx, tx, in.ChallengeID, PasskeyLoginPurpose, user.ID, "session"); err != nil {
 			return err
 		}
-		actor := ActorContext{
-			User: user, Session: &Session{ID: "passkey-login", UserID: user.ID},
-			IP: in.IP, UserAgent: in.UserAgent,
-		}
-		if err := uc.verifyWebAuthnAssertion(ctx, tx, actor, payload.Challenge, in.Assertion, now); err != nil {
+		if err := uc.verifyWebAuthnAssertion(ctx, tx, user.ID, payload.Challenge, in.Assertion, now, true); err != nil {
 			failed = true
 			return err
 		}
@@ -231,20 +193,18 @@ func (uc *AuthUsecase) CompletePasskeyLogin(ctx context.Context, in PasskeyLogin
 	if err != nil {
 		if failed {
 			uc.recordSecurity(ctx, user.ID, "", "login", "failure", in.IP, in.UserAgent, "")
+			err = uc.webAuthnAssertionError(ctx, ActorContext{
+				User: user, IP: in.IP, UserAgent: in.UserAgent,
+			}, err)
 		}
 		return nil, err
 	}
-	_ = uc.Challenges.Delete(ctx, in.ChallengeID)
+	_ = uc.Challenges.Delete(ctx, PasskeyLoginPurpose, in.ChallengeID)
 
 	if mfaEnabled {
-		challengeID, expires, err := uc.putPasskeyLoginMFAChallenge(ctx, user, in)
-		if err != nil {
-			return nil, err
-		}
-		return &LoginResult{
-			Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires,
-			User: uc.publicUser(ctx, user),
-		}, nil
+		// Only TOTP and recovery codes are eligible after a passkey was used
+		// as the primary factor.
+		return uc.newLoginMFAChallenge(ctx, user, LoginInput{IP: in.IP, UserAgent: in.UserAgent, Remember: in.Remember}, ApplicationCode, nil)
 	}
 	uc.recordSecurity(ctx, user.ID, session.ID, "login", "success", in.IP, in.UserAgent, "")
 	if session.EvictedSessions > 0 {
@@ -252,7 +212,7 @@ func (uc *AuthUsecase) CompletePasskeyLogin(ctx context.Context, in PasskeyLogin
 	}
 	result := &LoginResult{
 		Status: "authenticated", User: uc.publicUser(ctx, user), Session: session,
-		RawToken: rawToken, RecycledSessions: session.EvictedSessions,
+		RawToken: rawToken, Remember: in.Remember, RecycledSessions: session.EvictedSessions,
 	}
 	if cred, cerr := uc.Credentials.Get(ctx, nil, user.ID); cerr == nil && cred != nil {
 		result.PasswordChangeRequired = cred.MustChangePassword
@@ -262,24 +222,4 @@ func (uc *AuthUsecase) CompletePasskeyLogin(ctx context.Context, in PasskeyLogin
 		}
 	}
 	return result, nil
-}
-
-// putPasskeyLoginMFAChallenge keeps the shared /auth/mfa/complete contract:
-// an account that still has TOTP enabled must present it after the passkey.
-// Passkeys are not offered as the second factor here because one was just
-// used as the first.
-func (uc *AuthUsecase) putPasskeyLoginMFAChallenge(ctx context.Context, user *User, in PasskeyLoginInput) (string, time.Time, error) {
-	id := uc.IDs.NewID()
-	expires := uc.Clock.Now().Add(passkeyLoginChallengeTTL)
-	payload, _ := jsonx.Marshal(map[string]any{
-		"identity_version": user.IdentityVersion, "ip": in.IP,
-		"ua": SummizeAgent(in.UserAgent), "remember": in.Remember,
-		"app_id": "", "webauthn_challenge": "",
-	})
-	if err := uc.Challenges.Put(ctx, Challenge{
-		ID: id, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires,
-	}); err != nil {
-		return "", time.Time{}, ErrDependency
-	}
-	return id, expires, nil
 }

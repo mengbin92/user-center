@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/url"
@@ -23,16 +24,15 @@ import (
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
-// WebAuthn (V2.4 R13). Passkeys are a *second* factor only: the first factor
-// always remains username + password, and each WebAuthn operation requires a
-// re-entered primary credential. Attestation is restricted to "none" so no
-// certificate chain or device attestation secret is stored.
+// WebAuthn registration and Step-up require primary authentication.
+// Attestation is restricted to "none" so no certificate chain is stored.
 
 const (
 	WebAuthnRegisterPurpose = "webauthn_register"
 	WebAuthnAssertPurpose   = "webauthn_assert"
 
 	flagUserPresent  = 0x01
+	flagUserVerified = 0x04
 	flagAttestedData = 0x40
 )
 
@@ -169,6 +169,9 @@ func (uc *WebAuthnUsecase) ConfirmRegistration(ctx context.Context, actor ActorC
 	cred.Transports = in.Transports
 	var created *WebAuthnCredential
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.lockUserGeneration(ctx, tx, actor.User.ID, actor.Session.IdentityVersion); err != nil {
+			return err
+		}
 		if err := uc.Flows.Complete(ctx, tx, in.ChallengeID, WebAuthnRegisterPurpose, actor.User.ID, "webauthn_credential"); err != nil {
 			return ErrChallengeInvalid
 		}
@@ -177,12 +180,20 @@ func (uc *WebAuthnUsecase) ConfirmRegistration(ctx context.Context, actor ActorC
 			return err
 		}
 		created = row
-		return uc.audit(ctx, tx, actor, "credential.webauthn.register", itoa(row.ID), "{}", "{}", "{}", "self-service passkey registration", "success")
+		version, err := uc.refreshCredentialSessions(ctx, tx, actor)
+		if err != nil {
+			return err
+		}
+		if err := uc.audit(ctx, tx, actor, "credential.webauthn.register", itoa(row.ID), "{}", "{}", "{}", "self-service passkey registration", "success"); err != nil {
+			return err
+		}
+		payload := string(mustJSON(map[string]any{"user_id": actor.User.ID, "identity_version": version}))
+		return uc.emit(ctx, tx, "user", actor.User.ID, version, "credential.changed", payload)
 	})
 	if err != nil {
 		return nil, err
 	}
-	_ = uc.Challenges.Delete(ctx, in.ChallengeID)
+	_ = uc.Challenges.Delete(ctx, WebAuthnRegisterPurpose, in.ChallengeID)
 	return created, nil
 }
 
@@ -207,25 +218,39 @@ func (uc *WebAuthnUsecase) Delete(ctx context.Context, actor ActorContext, id in
 	if err := uc.confirmPrimaryAuthentication(ctx, actor, password); err != nil {
 		return err
 	}
-	if _, err := uc.WebAuthn.Get(ctx, nil, actor.User.ID, id); err != nil {
-		return ErrResourceNotFound
-	}
-	creds, err := uc.WebAuthn.ListByUser(ctx, nil, actor.User.ID)
-	if err != nil {
-		return ErrDependency
-	}
-	state, serr := uc.MFA.Get(ctx, nil, actor.User.ID)
-	totpEnabled := serr == nil && state != nil && state.Enabled()
-	// Keep at least one usable second factor: either a confirmed TOTP secret
-	// or another WebAuthn credential.
-	if !totpEnabled && len(creds) <= 1 {
-		return ConflictCode("LAST_SECOND_FACTOR", "删除最后一个第二因素前请先绑定替代方式")
-	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.lockUserGeneration(ctx, tx, actor.User.ID, actor.Session.IdentityVersion); err != nil {
+			return err
+		}
+		if _, err := uc.WebAuthn.Get(ctx, tx, actor.User.ID, id); err != nil {
+			if errors.Is(err, ErrResourceNotFound) {
+				return err
+			}
+			return ErrDependency
+		}
+		creds, err := uc.WebAuthn.ListByUser(ctx, tx, actor.User.ID)
+		if err != nil {
+			return ErrDependency
+		}
+		state, err := uc.MFA.Get(ctx, tx, actor.User.ID)
+		if err != nil && !errors.Is(err, ErrResourceNotFound) {
+			return ErrDependency
+		}
+		if (state == nil || !state.Enabled()) && len(creds) <= 1 {
+			return ConflictCode("LAST_SECOND_FACTOR", "删除最后一个第二因素前请先绑定替代方式")
+		}
 		if err := uc.WebAuthn.Delete(ctx, tx, actor.User.ID, id); err != nil {
 			return err
 		}
-		return uc.audit(ctx, tx, actor, "credential.webauthn.delete", itoa(id), "{}", "{}", "{}", "self-service passkey removal", "success")
+		version, err := uc.refreshCredentialSessions(ctx, tx, actor)
+		if err != nil {
+			return err
+		}
+		if err := uc.audit(ctx, tx, actor, "credential.webauthn.delete", itoa(id), "{}", "{}", "{}", "self-service passkey removal", "success"); err != nil {
+			return err
+		}
+		payload := string(mustJSON(map[string]any{"user_id": actor.User.ID, "identity_version": version}))
+		return uc.emit(ctx, tx, "user", actor.User.ID, version, "credential.changed", payload)
 	})
 }
 
@@ -271,32 +296,28 @@ func (uc *WebAuthnUsecase) VerifyAssertion(ctx context.Context, actor ActorConte
 		return time.Time{}, err
 	}
 	now := uc.Clock.Now().UTC()
-	var until time.Time
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		if err := uc.Flows.Complete(ctx, tx, in.ChallengeID, WebAuthnAssertPurpose, actor.User.ID, "webauthn_assertion"); err != nil {
 			return ErrChallengeInvalid
 		}
-		if err := uc.verifyWebAuthnAssertion(ctx, tx, actor, payload.Challenge, in, now); err != nil {
-			return err
-		}
-		if stepUp {
-			until = uc.Clock.Now().Add(uc.StepUpTTL)
-			if err := uc.StepUp.Put(ctx, StepUpKey(actor.Session), until); err != nil {
-				return ErrDependency
-			}
-		}
-		return nil
+		return uc.verifyWebAuthnAssertion(ctx, tx, actor.User.ID, payload.Challenge, in, now, false)
 	})
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, uc.webAuthnAssertionError(ctx, actor, err)
 	}
-	_ = uc.Challenges.Delete(ctx, in.ChallengeID)
+	_ = uc.Challenges.Delete(ctx, WebAuthnAssertPurpose, in.ChallengeID)
+	var until time.Time
+	if stepUp {
+		until = uc.Clock.Now().Add(uc.StepUpTTL)
+		if err := uc.StepUp.Put(ctx, StepUpKey(actor.Session), until); err != nil {
+			return time.Time{}, ErrDependency
+		}
+	}
 	uc.recordSecurity(ctx, actor.User.ID, actor.Session.ID, "webauthn_assert", "success", actor.IP, actor.UserAgent, actor.RequestID)
 	return until, nil
 }
 
-// verifyWebAuthnAssertion is shared by Step-up and the login MFA flow.
-func (s *Services) verifyWebAuthnAssertion(ctx context.Context, tx Tx, actor ActorContext, challenge string, in WebAuthnAssertion, now time.Time) error {
+func (s *Services) verifyWebAuthnAssertion(ctx context.Context, tx Tx, userID int64, challenge string, in WebAuthnAssertion, now time.Time, requireUV bool) error {
 	rpID, origin, err := s.webAuthnRP()
 	if err != nil {
 		return ErrDependency
@@ -304,7 +325,7 @@ func (s *Services) verifyWebAuthnAssertion(ctx context.Context, tx Tx, actor Act
 	if err := verifyClientData(in.ClientDataJSON, challenge, "webauthn.get", origin); err != nil {
 		return err
 	}
-	counter, err := parseAuthenticatorData(in.AuthenticatorData, rpID)
+	counter, err := parseAuthenticatorData(in.AuthenticatorData, rpID, requireUV)
 	if err != nil {
 		return err
 	}
@@ -312,7 +333,7 @@ func (s *Services) verifyWebAuthnAssertion(ctx context.Context, tx Tx, actor Act
 	if err != nil {
 		return ErrChallengeInvalid
 	}
-	if cred.UserID != actor.User.ID {
+	if cred.UserID != userID {
 		return ErrChallengeInvalid
 	}
 	clientHash := sha256.Sum256(in.ClientDataJSON)
@@ -321,26 +342,45 @@ func (s *Services) verifyWebAuthnAssertion(ctx context.Context, tx Tx, actor Act
 		return ErrChallengeInvalid
 	}
 	if cred.SignCount > 0 && counter <= cred.SignCount {
-		// A cloned authenticator typically replays a stale counter. Refuse and
-		// leave a warning trail instead of silently accepting the assertion.
-		s.recordSecurity(ctx, actor.User.ID, actor.Session.ID, "webauthn_sign_count_regression", "failure", actor.IP, actor.UserAgent, actor.RequestID)
-		_ = s.audit(ctx, nil, actor, "credential.webauthn.sign_count_regression", itoa(cred.ID),
-			string(mustJSON(map[string]any{"stored": cred.SignCount, "observed": counter})), "{}", "{}",
-			"authenticator counter regression", "denied")
-		return ConflictCode("WEBAUTHN_SIGN_COUNT_REGRESSION", "认证器计数器回退，已拒绝")
+		return &webAuthnCounterRegression{credentialID: cred.ID, stored: cred.SignCount, observed: counter}
 	}
 	return s.WebAuthn.UpdateSignCount(ctx, tx, cred.ID, counter, &now, cred.Revision)
+}
+
+type webAuthnCounterRegression struct {
+	credentialID     int64
+	stored, observed uint32
+}
+
+func (*webAuthnCounterRegression) Error() string { return "WebAuthn authenticator counter regression" }
+
+func (s *Services) webAuthnAssertionError(ctx context.Context, actor ActorContext, err error) error {
+	var regression *webAuthnCounterRegression
+	if !errors.As(err, &regression) {
+		return err
+	}
+	// Record the rejection after rollback, when the write connection is free.
+	sessionID := ""
+	if actor.Session != nil {
+		sessionID = actor.Session.ID
+	}
+	s.recordSecurity(ctx, actor.User.ID, sessionID, "webauthn_sign_count_regression", "failure", actor.IP, actor.UserAgent, actor.RequestID)
+	_ = s.audit(ctx, nil, actor, "credential.webauthn.sign_count_regression", itoa(regression.credentialID),
+		string(mustJSON(map[string]any{"stored": regression.stored, "observed": regression.observed})), "{}", "{}",
+		"authenticator counter regression", "denied")
+	return ConflictCode("WEBAUTHN_SIGN_COUNT_REGRESSION", "认证器计数器回退，已拒绝")
 }
 
 // --- wire parsing / signature verification ---
 
 func verifyClientData(raw []byte, challenge, expectedType, origin string) error {
 	var data struct {
-		Type      string `json:"type"`
-		Challenge string `json:"challenge"`
-		Origin    string `json:"origin"`
+		Type        string `json:"type"`
+		Challenge   string `json:"challenge"`
+		Origin      string `json:"origin"`
+		CrossOrigin bool   `json:"crossOrigin"`
 	}
-	if jsonx.Unmarshal(raw, &data) != nil || data.Type != expectedType || data.Origin != origin {
+	if jsonx.Unmarshal(raw, &data) != nil || data.Type != expectedType || data.Origin != origin || data.CrossOrigin {
 		return ErrChallengeInvalid
 	}
 	if subtle.ConstantTimeCompare([]byte(data.Challenge), []byte(challenge)) != 1 {
@@ -349,7 +389,7 @@ func verifyClientData(raw []byte, challenge, expectedType, origin string) error 
 	return nil
 }
 
-func parseAuthenticatorData(raw []byte, rpID string) (uint32, error) {
+func parseAuthenticatorData(raw []byte, rpID string, requireUV bool) (uint32, error) {
 	if len(raw) < 37 {
 		return 0, ErrChallengeInvalid
 	}
@@ -357,7 +397,7 @@ func parseAuthenticatorData(raw []byte, rpID string) (uint32, error) {
 	if subtle.ConstantTimeCompare(raw[:32], expected[:]) != 1 {
 		return 0, ErrChallengeInvalid
 	}
-	if raw[32]&flagUserPresent == 0 {
+	if raw[32]&flagUserPresent == 0 || requireUV && raw[32]&flagUserVerified == 0 {
 		return 0, ErrChallengeInvalid
 	}
 	return binary.BigEndian.Uint32(raw[33:37]), nil
@@ -468,12 +508,28 @@ func verifyCOSESignature(cose, signed, signature []byte) error {
 // HasSecondFactor reports whether an account has any enrolled second factor;
 // WebAuthn credentials satisfy the admin MFA policy alongside TOTP.
 func (s *Services) HasSecondFactor(ctx context.Context, userID int64) bool {
-	if state, err := s.MFA.Get(ctx, nil, userID); err == nil && state != nil && state.Enabled() {
+	return s.hasSecondFactorInTx(ctx, nil, userID)
+}
+
+func (s *Services) hasSecondFactorInTx(ctx context.Context, tx Tx, userID int64) bool {
+	if state, err := s.MFA.Get(ctx, tx, userID); err == nil && state != nil && state.Enabled() {
 		return true
 	}
+	enrolled, _ := s.hasPasskeyInTx(ctx, tx, userID)
+	return enrolled
+}
+
+func (s *Services) hasPasskey(ctx context.Context, userID int64) (bool, error) {
+	return s.hasPasskeyInTx(ctx, nil, userID)
+}
+
+func (s *Services) hasPasskeyInTx(ctx context.Context, tx Tx, userID int64) (bool, error) {
 	if s.WebAuthn == nil {
-		return false
+		return false, nil
 	}
-	creds, err := s.WebAuthn.ListByUser(ctx, nil, userID)
-	return err == nil && len(creds) > 0
+	creds, err := s.WebAuthn.ListByUser(ctx, tx, userID)
+	if err != nil {
+		return false, ErrDependency
+	}
+	return len(creds) > 0, nil
 }

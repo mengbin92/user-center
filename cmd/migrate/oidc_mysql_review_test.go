@@ -19,10 +19,14 @@ func TestOIDCMySQLMigrations(t *testing.T) {
 	d, cleanup, err := data.NewData(&conf.Data{Database: &conf.Database{Driver: "mysql", Source: dsn}}, &conf.Security{SessionSecret: secret, CsrfSecret: secret, MfaEncryptionKey: secret}, zap.NewNop())
 	require.NoError(t, err)
 	t.Cleanup(cleanup)
+	results := make(chan error, 2)
 	for range 2 {
-		require.NoError(t, runSQLMigrations(d.DB(), "../../migrations/mysql", zap.NewNop()))
-		require.NoError(t, data.SeedCatalog(d.DB()))
+		go func() { results <- runSQLMigrations(d.DB(), "../../migrations/mysql", zap.NewNop()) }()
 	}
+	require.NoError(t, <-results)
+	require.NoError(t, <-results)
+	require.NoError(t, runSQLMigrations(d.DB(), "../../migrations/mysql", zap.NewNop()))
+	require.NoError(t, data.SeedCatalog(d.DB()))
 	for _, table := range []string{"oidc_authorization_codes", "oidc_refresh_tokens"} {
 		require.True(t, d.DB().Migrator().HasColumn(table, "identity_version"))
 	}

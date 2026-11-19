@@ -796,7 +796,7 @@ export function AdminAssignmentsPage() {
             size="xs"
             variant="outline"
             disabled={!selectedUserId || !roleId || singlePreviewMutation.isPending}
-            onClick={() => void singlePreviewMutation.mutateAsync()}
+            onClick={() => singlePreviewMutation.mutate()}
           >
             预览将获得的权限
           </Button>

@@ -191,7 +191,7 @@ func (s *Services) ResetRootMFA(ctx context.Context, username string) error {
 // which case a conservative default of five entries is used.
 func (s *Services) recordBootstrapHistory(ctx context.Context, tx Tx, userID int64, hash string) error {
 	keep := 5
-	if settings, err := s.Settings.GetAuth(ctx, nil); err == nil && settings.PasswordHistoryCount > 0 {
+	if settings, err := s.Settings.GetAuth(ctx, tx); err == nil && settings.PasswordHistoryCount > 0 {
 		keep = settings.PasswordHistoryCount
 	}
 	return s.Credentials.RecordPasswordHash(ctx, tx, userID, hash, keep)

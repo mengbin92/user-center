@@ -219,14 +219,15 @@ func (uc *OIDCUsecase) managementGuard(ctx context.Context, tx Tx, actor ActorCo
 	if policy != actor.ExpectedPolicyRevision {
 		return ConflictPolicy(policy)
 	}
-	current, err := uc.currentIAMActor(ctx, actor)
+	current, err := uc.currentIAMActorInTx(ctx, tx, actor)
 	if err != nil {
 		return err
 	}
 	if err := uc.authenticationRestrictions(ctx, tx, current.User); err != nil {
 		return err
 	}
-	if _, err := uc.Authorize(ctx, current, "oidc.client.update", 0, true); err != nil {
+	iam := &IAMUsecase{Services: uc.Services}
+	if err := iam.authorizePlatform(ctx, tx, current, "oidc.client.update", 0, true); err != nil {
 		return err
 	}
 	return uc.RequireStepUp(ctx, current)
@@ -515,31 +516,48 @@ func (uc *OIDCUsecase) AuthorizeRequest(ctx context.Context, actor ActorContext,
 	// one-time handle instead of issuing a code. prompt=consent always
 	// re-prompts; prompt=none fails with interaction_required instead of
 	// silently granting.
-	needConsent, cerr := uc.consentRequired(ctx, client, actor.User.ID, scopes, slices.Contains(prompts, "consent"))
-	if cerr != nil {
-		return "", ErrDependency
-	}
-	if needConsent {
-		if slices.Contains(prompts, "none") {
-			return reject("interaction_required", "user consent is required")
+	var target string
+	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		current, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, tx, req.ClientID)
+		if err != nil {
+			return ErrDependency
 		}
-		return uc.parkConsentRequest(ctx, actor, client, req, redirect, scope, challenge, method, authTime)
-	}
-	rawCode, err := newToken(32)
+		if current.Status != "active" || current.Revision != client.Revision {
+			return oidcErr("invalid_request", "client configuration changed", 400)
+		}
+		needConsent, err := uc.consentRequired(ctx, tx, current, actor.User.ID, scopes, slices.Contains(prompts, "consent"))
+		if err != nil {
+			return ErrDependency
+		}
+		if needConsent {
+			if slices.Contains(prompts, "none") {
+				_, err := reject("interaction_required", "user consent is required")
+				return err
+			}
+			target, err = uc.parkConsentRequest(ctx, tx, actor, current, req, redirect, scope, challenge, method, authTime)
+			return err
+		}
+		rawCode, err := newToken(32)
+		if err != nil {
+			return ErrDependency
+		}
+		code := &OIDCCode{
+			CodeHash: HashToken(rawCode), ClientID: current.ClientID, UserID: actor.User.ID,
+			IdentityVersion: actor.User.IdentityVersion,
+			RedirectURI:     redirect, Scope: scope, Nonce: req.Nonce,
+			CodeChallenge: challenge, CodeChallengeMethod: method,
+			AuthTime: authTime.UTC(), ExpiresAt: uc.Clock.Now().Add(5 * time.Minute).UTC(),
+		}
+		if err := uc.OIDCCodes.CreateOIDCCode(ctx, tx, code); err != nil {
+			return ErrDependency
+		}
+		target = appendQuery(redirect, map[string]string{"code": rawCode, "state": state})
+		return nil
+	})
 	if err != nil {
-		return "", ErrDependency
+		return "", err
 	}
-	code := &OIDCCode{
-		CodeHash: HashToken(rawCode), ClientID: client.ClientID, UserID: actor.User.ID,
-		IdentityVersion: actor.User.IdentityVersion,
-		RedirectURI:     redirect, Scope: scope, Nonce: req.Nonce,
-		CodeChallenge: challenge, CodeChallengeMethod: method,
-		AuthTime: authTime.UTC(), ExpiresAt: uc.Clock.Now().Add(5 * time.Minute).UTC(),
-	}
-	if err := uc.OIDCCodes.CreateOIDCCode(ctx, nil, code); err != nil {
-		return "", ErrDependency
-	}
-	return appendQuery(redirect, map[string]string{"code": rawCode, "state": state}), nil
+	return target, nil
 }
 
 func appendQuery(raw string, values map[string]string) string {
@@ -687,7 +705,7 @@ func (uc *OIDCUsecase) authenticationRestrictions(ctx context.Context, tx Tx, us
 		return ErrDependency
 	}
 	user.Roles = roles
-	return uc.requireAdminMFA(ctx, ActorContext{User: user})
+	return uc.requireAdminMFAInTx(ctx, tx, ActorContext{User: user})
 }
 
 func (uc *OIDCUsecase) issueTokens(ctx context.Context, tx Tx, client *OIDCClient, userID int64, identityVersion uint64, scope, nonce string, authTime time.Time, familyID string, refreshExpiry time.Time) (map[string]any, error) {

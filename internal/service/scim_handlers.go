@@ -2,6 +2,7 @@ package service
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -13,8 +14,12 @@ import (
 // token; a resource id is resolved only through that tenant's identity map.
 
 func (s *SCIMService) serveSCIMUsers(w http.ResponseWriter, r *http.Request, orgID int64, baseURL string) {
-	id, hasID := scimID(r.URL.Path)
-	if !hasID {
+	id, err := scimID(r.URL.Path, "Users")
+	if err != nil {
+		scimFail(w, err)
+		return
+	}
+	if id == 0 {
 		switch r.Method {
 		case http.MethodGet:
 			s.scimListUsers(w, r, orgID, baseURL)
@@ -25,6 +30,15 @@ func (s *SCIMService) serveSCIMUsers(w http.ResponseWriter, r *http.Request, org
 		}
 		return
 	}
+	var expected uint64
+	switch r.Method {
+	case http.MethodPut, http.MethodPatch, http.MethodDelete:
+		expected, err = scimExpectedRevision(r)
+		if err != nil {
+			scimFail(w, err)
+			return
+		}
+	}
 	switch r.Method {
 	case http.MethodGet:
 		u, err := s.uc.GetUser(r.Context(), orgID, id)
@@ -34,29 +48,24 @@ func (s *SCIMService) serveSCIMUsers(w http.ResponseWriter, r *http.Request, org
 		}
 		scimWriteJSON(w, http.StatusOK, scimProjectUser(scimUserResource(u, baseURL), r), scimETag(u.Revision))
 	case http.MethodPut:
-		if !s.scimCheckVersion(w, r, orgID, id) {
-			return
-		}
 		in, err := scimDecodeBody(r, scimSchemaUser)
 		if err != nil {
 			scimFail(w, err)
 			return
 		}
-		u, err := s.uc.ReplaceUser(r.Context(), orgID, id, in.userInput())
+		u, err := s.uc.ReplaceUser(r.Context(), orgID, id, in.userInput(), expected)
 		if err != nil {
 			scimFail(w, err)
 			return
 		}
 		scimWriteJSON(w, http.StatusOK, scimUserResource(u, baseURL), scimETag(u.Revision))
 	case http.MethodPatch:
-		if !s.scimCheckVersion(w, r, orgID, id) {
-			return
-		}
 		in, err := scimPatchUserInput(r)
 		if err != nil {
 			scimFail(w, err)
 			return
 		}
+		in.ExpectedRevision = expected
 		u, err := s.uc.PatchUser(r.Context(), orgID, id, in)
 		if err != nil {
 			scimFail(w, err)
@@ -64,10 +73,7 @@ func (s *SCIMService) serveSCIMUsers(w http.ResponseWriter, r *http.Request, org
 		}
 		scimWriteJSON(w, http.StatusOK, scimUserResource(u, baseURL), scimETag(u.Revision))
 	case http.MethodDelete:
-		if !s.scimCheckVersion(w, r, orgID, id) {
-			return
-		}
-		if err := s.uc.DeleteUser(r.Context(), orgID, id); err != nil {
+		if err := s.uc.DeleteUserIfMatch(r.Context(), orgID, id, expected); err != nil {
 			scimFail(w, err)
 			return
 		}
@@ -75,19 +81,6 @@ func (s *SCIMService) serveSCIMUsers(w http.ResponseWriter, r *http.Request, org
 	default:
 		requireSCIMMethod(w, r, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete)
 	}
-}
-
-func (s *SCIMService) scimCheckVersion(w http.ResponseWriter, r *http.Request, orgID, id int64) bool {
-	current, err := s.uc.GetUser(r.Context(), orgID, id)
-	if err != nil {
-		scimFail(w, err)
-		return false
-	}
-	if !scimIfMatchOK(r, current.Revision) {
-		scimError(w, http.StatusPreconditionFailed, "preCondition Failed", "If-Match 与当前版本不一致")
-		return false
-	}
-	return true
 }
 
 func (s *SCIMService) scimListUsers(w http.ResponseWriter, r *http.Request, orgID int64, baseURL string) {
@@ -145,39 +138,47 @@ func scimProjectGroup(resource map[string]any, r *http.Request) map[string]any {
 	return scimProject(resource, r, []string{"schemas", "id", "meta", "externalId", "displayName", "members"})
 }
 
-// scimProject implements the top-level form of attributes / excludedAttributes.
-// Nested paths are refused: silently ignoring them would return more PII than
-// the caller asked to be excluded.
+func scimValidateQuery(q url.Values) error {
+	for _, name := range []string{"attributes", "excludedAttributes", "filter", "startIndex", "count", "sortBy", "sortOrder"} {
+		if len(q[name]) > 1 {
+			return biz.Validation("查询参数不能重复")
+		}
+	}
+	attrs, excluded := q.Get("attributes"), q.Get("excludedAttributes")
+	if attrs != "" && excluded != "" {
+		return biz.Validation("attributes 和 excludedAttributes 不能同时使用")
+	}
+	for _, raw := range []string{attrs, excluded} {
+		if strings.ContainsAny(raw, ".[") {
+			return biz.Validation("仅支持顶层属性投影")
+		}
+	}
+	return nil
+}
+
 func scimProject(resource map[string]any, r *http.Request, allowed []string) map[string]any {
 	q := r.URL.Query()
 	attrs, excluded := q.Get("attributes"), q.Get("excludedAttributes")
 	if attrs == "" && excluded == "" {
 		return resource
 	}
-	for _, raw := range []string{attrs, excluded} {
-		for _, field := range strings.Split(raw, ",") {
-			field = strings.TrimSpace(field)
-			if field != "" && strings.ContainsAny(field, ".[") {
-				return resource
-			}
-		}
-	}
-	keep := map[string]bool{"schemas": true, "id": true, "meta": true}
+	keep := map[string]bool{}
 	if attrs != "" {
 		for _, field := range strings.Split(attrs, ",") {
-			keep[strings.TrimSpace(field)] = true
+			keep[strings.ToLower(strings.TrimSpace(field))] = true
 		}
 	} else {
 		for _, field := range allowed {
-			keep[field] = true
+			keep[strings.ToLower(field)] = true
 		}
 		for _, field := range strings.Split(excluded, ",") {
-			delete(keep, strings.TrimSpace(field))
+			delete(keep, strings.ToLower(strings.TrimSpace(field)))
 		}
 	}
+	keep["schemas"], keep["id"], keep["meta"] = true, true, true
 	out := map[string]any{}
 	for k, v := range resource {
-		if keep[k] {
+		if keep[strings.ToLower(k)] {
 			out[k] = v
 		}
 	}
@@ -267,31 +268,39 @@ func scimPatchUserInput(r *http.Request) (biz.SCIMUserInput, error) {
 			}
 			out.Active = &v
 		case "displayname", "name.formatted":
+			if kind == "remove" {
+				return out, biz.ErrSCIMReadOnlyProfile
+			}
 			var v string
-			if err := jsonx.Unmarshal(op.Value, &v); err != nil {
+			if err := jsonx.Unmarshal(op.Value, &v); err != nil || strings.TrimSpace(v) == "" {
 				return out, biz.Validation("displayName 必须是字符串")
 			}
 			out.DisplayName = v
 		case "username":
+			if kind == "remove" {
+				return out, biz.ErrSCIMReadOnlyProfile
+			}
 			var v string
-			if err := jsonx.Unmarshal(op.Value, &v); err != nil {
+			if err := jsonx.Unmarshal(op.Value, &v); err != nil || strings.TrimSpace(v) == "" {
 				return out, biz.Validation("userName 必须是字符串")
 			}
 			out.UserName = v
 		case "externalid":
 			var v string
-			if err := jsonx.Unmarshal(op.Value, &v); err != nil {
-				return out, biz.Validation("externalId 必须是字符串")
+			if err := jsonx.Unmarshal(op.Value, &v); err != nil || strings.TrimSpace(v) == "" {
+				return out, biz.Validation("externalId 必须是非空字符串")
 			}
 			out.ExternalID = v
 		case "emails", "emails.value", `emails[type eq "work"].value`:
 			if kind == "remove" {
-				out.Email = ""
-				continue
+				return out, biz.ErrSCIMReadOnlyProfile
 			}
 			email, err := scimPatchEmail(op.Value)
 			if err != nil {
 				return out, err
+			}
+			if email == "" {
+				return out, biz.ErrSCIMReadOnlyProfile
 			}
 			out.Email = email
 		default:
@@ -324,8 +333,12 @@ func scimPatchEmail(raw jsonx.RawMessage) (string, error) {
 // Groups
 
 func (s *SCIMService) serveSCIMGroups(w http.ResponseWriter, r *http.Request, orgID int64, baseURL string) {
-	id, hasID := scimID(r.URL.Path)
-	if !hasID {
+	id, err := scimID(r.URL.Path, "Groups")
+	if err != nil {
+		scimFail(w, err)
+		return
+	}
+	if id == 0 {
 		switch r.Method {
 		case http.MethodGet:
 			s.scimListGroups(w, r, orgID, baseURL)
@@ -335,6 +348,15 @@ func (s *SCIMService) serveSCIMGroups(w http.ResponseWriter, r *http.Request, or
 			requireSCIMMethod(w, r, http.MethodGet, http.MethodPost)
 		}
 		return
+	}
+	var expected uint64
+	switch r.Method {
+	case http.MethodPut, http.MethodPatch, http.MethodDelete:
+		expected, err = scimExpectedRevision(r)
+		if err != nil {
+			scimFail(w, err)
+			return
+		}
 	}
 	switch r.Method {
 	case http.MethodGet:
@@ -355,15 +377,14 @@ func (s *SCIMService) serveSCIMGroups(w http.ResponseWriter, r *http.Request, or
 			scimFail(w, err)
 			return
 		}
-		current, err := s.uc.GetGroup(r.Context(), orgID, id)
-		if err != nil {
-			scimFail(w, err)
+		if strings.TrimSpace(in.DisplayName) == "" {
+			scimFail(w, biz.Validation("displayName 不能为空"))
 			return
 		}
-		// PUT replaces the member set: remove everything currently present,
-		// then add the supplied set.
-		in2 := biz.SCIMGroupInput{DisplayName: in.DisplayName, DelMembers: current.MemberIDs, AddMembers: ids}
-		g, err := s.uc.PatchGroup(r.Context(), orgID, id, in2)
+		g, err := s.uc.PatchGroup(r.Context(), orgID, id, biz.SCIMGroupInput{
+			ExternalID: in.ExternalID, DisplayName: in.DisplayName,
+			Members: []biz.SCIMGroupMemberChange{{IDs: ids, Replace: true}},
+		}, expected)
 		if err != nil {
 			scimFail(w, err)
 			return
@@ -375,14 +396,14 @@ func (s *SCIMService) serveSCIMGroups(w http.ResponseWriter, r *http.Request, or
 			scimFail(w, err)
 			return
 		}
-		g, err := s.uc.PatchGroup(r.Context(), orgID, id, in)
+		g, err := s.uc.PatchGroup(r.Context(), orgID, id, in, expected)
 		if err != nil {
 			scimFail(w, err)
 			return
 		}
 		scimWriteJSON(w, http.StatusOK, scimGroupResource(g, baseURL), scimETag(g.Revision))
 	case http.MethodDelete:
-		if err := s.uc.DeleteGroup(r.Context(), orgID, id); err != nil {
+		if err := s.uc.DeleteGroup(r.Context(), orgID, id, expected); err != nil {
 			scimFail(w, err)
 			return
 		}
@@ -401,6 +422,10 @@ func (s *SCIMService) scimListGroups(w http.ResponseWriter, r *http.Request, org
 	_, groupMatch, err := scimFilter(r.URL.Query().Get("filter"), "Group")
 	if err != nil {
 		scimError(w, http.StatusBadRequest, "invalidFilter", err.Error())
+		return
+	}
+	if r.URL.Query().Get("sortBy") != "" || r.URL.Query().Get("sortOrder") != "" {
+		scimError(w, http.StatusBadRequest, "invalidFilter", "sortBy / sortOrder 暂不支持")
 		return
 	}
 	items, err := s.uc.ListGroups(r.Context(), orgID)
@@ -433,7 +458,8 @@ func (s *SCIMService) scimCreateGroup(w http.ResponseWriter, r *http.Request, or
 		return
 	}
 	g, err := s.uc.CreateGroup(r.Context(), orgID, biz.SCIMGroupInput{
-		ExternalID: in.ExternalID, DisplayName: in.DisplayName, AddMembers: ids,
+		ExternalID: in.ExternalID, DisplayName: in.DisplayName,
+		Members: []biz.SCIMGroupMemberChange{{IDs: ids}},
 	})
 	if err != nil {
 		scimFail(w, err)
@@ -468,11 +494,13 @@ func scimPatchGroupInput(r *http.Request) (biz.SCIMGroupInput, error) {
 			if obj.ExternalID != "" {
 				out.ExternalID = obj.ExternalID
 			}
-			ids, err := obj.memberIDs()
-			if err != nil {
-				return out, err
+			if obj.Members != nil {
+				ids, err := obj.memberIDs()
+				if err != nil {
+					return out, err
+				}
+				out.Members = append(out.Members, biz.SCIMGroupMemberChange{IDs: ids, Replace: kind == "replace"})
 			}
-			out.AddMembers = append(out.AddMembers, ids...)
 			continue
 		}
 		switch {
@@ -481,27 +509,37 @@ func scimPatchGroupInput(r *http.Request) (biz.SCIMGroupInput, error) {
 			if err := jsonx.Unmarshal(op.Value, &v); err != nil {
 				return out, biz.Validation("displayName 必须是字符串")
 			}
+			if strings.TrimSpace(v) == "" {
+				return out, biz.Validation("displayName 不能为空")
+			}
 			out.DisplayName = v
+		case strings.EqualFold(path, "externalId"):
+			if err := jsonx.Unmarshal(op.Value, &out.ExternalID); err != nil || strings.TrimSpace(out.ExternalID) == "" {
+				return out, biz.Validation("externalId 必须是非空字符串")
+			}
 		case strings.EqualFold(path, "members"):
+			if kind == "remove" && len(op.Value) == 0 {
+				out.Members = append(out.Members, biz.SCIMGroupMemberChange{Replace: true})
+				continue
+			}
 			ids, err := scimPatchMembers(op.Value)
 			if err != nil {
 				return out, err
 			}
-			if kind == "remove" {
-				out.DelMembers = append(out.DelMembers, ids...)
-			} else {
-				out.AddMembers = append(out.AddMembers, ids...)
-			}
+			out.Members = append(out.Members, biz.SCIMGroupMemberChange{
+				IDs: ids, Replace: kind == "replace", Remove: kind == "remove",
+			})
 		case strings.HasPrefix(strings.ToLower(path), "members[value eq ") && kind == "remove":
-			// A value-path removal names one member. Reuse the same parser by
-			// wrapping the quoted id in a member ref array.
-			inner := strings.TrimSuffix(strings.TrimPrefix(path[len("members[value eq "):], `"`), "]")
-			inner = strings.Trim(inner, `" `)
-			v, err := strconv.ParseInt(inner, 10, 64)
+			inner, closed := strings.CutSuffix(path[len("members[value eq "):], "]")
+			var value string
+			if !closed || jsonx.Unmarshal([]byte(strings.TrimSpace(inner)), &value) != nil {
+				return out, biz.Validation("members 过滤值必须为带引号的用户 id")
+			}
+			v, err := strconv.ParseInt(value, 10, 64)
 			if err != nil || v <= 0 {
 				return out, biz.Validation("members 过滤值必须为用户 id")
 			}
-			out.DelMembers = append(out.DelMembers, v)
+			out.Members = append(out.Members, biz.SCIMGroupMemberChange{IDs: []int64{v}, Remove: true})
 		default:
 			return out, biz.Validation("不支持的 PATCH path: " + path)
 		}

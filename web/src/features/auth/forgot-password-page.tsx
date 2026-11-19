@@ -60,11 +60,11 @@ export function ForgotPasswordPage() {
               重置邮件已发送
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              如果该账号存在且可接收邮件，你会在几分钟内收到重置链接。链接 30 分钟内有效。
+              如果该账号绑定了已验证的邮箱，你会在几分钟内收到重置链接。
             </p>
           </div>
           <InlineAlert tone="info" title="没有收到邮件？">
-            请检查垃圾邮件。开发环境使用 console 邮件驱动时，重置链接会打印在后端日志中。
+            请检查垃圾邮件。仍未收到时，请联系管理员。
           </InlineAlert>
           <div className="flex flex-col gap-2">
             <Button variant="secondary" onClick={() => setSent(false)}>

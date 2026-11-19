@@ -72,7 +72,7 @@ dev:
 
 .PHONY: docker
 docker:
-	docker buildx build --platform linux/amd64 --load -t user-center:latest .
+	docker buildx build --platform linux/amd64 --build-arg VERSION="$(VERSION)" --load -t user-center:latest .
 
 .PHONY: clean
 clean:

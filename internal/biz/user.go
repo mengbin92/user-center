@@ -55,9 +55,7 @@ func (uc *UserUsecase) Me(ctx context.Context, actor ActorContext) (*User, error
 	}
 	roles, _ := uc.Users.RolesForUser(ctx, nil, u.ID)
 	u.Roles = roles
-	if state, err := uc.MFA.Get(ctx, nil, u.ID); err == nil {
-		u.MFAEnabled = state.Enabled()
-	}
+	u.MFAEnabled = uc.HasSecondFactor(ctx, u.ID)
 	return u, nil
 }
 
@@ -135,17 +133,8 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, actor ActorContext, c
 	}
 	now := uc.Clock.Now().UTC()
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		if cred == nil || cred.PasswordHash == "" {
-			user, err := uc.Users.Get(ctx, tx, actor.User.ID)
-			if err != nil {
-				return ErrDependency
-			}
-			if user.IdentityVersion != actor.Session.IdentityVersion {
-				return ErrStepUpRequired
-			}
-			if _, err := uc.Users.Update(ctx, tx, user, user.Revision); err != nil {
-				return err
-			}
+		if err := uc.lockUserGeneration(ctx, tx, actor.User.ID, actor.Session.IdentityVersion); err != nil {
+			return err
 		}
 		if cred == nil {
 			if err := uc.Credentials.Create(ctx, tx, &Credential{UserID: actor.User.ID, PasswordHash: hash, Algorithm: "bcrypt", PasswordVersion: 1, Revision: 1, ChangedAt: now, UpdatedAt: now}); err != nil {
@@ -213,25 +202,24 @@ func (uc *UserUsecase) CreateEmailChallenge(ctx context.Context, actor ActorCont
 	if err := uc.Challenges.Put(ctx, Challenge{
 		ID: id, Purpose: "email_change",
 		CodeHash: HMACCode(uc.CodeSecret, "email_change", code),
-		UserID:   actor.User.ID, Email: newEmail, ExpiresAt: expires,
+		UserID:   actor.User.ID, IdentityVersion: actor.User.IdentityVersion,
+		Email: newEmail, ExpiresAt: expires,
 	}); err != nil {
 		return "", time.Time{}, ErrDependency
 	}
 	if err := uc.Mail.Send(ctx, newEmail, "用户中心邮箱验证码", fmt.Sprintf("你的邮箱绑定验证码是 %s，%d 分钟内有效。", code, int(uc.ChallengeTTL.Minutes()))); err != nil {
+		_ = uc.Challenges.Delete(ctx, "email_change", id)
 		return "", time.Time{}, ErrDependency
 	}
 	return id, expires, nil
 }
 
 func (uc *UserUsecase) ConfirmEmail(ctx context.Context, actor ActorContext, challengeID, code string) (*User, error) {
-	if err := uc.clearStepUp(ctx, actor.Session); err != nil {
-		return nil, err
-	}
 	c, err := uc.Challenges.Verify(ctx, "email_change", challengeID, code)
 	if err != nil {
 		return nil, err
 	}
-	if c.UserID != actor.User.ID {
+	if c.UserID != actor.User.ID || c.IdentityVersion != actor.Session.IdentityVersion {
 		return nil, ErrChallengeInvalid
 	}
 	email := NormalizeEmail(c.Email)
@@ -243,6 +231,9 @@ func (uc *UserUsecase) ConfirmEmail(ctx context.Context, actor ActorContext, cha
 	}
 	now := uc.Clock.Now().UTC()
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.lockUserGeneration(ctx, tx, actor.User.ID, c.IdentityVersion); err != nil {
+			return err
+		}
 		u, err := uc.Users.Get(ctx, tx, actor.User.ID)
 		if err != nil {
 			return err
@@ -251,24 +242,8 @@ func (uc *UserUsecase) ConfirmEmail(ctx context.Context, actor ActorContext, cha
 		if _, err := uc.Users.Update(ctx, tx, u, u.Revision); err != nil {
 			return err
 		}
-		version, err := uc.Users.BumpIdentityVersion(ctx, tx, u.ID)
-		if err != nil {
+		if _, err := uc.refreshCredentialSessions(ctx, tx, actor); err != nil {
 			return err
-		}
-		if err := uc.Sessions.SetIdentityVersion(ctx, tx, actor.Session.ID, version); err != nil {
-			return err
-		}
-		rows, err := uc.Sessions.ListByUser(ctx, tx, u.ID)
-		if err != nil {
-			return err
-		}
-		for _, sess := range rows {
-			if sess.ID == actor.Session.ID {
-				continue
-			}
-			if err := uc.Sessions.Revoke(ctx, tx, sess.ID, &now); err != nil {
-				return err
-			}
 		}
 		if err := uc.Flows.Complete(ctx, tx, c.ID, "email_change", u.ID, "email"); err != nil {
 			return err
@@ -282,12 +257,13 @@ func (uc *UserUsecase) ConfirmEmail(ctx context.Context, actor ActorContext, cha
 	if err != nil {
 		return nil, err
 	}
-	_ = uc.Challenges.Delete(ctx, c.ID)
+	_ = uc.Challenges.Delete(ctx, c.Purpose, c.ID)
 	return uc.Me(ctx, actor)
 }
 
 func (uc *UserUsecase) CreateAdminEmailChange(ctx context.Context, actor ActorContext, targetID int64, newEmail, reason string) (string, time.Time, error) {
-	if _, err := uc.managementTarget(ctx, nil, actor, targetID, false); err != nil {
+	user, err := uc.managementTarget(ctx, nil, actor, targetID, false)
+	if err != nil {
 		return "", time.Time{}, err
 	}
 	if _, err := uc.Authorize(ctx, actor, "identity.user.email_binding.update", targetID, false); err != nil {
@@ -299,10 +275,6 @@ func (uc *UserUsecase) CreateAdminEmailChange(ctx context.Context, actor ActorCo
 	newEmail = NormalizeEmail(newEmail)
 	if err := ValidateEmail(newEmail); err != nil {
 		return "", time.Time{}, err
-	}
-	user, err := uc.Users.Get(ctx, nil, targetID)
-	if err != nil {
-		return "", time.Time{}, ErrUserNotFound
 	}
 	if user.Status == UserStatusArchived {
 		return "", time.Time{}, Validation("已归档账号不能变更邮箱")
@@ -319,11 +291,13 @@ func (uc *UserUsecase) CreateAdminEmailChange(ctx context.Context, actor ActorCo
 	if err := uc.Challenges.Put(ctx, Challenge{
 		ID: challengeID, Purpose: "admin_email_change",
 		CodeHash: HMACCode(uc.CodeSecret, "admin_email_change", code),
-		UserID:   targetID, Email: newEmail, ExpiresAt: expires,
+		UserID:   targetID, IdentityVersion: user.IdentityVersion,
+		Email: newEmail, ExpiresAt: expires,
 	}); err != nil {
 		return "", time.Time{}, ErrDependency
 	}
 	if err := uc.Mail.Send(ctx, newEmail, "用户中心邮箱变更验证码", fmt.Sprintf("管理员发起邮箱变更。验证码：%s，%d 分钟内有效。", code, int(uc.ChallengeTTL.Minutes()))); err != nil {
+		_ = uc.Challenges.Delete(ctx, "admin_email_change", challengeID)
 		return "", time.Time{}, ErrDependency
 	}
 	_ = uc.audit(ctx, nil, actor, "identity.user.email.change_request", itoa(targetID), "{}", "{}", string(mustJSON(map[string]string{"new_email": newEmail})), reason, "success")
@@ -350,18 +324,19 @@ func (uc *UserUsecase) ConfirmAdminEmailChange(ctx context.Context, actor ActorC
 	email := NormalizeEmail(c.Email)
 	now := uc.Clock.Now().UTC()
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		if _, err := uc.managementTarget(ctx, tx, actor, targetID, false); err != nil {
+		u, err := uc.managementTarget(ctx, tx, actor, targetID, false)
+		if err != nil {
 			return err
 		}
-		u, err := uc.Users.Get(ctx, tx, targetID)
-		if err != nil {
-			return ErrUserNotFound
+		if c.IdentityVersion != u.IdentityVersion || u.Status == UserStatusArchived {
+			return ErrChallengeInvalid
 		}
 		if other, oerr := uc.Users.GetByEmail(ctx, tx, email); oerr == nil && other.ID != targetID {
 			return Validation("该邮箱已被使用")
 		}
 		u.Email, u.EmailNormalized, u.EmailVerified = email, email, true
-		if _, err := uc.Users.Update(ctx, tx, u, u.Revision); err != nil {
+		updated, err := uc.Users.Update(ctx, tx, u, u.Revision)
+		if err != nil {
 			return err
 		}
 		version, err := uc.Users.BumpIdentityVersion(ctx, tx, targetID)
@@ -378,12 +353,12 @@ func (uc *UserUsecase) ConfirmAdminEmailChange(ctx context.Context, actor ActorC
 			return err
 		}
 		payload, _ := jsonx.Marshal(map[string]any{"user_id": targetID, "email_verified": true, "identity_version": version})
-		return uc.emit(ctx, tx, "user", targetID, version, "user.profile.updated", string(payload))
+		return uc.emit(ctx, tx, "user", targetID, updated.Revision, "user.profile.updated", string(payload))
 	})
 	if err != nil {
 		return nil, err
 	}
-	_ = uc.Challenges.Delete(ctx, challengeID)
+	_ = uc.Challenges.Delete(ctx, c.Purpose, c.ID)
 	return uc.loadUserWithRoles(ctx, actor, targetID)
 }
 
@@ -524,16 +499,12 @@ func (uc *UserUsecase) ListUsers(ctx context.Context, actor ActorContext, filter
 		return nil, 0, ErrDependency
 	}
 	// The scope filter above already loaded the snapshot; reusing it here keeps
-	// a page of rows down to two batch lookups plus two permission reads.
+	// a page of rows down to one batch role lookup plus two permission reads.
 	ids := make([]int64, 0, len(users))
 	for _, u := range users {
 		ids = append(ids, u.ID)
 	}
 	roleMap, err := uc.Users.RolesForUsers(ctx, nil, ids)
-	if err != nil {
-		return nil, 0, ErrDependency
-	}
-	mfaMap, err := uc.MFA.ListByUsers(ctx, nil, ids)
 	if err != nil {
 		return nil, 0, ErrDependency
 	}
@@ -547,9 +518,6 @@ func (uc *UserUsecase) ListUsers(ctx context.Context, actor ActorContext, filter
 			continue
 		}
 		u.Roles = roleMap[u.ID]
-		if state := mfaMap[u.ID]; state != nil {
-			u.MFAEnabled = state.Enabled()
-		}
 		if contact, cerr := uc.decideWithFacts(ctx, facts, actor, "identity.user.contact.read", u.ID, false); cerr != nil || !contact.Allowed {
 			u.Email = ""
 			u.EmailNormalized = ""
@@ -563,18 +531,7 @@ func (uc *UserUsecase) GetUser(ctx context.Context, actor ActorContext, id int64
 	if _, err := uc.Authorize(ctx, actor, "identity.user.read", id, false); err != nil {
 		return nil, err
 	}
-	u, err := uc.Users.Get(ctx, nil, id)
-	if err != nil {
-		return nil, ErrUserNotFound
-	}
-	u.Roles, _ = uc.Users.RolesForUser(ctx, nil, id)
-	if state, merr := uc.MFA.Get(ctx, nil, id); merr == nil {
-		u.MFAEnabled = state.Enabled()
-	}
-	if d, derr := uc.Decide(ctx, actor, "identity.user.contact.read", id, false); derr != nil || !d.Allowed {
-		u.Email, u.EmailNormalized = "", ""
-	}
-	return u, nil
+	return uc.loadUserWithRoles(ctx, actor, id)
 }
 
 func (uc *UserUsecase) loadUserWithRoles(ctx context.Context, actor ActorContext, id int64) (*User, error) {
@@ -583,9 +540,7 @@ func (uc *UserUsecase) loadUserWithRoles(ctx context.Context, actor ActorContext
 		return nil, ErrUserNotFound
 	}
 	u.Roles, _ = uc.Users.RolesForUser(ctx, nil, id)
-	if state, merr := uc.MFA.Get(ctx, nil, id); merr == nil {
-		u.MFAEnabled = state.Enabled()
-	}
+	u.MFAEnabled = uc.HasSecondFactor(ctx, u.ID)
 	if d, derr := uc.Decide(ctx, actor, "identity.user.contact.read", id, false); derr != nil || !d.Allowed {
 		u.Email, u.EmailNormalized = "", ""
 	}
@@ -705,38 +660,27 @@ func (uc *UserUsecase) CreateUser(ctx context.Context, actor ActorContext, in Cr
 		return nil, err
 	}
 	if hash == "" || in.SendActivation {
-		if code, cerr := uc.createActivation(ctx, created, actor); cerr == nil {
-			_ = code
-		}
+		uc.createActivation(ctx, created, actor)
 	}
 	created.Roles, _ = uc.Users.RolesForUser(ctx, nil, created.ID)
 	return created, nil
 }
 
-func (uc *UserUsecase) createActivation(ctx context.Context, user *User, actor ActorContext) (string, error) {
+func (uc *UserUsecase) createActivation(ctx context.Context, user *User, actor ActorContext) {
 	if user.Email == "" {
-		return "", errors.New("no email")
+		return
 	}
-	code, err := GenerateCode()
+	id, code, _, err := uc.storePasswordResetChallenge(ctx, user, uc.ActivationTTL)
 	if err != nil {
-		return "", err
+		return
 	}
-	id := uc.IDs.NewID()
-	if err := uc.Challenges.Put(ctx, Challenge{
-		ID: id, Purpose: "password_reset",
-		CodeHash: HMACCode(uc.CodeSecret, "password_reset", code),
-		UserID:   user.ID, Email: user.Email,
-		ExpiresAt: uc.Clock.Now().Add(uc.ActivationTTL),
-	}); err != nil {
-		return "", err
+	link := uc.passwordResetLink(id, code)
+	body := fmt.Sprintf("你的账号已创建。请通过以下链接设置密码：\n\n%s\n\n链接 %d 分钟内有效。", link, int(uc.ActivationTTL.Minutes()))
+	if err := uc.Mail.Send(ctx, user.Email, "用户中心账号激活", body); err != nil {
+		_ = uc.Challenges.Delete(ctx, "password_reset", id)
+		return
 	}
-	link := fmt.Sprintf("%s/reset-password?challenge=%s&code=%s", strings.TrimRight(uc.PublicBaseURL, "/"), id, code)
-	body := fmt.Sprintf("你的账号已创建。请通过以下链接设置密码：\n\n%s\n\n链接 24 小时内有效。", link)
-	_ = uc.Mail.Send(ctx, user.Email, "用户中心账号激活", body)
-	if err := uc.audit(ctx, nil, actor, "identity.user.activation.send", itoa(user.ID), "{}", "{}", "{}", "account activation", "success"); err != nil {
-		return id, nil
-	}
-	return id, nil
+	_ = uc.audit(ctx, nil, actor, "identity.user.activation.send", itoa(user.ID), "{}", "{}", "{}", "account activation", "success")
 }
 
 func (uc *UserUsecase) UpdateUser(ctx context.Context, actor ActorContext, id int64, in UpdateUserInput) (*User, error) {
@@ -956,22 +900,14 @@ func (uc *UserUsecase) CreatePasswordResetTask(ctx context.Context, actor ActorC
 	if u.Status == UserStatusArchived || u.Email == "" {
 		return time.Time{}, Validation("该账号无法接收密码重置邮件")
 	}
-	code, err := GenerateCode()
+	challengeID, code, expires, err := uc.storePasswordResetChallenge(ctx, u, uc.ResetTTL)
 	if err != nil {
-		return time.Time{}, ErrDependency
+		return time.Time{}, err
 	}
-	challengeID := uc.IDs.NewID()
-	expires := uc.Clock.Now().Add(uc.ResetTTL)
-	if err := uc.Challenges.Put(ctx, Challenge{
-		ID: challengeID, Purpose: "password_reset",
-		CodeHash: HMACCode(uc.CodeSecret, "password_reset:"+itoa(u.ID), code),
-		UserID:   u.ID, Email: u.Email, ExpiresAt: expires,
-	}); err != nil {
-		return time.Time{}, ErrDependency
-	}
-	link := fmt.Sprintf("%s/reset-password?challenge=%s&code=%s", strings.TrimRight(uc.PublicBaseURL, "/"), challengeID, code)
-	body := fmt.Sprintf("管理员已发起密码重置。请通过以下链接设置新密码：\n\n%s\n\n链接 30 分钟内有效。", link)
+	link := uc.passwordResetLink(challengeID, code)
+	body := fmt.Sprintf("管理员已发起密码重置。请通过以下链接设置新密码：\n\n%s\n\n链接 %d 分钟内有效。", link, int(uc.ResetTTL.Minutes()))
 	if err := uc.Mail.Send(ctx, u.Email, "用户中心密码重置", body); err != nil {
+		_ = uc.Challenges.Delete(ctx, "password_reset", challengeID)
 		return time.Time{}, ErrDependency
 	}
 	_ = uc.audit(ctx, nil, actor, "identity.user.password.reset_request", itoa(id), "{}", "{}", "{}", reason, "success")
@@ -1132,10 +1068,6 @@ func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyw
 			}
 		}
 		roles, _ := uc.Users.RolesForUser(ctx, nil, u.ID)
-		mfa := false
-		if state, merr := uc.MFA.Get(ctx, nil, u.ID); merr == nil {
-			mfa = state.Enabled()
-		}
 		row := make([]string, 0, len(fields))
 		for _, field := range fields {
 			switch field {
@@ -1152,7 +1084,7 @@ func (uc *UserUsecase) ExportUsers(ctx context.Context, actor ActorContext, keyw
 			case "status":
 				row = append(row, u.Status)
 			case "mfa_enabled":
-				row = append(row, fmt.Sprint(mfa))
+				row = append(row, fmt.Sprint(u.MFAEnabled))
 			case "created_at":
 				row = append(row, u.CreatedAt.Format(time.RFC3339))
 			case "roles":

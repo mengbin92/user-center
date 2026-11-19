@@ -115,6 +115,9 @@ func (uc *OrganizationUsecase) GetAuditExport(ctx context.Context, actor ActorCo
 		job.ActorUserID != actor.User.ID || job.ActorSessionID != actor.Session.ID {
 		return nil, ErrResourceNotFound
 	}
+	if _, _, err := uc.orgAccess(ctx, actor, orgID); err != nil {
+		return nil, err
+	}
 	if err := uc.orgPermission(ctx, actor, orgID, PermOrgAuditRead, 0, true); err != nil {
 		return nil, err
 	}

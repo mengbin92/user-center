@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/mengbin92/user-center/internal/conf"
 )
 
 // Enterprise directory synchronization end to end: a JSON feed stands in for
@@ -147,6 +150,61 @@ func TestDirectorySyncProvisionsAndReconciles(t *testing.T) {
 	runs := h.do(http.MethodGet, "/api/v1/admin/directory-sync-runs?source_id="+sourceID, nil, "", false)
 	require.Equal(t, http.StatusOK, runs.Code, runs.Body.String())
 	require.GreaterOrEqual(t, len(decode[map[string]any](t, runs)["items"].([]any)), 4)
+}
+
+func TestDirectorySyncPersistsIsolatedHistoryAndRetriesPartialDelta(t *testing.T) {
+	h := newHarnessFor(t, &conf.Data{
+		Database: &conf.Database{Driver: "sqlite", Source: "file:" + filepath.Join(t.TempDir(), "platform.db")},
+		Tenancy:  &conf.Tenancy{SchemaIsolation: true},
+	})
+	feed, state := newDirectoryFeed(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	orgID := orgByCode(t, h, "dirsync-isolated")
+	source := createDirectorySource(t, h, orgID, directoryConfigJSON(t, feed.URL, map[string]any{"deletion_policy": "keep"}))
+	sourceID := source["id"].(string)
+	trigger := func() map[string]any {
+		rec := h.do(http.MethodPost, "/api/v1/admin/directory-sources/"+sourceID+":sync", map[string]any{
+			"mode": "delta", "reason": "directory fixture",
+		}, "", true)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		return decode[map[string]any](t, rec)
+	}
+	state.set(usersPayload())
+	first := trigger()
+	require.Equal(t, "succeeded", first["status"], first)
+	require.Equal(t, "c1", first["cursor_after"])
+	require.EqualValues(t, 2, first["created_count"])
+
+	fixtureUserWithEmail(t, h, "outside_directory", "outside-directory@example.com")
+	state.set(map[string]any{
+		"cursor":  "c2",
+		"deleted": []string{"u-1"},
+		"users": []map[string]any{{
+			"externalId": "u-3", "userName": "dir-unlinked", "email": "outside-directory@example.com",
+		}},
+	})
+	partial := trigger()
+	require.Equal(t, "partial", partial["status"], partial)
+	require.Equal(t, "c1", partial["cursor_before"])
+	require.Equal(t, "c1", partial["cursor_after"])
+	require.EqualValues(t, 0, partial["disabled_count"])
+
+	state.set(map[string]any{"cursor": "c2", "deleted": []string{"u-1"}})
+	recovered := trigger()
+	require.Equal(t, "succeeded", recovered["status"], recovered)
+	require.Equal(t, "c1", recovered["cursor_before"])
+	require.Equal(t, "c2", recovered["cursor_after"])
+	require.EqualValues(t, 0, recovered["disabled_count"])
+	members := h.do(http.MethodGet, "/api/v1/orgs/"+orgID+"/members", nil, "", false)
+	require.Equal(t, http.StatusOK, members.Code, members.Body.String())
+	require.Contains(t, members.Body.String(), "dir-alice")
+
+	runs := h.do(http.MethodGet, "/api/v1/admin/directory-sync-runs?source_id="+sourceID, nil, "", false)
+	require.Equal(t, http.StatusOK, runs.Code, runs.Body.String())
+	items := decode[map[string]any](t, runs)["items"].([]any)
+	require.Len(t, items, 3)
+	require.Equal(t, "partial", items[1].(map[string]any)["status"])
+	require.NotEmpty(t, items[1].(map[string]any)["finished_at"])
 }
 
 func TestDirectorySyncGovernanceDenials(t *testing.T) {

@@ -28,7 +28,7 @@ func main() {
 	confPath := flag.String("config", envOr("CONF_PATH", "configs/config.yaml"), "config path")
 	orgID := flag.Int64("org", 0, "prepare the schema for one organization id")
 	all := flag.Bool("all", false, "prepare schemas for every active organization")
-	list := flag.Bool("list", false, "list schemas opened on this instance")
+	list := flag.Bool("list", false, "list registered ready schemas")
 	flag.Parse()
 	log, _ := zap.NewProduction()
 	defer func() { _ = log.Sync() }()
@@ -52,7 +52,12 @@ func main() {
 		return
 	}
 	if *list {
-		for _, name := range d.TenantSchemas() {
+		var names []string
+		if err := d.DB().Table("tenant_schemas").Where("status = ?", "ready").
+			Order("organization_id ASC").Pluck("schema_name", &names).Error; err != nil {
+			log.Fatal("list tenant schemas", zap.Error(err))
+		}
+		for _, name := range names {
 			fmt.Println(name)
 		}
 		return

@@ -1,11 +1,13 @@
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   CSRF_COOKIE,
   CSRF_HEADER,
   REQUEST_ID_HEADER,
   createHttpClient,
+  invalidateHttpSession,
+  setUnauthorizedHandler,
 } from './http'
 
 const UUID_PATTERN =
@@ -64,10 +66,31 @@ describe('CSRF and request id client', () => {
 })
 
 describe('session response isolation', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    setUnauthorizedHandler(null)
+  })
+
+  it('cancels a write waiting for CSRF bootstrap when the session changes', async () => {
+    let completeBootstrap!: (response: Response) => void
+    const bootstrap = vi.fn(() => new Promise<Response>((resolve) => { completeBootstrap = resolve }))
+    vi.stubGlobal('fetch', bootstrap)
+    const { client, captured } = createCaptureClient()
+    const unauthorized = vi.fn()
+    setUnauthorizedHandler(unauthorized)
+
+    const pending = client.post('/api/v1/me/sessions:revoke-others').catch((error: unknown) => error)
+    await vi.waitFor(() => expect(bootstrap).toHaveBeenCalledOnce())
+    invalidateHttpSession()
+    completeBootstrap(new Response())
+
+    expect(await pending).toMatchObject({ reason: 'SESSION_CHANGED' })
+    expect(captured).toHaveLength(0)
+    expect(unauthorized).not.toHaveBeenCalled()
+  })
+
   it('ignores unauthorized responses that started before a session change', async () => {
     const { AxiosError } = await import('axios')
-    const { invalidateHttpSession, setUnauthorizedHandler } = await import('./http')
-    const { vi } = await import('vitest')
     const unauthorized = vi.fn()
     let reject!: (error: Error) => void
     let request!: InternalAxiosRequestConfig
@@ -85,6 +108,5 @@ describe('session response isolation', () => {
     }))
     await pending
     expect(unauthorized).not.toHaveBeenCalled()
-    setUnauthorizedHandler(null)
   })
 })

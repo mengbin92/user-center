@@ -5,6 +5,7 @@
 - MySQL 8.x（生产唯一验收数据库）、Redis 7.x（多实例部署必需；仅未配置 Redis 的单进程开发环境可使用内存存储）。
 - HTTPS 反向代理（Nginx/Caddy/网关），负责 TLS、请求体上限、基础 WAF。
 - 独立数据库账号；生产账号不应具备跨库读取或 DDL 权限（DDL 由 `migrate` 专用账号执行）。**例外**：启用租户独立 schema 后，`cmd/tenant-schema` 需要 `CREATE DATABASE` 与租户库 DDL 权限，须由专用迁移账号执行；运行账号按最小权限授予每个 `usercenter_org_*` 库（见 `docs/tenancy.md` §7）。
+- MySQL 迁移用数据库级命名锁串行执行。同库第二个进程最多等待 30 秒。进程在 DDL 完成后、写入 `schema_migrations` 前中断时，先核对表结构和迁移记录，再续跑。
 
 ### 1.1 启用租户独立 schema（可选，默认关闭）
 
@@ -74,7 +75,7 @@ docker compose run --rm user-center /app/admin-rescue \
 
 要求：
 
-- 终止 TLS；转发 `Host`、`X-Forwarded-For`、`X-Real-IP`；设置 `TRUST_PROXY_HEADERS=true` 时才会信任这些头。
+- 终止 TLS。仅在后端只能由受信代理访问时设置 `TRUST_PROXY_HEADERS=true`。代理应覆盖转发头。服务使用最后一跳写入的 `X-Forwarded-For` 地址，缺少该头时使用 `X-Real-IP`。
 - 请求体上限 ≤ 1 MiB；禁用代理层缓存 `/api/`。
 - 透传 `Set-Cookie`（不要重写 `uc_session`/`uc_csrf`）。
 - 将 `/.well-known/openid-configuration`、`/oidc/` 与 `/api/` 一起转发到后端；SPA 由同一后端托管时无需额外配置。
@@ -86,7 +87,7 @@ Nginx 片段：
 location / {
   proxy_pass http://127.0.0.1:8080;
   proxy_set_header Host $host;
-  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-For $remote_addr;
   proxy_set_header X-Real-IP $remote_addr;
   proxy_http_version 1.1;
   client_max_body_size 1m;
@@ -380,7 +381,7 @@ docker compose run --rm user-center /app/admin-rescue \
 
 `cmd/retention` 对**已归档**且超过保留期的账号做不可逆匿名化。默认保留期 **365 天**（按 `users.archived_at` 计算），可用 `RETENTION_DAYS` 环境变量或 `-retention-days` 覆盖。
 
-清理范围：`users.username / username_normalized / display_name / email / email_normalized / email_verified_at`、`user_credentials`、`identity_mfa`（含恢复码）、`iam_sessions`、`iam_session_roles`、`user_oauth_identities`、`webauthn_credentials`。审计事件与 Outbox 事件**不删除**，只保留不可逆的 `user_id`；`users.anonymized_at` 作为幂等标记，已清理账号不会再次入选。
+清理范围包括 `users.username / username_normalized / display_name / email / email_normalized / email_verified_at`、`user_credentials`、`password_history`、`identity_mfa`（含恢复码）、`iam_sessions`、`iam_session_roles`、`user_oauth_identities`、`webauthn_credentials`。清理事件用 `user_id` 留痕，既有审计与 Outbox 记录继续保留。每批优先选取可清理的账号。`users.anonymized_at` 防止重复清理。
 
 ### ⚠️ 执行前必须完成的流程
 

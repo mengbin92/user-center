@@ -101,8 +101,9 @@ export async function getLoginAssertion(
   rpId: string,
   allowCredentialIds: string[],
   challengeId: string,
+  userVerification: UserVerificationRequirement = 'preferred',
 ): Promise<CompleteMFARequest> {
-  const assertion = await rawAssertion(challenge, rpId, allowCredentialIds)
+  const assertion = await rawAssertion(challenge, rpId, allowCredentialIds, userVerification)
   return {
     challenge_id: challengeId,
     credential_id: assertion.credentialId,
@@ -112,12 +113,17 @@ export async function getLoginAssertion(
   }
 }
 
-async function rawAssertion(challenge: string, rpId: string, allow: string[]) {
+async function rawAssertion(
+  challenge: string,
+  rpId: string,
+  allow: string[],
+  userVerification: UserVerificationRequirement = 'preferred',
+) {
   if (!browserSupported()) throw new Error('当前浏览器不支持 Passkey，请使用 HTTPS 或更换浏览器')
   const publicKey: PublicKeyCredentialRequestOptions = {
     challenge: toBuffer(challenge),
     rpId,
-    userVerification: 'preferred',
+    userVerification,
     timeout: 60_000,
     allowCredentials: allow.map((id) => ({ type: 'public-key' as const, id: toBuffer(id) })),
   }

@@ -161,7 +161,7 @@ func (s *AuthService) CompleteMFAWithWebAuthn(ctx context.Context, req *usercv1.
 	if err != nil {
 		return nil, err
 	}
-	setSessionCookie(ctx, s.deps, result.RawToken, result.Session.ExpiresAt)
+	setSessionCookie(ctx, s.deps, result)
 	return &usercv1.LoginReply{
 		Status: result.Status, User: userProto(result.User),
 		SessionExpiresAt:       result.Session.ExpiresAt.Format(timeLayout),

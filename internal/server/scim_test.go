@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -130,6 +131,10 @@ func TestSCIMProvisioningLifecycle(t *testing.T) {
 	list := h.do(http.MethodGet, "/scim/v2/Users?filter="+url.QueryEscape("userName eq \"alice\""), nil, token, false)
 	require.Equal(t, http.StatusOK, list.Code, list.Body.String())
 	require.Equal(t, float64(1), decode[map[string]any](t, list)["totalResults"])
+	emailFilter := url.QueryEscape(`emails[type eq "work"].value eq "alice@example.com" and active eq true`)
+	filteredByEmail := h.do(http.MethodGet, "/scim/v2/Users?filter="+emailFilter, nil, token, false)
+	require.Equal(t, http.StatusOK, filteredByEmail.Code, filteredByEmail.Body.String())
+	require.Equal(t, float64(1), decode[map[string]any](t, filteredByEmail)["totalResults"])
 
 	// A duplicate externalId is a SCIM uniqueness conflict.
 	dup := h.do(http.MethodPost, "/scim/v2/Users", map[string]any{
@@ -269,4 +274,104 @@ func TestSCIMTokenGovernanceDenials(t *testing.T) {
 	require.Equal(t, http.StatusOK, list.Code, list.Body.String())
 	require.NotContains(t, list.Body.String(), "ucs_")
 	require.NotContains(t, list.Body.String(), "token_hash")
+}
+
+func TestSCIMPreservesPlatformIdentityAndLastOwner(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	orgID := orgByCode(t, h, "scim-owner")
+	token, _ := scimToken(t, h, orgID, "directory")
+	created := scimCreateUser(t, h, token, "root", "root@example.com", "root-in-directory")
+	path := "/scim/v2/Users/" + created["id"].(string)
+
+	profile := h.do(http.MethodPatch, path, map[string]any{
+		"schemas":    []string{scimPatchSchema},
+		"Operations": []map[string]any{{"op": "replace", "path": "emails.value", "value": "new@example.com"}},
+	}, token, false)
+	require.Equal(t, http.StatusBadRequest, profile.Code, profile.Body.String())
+	require.Contains(t, profile.Body.String(), "mutability")
+	root, err := h.svc.Users.GetByUsername(context.Background(), nil, "root")
+	require.NoError(t, err)
+	require.Equal(t, "root@example.com", root.Email)
+
+	disable := h.do(http.MethodPatch, path, map[string]any{
+		"schemas":    []string{scimPatchSchema},
+		"Operations": []map[string]any{{"op": "replace", "path": "active", "value": false}},
+	}, token, false)
+	require.Equal(t, http.StatusConflict, disable.Code, disable.Body.String())
+	remove := h.do(http.MethodDelete, path, nil, token, false)
+	require.Equal(t, http.StatusConflict, remove.Code, remove.Body.String())
+	current := h.do(http.MethodGet, path, nil, token, false)
+	require.Equal(t, http.StatusOK, current.Code, current.Body.String())
+	require.Equal(t, true, decode[map[string]any](t, current)["active"])
+}
+
+func TestSCIMGroupReplacementAndConditionalWrites(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	orgID := orgByCode(t, h, "scim-groups-etag")
+	token, _ := scimToken(t, h, orgID, "directory")
+	alice := scimCreateUser(t, h, token, "group-alice", "alice@example.com", "alice")
+	bob := scimCreateUser(t, h, token, "group-bob", "bob@example.com", "bob")
+	group := h.do(http.MethodPost, "/scim/v2/Groups", map[string]any{
+		"schemas": []string{scimGroupSchema}, "displayName": "Project",
+		"members": []map[string]any{{"value": alice["id"]}, {"value": bob["id"]}},
+	}, token, false)
+	require.Equal(t, http.StatusCreated, group.Code, group.Body.String())
+	path := "/scim/v2/Groups/" + decode[map[string]any](t, group)["id"].(string)
+	oldTag := group.Header().Get("ETag")
+	replaced := scimDoRaw(h, http.MethodPut, path, token, map[string]any{
+		"schemas": []string{scimGroupSchema}, "displayName": "Project", "externalId": "remapped-project",
+		"members": []map[string]any{{"value": alice["id"]}},
+	}, map[string]string{"If-Match": oldTag})
+	require.Equal(t, http.StatusOK, replaced.Code, replaced.Body.String())
+	replacedGroup := decode[map[string]any](t, replaced)
+	require.Equal(t, "remapped-project", replacedGroup["externalId"])
+	members := replacedGroup["members"].([]any)
+	require.Len(t, members, 1)
+	require.Equal(t, alice["id"], members[0].(map[string]any)["value"])
+	newTag := replaced.Header().Get("ETag")
+	require.NotEqual(t, oldTag, newTag)
+
+	removed := scimDoRaw(h, http.MethodDelete, path, token, nil, map[string]string{"If-Match": oldTag})
+	require.Equal(t, http.StatusPreconditionFailed, removed.Code, removed.Body.String())
+	patched := scimDoRaw(h, http.MethodPatch, path, token, map[string]any{
+		"schemas": []string{scimPatchSchema},
+		"Operations": []map[string]any{
+			{"op": "remove", "path": "members"},
+			{"op": "add", "path": "members", "value": []map[string]any{{"value": bob["id"]}}},
+		},
+	}, map[string]string{"If-Match": newTag})
+	require.Equal(t, http.StatusOK, patched.Code, patched.Body.String())
+	patchTag := patched.Header().Get("ETag")
+	require.NotEqual(t, newTag, patchTag)
+	members = decode[map[string]any](t, patched)["members"].([]any)
+	require.Len(t, members, 1)
+	require.Equal(t, bob["id"], members[0].(map[string]any)["value"])
+
+	deprovision := h.do(http.MethodDelete, "/scim/v2/Users/"+bob["id"].(string), nil, token, false)
+	require.Equal(t, http.StatusNoContent, deprovision.Code, deprovision.Body.String())
+	updated := h.do(http.MethodGet, path, nil, token, false)
+	require.Equal(t, http.StatusOK, updated.Code, updated.Body.String())
+	require.Empty(t, decode[map[string]any](t, updated)["members"])
+	require.NotEqual(t, patchTag, updated.Header().Get("ETag"))
+}
+
+func TestSCIMCollectionRoutesAndProjection(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	orgID := orgByCode(t, h, "scim-routing")
+	token, _ := scimToken(t, h, orgID, "directory")
+	created := scimCreateUser(t, h, token, "projection", "projection@example.com", "projection")
+	path := "/scim/v2/Users/" + created["id"].(string)
+	invalidItem := h.do(http.MethodGet, "/scim/v2/Users/no-such-id", nil, token, false)
+	require.Equal(t, http.StatusNotFound, invalidItem.Code, invalidItem.Body.String())
+	unsupported := h.do(http.MethodGet, path+"?excludedAttributes=emails.value", nil, token, false)
+	require.Equal(t, http.StatusBadRequest, unsupported.Code, unsupported.Body.String())
+	require.NotContains(t, unsupported.Body.String(), "projection@example.com")
+	projected := h.do(http.MethodGet, path+"?excludedAttributes=EMAILS,id", nil, token, false)
+	require.Equal(t, http.StatusOK, projected.Code, projected.Body.String())
+	result := decode[map[string]any](t, projected)
+	require.NotContains(t, result, "emails")
+	require.Equal(t, created["id"], result["id"])
 }

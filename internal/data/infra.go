@@ -74,7 +74,7 @@ func (s *challengeStore) load(ctx context.Context, purpose, id string) (biz.Chal
 		return biz.Challenge{}, nil, biz.ErrChallengeInvalid
 	}
 	if time.Now().UTC().After(c.ExpiresAt) {
-		_ = s.Delete(ctx, id)
+		_ = s.Delete(ctx, purpose, id)
 		return biz.Challenge{}, nil, biz.ErrChallengeInvalid
 	}
 	return c, raw, nil
@@ -150,7 +150,7 @@ func (s *challengeStore) Verify(ctx context.Context, purpose, id, code string) (
 		return biz.Challenge{}, err
 	}
 	if c.Attempts >= 10 {
-		_ = s.Delete(ctx, id)
+		_ = s.Delete(ctx, purpose, id)
 		return biz.Challenge{}, biz.ErrChallengeInvalid
 	}
 	if c.CodeHash == "" {
@@ -170,15 +170,12 @@ func (s *challengeStore) Verify(ctx context.Context, purpose, id, code string) (
 	return c, nil
 }
 
-func (s *challengeStore) Delete(ctx context.Context, id string) error {
+func (s *challengeStore) Delete(ctx context.Context, purpose, id string) error {
+	key := challengeKey(purpose, id)
 	if s.d.redis != nil {
-		keys, _ := s.d.redis.Keys(ctx, "uc:challenge:*:"+id).Result()
-		if len(keys) > 0 {
-			return s.d.redis.Del(ctx, keys...).Err()
-		}
-		return nil
+		return s.d.redis.Del(ctx, key).Err()
 	}
-	s.mem.deleteSuffix(":" + id)
+	s.mem.delete(key)
 	return nil
 }
 
@@ -469,14 +466,4 @@ func (m *memoryKV) delete(key string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.data, key)
-}
-
-func (m *memoryKV) deleteSuffix(suffix string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for k := range m.data {
-		if strings.HasSuffix(k, suffix) {
-			delete(m.data, k)
-		}
-	}
 }

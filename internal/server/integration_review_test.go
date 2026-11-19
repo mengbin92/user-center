@@ -109,6 +109,43 @@ func TestIntegrationClientRejectsUnknownMethodUnderValidPrefix(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
 
+func TestIntegrationCredentialRotationAndDisableUseOneRevision(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	fixtureStepUp(h)
+	reserved := h.management(http.MethodPost, "/api/v1/admin/integration-clients", map[string]any{
+		"code": biz.ApplicationCode, "service_owner": "billing", "allowed_methods": []string{"Authenticate"}, "reason": "verify application boundary",
+	}, "", true)
+	require.Equal(t, http.StatusBadRequest, reserved.Code, reserved.Body.String())
+	created := h.management(http.MethodPost, "/api/v1/admin/integration-clients", map[string]any{
+		"code": "review-client", "service_owner": "billing",
+		"allowed_methods": []string{"GetUser", "Authenticate", "CompleteMFA"}, "reason": "provision test client",
+	}, "", true)
+	require.Equal(t, http.StatusOK, created.Code, created.Body.String())
+	client := decode[map[string]any](t, created)["client"].(map[string]any)
+	path := "/api/v1/admin/integration-clients/" + client["id"].(string)
+	initialRevision := client["revision"]
+	rotated := h.management(http.MethodPost, path+":rotate-credential", map[string]any{
+		"expected_revision": initialRevision, "reason": "rotate fixture credential",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rotated.Code, rotated.Body.String())
+	row := decode[map[string]any](t, rotated)["client"].(map[string]any)
+	require.Equal(t, "2", row["revision"])
+	require.Equal(t, float64(2), row["credential_version"])
+
+	stale := h.management(http.MethodPost, path+":disable", map[string]any{
+		"expected_revision": initialRevision, "reason": "disable stale revision",
+	}, "", true)
+	require.Equal(t, http.StatusConflict, stale.Code, stale.Body.String())
+	disabled := h.management(http.MethodPost, path+":disable", map[string]any{
+		"expected_revision": row["revision"], "reason": "disable current revision",
+	}, "", true)
+	require.Equal(t, http.StatusOK, disabled.Code, disabled.Body.String())
+	final := decode[map[string]any](t, disabled)
+	require.Equal(t, "3", final["revision"])
+	require.Equal(t, "disabled", final["status"])
+}
+
 func TestOutboxRetainsBacklogBeyondNewestPage(t *testing.T) {
 	t.Setenv("OUTBOX_SIGNING_SECRET", "review-signing-secret-at-least-32-bytes")
 	h := newHarness(t)

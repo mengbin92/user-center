@@ -13,13 +13,9 @@ func (s *AuthService) BeginPasskeyLogin(ctx context.Context, req *usercv1.BeginP
 	if err != nil {
 		return nil, err
 	}
-	allow := challenge.AllowCredentialIDs
-	if allow == nil {
-		allow = []string{}
-	}
 	return &usercv1.PasskeyLoginChallengeReply{
 		ChallengeId: challenge.ChallengeID, Challenge: challenge.Challenge,
-		RpId: challenge.RPID, AllowCredentialIds: allow,
+		RpId:      challenge.RPID,
 		ExpiresAt: challenge.ExpiresAt.Format(timeLayout),
 	}, nil
 }
@@ -65,7 +61,7 @@ func (s *AuthService) CompletePasskeyLogin(ctx context.Context, req *usercv1.Com
 		reply.ChallengeExpiresAt = result.ChallengeExpires.Format(timeLayout)
 		return reply, nil
 	}
-	setSessionCookie(ctx, s.deps, result.RawToken, result.Session.ExpiresAt)
+	setSessionCookie(ctx, s.deps, result)
 	reply.SessionExpiresAt = result.Session.ExpiresAt.Format(timeLayout)
 	return reply, nil
 }

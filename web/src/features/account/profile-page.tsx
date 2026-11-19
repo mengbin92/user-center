@@ -319,7 +319,7 @@ export function ProfilePage() {
               size="sm"
               loading={updateUsername.isPending}
               disabled={newUsername.trim().length < 3 || !currentPassword}
-              onClick={() => void updateUsername.mutateAsync()}
+              onClick={() => updateUsername.mutate()}
             >
               确认修改
             </Button>

@@ -34,7 +34,7 @@ func (r *userRepo) Overview(ctx context.Context, tx biz.Tx, filter biz.UserFilte
 			out.Archived = c.N
 		}
 	}
-	if err := db.Model(&mfaPO{}).Where("user_id IN (?) AND secret_ciphertext <> ''", visible().Select("id")).Count(&out.MFA).Error; err != nil {
+	if err := visible().Where(userHasSecondFactor).Count(&out.MFA).Error; err != nil {
 		return nil, err
 	}
 	if err := db.Model(&sessionPO{}).Where("user_id IN (?) AND revoked_at IS NULL AND expires_at > ? AND idle_expires_at > ?", visible().Select("id"), now, now).Count(&out.ActiveSessions).Error; err != nil {

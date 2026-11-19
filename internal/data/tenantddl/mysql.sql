@@ -66,8 +66,11 @@ CREATE TABLE IF NOT EXISTS {{schema}}.`iam_roles` (
     max_members BIGINT NULL,
     revision BIGINT UNSIGNED NOT NULL DEFAULT 1,
     creation_delegation_id BIGINT NOT NULL DEFAULT 0,
+    context_type VARCHAR(16) NOT NULL DEFAULT 'organization',
+    context_id BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_iam_roles_code (code)
+    UNIQUE KEY uk_iam_roles_context_code (context_type, context_id, code),
+    KEY idx_iam_roles_context (context_type, context_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS {{schema}}.`iam_role_permissions` (
@@ -96,9 +99,12 @@ CREATE TABLE IF NOT EXISTS {{schema}}.`iam_user_roles` (
     revision BIGINT UNSIGNED NOT NULL DEFAULT 1,
     assigned_by BIGINT NOT NULL DEFAULT 0,
     created_at DATETIME(3) NOT NULL,
+    context_type VARCHAR(16) NOT NULL DEFAULT 'organization',
+    context_id BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
     KEY idx_iam_user_roles_user (user_id, status, expires_at),
-    KEY idx_iam_user_roles_role (role_id, status)
+    KEY idx_iam_user_roles_role (role_id, status),
+    KEY idx_iam_user_roles_context (context_type, context_id, user_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS {{schema}}.`iam_role_constraints` (
@@ -109,7 +115,10 @@ CREATE TABLE IF NOT EXISTS {{schema}}.`iam_role_constraints` (
     max_count BIGINT NOT NULL DEFAULT 0,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     revision BIGINT UNSIGNED NOT NULL DEFAULT 1,
-    PRIMARY KEY (id)
+    context_type VARCHAR(16) NOT NULL DEFAULT 'organization',
+    context_id BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_iam_constraints_context (context_type, context_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS {{schema}}.`iam_delegations` (
@@ -127,8 +136,11 @@ CREATE TABLE IF NOT EXISTS {{schema}}.`iam_delegations` (
     revision BIGINT UNSIGNED NOT NULL DEFAULT 1,
     created_by BIGINT NOT NULL DEFAULT 0,
     created_at DATETIME(3) NOT NULL,
+    context_type VARCHAR(16) NOT NULL DEFAULT 'organization',
+    context_id BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    KEY idx_delegation_manager (manager_role_id, target_role_id, revoked_at)
+    KEY idx_delegation_manager (manager_role_id, target_role_id, revoked_at),
+    KEY idx_iam_delegations_context (context_type, context_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS {{schema}}.`iam_audit_events` (
@@ -146,11 +158,13 @@ CREATE TABLE IF NOT EXISTS {{schema}}.`iam_audit_events` (
     request_id VARCHAR(64) NOT NULL DEFAULT '',
     authorization_versions TEXT NULL,
     occurred_at DATETIME(3) NOT NULL,
+    organization_id BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (event_id),
     KEY idx_audit_time (occurred_at, event_id),
     KEY idx_audit_actor (actor_user_id, occurred_at),
     KEY idx_audit_action (action, occurred_at),
-    KEY idx_audit_target (target)
+    KEY idx_audit_target (target),
+    KEY idx_iam_audit_org (organization_id, occurred_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS {{schema}}.`scim_identities` (

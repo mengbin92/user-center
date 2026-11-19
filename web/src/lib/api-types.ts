@@ -3284,7 +3284,7 @@ export interface components {
             /** @description base64url challenge for navigator.credentials.get(). */
             challenge?: string;
             rp_id?: string;
-            /** @description Always populated, including for the anti-enumeration decoy ceremony. */
+            /** @description Empty for passwordless login, which uses discoverable credentials. */
             allow_credential_ids?: string[];
             expires_at?: string;
         };

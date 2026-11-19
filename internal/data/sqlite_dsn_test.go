@@ -7,6 +7,8 @@ func TestWithSQLiteBusyTimeout(t *testing.T) {
 		"file:/tmp/x.db?_fk=1":              "file:/tmp/x.db?_fk=1&_busy_timeout=10000",
 		"file:/tmp/x.db":                    "file:/tmp/x.db?_busy_timeout=10000",
 		"file:/tmp/x.db?_busy_timeout=2000": "file:/tmp/x.db?_busy_timeout=2000",
+		"file:/tmp/x.db?_timeout=2000":      "file:/tmp/x.db?_timeout=2000",
+		"file:/tmp/busy_timeout.db":         "file:/tmp/busy_timeout.db?_busy_timeout=10000",
 	}
 	for in, want := range cases {
 		if got := withSQLiteBusyTimeout(in); got != want {

@@ -2,7 +2,7 @@ import { KeyRound, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 
 import { Button } from '../../components/button'
 import { InlineAlert } from '../../components/card'
@@ -14,8 +14,10 @@ import { errorMessage, isApiError } from '../../lib/errors'
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
-  const initialChallenge = searchParams.get('challenge') ?? ''
-  const initialCode = searchParams.get('code') ?? ''
+  const fragmentParams = new URLSearchParams(useLocation().hash.slice(1))
+  const linkParams = fragmentParams.has('challenge') ? fragmentParams : searchParams
+  const initialChallenge = linkParams.get('challenge') ?? ''
+  const initialCode = linkParams.get('code') ?? ''
   const [challengeId, setChallengeId] = useState(initialChallenge)
   const [code, setCode] = useState(initialCode)
   const [password, setPassword] = useState('')

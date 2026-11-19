@@ -2,7 +2,7 @@ import { ArrowLeft, Fingerprint, KeyRound, Loader2, ShieldCheck } from 'lucide-r
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, Navigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router'
 
 import { Button } from '../../components/button'
 import { FullPageLoading } from '../../app/guards'
@@ -59,6 +59,7 @@ export function LoginPage() {
   const { status, hasAdmin, signIn } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
+  const { hash } = useLocation()
   const next = safeNext(searchParams.get('next'))
   const oauthErrorParam = searchParams.get('oauth_error')
   const oauthMfaChallenge = searchParams.get('mfa_challenge')
@@ -71,7 +72,16 @@ export function LoginPage() {
   const [challengeId, setChallengeId] = useState(oauthMfaChallenge ?? '')
   const [challengeExpiresAt, setChallengeExpiresAt] = useState('')
   const [code, setCode] = useState('')
-  const [webAuthn, setWebAuthn] = useState<WebAuthnChallenge | null>(null)
+  const [webAuthn, setWebAuthn] = useState<WebAuthnChallenge | null>(() => {
+    if (!oauthMfaChallenge) return null
+    const params = new URLSearchParams(hash.slice(1))
+    const challenge = params.get('challenge')
+    const rpId = params.get('rp_id')
+    const credentialIds = params.getAll('allow_credential_ids')
+    return challenge && rpId && credentialIds.length
+      ? { challenge, rp_id: rpId, allow_credential_ids: credentialIds }
+      : null
+  })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const destination = postLoginPath ?? next ?? (hasAdmin ? '/admin' : '/account')
@@ -216,8 +226,9 @@ export function LoginPage() {
       const assertion = await getLoginAssertion(
         challenge.challenge ?? '',
         challenge.rp_id ?? '',
-        challenge.allow_credential_ids ?? [],
+        [],
         challenge.challenge_id ?? '',
+        'required',
       )
       const reply = await api.auth.completePasskeyLogin({ ...assertion, remember })
       if (reply.status === 'mfa_required') {

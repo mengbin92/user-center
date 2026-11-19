@@ -88,42 +88,37 @@ func (r *integrationClientRepo) Create(ctx context.Context, tx biz.Tx, c *biz.In
 func (r *integrationClientRepo) Update(ctx context.Context, tx biz.Tx, c *biz.IntegrationClient, expected uint64) (*biz.IntegrationClient, error) {
 	methods, _ := jsonx.Marshal(c.AllowedMethods)
 	events, _ := jsonx.Marshal(c.EventSubscriptions)
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&integrationClientPO{}).Where("id = ? AND revision = ?", c.ID, expected).Updates(map[string]any{
+	return r.updateState(ctx, tx, c.ID, expected, map[string]any{
 		"allowed_methods": string(methods), "event_subscriptions": string(events),
-		"callback_url": c.CallbackURL, "revision": expected + 1, "updated_at": time.Now().UTC(),
+		"callback_url": c.CallbackURL,
 	})
-	if res.Error != nil {
-		return nil, res.Error
-	}
-	if res.RowsAffected == 0 {
-		return nil, biz.ConflictRevision(expected)
-	}
-	return r.Get(ctx, tx, c.ID)
 }
 
-func (r *integrationClientRepo) RotateCredential(ctx context.Context, tx biz.Tx, id int64, hash string, version int) (*biz.IntegrationClient, error) {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&integrationClientPO{}).Where("id = ?", id).Updates(map[string]any{
-		"credential_hash": hash, "credential_version": version, "updated_at": time.Now().UTC(),
-		"revision": gorm.Expr("revision + 1"),
+func (r *integrationClientRepo) RotateCredential(ctx context.Context, tx biz.Tx, id int64, hash string, expected uint64) (*biz.IntegrationClient, error) {
+	return r.updateState(ctx, tx, id, expected, map[string]any{
+		"credential_hash": hash, "credential_version": gorm.Expr("credential_version + 1"),
 	})
+}
+
+func (r *integrationClientRepo) Disable(ctx context.Context, tx biz.Tx, id int64, expected uint64) (*biz.IntegrationClient, error) {
+	return r.updateState(ctx, tx, id, expected, map[string]any{
+		"status": "disabled",
+	})
+}
+
+func (r *integrationClientRepo) updateState(ctx context.Context, tx biz.Tx, id int64, expected uint64, changes map[string]any) (*biz.IntegrationClient, error) {
+	changes["updated_at"] = time.Now().UTC()
+	changes["revision"] = expected + 1
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&integrationClientPO{}).Where("id = ? AND revision = ?", id, expected).Updates(changes)
 	if res.Error != nil {
 		return nil, res.Error
 	}
 	if res.RowsAffected == 0 {
-		return nil, biz.ErrResourceNotFound
+		current, err := r.Get(ctx, tx, id)
+		if err != nil {
+			return nil, err
+		}
+		return nil, biz.ConflictRevision(current.Revision)
 	}
 	return r.Get(ctx, tx, id)
-}
-
-func (r *integrationClientRepo) Disable(ctx context.Context, tx biz.Tx, id int64) error {
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&integrationClientPO{}).Where("id = ?", id).Updates(map[string]any{
-		"status": "disabled", "updated_at": time.Now().UTC(), "revision": gorm.Expr("revision + 1"),
-	})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return biz.ErrResourceNotFound
-	}
-	return nil
 }

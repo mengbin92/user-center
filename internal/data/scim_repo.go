@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/internal/biz"
 )
@@ -120,7 +121,11 @@ func (r *scimRepo) GetIdentityByExternal(ctx context.Context, tx biz.Tx, orgID i
 
 func (r *scimRepo) GetIdentityByLocal(ctx context.Context, tx biz.Tx, orgID int64, kind string, localID int64) (*biz.SCIMIdentity, error) {
 	var p scimIdentityPO
-	err := r.d.tenantOr(ctx, tx).WithContext(ctx).
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
+	if tx != nil && kind == biz.SCIMKindUser {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := db.
 		Where("organization_id = ? AND kind = ? AND local_id = ?", orgID, kind, localID).
 		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -148,31 +153,35 @@ func (r *scimRepo) ListIdentities(ctx context.Context, tx biz.Tx, orgID int64, k
 func (r *scimRepo) UpsertIdentity(ctx context.Context, tx biz.Tx, in *biz.SCIMIdentity) (*biz.SCIMIdentity, error) {
 	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
 	now := time.Now().UTC()
-	var existing scimIdentityPO
-	err := db.Where("organization_id = ? AND kind = ? AND local_id = ?", in.OrganizationID, in.Kind, in.LocalID).
-		First(&existing).Error
-	if err == nil {
-		res := db.Model(&scimIdentityPO{}).Where("id = ?", existing.ID).Updates(map[string]any{
-			"external_id": in.ExternalID, "revision": existing.Revision + 1, "updated_at": now,
-		})
+	if in.Revision != 0 {
+		res := db.Model(&scimIdentityPO{}).
+			Where("id = ? AND organization_id = ? AND revision = ?", in.ID, in.OrganizationID, in.Revision).
+			Updates(map[string]any{"external_id": in.ExternalID, "revision": in.Revision + 1, "updated_at": now})
 		if res.Error != nil {
-			return nil, res.Error
+			return nil, scimWriteError(res.Error)
 		}
-		existing.ExternalID = in.ExternalID
-		existing.Revision++
-		return scimIdentityToBiz(existing), nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+		if res.RowsAffected == 0 {
+			return nil, biz.ConflictRevision(in.Revision)
+		}
+		updated := *in
+		updated.Revision++
+		return &updated, nil
 	}
 	p := &scimIdentityPO{
 		OrganizationID: in.OrganizationID, Kind: in.Kind, ExternalID: in.ExternalID,
 		LocalID: in.LocalID, Revision: 1, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := db.Create(p).Error; err != nil {
-		return nil, err
+		return nil, scimWriteError(err)
 	}
 	return scimIdentityToBiz(*p), nil
+}
+
+func scimWriteError(err error) error {
+	if isDuplicateKeyError(err) {
+		return biz.ConflictCode("SCIM_UNIQUENESS", "资源名称或映射已存在")
+	}
+	return biz.ErrDependency
 }
 
 func (r *scimRepo) DeleteIdentity(ctx context.Context, tx biz.Tx, orgID int64, kind string, localID int64) error {
@@ -194,7 +203,7 @@ func (r *scimRepo) CreateGroup(ctx context.Context, tx biz.Tx, g *biz.SCIMGroup)
 		Revision: 1, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := r.d.tenantOr(ctx, tx).WithContext(ctx).Create(p).Error; err != nil {
-		return nil, err
+		return nil, scimWriteError(err)
 	}
 	return scimGroupToBiz(*p), nil
 }
@@ -232,7 +241,7 @@ func (r *scimRepo) UpdateGroup(ctx context.Context, tx biz.Tx, g *biz.SCIMGroup,
 			"display_name": g.DisplayName, "revision": expected + 1, "updated_at": time.Now().UTC(),
 		})
 	if res.Error != nil {
-		return nil, res.Error
+		return nil, scimWriteError(res.Error)
 	}
 	if res.RowsAffected == 0 {
 		return nil, biz.ConflictRevision(expected)
@@ -240,9 +249,16 @@ func (r *scimRepo) UpdateGroup(ctx context.Context, tx biz.Tx, g *biz.SCIMGroup,
 	return r.GetGroup(ctx, tx, g.OrganizationID, g.ID)
 }
 
-func (r *scimRepo) DeleteGroup(ctx context.Context, tx biz.Tx, orgID, id int64) error {
-	return r.d.tenantOr(ctx, tx).WithContext(ctx).
-		Where("id = ? AND organization_id = ?", id, orgID).Delete(&scimGroupPO{}).Error
+func (r *scimRepo) DeleteGroup(ctx context.Context, tx biz.Tx, orgID, id int64, expected uint64) error {
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).
+		Where("id = ? AND organization_id = ? AND revision = ?", id, orgID, expected).Delete(&scimGroupPO{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return biz.ConflictRevision(expected)
+	}
+	return nil
 }
 
 func (r *scimRepo) SetGroupMembers(ctx context.Context, tx biz.Tx, groupID int64, ids []int64) error {
@@ -263,6 +279,22 @@ func (r *scimRepo) SetGroupMembers(ctx context.Context, tx biz.Tx, groupID int64
 		rows = append(rows, scimGroupMemberPO{GroupID: groupID, UserID: uid})
 	}
 	return db.Create(&rows).Error
+}
+
+func (r *scimRepo) RemoveUserFromGroups(ctx context.Context, tx biz.Tx, orgID, userID int64) error {
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
+	var memberGroups, groups []int64
+	if err := db.Model(&scimGroupMemberPO{}).Where("user_id = ?", userID).Pluck("group_id", &memberGroups).Error; err != nil || len(memberGroups) == 0 {
+		return err
+	}
+	if err := db.Model(&scimGroupPO{}).Where("organization_id = ? AND id IN ?", orgID, memberGroups).Pluck("id", &groups).Error; err != nil || len(groups) == 0 {
+		return err
+	}
+	if err := db.Model(&scimGroupPO{}).Where("organization_id = ? AND id IN ?", orgID, groups).
+		Updates(map[string]any{"revision": gorm.Expr("revision + 1"), "updated_at": time.Now().UTC()}).Error; err != nil {
+		return err
+	}
+	return db.Where("user_id = ? AND group_id IN ?", userID, groups).Delete(&scimGroupMemberPO{}).Error
 }
 
 func (r *scimRepo) GroupMembers(ctx context.Context, tx biz.Tx, groupID int64) ([]int64, error) {

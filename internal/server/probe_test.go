@@ -36,12 +36,14 @@ func TestReadyzReportsDependencyState(t *testing.T) {
 // and it must fail readiness while liveness stays green.
 func TestReadyzFailsWhenTheSchemaIsGone(t *testing.T) {
 	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	require.Equal(t, http.StatusOK, h.do(http.MethodGet, "/readyz", nil, "", false).Code)
 
 	require.NoError(t, h.d.DB().Exec("DROP TABLE users").Error)
 
 	rec := h.do(http.MethodGet, "/readyz", nil, "", false)
 	require.Equal(t, http.StatusServiceUnavailable, rec.Code, rec.Body.String())
+	require.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 	require.Contains(t, rec.Body.String(), `"status":"unavailable"`)
 	require.NotContains(t, rec.Body.String(), `"mysql":"ok"`)
 

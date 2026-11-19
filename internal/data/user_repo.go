@@ -11,6 +11,7 @@ import (
 
 	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
 type userRepo struct{ d *Data }
@@ -87,16 +88,19 @@ func (r *userRepo) Get(ctx context.Context, tx biz.Tx, id int64) (*biz.User, err
 
 // LockUser takes a row lock on the user row for the rest of tx.
 //
-// SQLite is skipped on purpose: it has no row locks, and the clause would be a
-// syntax error. Its write transactions are serialised by the file lock instead,
-// which is a stronger guarantee than the row lock this emulates.
+// SQLite has no row locks. Acquire its write lock before reading any state so
+// concurrent transactions wait instead of trying to upgrade a read snapshot.
 func (r *userRepo) LockUser(ctx context.Context, tx biz.Tx, id int64) error {
 	db := r.d.dbOr(tx).WithContext(ctx)
-	if db.Dialector == nil || db.Dialector.Name() != "sqlite" {
-		db = db.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
+	if db.Dialector.Name() == "sqlite" {
+		result := db.Model(&userPO{}).Where("id = ?", id).UpdateColumn("id", gorm.Expr("id"))
+		if result.Error == nil && result.RowsAffected == 0 {
+			return biz.ErrUserNotFound
+		}
+		return result.Error
 	}
 	var p userPO
-	err := db.Select("id").Where("id = ?", id).First(&p).Error
+	err := db.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Select("id").Where("id = ?", id).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return biz.ErrUserNotFound
 	}
@@ -222,27 +226,35 @@ func (r *userRepo) List(ctx context.Context, tx biz.Tx, f biz.UserFilter) ([]*bi
 		db = db.Where("id IN (?)", r.d.dbOr(tx).Model(&assignmentPO{}).Select("user_id").Where("role_id = ? AND status = ? AND starts_at <= ? AND (expires_at IS NULL OR expires_at > ?)", f.RoleID, "active", time.Now().UTC(), time.Now().UTC()))
 	}
 	if f.MFA != nil {
-		sub := r.d.dbOr(tx).Model(&mfaPO{}).Select("user_id").Where("secret_ciphertext <> ''")
 		if *f.MFA {
-			db = db.Where("id IN (?)", sub)
+			db = db.Where(userHasSecondFactor)
 		} else {
-			db = db.Where("id NOT IN (?)", sub)
+			db = db.Where("NOT " + userHasSecondFactor)
 		}
 	}
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	var rows []userPO
-	if err := db.Order("created_at DESC, id DESC").Offset(f.Offset).Limit(f.Limit).Find(&rows).Error; err != nil {
+	var rows []struct {
+		User       userPO `gorm:"embedded"`
+		MFAEnabled bool
+	}
+	if err := db.Select("users.*, " + userHasSecondFactor + " AS mfa_enabled").
+		Order("created_at DESC, id DESC").Offset(f.Offset).Limit(f.Limit).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	out := make([]*biz.User, 0, len(rows))
-	for _, p := range rows {
-		out = append(out, p.toBiz())
+	for _, row := range rows {
+		user := row.User.toBiz()
+		user.MFAEnabled = row.MFAEnabled
+		out = append(out, user)
 	}
 	return out, total, nil
 }
+
+const userHasSecondFactor = `(EXISTS (SELECT 1 FROM identity_mfa WHERE user_id = users.id AND secret_ciphertext <> '')
+	OR EXISTS (SELECT 1 FROM webauthn_credentials WHERE user_id = users.id))`
 
 func (r *userRepo) CountByStatus(ctx context.Context, tx biz.Tx, scope authorization.Scope) (map[string]int64, error) {
 	db := r.scoped(r.d.dbOr(tx).WithContext(ctx).Model(&userPO{}), biz.UserFilter{Scope: scope})
@@ -267,7 +279,7 @@ func (r *userRepo) CountByStatus(ctx context.Context, tx biz.Tx, scope authoriza
 func (r *userRepo) CountMFA(ctx context.Context, tx biz.Tx, scope authorization.Scope) (int64, error) {
 	db := r.scoped(r.d.dbOr(tx).WithContext(ctx).Model(&userPO{}), biz.UserFilter{Scope: scope})
 	var n int64
-	err := db.Where("id IN (?)", r.d.dbOr(tx).Model(&mfaPO{}).Select("user_id").Where("secret_ciphertext <> ''")).Count(&n).Error
+	err := db.Where(userHasSecondFactor).Count(&n).Error
 	return n, err
 }
 
@@ -275,12 +287,12 @@ func (r *userRepo) RolesForUser(ctx context.Context, tx biz.Tx, userID int64) ([
 	db := r.d.dbOr(tx).WithContext(ctx)
 	now := time.Now().UTC()
 	type row struct {
-		ID         int64
-		Code, Name string
+		ID                   int64
+		Code, Name, Boundary string
 	}
 	var rows []row
 	err := db.Table("iam_user_roles AS ur").
-		Select("r.id, r.code, r.name").
+		Select("r.id, r.code, r.name, ur.boundary").
 		Joins("JOIN iam_roles AS r ON r.id = ur.role_id").
 		// Platform view only: organization-scoped assignments must never
 		// surface as platform roles (tenant isolation).
@@ -292,7 +304,15 @@ func (r *userRepo) RolesForUser(ctx context.Context, tx biz.Tx, userID int64) ([
 	}
 	out := make([]biz.RoleRef, 0, len(rows))
 	for _, x := range rows {
-		out = append(out, biz.RoleRef{ID: x.ID, Code: x.Code, Name: x.Name})
+		ref := biz.RoleRef{ID: x.ID, Code: x.Code, Name: x.Name}
+		if x.Code == "root" || x.Code == "admin" {
+			var boundary authorization.Scope
+			if err := jsonx.UnmarshalFromString(x.Boundary, &boundary); err != nil {
+				return nil, err
+			}
+			ref.Unrestricted = boundary.All
+		}
+		out = append(out, ref)
 	}
 	return out, nil
 }

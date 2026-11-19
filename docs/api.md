@@ -50,8 +50,11 @@ GET  /auth/providers/{provider}/callback ?state&code → 302 / Set-Cookie
 ```
 
 登录成功后服务端设置 Cookie；响应不返回任何 bearer token。MFA 登录时先返回短期 challenge，不建立完整会话。`LoginReply` 还包含 `password_change_required` 和 `mfa_enrollment_required`：前者要求先改初始密码，后者要求管理员先绑定 TOTP。
+密码和 Passkey 登录的 `remember` 决定会话 Cookie 是否保留到会话到期。两种 Cookie 都受同一服务端有效期和空闲超时约束。
 
-OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie；`mode=bind` 必须已登录。回调只接受服务端交换，不把 provider access token 返回浏览器。未绑定账号登录返回 `OAUTH_NOT_BOUND`，不回退为按邮箱自动合并。若账号已启用 MFA，OAuth 登录不会直接建立会话，而是重定向到 `/login?mfa_challenge=...` 完成第二因素。
+自助密码重置只向当前已验证的邮箱发送验证码。管理员发起的密码重置和激活可使用管理员为账号指定的邮箱。密码重置挑战绑定签发时的邮箱和身份版本。
+
+OAuth 使用单次 `state`（Redis）与 HttpOnly state Cookie，`mode=bind` 必须已登录。回调只接受服务端交换，未绑定身份会返回 `OAUTH_NOT_BOUND`。OAuth 登录重定向到 `/login?mfa_challenge=...` 完成已有的 TOTP 或 Passkey 第二因素。Passkey 挑战使用重定向的 URL fragment 传给 SPA。禁用提供方后，登录入口和待处理的回调均会拒绝。
 
 纯 OAuth 账号可用 `mode=verify` 重新认证已经绑定的外部身份。state 绑定当前用户、会话和身份版本，回调 subject 必须仍属于当前用户；成功后服务端保存 5 分钟主认证证明。该证明允许设置首个本地密码或开始 MFA 设置，不替代已经启用的第二因素。已有 MFA 时，先完成 `/me/security:verify`，再设置首个本地密码。证明不返回给浏览器，跨会话、过期、身份变更及 state 重放均被拒绝。
 
@@ -283,7 +286,7 @@ GET  /oidc/userinfo                      Bearer access token
 - **凭据来源单一化**：外部 provider 凭据只从环境变量读取（`OAUTH_GITHUB_*` / `OAUTH_GOOGLE_*`），不入库、不回显；`/admin/settings/providers` 只做只读可视化与启停，启停仍走 `/admin/settings/auth` 的 `providers` 字段（写审计并推进 policy revision）。若未来入库，需要加密、轮换与审计设计，并先移除环境变量来源，避免两处同时生效。
 - **用户名只能自助修改**：`UpdateUsername` 只暴露在 `/api/v1/me`，管理端没有改名 RPC，避免审计主体歧义。规则（格式、归一化、保留字）与注册路径共用同一函数。
 - **组织配额默认关闭**：开启后每用户默认 5 个（可配 1–1000），平台管理员（root/admin）豁免；归档组织默认不计入。
-- **不纳入**：`ExchangeLegacySession`。租户物理隔离的独立 schema 基础设施已交付，但**存量数据 cutover 未完成**，未完成项见 [tenancy.md](tenancy.md) §4；启用方式不影响任何现有 API 契约。**SCIM 2.0、企业目录同步与组织级 SoD 已交付**，不再属于不纳入项：SCIM 端点与凭据管理见 [SCIM 文档](scim.md) 与下文组织委派 API。WebAuthn/Passkey（R13）与个人信息清理（R14）按路线图分别滑动到 V2.5 / 未排期，当前未实现。
+- `ExchangeLegacySession` 仍在当前 API 范围之外。WebAuthn/Passkey、个人信息保留清理、企业目录同步和组织级 SoD 已实现。独立 schema 的存量切换通过运维 CLI 执行。[个人信息保留与清理](operations.md#个人信息保留与清理v24-r14) · [租户切换](tenancy.md#4-启用与-cutover) · [SCIM 端点与凭据](scim.md)
 
 ### 组织委派 API
 
@@ -314,10 +317,10 @@ GET  /oidc/userinfo                      Bearer access token
 | POST | `/api/v1/me/webauthn/credentials/{id}:delete` | 删除；无 TOTP 且仅剩一枚凭据时返回 `LAST_SECOND_FACTOR` |
 | POST | `/api/v1/me/webauthn/assertions:challenge` | Step-up 断言挑战 |
 | POST | `/api/v1/me/webauthn/assertions:verify` | 验签 + 计数器单调 + Step-up（与 TOTP 同等效力） |
-| POST | `/api/v1/auth/passkey/login:begin` | 公开；用户名或邮箱换取断言挑战；未知/停用/未绑定账号返回同形状诱饵 |
+| POST | `/api/v1/auth/passkey/login:begin` | 公开；用户名或邮箱换取可发现凭据的断言挑战，`allow_credential_ids` 为空 |
 | POST | `/api/v1/auth/passkey/login:complete` | 公开；验签后签发会话；仍启用 TOTP 时返回 `mfa_required` + challenge |
 
-登录 `LoginReply.webauthn` 在账号绑定 Passkey 时下发挑战；`/api/v1/auth/mfa/complete` 可改用 `credential_id/authenticator_data/client_data_json/signature` 完成登录。Passkey 也可作为第一因素通过 `passkey/login:begin` + `:complete` 免密码登录；挑战一次性消费，未知/停用/未绑定账号由服务端密钥派生的诱饵 ceremony 覆盖，无效断言统一返回 `CHALLENGE_INVALID`。`sign_count` 回退返回 `WEBAUTHN_SIGN_COUNT_REGRESSION` 并写告警审计。用户名 + 密码登录继续保留。
+账号绑定 Passkey 后，密码登录的 `LoginReply.webauthn` 会携带挑战。`/api/v1/auth/mfa/complete` 可使用 `credential_id/authenticator_data/client_data_json/signature` 完成验证。无密码登录使用 `passkey/login:begin` 和 `:complete`，需要可发现凭据和认证器的用户验证。挑战一次性消费，无效断言统一返回 `CHALLENGE_INVALID`。`sign_count` 回退返回 `WEBAUTHN_SIGN_COUNT_REGRESSION` 并写告警审计。
 
 ### R14 个人信息保留与清理
 

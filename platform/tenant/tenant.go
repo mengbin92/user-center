@@ -3,7 +3,11 @@
 // about connection pools. It is a pure transport type: no storage, no GORM.
 package tenant
 
-import "context"
+import (
+	"context"
+	"strconv"
+	"strings"
+)
 
 type contextKey struct{}
 
@@ -27,34 +31,14 @@ func From(ctx context.Context) int64 {
 // It is deliberately strict: a malformed or negative id resolves to platform
 // scope, and the authorization layer still has to reject the request.
 func FromPath(path string) int64 {
-	const marker = "/api/v1/orgs/"
-	start := -1
-	for i := 0; i+len(marker) <= len(path); i++ {
-		if path[i:i+len(marker)] == marker {
-			start = i + len(marker)
-			break
-		}
-	}
-	if start < 0 {
+	rest, ok := strings.CutPrefix(path, "/api/v1/orgs/")
+	if !ok {
 		return 0
 	}
-	rest := path[start:]
-	end := len(rest)
-	for i, c := range rest {
-		if c == '/' || c == '?' {
-			end = i
-			break
-		}
-	}
-	var id int64
-	for _, c := range rest[:end] {
-		if c < '0' || c > '9' {
-			return 0
-		}
-		id = id*10 + int64(c-'0')
-		if id > 1<<62 {
-			return 0
-		}
+	raw, _, _ := strings.Cut(rest, "/")
+	id, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || id <= 0 {
+		return 0
 	}
 	return id
 }

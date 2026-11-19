@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +38,8 @@ type Data struct {
 	tenancy    *conf.Tenancy
 	driver     string
 	baseSource string
+	tenantDir  string
+	tenantTemp bool
 	attached   map[string]bool
 	tenants    map[int64]*gorm.DB
 	tenantsMu  sync.Mutex
@@ -55,6 +58,11 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 	}
 	if driver == "mysql" || sec != nil && sec.CookieSecure {
 		if err := validateProductionSecrets(sec); err != nil {
+			return nil, nil, err
+		}
+	}
+	if dataConf != nil && dataConf.GetTenancy().GetSchemaIsolation() {
+		if err := validateTenantPrefix(dataConf.GetTenancy().GetSchemaPrefix()); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -87,6 +95,11 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 		source := "usercenter:usercenter@tcp(127.0.0.1:3306)/usercenter?parseTime=true&loc=UTC&charset=utf8mb4"
 		if dataConf != nil && dataConf.Database != nil && dataConf.Database.Source != "" {
 			source = dataConf.Database.Source
+		}
+		if dataConf != nil && dataConf.GetTenancy().GetSchemaIsolation() {
+			if err := validateTenantMySQLSource(source, dataConf.GetTenancy().GetSchemaPrefix()); err != nil {
+				return nil, nil, err
+			}
 		}
 		baseSource = source
 		dial = mysql.Open(source)
@@ -128,6 +141,10 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 	}
 	d.registerTenantRouting()
 	if d.IsolationEnabled() && (driver == "sqlite" || driver == "sqlite3") {
+		if err := d.setSQLiteTenantDir(); err != nil {
+			_ = sqlDB.Close()
+			return nil, nil, err
+		}
 		// SQLite has no schemas. Each tenant gets its own database file and its
 		// own pool instead of an ATTACH, because an ATTACH is connection-local
 		// and forcing a single connection deadlocks nested transactions.
@@ -145,6 +162,7 @@ func NewData(dataConf *conf.Data, sec *conf.Security, log *zap.Logger) (*Data, f
 		if err := rc.Ping(ctx).Err(); err != nil {
 			_ = rc.Close()
 			_ = sqlDB.Close()
+			d.closeTenantPools()
 			return nil, nil, fmt.Errorf("configured redis is unavailable: %w", err)
 		} else {
 			d.redis = rc
@@ -265,11 +283,12 @@ func models() []any {
 // withSQLiteBusyTimeout appends mattn/go-sqlite3's busy timeout so concurrent
 // writers wait instead of failing. It is idempotent and only affects SQLite.
 func withSQLiteBusyTimeout(source string) string {
-	if strings.Contains(source, "_busy_timeout") || strings.Contains(source, "busy_timeout") {
-		return source
-	}
 	sep := "?"
-	if strings.Contains(source, "?") {
+	if _, raw, ok := strings.Cut(source, "?"); ok {
+		opts, _ := url.ParseQuery(raw)
+		if opts.Has("_busy_timeout") || opts.Has("_timeout") {
+			return source
+		}
 		sep = "&"
 	}
 	return source + sep + "_busy_timeout=10000"

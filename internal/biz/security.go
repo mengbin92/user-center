@@ -27,7 +27,13 @@ func (uc *SecurityUsecase) Status(ctx context.Context, actor ActorContext) (mfaE
 	}
 	passwordAvailable = cerr == nil && cred.PasswordHash != ""
 	until := uc.stepUpUntil(ctx, actor)
-	enabled := state != nil && state.Enabled() || uc.HasSecondFactor(ctx, actor.User.ID)
+	enabled := state != nil && state.Enabled()
+	if !enabled {
+		enabled, err = uc.hasPasskey(ctx, actor.User.ID)
+		if err != nil {
+			return false, false, 0, time.Time{}, err
+		}
+	}
 	if state == nil {
 		return enabled, passwordAvailable, 0, until, nil
 	}
@@ -117,6 +123,9 @@ func (uc *SecurityUsecase) Confirm(ctx context.Context, actor ActorContext, code
 	}
 
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.lockUserGeneration(ctx, tx, actor.User.ID, actor.Session.IdentityVersion); err != nil {
+			return err
+		}
 		if err := uc.MFA.Save(ctx, tx, state); err != nil {
 			return err
 		}
@@ -141,33 +150,39 @@ func (uc *SecurityUsecase) Disable(ctx context.Context, actor ActorContext, pass
 	if err := uc.Services.confirmPrimaryAuthentication(ctx, actor, password); err != nil {
 		return err
 	}
-	if err := uc.verifyMFA(ctx, actor.User.ID, code); err != nil {
+	if err := uc.verifyMFA(ctx, nil, actor.User.ID, code); err != nil {
 		return err
-	}
-	// Removing TOTP must not strip an administrator of the last second factor
-	// required by the platform policy.
-	var creds []*WebAuthnCredential
-	if uc.WebAuthn != nil {
-		var cerr error
-		creds, cerr = uc.WebAuthn.ListByUser(ctx, nil, actor.User.ID)
-		if cerr != nil {
-			return ErrDependency
-		}
-	}
-	if len(creds) == 0 {
-		settings, serr := uc.Settings.GetAuth(ctx, nil)
-		if serr == nil && settings.MFARequiredForAdmins {
-			for _, role := range actor.User.Roles {
-				if role.Code == "root" || role.Code == "admin" {
-					return ConflictCode("LAST_SECOND_FACTOR", "请先绑定替代第二因素再停用 TOTP")
-				}
-			}
-		}
 	}
 	if err := uc.clearStepUp(ctx, actor.Session); err != nil {
 		return err
 	}
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.lockUserGeneration(ctx, tx, actor.User.ID, actor.Session.IdentityVersion); err != nil {
+			return err
+		}
+		settings, err := uc.Settings.GetAuth(ctx, tx)
+		if err != nil {
+			return ErrDependency
+		}
+		if settings.MFARequiredForAdmins {
+			roles, err := uc.Users.RolesForUser(ctx, tx, actor.User.ID)
+			if err != nil {
+				return ErrDependency
+			}
+			for _, role := range roles {
+				if role.Code != "root" && role.Code != "admin" {
+					continue
+				}
+				enrolled, err := uc.hasPasskeyInTx(ctx, tx, actor.User.ID)
+				if err != nil {
+					return ErrDependency
+				}
+				if !enrolled {
+					return ConflictCode("LAST_SECOND_FACTOR", "请先绑定替代第二因素再停用 TOTP")
+				}
+				break
+			}
+		}
 		if err := uc.MFA.Delete(ctx, tx, actor.User.ID); err != nil {
 			return err
 		}
@@ -192,7 +207,7 @@ func (uc *SecurityUsecase) RotateRecoveryCodes(ctx context.Context, actor ActorC
 	if err := uc.Services.confirmPrimaryAuthentication(ctx, actor, password); err != nil {
 		return nil, err
 	}
-	if err := uc.verifyMFA(ctx, actor.User.ID, code); err != nil {
+	if err := uc.verifyMFA(ctx, nil, actor.User.ID, code); err != nil {
 		return nil, err
 	}
 	codes, hashes, err := generateRecoveryCodes()
@@ -209,6 +224,9 @@ func (uc *SecurityUsecase) RotateRecoveryCodes(ctx context.Context, actor ActorC
 		return nil, err
 	}
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.lockUserGeneration(ctx, tx, actor.User.ID, actor.Session.IdentityVersion); err != nil {
+			return err
+		}
 		if err := uc.MFA.Save(ctx, tx, state); err != nil {
 			return err
 		}
@@ -238,23 +256,20 @@ func (uc *SecurityUsecase) Verify(ctx context.Context, actor ActorContext, passw
 	// sensitive operation with its primary credential instead of being locked
 	// out of every step-up-protected flow.
 	state, err := uc.MFA.Get(ctx, nil, actor.User.ID)
-	switch {
-	case errors.Is(err, ErrResourceNotFound):
-		// No MFA row: password re-entry is the strongest proof available,
-		// unless a passkey is enrolled.
-		if uc.HasSecondFactor(ctx, actor.User.ID) {
-			return time.Time{}, Validation("请使用 WebAuthn 完成安全验证")
-		}
-	case err != nil:
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
 		return time.Time{}, ErrDependency
-	case !state.Enabled():
-		// MFA row exists but no confirmed secret.
-		if uc.HasSecondFactor(ctx, actor.User.ID) {
-			return time.Time{}, Validation("请使用 WebAuthn 完成安全验证")
-		}
-	default:
-		if err := uc.verifyMFA(ctx, actor.User.ID, code); err != nil {
+	}
+	if state != nil && state.Enabled() {
+		if err := uc.verifyMFA(ctx, nil, actor.User.ID, code); err != nil {
 			return time.Time{}, err
+		}
+	} else {
+		enrolled, err := uc.hasPasskey(ctx, actor.User.ID)
+		if err != nil {
+			return time.Time{}, err
+		}
+		if enrolled {
+			return time.Time{}, Validation("请使用 WebAuthn 完成安全验证")
 		}
 	}
 	until := uc.Clock.Now().Add(uc.StepUpTTL)
@@ -305,8 +320,8 @@ func (s *Services) refreshCredentialSessions(ctx context.Context, tx Tx, actor A
 
 // verifyMFA accepts a TOTP code or a single recovery code. It enforces the
 // per-user failure lockout and persists the consumed TOTP step.
-func (uc *SecurityUsecase) verifyMFA(ctx context.Context, userID int64, code string) error {
-	state, err := uc.MFA.Get(ctx, nil, userID)
+func (s *Services) verifyMFA(ctx context.Context, tx Tx, userID int64, code string) error {
+	state, err := s.MFA.Get(ctx, tx, userID)
 	if err != nil {
 		if !errors.Is(err, ErrResourceNotFound) {
 			return ErrDependency
@@ -316,11 +331,12 @@ func (uc *SecurityUsecase) verifyMFA(ctx context.Context, userID int64, code str
 	if !state.Enabled() {
 		return ErrMFADisabled
 	}
-	now := uc.Clock.Now()
+	now := s.Clock.Now()
 	if !state.LockedUntil.IsZero() && now.Before(state.LockedUntil) {
 		return ErrMFALocked
 	}
-	secret, err := uc.Secrets.Decrypt(state.Secret)
+	state.LockedUntil = time.Time{}
+	secret, err := s.Secrets.Decrypt(state.Secret)
 	if err != nil {
 		return ErrDependency
 	}
@@ -329,7 +345,7 @@ func (uc *SecurityUsecase) verifyMFA(ctx context.Context, userID int64, code str
 		state.Failures = 0
 		state.LockedUntil = time.Time{}
 		state.Revision++
-		if err := uc.MFA.Save(ctx, nil, state); err != nil {
+		if err := s.MFA.Save(ctx, tx, state); err != nil {
 			if errors.Is(err, ErrRevisionConflict) {
 				return ErrMFAInvalid
 			}
@@ -345,7 +361,7 @@ func (uc *SecurityUsecase) verifyMFA(ctx context.Context, userID int64, code str
 			state.RecoveryHashes = append(append([]string{}, state.RecoveryHashes[:i]...), state.RecoveryHashes[i+1:]...)
 			state.Failures = 0
 			state.Revision++
-			if err := uc.MFA.Save(ctx, nil, state); err != nil {
+			if err := s.MFA.Save(ctx, tx, state); err != nil {
 				if errors.Is(err, ErrRevisionConflict) {
 					return ErrMFAInvalid
 				}
@@ -360,18 +376,13 @@ func (uc *SecurityUsecase) verifyMFA(ctx context.Context, userID int64, code str
 		state.Failures = 0
 	}
 	state.Revision++
-	if err := uc.MFA.Save(ctx, nil, state); err != nil {
+	if err := s.MFA.Save(ctx, tx, state); err != nil {
 		return ErrDependency
 	}
 	if !state.LockedUntil.IsZero() {
 		return ErrMFALocked
 	}
 	return ErrMFAInvalid
-}
-
-// LoginMFA verifies a second factor during the login challenge flow.
-func (uc *AuthUsecase) verifyMFA(ctx context.Context, userID int64, code string) error {
-	return (&SecurityUsecase{Services: uc.Services}).verifyMFA(ctx, userID, code)
 }
 
 func generateRecoveryCodes() ([]string, []string, error) {

@@ -28,7 +28,7 @@ SCIM 凭据（bearer token）**绑定唯一一个组织**，这个绑定是 `/sc
 | POST | `/scim/v2/Groups` | 创建组 |
 | GET/PUT/PATCH/DELETE | `/scim/v2/Groups/{id}` | 组读写与成员增删 |
 
-响应 `Content-Type: application/scim+json`；单资源带 `ETag: W/"<revision>"`，PUT/PATCH/DELETE 支持 `If-Match`（不匹配返回 `412` + `scimType: preCondition Failed`）。错误统一为 SCIM `Error` 消息，带 `status` 与 `scimType`。
+响应 `Content-Type: application/scim+json`。用户、组的单资源响应带供给状态的 `ETag: W/"<revision>"`。PUT/PATCH/DELETE 在事务内验证 `If-Match`，版本不匹配时返回 `412`。错误统一为 SCIM `Error` 消息，包含 `status`，适用时包含 `scimType`。
 
 管理面（浏览器，平台管理员 + Step-up + `reason`）：
 
@@ -41,16 +41,18 @@ SCIM 凭据（bearer token）**绑定唯一一个组织**，这个绑定是 `/sc
 
 ## 3. 身份映射与冲突策略
 
-`scim_identities` 以 `(organization_id, kind, external_id)` 为唯一键，把 IdP 的稳定标识映射到本地 `users.id` 或 `scim_groups.id`。`externalId` 是匹配权威，改名/换邮箱不会造成重复账号。
+`scim_identities` 以 `(organization_id, kind, external_id)` 为唯一键，把 IdP 的稳定标识映射到本地 `users.id` 或 `scim_groups.id`。使用 `externalId` 识别同一个供给对象。
 
 供给用户时：
 
 1. `externalId` 已存在 → `409` + `scimType: uniqueness`。
-2. 邮箱对应的本地账号**已存在且是本组织活跃成员** → 复用该账号，只建立映射（幂等重新供给）。
+2. 邮箱对应的本地账号**已存在且是本组织活跃成员** → 建立映射。账号已有本组织的 SCIM 映射时返回 `409`。
 3. 邮箱对应的本地账号存在但**不属于本组织** → `409`，不静默跨租户绑定。否则一个租户的凭据可以靠猜邮箱把别的租户用户拉进自己的目录。
-4. 账号不存在 → 创建本地账号并加入本组织。账号使用随机不可知密码，只能通过联邦登录或管理员重置使用；不会生成可猜测的初始口令。
+4. 账号不存在 → 创建本地账号并加入本组织。用户名须可用，邮箱作为未验证资料保存。账号使用随机不可知密码，可通过联邦登录或管理员激活使用。
 
-`active=false` **只停用本组织的成员资格**（软失效并撤销其组织角色与委派），不改全局账号状态——全局账号被多个组织共享，禁用会连带锁死其他租户。`DELETE /Users/{id}` 同理：移除成员资格与映射，保留全局账号与审计历史。
+`active=false` 停用本组织的成员资格，并撤销其组织角色与委派。`DELETE /Users/{id}` 另行移除映射和该组织的 SCIM 组成员关系。最后一位组织 owner 受保护，两种操作均返回 `409`。全局账号与审计历史保留。
+
+创建后的 `userName`、`displayName` 和 `emails` 由平台账号资料流程维护。SCIM 可回传这些字段当前的值，提交修改会返回 `400 mutability`。
 
 组的成员必须是通过 SCIM 供给到**本组织**的用户；传入其他租户的用户 id 返回 `400`。
 
@@ -60,11 +62,11 @@ SCIM 凭据（bearer token）**绑定唯一一个组织**，这个绑定是 `/sc
 |---|---|
 | `filter`：`userName / externalId / id / active / emails.value / emails[type eq "work"].value eq "value"`，多条件用 `and` | ✅ |
 | `filter` 其它操作符（`sw`、`co`、`pr`、`or`、括号） | ❌ `400 invalidFilter` |
-| PATCH path：`active`、`displayName`、`userName`、`externalId`、`emails`、`emails.value`、`name.formatted`、无 path 整体对象 | ✅ |
-| PATCH Group：`displayName`、`members`（add/remove）、`members[value eq "x"]`（remove） | ✅ |
+| PATCH User：`active`、`externalId`、无 path 整体对象 | ✅ |
+| PATCH Group：`displayName`、`externalId`、`members`（add/replace/remove）、`members[value eq "x"]`（remove） | ✅ |
 | 其它 PATCH path / value-path | ❌ `400 invalidValue` |
 | `attributes` / `excludedAttributes` 顶层字段投影 | ✅ |
-| 嵌套投影路径（如 `name.givenName`） | ❌ 返回完整资源，不假装支持 |
+| 嵌套投影路径（如 `name.givenName`） | ❌ `400 invalidValue` |
 | `startIndex` / `count`（`count` 上限 1000） | ✅ |
 | `sortBy` / `sortOrder` | ❌ `400 invalidFilter` |
 | `ETag` / `If-Match` | ✅ |

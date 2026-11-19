@@ -127,7 +127,7 @@ message PasskeyLoginChallengeReply {
   // base64url challenge for navigator.credentials.get().
   string challenge = 2;
   string rp_id = 3;
-  // Always populated, including for the anti-enumeration decoy ceremony.
+  // Empty for passwordless login, which uses discoverable credentials.
   repeated string allow_credential_ids = 4;
   string expires_at = 5;
 }

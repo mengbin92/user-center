@@ -5485,7 +5485,7 @@ components:
                     type: array
                     items:
                         type: string
-                    description: Always populated, including for the anti-enumeration decoy ceremony.
+                    description: Empty for passwordless login, which uses discoverable credentials.
                 expires_at:
                     type: string
         api.usercenter.v1.PasswordResetTaskReply:

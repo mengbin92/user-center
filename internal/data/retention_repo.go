@@ -17,7 +17,8 @@ func (r *retentionRepo) ListRetentionCandidates(ctx context.Context, tx biz.Tx, 
 	err := r.d.dbOr(tx).WithContext(ctx).
 		Where("status = ? AND archived_at IS NOT NULL AND archived_at < ? AND anonymized_at IS NULL",
 			biz.UserStatusArchived, cutoff).
-		Order("archived_at ASC").Limit(limit).Find(&rows).Error
+		Order("CASE WHEN EXISTS (SELECT 1 FROM user_legal_holds WHERE user_id = users.id AND released_at IS NULL) THEN 1 ELSE 0 END").
+		Order("archived_at ASC, id ASC").Limit(limit).Find(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,8 @@ func (r *retentionRepo) ReleaseLegalHold(ctx context.Context, tx biz.Tx, userID 
 }
 
 func (r *retentionRepo) AnonymizeUser(ctx context.Context, tx biz.Tx, userID int64, at time.Time) error {
-	anonymous := "anon_" + itoa(userID)
+	// The marker must be outside the namespace of user-selected handles.
+	anonymous := "anon~" + itoa(userID)
 	return r.d.dbOr(tx).WithContext(ctx).Model(&userPO{}).Where("id = ? AND anonymized_at IS NULL", userID).
 		Updates(map[string]any{
 			"username": anonymous, "username_normalized": anonymous,
@@ -73,7 +75,11 @@ func (r *retentionRepo) PurgeMFA(ctx context.Context, tx biz.Tx, userID int64) e
 }
 
 func (r *retentionRepo) PurgeCredentials(ctx context.Context, tx biz.Tx, userID int64) error {
-	return r.d.dbOr(tx).WithContext(ctx).Where("user_id = ?", userID).Delete(&credentialPO{}).Error
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if err := db.Where("user_id = ?", userID).Delete(&passwordHistoryPO{}).Error; err != nil {
+		return err
+	}
+	return db.Where("user_id = ?", userID).Delete(&credentialPO{}).Error
 }
 
 func (r *retentionRepo) PurgeWebAuthn(ctx context.Context, tx biz.Tx, userID int64) error {

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 
@@ -132,6 +133,44 @@ func TestOIDCConsentLifecycle(t *testing.T) {
 	loc, err = url.Parse(rec.Header().Get("Location"))
 	require.NoError(t, err)
 	require.Equal(t, "/consent", loc.Path)
+}
+
+func TestOIDCConsentRevocationInvalidatesPendingCodesAndRefreshTokens(t *testing.T) {
+	h := newHarness(t)
+	consentClient(t, h, []string{"openid", "offline_access"})
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	query := consentQuery("openid offline_access", "")
+	exchange := func(location *url.URL) *httptest.ResponseRecorder {
+		t.Helper()
+		return h.doForm("/oidc/token", url.Values{
+			"grant_type": {"authorization_code"}, "code": {location.Query().Get("code")},
+			"client_id": {"consent_client"}, "redirect_uri": {consentRedirect}, "code_verifier": {consentVerifier},
+		}, "", "")
+	}
+	first := exchange(h.authorize(t, query))
+	require.Equal(t, http.StatusOK, first.Code, first.Body.String())
+	refresh := decode[map[string]any](t, first)["refresh_token"].(string)
+	pending := h.authorize(t, query)
+	revoke := h.do(http.MethodDelete, "/api/v1/me/oidc-consents/consent_client", nil, "", true)
+	require.Equal(t, http.StatusOK, revoke.Code, revoke.Body.String())
+
+	codeDenied := exchange(pending)
+	require.Equal(t, http.StatusBadRequest, codeDenied.Code, codeDenied.Body.String())
+	require.Equal(t, "invalid_grant", decode[map[string]any](t, codeDenied)["error"])
+	refreshDenied := h.doForm("/oidc/token", url.Values{
+		"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "client_id": {"consent_client"},
+	}, "", "")
+	require.Equal(t, http.StatusBadRequest, refreshDenied.Code, refreshDenied.Body.String())
+	require.Equal(t, "invalid_grant", decode[map[string]any](t, refreshDenied)["error"])
+
+	once := h.do(http.MethodGet, "/oidc/authorize?"+query.Encode(), nil, "", false)
+	location, err := url.Parse(once.Header().Get("Location"))
+	require.NoError(t, err)
+	exchanged := exchange(decideConsent(t, h, consentFromLocation(t, location), true, false))
+	require.Equal(t, http.StatusOK, exchanged.Code, exchanged.Body.String())
+	issued := decode[map[string]any](t, exchanged)
+	require.Equal(t, "openid", issued["scope"])
+	require.NotContains(t, issued, "refresh_token")
 }
 
 func TestOIDCConsentHandleRequiresTheOriginatingSession(t *testing.T) {

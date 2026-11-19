@@ -694,7 +694,7 @@ type PasskeyLoginChallengeReply struct {
 	// base64url challenge for navigator.credentials.get().
 	Challenge string `protobuf:"bytes,2,opt,name=challenge,proto3" json:"challenge,omitempty"`
 	RpId      string `protobuf:"bytes,3,opt,name=rp_id,json=rpId,proto3" json:"rp_id,omitempty"`
-	// Always populated, including for the anti-enumeration decoy ceremony.
+	// Empty for passwordless login, which uses discoverable credentials.
 	AllowCredentialIds []string `protobuf:"bytes,4,rep,name=allow_credential_ids,json=allowCredentialIds,proto3" json:"allow_credential_ids,omitempty"`
 	ExpiresAt          string   `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
 	unknownFields      protoimpl.UnknownFields

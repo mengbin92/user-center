@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/mengbin92/user-center/domain/authorization"
@@ -46,6 +47,16 @@ func (uc *RetentionUsecase) Hold(ctx context.Context, userID int64, reason strin
 		return Validation("legal hold 原因不能为空")
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.Users.LockUser(ctx, tx, userID); err != nil {
+			return err
+		}
+		user, err := uc.Users.Get(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		if user.AnonymizedAt != nil {
+			return Validation("用户数据已清理")
+		}
 		if err := uc.repo.AddLegalHold(ctx, tx, &LegalHold{UserID: userID, Reason: reason}); err != nil {
 			return ErrDependency
 		}
@@ -58,6 +69,9 @@ func (uc *RetentionUsecase) Release(ctx context.Context, userID int64, reason st
 		return Validation("解除 legal hold 需要原因")
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.Users.LockUser(ctx, tx, userID); err != nil {
+			return err
+		}
 		if err := uc.repo.ReleaseLegalHold(ctx, tx, userID); err != nil {
 			return ErrDependency
 		}
@@ -76,12 +90,15 @@ func (uc *RetentionUsecase) Run(ctx context.Context, in RetentionOptions) (*Rete
 	if days <= 0 {
 		days = DefaultRetentionDays
 	}
+	if days > int(time.Duration(math.MaxInt64)/(24*time.Hour)) {
+		return nil, Validation("retention-days 超出支持范围")
+	}
 	limit := in.Limit
 	if limit <= 0 || limit > 1000 {
 		limit = 100
 	}
 	now := uc.Clock.Now().UTC()
-	cutoff := now.Add(-time.Duration(days) * 24 * time.Hour)
+	cutoff := now.Add(-time.Duration(days) * (24 * time.Hour))
 	report := &RetentionReport{DryRun: in.DryRun, RetentionDays: days, Cutoff: cutoff}
 	candidates, err := uc.repo.ListRetentionCandidates(ctx, nil, cutoff, limit)
 	if err != nil {
@@ -103,19 +120,32 @@ func (uc *RetentionUsecase) Run(ctx context.Context, in RetentionOptions) (*Rete
 		if in.DryRun {
 			continue
 		}
-		if err := uc.anonymize(ctx, user.ID, now); err != nil {
+		changed, err := uc.anonymize(ctx, user.ID, now, cutoff)
+		if err != nil {
 			report.Failed++
 			continue
 		}
-		report.Cleaned++
+		if changed {
+			report.Cleaned++
+		}
 	}
 	return report, nil
 }
 
-func (uc *RetentionUsecase) anonymize(ctx context.Context, userID int64, at time.Time) error {
-	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		// Re-check the hold inside the transaction so a hold added between the
-		// scan and the write still wins.
+func (uc *RetentionUsecase) anonymize(ctx context.Context, userID int64, at, cutoff time.Time) (bool, error) {
+	changed := false
+	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.Users.LockUser(ctx, tx, userID); err != nil {
+			return err
+		}
+		user, err := uc.Users.Get(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		if user.Status != UserStatusArchived || user.ArchivedAt == nil ||
+			!user.ArchivedAt.Before(cutoff) || user.AnonymizedAt != nil {
+			return nil
+		}
 		held, err := uc.repo.HasLegalHold(ctx, tx, userID)
 		if err != nil {
 			return ErrDependency
@@ -141,6 +171,8 @@ func (uc *RetentionUsecase) anonymize(ctx context.Context, userID int64, at time
 			return err
 		}
 		payload, _ := jsonx.Marshal(map[string]any{"user_id": userID, "at": at})
+		changed = true
 		return uc.emit(ctx, tx, "user", userID, 0, "user.anonymized", string(payload))
 	})
+	return changed && err == nil, err
 }

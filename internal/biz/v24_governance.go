@@ -270,9 +270,7 @@ func (uc *SettingsUsecase) AuthProviders(ctx context.Context, actor ActorContext
 	out := &ProviderViewReply{Revision: settings.Revision}
 	for _, def := range defs {
 		configured := uc.OAuth[def.code] != nil
-		explicitlyListed := containsProvider(settings.Providers, def.code)
-		enabled := configured && !containsProvider(settings.Providers, ProvidersDisabledAll) &&
-			(len(settings.Providers) == 0 || explicitlyListed)
+		enabled := configured && oauthProviderEnabled(settings.Providers, def.code)
 		out.Items = append(out.Items, &ProviderView{
 			Code: def.code, Name: def.name, Enabled: enabled,
 			CredentialSource: "env", CredentialConfigured: configured,
@@ -281,13 +279,4 @@ func (uc *SettingsUsecase) AuthProviders(ctx context.Context, actor ActorContext
 		})
 	}
 	return out, nil
-}
-
-func containsProvider(list []string, code string) bool {
-	for _, p := range list {
-		if p == code {
-			return true
-		}
-	}
-	return false
 }

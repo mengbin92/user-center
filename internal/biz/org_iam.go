@@ -310,7 +310,7 @@ func (uc *OrgIAMUsecase) orgGuard(ctx context.Context, actor ActorContext, orgID
 		return authCtx, err
 	}
 	if isPlatformAdmin(actor) {
-		return authCtx, nil
+		return authCtx, uc.requireAdminMFA(ctx, actor)
 	}
 	member, err := uc.Organizations.GetMember(ctx, nil, orgID, actor.User.ID)
 	if err != nil || member.Status != OrgMemberActive {
@@ -407,6 +407,9 @@ func (uc *OrgIAMUsecase) CreateRole(ctx context.Context, actor ActorContext, org
 	}
 	var created *Role
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.authorizeOrgRoleWrite(ctx, tx, actor, orgID, in.Grants); err != nil {
+			return err
+		}
 		role, err := uc.OrgIAM.CreateRole(ctx, tx, authCtx, &Role{
 			Code: in.Code, Name: in.Name, Description: strings.TrimSpace(in.Description),
 			Status: RoleStatusActive, Grants: in.Grants,
@@ -458,6 +461,9 @@ func (uc *OrgIAMUsecase) UpdateRole(ctx context.Context, actor ActorContext, org
 	role.Name, role.Description = name, description
 	var updated *Role
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.authorizeOrgRoleWrite(ctx, tx, actor, orgID, nil); err != nil {
+			return err
+		}
 		row, err := uc.OrgIAM.UpdateRole(ctx, tx, authCtx, role, expected)
 		if err != nil {
 			return err
@@ -499,6 +505,9 @@ func (uc *OrgIAMUsecase) PutRoleGrants(ctx context.Context, actor ActorContext, 
 	}
 	var revision uint64
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.authorizeOrgRoleWrite(ctx, tx, actor, orgID, grants); err != nil {
+			return err
+		}
 		rev, err := uc.OrgIAM.PutRoleGrants(ctx, tx, authCtx, roleID, grants, expected)
 		if err != nil {
 			return err
@@ -537,13 +546,16 @@ func (uc *OrgIAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, or
 	if role.Builtin {
 		return Validation("内置组织角色不可归档")
 	}
-	if n, err := uc.OrgIAM.CountActiveAssignments(ctx, nil, authCtx, roleID); err != nil {
-		return ErrDependency
-	} else if n > 0 {
-		return ConflictCode("ORGANIZATION_ROLE_IN_USE", "角色仍被成员使用，请先撤销授权")
-	}
 	role.Status = RoleStatusArchived
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.authorizeOrgRoleWrite(ctx, tx, actor, orgID, nil); err != nil {
+			return err
+		}
+		if n, err := uc.OrgIAM.CountActiveAssignments(ctx, tx, authCtx, roleID); err != nil {
+			return ErrDependency
+		} else if n > 0 {
+			return ConflictCode("ORGANIZATION_ROLE_IN_USE", "角色仍被成员使用，请先撤销授权")
+		}
 		if _, err := uc.OrgIAM.UpdateRole(ctx, tx, authCtx, role, expected); err != nil {
 			return err
 		}
@@ -571,9 +583,16 @@ func (uc *OrgIAMUsecase) ArchiveRole(ctx context.Context, actor ActorContext, or
 // orgConstraintGuard instead). Without this branch the new capability check
 // silently closed the older organization-role management path for support
 // accounts.
-func (uc *OrgIAMUsecase) authorizeOrgInTx(ctx context.Context, tx Tx, actor ActorContext, orgID int64, operation string, targetUserID int64) error {
+func (uc *OrgIAMUsecase) authorizeOrgInTx(ctx context.Context, tx Tx, actor ActorContext, orgID int64, operation string, targetUserID int64, wholeObject bool) error {
 	if isPlatformAdmin(actor) {
-		return nil
+		current, err := uc.currentIAMActorInTx(ctx, tx, actor)
+		if err != nil {
+			return err
+		}
+		if !isPlatformAdmin(current) {
+			return ErrPermissionDenied
+		}
+		return uc.requireAdminMFAInTx(ctx, tx, current)
 	}
 	authCtx := authorization.Organization(orgID)
 	member, err := uc.Organizations.GetMember(ctx, tx, orgID, actor.User.ID)
@@ -586,12 +605,59 @@ func (uc *OrgIAMUsecase) authorizeOrgInTx(ctx context.Context, tx Tx, actor Acto
 	if member.Status != OrgMemberActive {
 		return ErrPermissionDenied
 	}
-	d, err := uc.DecideInTx(ctx, tx, actor, authCtx, operation, targetUserID, false)
+	d, err := uc.DecideInTx(ctx, tx, actor, authCtx, operation, targetUserID, wholeObject)
 	if err != nil {
 		return ErrAuthorizationDown
 	}
 	if !d.Allowed {
 		return ErrPermissionDenied
+	}
+	return nil
+}
+
+func (uc *OrgIAMUsecase) authorizeOrgRoleWrite(ctx context.Context, tx Tx, actor ActorContext, orgID int64, grants []Grant) error {
+	if _, err := uc.Policy.PolicyRevision(ctx, tx); err != nil {
+		return ErrDependency
+	}
+	if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgRoleManage, 0, true); err != nil {
+		return err
+	}
+	if isPlatformAdmin(actor) || len(grants) == 0 {
+		return nil
+	}
+	facts, err := uc.LoadAuthzFactsInTx(ctx, tx, authorization.Organization(orgID), actor.User.ID, nil)
+	if err != nil {
+		return ErrAuthorizationDown
+	}
+	facts.permissions = make(map[string]*Permission, len(grants))
+	for _, grant := range grants {
+		permission, err := uc.IAM.GetPermissionByCode(ctx, tx, grant.Operation)
+		if err != nil {
+			return ErrAuthorizationDown
+		}
+		facts.permissions[grant.Operation] = permission
+		if grant.Scope.All {
+			d, err := uc.decideWithFacts(ctx, facts, actor, grant.Operation, 0, true)
+			if err != nil || !d.Allowed {
+				return ErrPermissionDenied
+			}
+			continue
+		}
+		if grant.Scope.Self {
+			d, err := uc.decideWithFacts(ctx, facts, actor, grant.Operation, actor.User.ID, false)
+			if err != nil || !d.Allowed || !slices.ContainsFunc(d.Sources, func(src authorization.GrantSource) bool {
+				return src.Active && src.Effect == authorization.Allow &&
+					authorization.Covers(authorization.Intersect(src.RoleScope, src.Boundary), authorization.Scope{Self: true})
+			}) {
+				return ErrPermissionDenied
+			}
+		}
+		for _, target := range grant.Scope.UserIDs {
+			d, err := uc.decideWithFacts(ctx, facts, actor, grant.Operation, target, false)
+			if err != nil || !d.Allowed {
+				return ErrPermissionDenied
+			}
+		}
 	}
 	return nil
 }
@@ -658,8 +724,15 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 		// Re-verify the operation on this snapshot. The pre-transaction check in
 		// orgGuard is a fast rejection, not the authorization decision: by the
 		// time the insert runs the actor may no longer hold the operation.
-		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, in.UserID); err != nil {
+		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, in.UserID, false); err != nil {
 			return err
+		}
+		member, err := uc.Organizations.GetMemberForUpdate(ctx, tx, orgID, in.UserID)
+		if err != nil && !errors.Is(err, ErrResourceNotFound) {
+			return ErrDependency
+		}
+		if member == nil || member.Status != OrgMemberActive {
+			return Validation("目标用户不是本组织成员")
 		}
 		// Lock the role row: the duplicate and max_members checks below must not
 		// run on a stale snapshot when two admins grant the same role at once.
@@ -674,8 +747,13 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 		if err != nil {
 			return ErrDependency
 		}
+		now := uc.Clock.Now()
+		if in.ExpiresAt != nil && !now.Before(*in.ExpiresAt) {
+			return Validation("授权过期时间必须晚于当前时间")
+		}
 		for _, item := range existing {
-			if item.Assignment != nil && item.Assignment.RoleID == locked.ID && !item.Assignment.Revoked {
+			a := item.Assignment
+			if a != nil && a.RoleID == locked.ID && !a.Revoked && intervalsOverlap(a.StartsAt, a.ExpiresAt, now, in.ExpiresAt) {
 				return ConflictCode("ORGANIZATION_ASSIGNMENT_EXISTS", "该成员已拥有此角色")
 			}
 		}
@@ -703,8 +781,8 @@ func (uc *OrgIAMUsecase) AssignRole(ctx context.Context, actor ActorContext, org
 		}
 		row, err := uc.OrgIAM.CreateAssignment(ctx, tx, authCtx, &Assignment{
 			UserID: in.UserID, RoleID: role.ID, Boundary: authorization.Scope{All: true},
-			ExpiresAt: in.ExpiresAt, Origin: OriginExplicit, AssignedBy: actor.User.ID,
-			CreatedAt: uc.Clock.Now().UTC(),
+			StartsAt: now.UTC(), ExpiresAt: in.ExpiresAt, Origin: OriginExplicit, AssignedBy: actor.User.ID,
+			CreatedAt: now.UTC(),
 		})
 		if err != nil {
 			return err
@@ -751,7 +829,7 @@ func (uc *OrgIAMUsecase) RevokeAssignment(ctx context.Context, actor ActorContex
 		if _, err := uc.Policy.PolicyRevision(ctx, tx); err != nil {
 			return ErrDependency
 		}
-		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, assignment.UserID); err != nil {
+		if err := uc.authorizeOrgInTx(ctx, tx, actor, orgID, PermOrgAssignmentManage, assignment.UserID, false); err != nil {
 			return err
 		}
 		// The boundary: revoking authority you never had is also a way to break a

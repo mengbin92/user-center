@@ -33,15 +33,24 @@ func TestPasskeyPasswordlessLoginLifecycle(t *testing.T) {
 	require.NotEmpty(t, begin["challenge_id"])
 	require.NotEmpty(t, begin["challenge"])
 	require.Equal(t, fixture.rpID, begin["rp_id"])
-	require.Contains(t, begin["allow_credential_ids"], fixture.credIDText)
+	require.Empty(t, begin["allow_credential_ids"])
 
 	authData, clientData, signature := fixture.assertion(t, begin["challenge"].(string), 2)
 	body := map[string]any{
-		"challenge_id": begin["challenge_id"], "credential_id": fixture.credIDText,
+		"challenge_id": begin["challenge_id"], "credential_id": fixture.credIDText, "remember": true,
 		"authenticator_data": authData, "client_data_json": clientData, "signature": signature,
 	}
 	rec = h.do(http.MethodPost, "/api/v1/auth/passkey/login:complete", body, "", true)
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	require.Equal(t, "CHALLENGE_INVALID", decode[map[string]any](t, rec)["reason"])
+	require.Equal(t, http.StatusUnauthorized, h.do(http.MethodGet, "/api/v1/me", nil, "", false).Code)
+
+	fixture.verified = true
+	body["authenticator_data"], body["client_data_json"], body["signature"] =
+		fixture.assertion(t, begin["challenge"].(string), 2)
+	rec = h.do(http.MethodPost, "/api/v1/auth/passkey/login:complete", body, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assertRememberCookie(t, rec, true)
 	login := decode[map[string]any](t, rec)
 	require.Equal(t, "authenticated", login["status"])
 	require.Equal(t, "root", login["user"].(map[string]any)["username"])
@@ -74,9 +83,10 @@ func TestPasskeyPasswordlessLoginStillOwesTOTP(t *testing.T) {
 		map[string]any{"username": "root"}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	begin := decode[map[string]any](t, rec)
+	fixture.verified = true
 	authData, clientData, signature := fixture.assertion(t, begin["challenge"].(string), 2)
 	rec = h.do(http.MethodPost, "/api/v1/auth/passkey/login:complete", map[string]any{
-		"challenge_id": begin["challenge_id"], "credential_id": fixture.credIDText,
+		"challenge_id": begin["challenge_id"], "credential_id": fixture.credIDText, "remember": true,
 		"authenticator_data": authData, "client_data_json": clientData, "signature": signature,
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -94,6 +104,7 @@ func TestPasskeyPasswordlessLoginStillOwesTOTP(t *testing.T) {
 	}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Equal(t, "authenticated", decode[map[string]any](t, rec)["status"])
+	assertRememberCookie(t, rec, true)
 	require.Equal(t, http.StatusOK, h.do(http.MethodGet, "/api/v1/me", nil, "", false).Code)
 }
 
@@ -108,6 +119,10 @@ func TestPasskeyLoginDecoyParity(t *testing.T) {
 		"/api/v1/me/webauthn/credentials:challenge",
 		map[string]any{"current_password": "ChangeMe-12345"}, "", true))
 	registerPasskey(t, h, fixture, reg["challenge_id"].(string), reg["challenge"].(string))
+	reg = decode[map[string]any](t, h.do(http.MethodPost,
+		"/api/v1/me/webauthn/credentials:challenge",
+		map[string]any{"current_password": "ChangeMe-12345"}, "", true))
+	registerPasskey(t, h, newWebAuthnFixture(t), reg["challenge_id"].(string), reg["challenge"].(string))
 	fixtureStepUp(h)
 	rec := h.management(http.MethodPost, "/api/v1/admin/users", map[string]any{
 		"username": "no.passkey", "email": "no.passkey@example.com",
@@ -141,9 +156,7 @@ func TestPasskeyLoginDecoyParity(t *testing.T) {
 		begin := decode[map[string]any](t, rec)
 		require.NotEmpty(t, begin["challenge_id"])
 		require.NotEmpty(t, begin["challenge"])
-		allow, ok := begin["allow_credential_ids"].([]any)
-		require.True(t, ok)
-		require.Len(t, allow, 1, "the decoy must not send an empty allow list")
+		require.Empty(t, begin["allow_credential_ids"])
 
 		body := map[string]any{"challenge_id": begin["challenge_id"]}
 		for key, value := range fakeAssertion {

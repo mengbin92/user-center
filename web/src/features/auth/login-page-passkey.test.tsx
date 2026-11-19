@@ -9,6 +9,7 @@ import { LoginPage } from './login-page'
 const signIn = vi.fn().mockResolvedValue(undefined)
 const beginPasskeyLogin = vi.fn()
 const completePasskeyLogin = vi.fn()
+const completeMfa = vi.fn()
 const getLoginAssertion = vi.fn()
 
 vi.mock('../../lib/auth', () => ({
@@ -19,7 +20,7 @@ vi.mock('../../lib/api', () => ({
     auth: {
       context: async () => ({ providers: [] }),
       login: vi.fn(),
-      completeMfa: vi.fn(),
+      completeMfa: (...args: unknown[]) => completeMfa(...args),
       beginPasskeyLogin: (...args: unknown[]) => beginPasskeyLogin(...args),
       completePasskeyLogin: (...args: unknown[]) => completePasskeyLogin(...args),
     },
@@ -30,11 +31,11 @@ vi.mock('../../lib/webauthn', () => ({
   getLoginAssertion: (...args: unknown[]) => getLoginAssertion(...args),
 }))
 
-function mount() {
+function mount(url = '/login') {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <ToastProvider>
-        <MemoryRouter initialEntries={['/login']}>
+        <MemoryRouter initialEntries={[url]}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/account" element={<span>账号中心</span>} />
@@ -58,7 +59,6 @@ describe('passkey passwordless login', () => {
       challenge_id: 'c1',
       challenge: 'challenge-1',
       rp_id: 'localhost',
-      allow_credential_ids: ['cred-1'],
       expires_at: '2026-11-13T02:00:00Z',
     })
     getLoginAssertion.mockResolvedValue({
@@ -83,8 +83,9 @@ describe('passkey passwordless login', () => {
       expect(getLoginAssertion).toHaveBeenCalledWith(
         'challenge-1',
         'localhost',
-        ['cred-1'],
+        [],
         'c1',
+        'required',
       ),
     )
     await waitFor(() =>
@@ -104,7 +105,6 @@ describe('passkey passwordless login', () => {
       challenge_id: 'c2',
       challenge: 'challenge-2',
       rp_id: 'localhost',
-      allow_credential_ids: ['cred-1'],
     })
     getLoginAssertion.mockResolvedValue({
       challenge_id: 'c2',
@@ -140,5 +140,20 @@ describe('passkey passwordless login', () => {
       await screen.findByText(/请先输入用户名或邮箱/),
     ).toBeInTheDocument()
     expect(beginPasskeyLogin).not.toHaveBeenCalled()
+  })
+
+  it('uses the second factor carried by an OAuth continuation', async () => {
+    const assertion = { challenge_id: 'mfa-1', credential_id: 'cred-1' }
+    getLoginAssertion.mockResolvedValue(assertion)
+    completeMfa.mockResolvedValue({ status: 'authenticated' })
+    mount('/login?mfa_challenge=mfa-1#challenge=challenge-1&rp_id=localhost&allow_credential_ids=cred-1')
+
+    fireEvent.click(screen.getByRole('button', { name: /使用 Passkey/ }))
+
+    await waitFor(() =>
+      expect(getLoginAssertion).toHaveBeenCalledWith('challenge-1', 'localhost', ['cred-1'], 'mfa-1'),
+    )
+    await waitFor(() => expect(completeMfa).toHaveBeenCalledWith(assertion))
+    await waitFor(() => expect(signIn).toHaveBeenCalledTimes(1))
   })
 })

@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -84,13 +86,27 @@ var tenantTables = map[string]bool{
 
 const defaultSchemaPrefix = "usercenter_org_"
 
+func validateTenantPrefix(prefix string) error {
+	prefix = strings.TrimSpace(prefix)
+	if len(prefix) > 45 || strings.ContainsFunc(prefix, func(c rune) bool {
+		return !(c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9')
+	}) {
+		return errors.New("TENANT_SCHEMA_PREFIX must contain at most 45 ASCII letters, digits or underscores")
+	}
+	return nil
+}
+
 func (d *Data) IsolationEnabled() bool {
 	return d.tenancy != nil && d.tenancy.SchemaIsolation
 }
 
 func (d *Data) schemaPrefix() string {
-	if d.tenancy != nil && strings.TrimSpace(d.tenancy.SchemaPrefix) != "" {
-		return strings.TrimSpace(d.tenancy.SchemaPrefix)
+	return tenantPrefix(d.tenancy.GetSchemaPrefix())
+}
+
+func tenantPrefix(raw string) string {
+	if prefix := strings.TrimSpace(raw); prefix != "" {
+		return prefix
 	}
 	return defaultSchemaPrefix
 }
@@ -114,12 +130,14 @@ func (d *Data) TenantDB(ctx context.Context) *gorm.DB {
 	if orgID <= 0 {
 		return d.db
 	}
-	db, err := d.sqliteTenantDB(orgID)
+	db, err := d.sqliteTenantDB(orgID, false)
 	if err != nil {
 		if d.log != nil {
 			d.log.Warn("tenant database unavailable", zap.Int64("organization_id", orgID), zap.Error(err))
 		}
-		return d.db.Session(&gorm.Session{NewDB: true}).Table("__tenant_database_missing__")
+		unavailable := d.db.WithContext(ctx)
+		unavailable.AddError(err)
+		return unavailable
 	}
 	return db.WithContext(ctx)
 }
@@ -193,45 +211,72 @@ func (d *Data) registerTenantRouting() {
 	d.db.Callback().Delete().Before("gorm:delete").Register("tenant:delete", rewrite)
 }
 
-func (d *Data) tenantSource(orgID int64) (string, string, error) {
-	name := d.TenantSchemaName(orgID)
-	if d.isSQLite() {
-		base := d.baseSource
-		if base == "" {
-			base = "file::memory:?cache=shared"
-		}
-		path := strings.TrimPrefix(base, "file:")
-		if i := strings.IndexByte(path, '?'); i >= 0 {
-			path = path[:i]
-		}
-		dir := filepath.Dir(path)
-		if dir == "." || dir == "" || strings.Contains(path, ":memory:") {
-			dir = filepath.Join(os.TempDir(), "usercenter-tenants")
-		}
-		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return "", name, err
-		}
-		return filepath.Join(dir, fmt.Sprintf("tenant_%d.db", orgID)), name, nil
-	}
-	cfg, err := driverMySQL.ParseDSN(d.baseSource)
+func validateTenantMySQLSource(source, prefix string) error {
+	cfg, err := driverMySQL.ParseDSN(source)
 	if err != nil {
-		return "", name, fmt.Errorf("parse MySQL DSN: %w", err)
+		return errors.New("invalid MySQL DSN")
 	}
-	cfg.DBName = name
-	return cfg.FormatDSN(), name, nil
+	suffix, ok := strings.CutPrefix(strings.ToLower(cfg.DBName), strings.ToLower(tenantPrefix(prefix)))
+	if id, err := strconv.ParseInt(suffix, 10, 64); ok && err == nil && id > 0 && suffix == strconv.FormatInt(id, 10) {
+		return errors.New("platform database name overlaps the tenant schema namespace")
+	}
+	return nil
 }
 
-func (d *Data) sqliteTenantDB(orgID int64) (*gorm.DB, error) {
+func (d *Data) setSQLiteTenantDir() error {
+	raw, options, _ := strings.Cut(d.baseSource, "?")
+	path := strings.TrimPrefix(raw, "file:")
+	params, err := url.ParseQuery(options)
+	if err != nil {
+		return fmt.Errorf("invalid SQLite options: %w", err)
+	}
+	if path == "" || path == ":memory:" || params.Get("mode") == "memory" {
+		d.tenantDir, err = os.MkdirTemp("", "usercenter-tenants-")
+		d.tenantTemp = err == nil
+		return err
+	}
+	if raw != path {
+		path, err = url.PathUnescape(path)
+		if err != nil {
+			return err
+		}
+	}
+	d.tenantDir, err = filepath.Abs(path + ".tenants")
+	return err
+}
+
+func (d *Data) sqliteTenantDB(orgID int64, create bool) (*gorm.DB, error) {
 	d.tenantsMu.Lock()
 	defer d.tenantsMu.Unlock()
 	if db, ok := d.tenants[orgID]; ok {
 		return db, nil
 	}
-	source, _, err := d.tenantSource(orgID)
-	if err != nil {
-		return nil, err
+	source := filepath.Join(d.tenantDir, fmt.Sprintf("tenant_%d.db", orgID))
+	if !d.tenantTemp {
+		if _, statErr := os.Stat(source); errors.Is(statErr, os.ErrNotExist) {
+			base, _, _ := strings.Cut(strings.TrimPrefix(d.baseSource, "file:"), "?")
+			legacyDir := filepath.Dir(base)
+			if legacyDir == "." {
+				legacyDir = filepath.Join(os.TempDir(), "usercenter-tenants")
+			}
+			if _, legacyErr := os.Stat(filepath.Join(legacyDir, filepath.Base(source))); legacyErr == nil {
+				return nil, errors.New("legacy SQLite tenant file requires relocation, see docs/tenancy.md")
+			} else if !errors.Is(legacyErr, os.ErrNotExist) {
+				return nil, legacyErr
+			}
+		} else if statErr != nil {
+			return nil, statErr
+		}
 	}
-	db, err := gorm.Open(sqlite.Open("file:"+source+"?_fk=1"), &gorm.Config{
+	mode := "rw"
+	if create {
+		if err := os.MkdirAll(d.tenantDir, 0o750); err != nil {
+			return nil, err
+		}
+		mode = "rwc"
+	}
+	dsn := url.URL{Scheme: "file", Path: source, RawQuery: "_fk=1&mode=" + mode}
+	db, err := gorm.Open(sqlite.Open(withSQLiteBusyTimeout(dsn.String())), &gorm.Config{
 		Logger:  logger.Default.LogMode(logger.Silent),
 		NowFunc: func() time.Time { return time.Now().UTC() },
 	})
@@ -291,41 +336,93 @@ func (d *Data) EnsureTenantSchema(ctx context.Context, orgID int64) (string, err
 	if !d.IsolationEnabled() {
 		return "", fmt.Errorf("schema isolation is disabled in configuration")
 	}
-	_, name, err := d.tenantSource(orgID)
-	if err != nil {
-		return "", err
+	name := d.TenantSchemaName(orgID)
+	registry := d.db.WithContext(ctx)
+	var registered []tenantSchemaPO
+	if err := registry.Where("organization_id = ? OR schema_name = ?", orgID, name).Find(&registered).Error; err != nil {
+		return "", fmt.Errorf("read tenant schema registration: %w", err)
+	}
+	for _, row := range registered {
+		if row.OrganizationID != orgID || row.SchemaName != name {
+			return "", errors.New("configured tenant schema does not match its registration")
+		}
 	}
 	if d.isSQLite() {
-		db, err := d.sqliteTenantDB(orgID)
+		db, err := d.sqliteTenantDB(orgID, true)
 		if err != nil {
 			return "", fmt.Errorf("open tenant database: %w", err)
 		}
-		if err := d.execTenantDDL(db, "sqlite", "main"); err != nil {
+		if err := d.execTenantDDL(db.WithContext(ctx), "sqlite", "main"); err != nil {
 			return "", err
 		}
 	} else {
 		stmt := "CREATE DATABASE IF NOT EXISTS `" + name + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-		if err := d.db.Exec(stmt).Error; err != nil {
+		if err := d.db.WithContext(ctx).Exec(stmt).Error; err != nil {
 			return "", fmt.Errorf("create tenant schema: %w", err)
 		}
-		if err := d.execTenantDDL(d.db, "mysql", name); err != nil {
+		if err := d.execTenantDDL(d.db.WithContext(ctx), "mysql", name); err != nil {
+			return "", err
+		}
+		if err := d.ensureTenantMySQLColumns(ctx, name, orgID); err != nil {
 			return "", err
 		}
 	}
 	now := time.Now().UTC()
-	if err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
+	if err := registry.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "organization_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"schema_name", "status", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
 	}).Create(&tenantSchemaPO{
 		OrganizationID: orgID, SchemaName: name, Status: "ready",
 		CreatedAt: now, UpdatedAt: now,
 	}).Error; err != nil {
 		return "", fmt.Errorf("record tenant schema: %w", err)
 	}
+	var row tenantSchemaPO
+	if err := registry.Select("schema_name").Where("organization_id = ?", orgID).First(&row).Error; err != nil {
+		return "", fmt.Errorf("verify tenant schema registration: %w", err)
+	}
+	if row.SchemaName != name {
+		return "", errors.New("configured tenant schema does not match its registration")
+	}
 	d.tenantsMu.Lock()
 	d.attached[name] = true
 	d.tenantsMu.Unlock()
 	return name, nil
+}
+
+// Older MySQL tenant tables could be created before the context columns were
+// declared in the template. Every preexisting row belongs to this schema's org.
+func (d *Data) ensureTenantMySQLColumns(ctx context.Context, schema string, orgID int64) error {
+	db := d.db.WithContext(ctx)
+	var columns []struct{ TenantTable, TenantColumn string }
+	if err := db.Raw("SELECT table_name AS tenant_table, column_name AS tenant_column FROM information_schema.columns WHERE table_schema = ?", schema).Scan(&columns).Error; err != nil {
+		return err
+	}
+	present := make(map[string]bool, len(columns))
+	for _, column := range columns {
+		present[column.TenantTable+"."+column.TenantColumn] = true
+	}
+	organizationID := strconv.FormatInt(orgID, 10)
+	ensureColumn := func(table, column, definition string) error {
+		if present[table+"."+column] {
+			return nil
+		}
+		err := db.Exec("ALTER TABLE `" + schema + "`.`" + table + "` ADD COLUMN `" + column + "` " + definition).Error
+		var mysqlErr *driverMySQL.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1060 {
+			return nil
+		}
+		return err
+	}
+	for _, table := range []string{"iam_roles", "iam_user_roles", "iam_role_constraints", "iam_delegations"} {
+		if err := ensureColumn(table, "context_type", "VARCHAR(16) NOT NULL DEFAULT 'organization'"); err != nil {
+			return err
+		}
+		if err := ensureColumn(table, "context_id", "BIGINT NOT NULL DEFAULT "+organizationID); err != nil {
+			return err
+		}
+	}
+	return ensureColumn("iam_audit_events", "organization_id", "BIGINT NOT NULL DEFAULT "+organizationID)
 }
 
 // TenantSchemas lists schemas prepared on this instance.
@@ -359,6 +456,9 @@ func (d *Data) closeTenantPools() {
 			_ = sqlDB.Close()
 		}
 		delete(d.tenants, id)
+	}
+	if d.tenantTemp {
+		_ = os.RemoveAll(d.tenantDir)
 	}
 }
 
