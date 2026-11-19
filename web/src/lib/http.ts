@@ -15,7 +15,10 @@ const SAFE_METHODS = new Set(['get', 'head', 'options'])
 const AUTH_PATHS = [
   '/api/v1/auth/login',
   '/api/v1/auth/mfa/complete',
+  '/api/v1/auth/passkey/login:begin',
+  '/api/v1/auth/passkey/login:complete',
   '/api/v1/auth/context',
+  '/api/v1/auth/logout',
 ]
 
 let sessionGeneration = 0
@@ -72,6 +75,7 @@ export async function ensureCsrfToken(): Promise<string | null> {
   csrfBootstrap = fetch(`${baseURL}/api/v1/auth/context`, {
     method: 'GET',
     credentials: 'include',
+    signal: AbortSignal.timeout(10_000),
     headers: { [REQUEST_ID_HEADER]: newRequestId() },
   })
     .then(() => readCookie(CSRF_COOKIE))
@@ -85,7 +89,7 @@ export async function ensureCsrfToken(): Promise<string | null> {
 
 function isAuthExempt(url: string | undefined): boolean {
   if (!url) return false
-  return AUTH_PATHS.some((path) => url.includes(path))
+  return AUTH_PATHS.includes(url.split(/[?#]/, 1)[0])
 }
 
 export function toApiError(error: unknown): ApiError {
@@ -146,12 +150,16 @@ export function createHttpClient(options: HttpClientOptions = {}): AxiosInstance
   })
 
   client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-    requestGenerations.set(config, sessionGeneration)
+    const generation = sessionGeneration
+    requestGenerations.set(config, generation)
     config.headers.set(REQUEST_ID_HEADER, newRequestId())
 
     const method = (config.method ?? 'get').toLowerCase()
     if (!SAFE_METHODS.has(method)) {
       const token = await ensureCsrfToken()
+      if (generation !== sessionGeneration) {
+        throw new ApiError({ status: 401, reason: 'SESSION_CHANGED', message: '登录会话已变化，请重新发起请求' })
+      }
       if (token) config.headers.set(CSRF_HEADER, token)
     }
     return config
@@ -175,6 +183,7 @@ export function createHttpClient(options: HttpClientOptions = {}): AxiosInstance
         apiError.reason !== 'INVALID_CREDENTIALS' &&
         apiError.reason !== 'MFA_REQUIRED' &&
         apiError.reason !== 'CHALLENGE_INVALID' &&
+        apiError.reason !== 'SESSION_CHANGED' &&
         unauthorizedHandler
       ) {
         unauthorizedHandler(apiError)

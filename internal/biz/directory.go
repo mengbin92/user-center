@@ -2,11 +2,13 @@ package biz
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/mengbin92/user-center/pkg/jsonx"
 	"github.com/mengbin92/user-center/platform/tenant"
 )
 
@@ -77,6 +79,20 @@ type DirectoryRun struct {
 	CursorAfter    string
 	Report         []SyncOutcome
 	ErrorText      string
+	reportBytes    int
+}
+
+func (r *DirectoryRun) addOutcome(outcome SyncOutcome) {
+	const maxReportBytes = 60000
+	if r.reportBytes >= maxReportBytes {
+		return
+	}
+	raw, _ := jsonx.Marshal(outcome)
+	r.reportBytes += len(raw) + 1
+	if r.reportBytes >= maxReportBytes {
+		outcome = SyncOutcome{Action: "report_truncated"}
+	}
+	r.Report = append(r.Report, outcome)
 }
 
 type DirectoryRepo interface {
@@ -84,8 +100,8 @@ type DirectoryRepo interface {
 	GetSource(context.Context, Tx, int64) (*DirectorySource, error)
 	ListSources(context.Context, Tx, int64) ([]*DirectorySource, error)
 	DueSources(context.Context, Tx, time.Time, int) ([]*DirectorySource, error)
-	UpdateSource(context.Context, Tx, *DirectorySource, uint64) (*DirectorySource, error)
-	UpdateCursor(context.Context, Tx, int64, string, time.Time) error
+	UpdateSource(context.Context, Tx, *DirectorySource, uint64, bool) (*DirectorySource, error)
+	CompleteAttempt(context.Context, Tx, int64, uint64, string, time.Time) error
 
 	CreateRun(context.Context, Tx, *DirectoryRun) (*DirectoryRun, error)
 	FinishRun(context.Context, Tx, *DirectoryRun) error
@@ -103,6 +119,7 @@ type DirectoryUsecase struct {
 	Connectors map[string]DirectoryConnector
 	SCIM       *SCIMUsecase
 	workerMu   sync.Mutex
+	running    sync.Map
 }
 
 func NewDirectoryUsecase(s *Services, repo DirectoryRepo, connectors map[string]DirectoryConnector, scim *SCIMUsecase) *DirectoryUsecase {
@@ -112,6 +129,9 @@ func NewDirectoryUsecase(s *Services, repo DirectoryRepo, connectors map[string]
 func (uc *DirectoryUsecase) directoryGuard(ctx context.Context, actor ActorContext, write bool) error {
 	if !isPlatformAdmin(actor) {
 		return ErrPermissionDenied
+	}
+	if err := uc.requireAdminMFA(ctx, actor); err != nil {
+		return err
 	}
 	if write {
 		return uc.RequireStepUp(ctx, actor)
@@ -141,13 +161,14 @@ func (uc *DirectoryUsecase) Runs(ctx context.Context, actor ActorContext, source
 	if err := uc.directoryGuard(ctx, actor, false); err != nil {
 		return nil, err
 	}
-	if _, err := uc.Repo.GetSource(ctx, nil, sourceID); err != nil {
+	source, err := uc.Repo.GetSource(ctx, nil, sourceID)
+	if err != nil {
 		return nil, ErrResourceNotFound
 	}
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
-	items, err := uc.Repo.ListRuns(ctx, nil, sourceID, limit)
+	items, err := uc.Repo.ListRuns(tenant.With(ctx, source.OrganizationID), nil, sourceID, limit)
 	if err != nil {
 		return nil, ErrDependency
 	}
@@ -161,11 +182,9 @@ func (uc *DirectoryUsecase) CreateSource(ctx context.Context, actor ActorContext
 	if err := uc.directoryReason(reason); err != nil {
 		return nil, err
 	}
-	connector, ok := uc.Connectors[kind]
-	if !ok {
+	if _, ok := uc.Connectors[kind]; !ok {
 		return nil, Validation("不支持的目录类型: " + kind)
 	}
-	_ = connector
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > 128 {
 		return nil, Validation("name 必须为 1–128 个字符")
@@ -223,6 +242,10 @@ func (uc *DirectoryUsecase) UpdateSource(ctx context.Context, actor ActorContext
 	if status != "" && status != DirectoryStatusActive && status != DirectoryStatusPaused {
 		return nil, Validation("status 只能是 active / paused")
 	}
+	if _, busy := uc.running.LoadOrStore(id, struct{}{}); busy {
+		return nil, ErrDirectoryBusy
+	}
+	defer uc.running.Delete(id)
 	var out *DirectorySource
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		current, err := uc.Repo.GetSource(ctx, tx, id)
@@ -232,6 +255,7 @@ func (uc *DirectoryUsecase) UpdateSource(ctx context.Context, actor ActorContext
 		if expected == 0 || current.Revision != expected {
 			return ConflictRevision(current.Revision)
 		}
+		resetCursor := false
 		if cfg != nil {
 			cfg.Normalize()
 			if err := cfg.validate(); err != nil {
@@ -240,13 +264,14 @@ func (uc *DirectoryUsecase) UpdateSource(ctx context.Context, actor ActorContext
 			if _, err := validateDirectoryURL(cfg.URL, directorySchemes(current.Kind)...); err != nil {
 				return err
 			}
+			resetCursor = current.Config != *cfg
 			current.Config = *cfg
 		}
 		if status != "" {
 			current.Status = status
 		}
 		current.UpdatedAt = uc.Clock.Now()
-		row, err := uc.Repo.UpdateSource(ctx, tx, current, expected)
+		row, err := uc.Repo.UpdateSource(ctx, tx, current, expected, resetCursor)
 		if err != nil {
 			return err
 		}
@@ -266,6 +291,10 @@ func (uc *DirectoryUsecase) RotateSecret(ctx context.Context, actor ActorContext
 	if err := uc.directoryReason(reason); err != nil {
 		return nil, err
 	}
+	if _, busy := uc.running.LoadOrStore(id, struct{}{}); busy {
+		return nil, ErrDirectoryBusy
+	}
+	defer uc.running.Delete(id)
 	enc, err := uc.Secrets.Encrypt(secret)
 	if err != nil {
 		return nil, ErrDependency
@@ -281,7 +310,7 @@ func (uc *DirectoryUsecase) RotateSecret(ctx context.Context, actor ActorContext
 		}
 		current.SecretEnc = enc
 		current.UpdatedAt = uc.Clock.Now()
-		row, err := uc.Repo.UpdateSource(ctx, tx, current, expected)
+		row, err := uc.Repo.UpdateSource(ctx, tx, current, expected, false)
 		if err != nil {
 			return err
 		}
@@ -314,13 +343,31 @@ func (uc *DirectoryUsecase) TriggerSync(ctx context.Context, actor ActorContext,
 	if err := uc.audit(ctx, nil, actor, "directory.sync.triggered", itoa(sourceID), "{}", "{}", "{}", reason, "success"); err != nil {
 		return nil, err
 	}
-	return uc.syncOnce(ctx, source, mode)
+	return uc.syncOnce(ctx, source.ID, mode)
 }
 
 // ---------------------------------------------------------------------------
 // Sync engine
 
-func (uc *DirectoryUsecase) syncOnce(ctx context.Context, source *DirectorySource, mode string) (*DirectoryRun, error) {
+var ErrDirectoryBusy = ConflictCode("DIRECTORY_SYNC_BUSY", "目录源正在处理，请稍后重试")
+
+func (uc *DirectoryUsecase) syncOnce(ctx context.Context, sourceID int64, mode string) (result *DirectoryRun, resultErr error) {
+	if _, busy := uc.running.LoadOrStore(sourceID, struct{}{}); busy {
+		return nil, ErrDirectoryBusy
+	}
+	defer uc.running.Delete(sourceID)
+	source, err := uc.Repo.GetSource(ctx, nil, sourceID)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	org, err := uc.Organizations.GetOrganization(ctx, nil, source.OrganizationID)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	if org.Status != OrgStatusActive || source.Status != DirectoryStatusActive && mode != DirectoryModeDryRun {
+		return nil, ConflictCode("DIRECTORY_SOURCE_INACTIVE", "目录源或其所属组织已停用")
+	}
+	ctx = tenant.With(ctx, source.OrganizationID)
 	connector, ok := uc.Connectors[source.Kind]
 	if !ok {
 		return nil, Validation("目录类型没有可用连接器: " + source.Kind)
@@ -335,16 +382,34 @@ func (uc *DirectoryUsecase) syncOnce(ctx context.Context, source *DirectorySourc
 	}
 	run = created
 
+	cursorAfter := source.Cursor
 	defer func() {
-		now := uc.Clock.Now()
+		now := uc.Clock.Now().UTC()
 		run.FinishedAt = &now
 		if run.Status == "running" {
 			run.Status = "succeeded"
 		}
-		if run.Failed > 0 {
+		if run.Failed > 0 && run.Status == "succeeded" {
 			run.Status = "partial"
 		}
-		_ = uc.Repo.FinishRun(context.Background(), nil, run)
+		finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if mode != DirectoryModeDryRun {
+			if run.Status != "succeeded" {
+				cursorAfter = source.Cursor
+			}
+			if err := uc.Repo.CompleteAttempt(finishCtx, nil, source.ID, source.Revision, cursorAfter, run.StartedAt); err != nil {
+				if run.Status == "succeeded" {
+					run.Status = "partial"
+				}
+				run.ErrorText = "cursor update failed"
+			} else {
+				run.CursorAfter = cursorAfter
+			}
+		}
+		if err := uc.Repo.FinishRun(finishCtx, nil, run); err != nil {
+			result, resultErr = nil, ErrDependency
+		}
 	}()
 
 	secret, err := uc.Secrets.Decrypt(source.SecretEnc)
@@ -362,78 +427,48 @@ func (uc *DirectoryUsecase) syncOnce(ctx context.Context, source *DirectorySourc
 		return run, nil
 	}
 	run.Fetched = len(snapshot.Records)
+	if len(snapshot.Cursor) > 512 {
+		run.Status, run.ErrorText = "failed", "directory cursor exceeds size limit"
+		return run, nil
+	}
 
 	seen := map[string]bool{}
 	for _, record := range snapshot.Records {
 		mapped := directoryExternalID(source.ID, record.ExternalID)
+		if seen[mapped] {
+			run.Status, run.ErrorText = "failed", "duplicate directory object"
+			return run, nil
+		}
+		if strings.TrimSpace(record.ExternalID) != record.ExternalID || len(mapped) > 255 {
+			run.Status, run.ErrorText = "failed", "invalid directory object identifier"
+			return run, nil
+		}
 		seen[mapped] = true
-		if mode == DirectoryModeDryRun {
-			// Counters describe writes that actually happened. A preview only
-			// reports what WOULD happen, so created_count stays zero.
-			action := "would_create"
-			if _, err := uc.Repo.GetObject(ctx, nil, source.ID, mapped); err == nil {
-				action = "would_update"
-			}
-			run.Report = append(run.Report, SyncOutcome{ExternalID: record.ExternalID, Action: action})
-			continue
+	}
+	for _, externalID := range snapshot.Deleted {
+		if seen[directoryExternalID(source.ID, externalID)] {
+			run.Status, run.ErrorText = "failed", "directory object present and deleted"
+			return run, nil
 		}
-		obj, objErr := uc.Repo.GetObject(ctx, nil, source.ID, mapped)
-		input := SCIMUserInput{
-			ExternalID: mapped, UserName: record.UserName,
-			DisplayName: record.DisplayName, Email: record.Email,
-			Active: boolPtr(record.Active),
-		}
-		if objErr != nil {
-			user, err := uc.SCIM.CreateUser(ctx, source.OrganizationID, input)
-			if err != nil {
-				run.Failed++
-				run.Report = append(run.Report, SyncOutcome{ExternalID: record.ExternalID, Action: "failed", Detail: err.Error()})
-				continue
-			}
-			if err := uc.Repo.UpsertObject(ctx, nil, &DirectoryObject{
-				SourceID: source.ID, OrganizationID: source.OrganizationID,
-				ExternalID: mapped, LocalID: user.ID, LastSeenAt: run.StartedAt,
-			}); err != nil {
-				run.Failed++
-				continue
-			}
-			run.Created++
-			run.Report = append(run.Report, SyncOutcome{ExternalID: record.ExternalID, Action: "created"})
-			continue
-		}
-		if source.Config.Conflict == "local_wins" {
-			_ = uc.Repo.UpsertObject(ctx, nil, &DirectoryObject{
-				SourceID: source.ID, OrganizationID: source.OrganizationID,
-				ExternalID: mapped, LocalID: obj.LocalID, LastSeenAt: run.StartedAt,
-			})
-			run.Unchanged++
-			continue
-		}
-		// PatchUser keeps the local id authoritative; externalId is only used
-		// on creation so an IdP rename cannot rebind an existing row.
-		input.ExternalID = ""
-		if _, err := uc.SCIM.PatchUser(ctx, source.OrganizationID, obj.LocalID, input); err != nil {
+	}
+	for _, record := range snapshot.Records {
+		mapped := directoryExternalID(source.ID, record.ExternalID)
+		if err := uc.syncDirectoryRecord(ctx, source, run, record, mapped); err != nil {
 			run.Failed++
-			run.Report = append(run.Report, SyncOutcome{ExternalID: record.ExternalID, Action: "failed", Detail: err.Error()})
-			continue
-		}
-		_ = uc.Repo.UpsertObject(ctx, nil, &DirectoryObject{
-			SourceID: source.ID, OrganizationID: source.OrganizationID,
-			ExternalID: mapped, LocalID: obj.LocalID, LastSeenAt: run.StartedAt,
-		})
-		run.Updated++
-		if !record.Active {
-			run.Disabled++
+			run.addOutcome(SyncOutcome{ExternalID: record.ExternalID, Action: "failed", Detail: err.Error()})
 		}
 	}
 
-	// Reconciliation: explicit deletions (delta) or absence from a full
-	// snapshot. local_wins never removes anything on its own.
+	if source.Config.Deletion == "keep" {
+		cursorAfter = snapshot.Cursor
+		return run, nil
+	}
+	// Reconcile explicit deletions and absence from a complete snapshot.
 	tombstones := map[string]bool{}
 	for _, raw := range snapshot.Deleted {
 		tombstones[directoryExternalID(source.ID, raw)] = true
 	}
-	if snapshot.Full && source.Config.Deletion != "keep" {
+	if snapshot.Full {
 		objects, err := uc.Repo.ListObjects(ctx, nil, source.ID)
 		if err != nil {
 			run.Status, run.ErrorText = "failed", "reconciliation read failed"
@@ -447,19 +482,27 @@ func (uc *DirectoryUsecase) syncOnce(ctx context.Context, source *DirectorySourc
 	}
 	for mapped := range tombstones {
 		obj, err := uc.Repo.GetObject(ctx, nil, source.ID, mapped)
+		if errors.Is(err, ErrResourceNotFound) {
+			continue
+		}
 		if err != nil {
+			run.Failed++
+			run.addOutcome(SyncOutcome{ExternalID: mapped, Action: "failed", Detail: ErrDependency.Error()})
 			continue
 		}
 		if mode == DirectoryModeDryRun {
-			run.Report = append(run.Report, SyncOutcome{ExternalID: mapped, Action: "would_deprovision"})
+			run.addOutcome(SyncOutcome{ExternalID: mapped, Action: "would_deprovision"})
 			continue
 		}
 		var err2 error
 		switch source.Config.Deletion {
 		case "delete":
 			err2 = uc.SCIM.DeleteUser(ctx, source.OrganizationID, obj.LocalID)
-			if err2 == nil {
-				_ = uc.Repo.DeleteObject(ctx, nil, source.ID, mapped)
+			if err2 == nil || errors.Is(err2, ErrResourceNotFound) {
+				err2 = uc.Repo.DeleteObject(ctx, nil, source.ID, mapped)
+				if err2 != nil {
+					err2 = ErrDependency
+				}
 			}
 		default: // disable
 			inactive := false
@@ -467,29 +510,88 @@ func (uc *DirectoryUsecase) syncOnce(ctx context.Context, source *DirectorySourc
 		}
 		if err2 != nil {
 			run.Failed++
-			run.Report = append(run.Report, SyncOutcome{ExternalID: mapped, Action: "failed", Detail: err2.Error()})
+			run.addOutcome(SyncOutcome{ExternalID: mapped, Action: "failed", Detail: err2.Error()})
 			continue
 		}
 		run.Disabled++
-		run.Report = append(run.Report, SyncOutcome{ExternalID: mapped, Action: "deprovisioned"})
+		run.addOutcome(SyncOutcome{ExternalID: mapped, Action: "deprovisioned"})
 	}
 
-	if mode != DirectoryModeDryRun {
-		// A dry run must not advance the watermark: doing so would make the
-		// next real run skip every object the preview just reported on.
-		run.CursorAfter = snapshot.Cursor
-		if err := uc.Repo.UpdateCursor(ctx, nil, source.ID, snapshot.Cursor, run.StartedAt); err != nil {
-			run.Status, run.ErrorText = "partial", "cursor update failed"
+	cursorAfter = snapshot.Cursor
+	return run, nil
+}
+
+func (uc *DirectoryUsecase) syncDirectoryRecord(ctx context.Context, source *DirectorySource, run *DirectoryRun, record DirectoryRecord, mapped string) error {
+	obj, err := uc.Repo.GetObject(ctx, nil, source.ID, mapped)
+	if err != nil && !errors.Is(err, ErrResourceNotFound) {
+		return ErrDependency
+	}
+	if obj == nil {
+		// The previous attempt may have committed provisioning before the
+		// directory mapping was saved. Recover by its stable external ID.
+		identity, err := uc.SCIM.SCIM.GetIdentityByExternal(ctx, nil, source.OrganizationID, SCIMKindUser, mapped)
+		if err != nil && !errors.Is(err, ErrResourceNotFound) {
+			return ErrDependency
+		}
+		if identity != nil {
+			obj = &DirectoryObject{LocalID: identity.LocalID}
 		}
 	}
-	return run, nil
+	if run.Mode == DirectoryModeDryRun {
+		action := "would_create"
+		if obj != nil {
+			action = "would_update"
+			if source.Config.Conflict == "local_wins" {
+				action = "would_keep"
+			}
+		}
+		run.addOutcome(SyncOutcome{ExternalID: record.ExternalID, Action: action})
+		return nil
+	}
+	input := SCIMUserInput{Active: &record.Active}
+	var localID int64
+	var action string
+	switch {
+	case obj == nil:
+		input.ExternalID = mapped
+		input.UserName, input.DisplayName, input.Email = record.UserName, record.DisplayName, record.Email
+		user, err := uc.SCIM.CreateUser(ctx, source.OrganizationID, input)
+		if err != nil {
+			return err
+		}
+		localID, action = user.ID, "created"
+	case source.Config.Conflict == "local_wins":
+		localID, action = obj.LocalID, "unchanged"
+	default:
+		if _, err := uc.SCIM.PatchUser(ctx, source.OrganizationID, obj.LocalID, input); err != nil {
+			return err
+		}
+		localID, action = obj.LocalID, "updated"
+	}
+	if err := uc.Repo.UpsertObject(ctx, nil, &DirectoryObject{
+		SourceID: source.ID, OrganizationID: source.OrganizationID,
+		ExternalID: mapped, LocalID: localID, LastSeenAt: run.StartedAt,
+	}); err != nil {
+		return ErrDependency
+	}
+	switch action {
+	case "created":
+		run.Created++
+	case "unchanged":
+		run.Unchanged++
+	case "updated":
+		run.Updated++
+		if !record.Active {
+			run.Disabled++
+		}
+	}
+	run.addOutcome(SyncOutcome{ExternalID: record.ExternalID, Action: action})
+	return nil
 }
 
 func directoryExternalID(sourceID int64, external string) string {
 	return fmt.Sprintf("dir:%d:%s", sourceID, external)
 }
-
-func boolPtr(v bool) *bool { return &v }
 
 // Dispatch runs due sources once. It is serial on purpose: a directory pull
 // can be slow, and overlapping runs of the same source would fight over the
@@ -509,7 +611,7 @@ func (uc *DirectoryUsecase) Dispatch(ctx context.Context) {
 			return
 		default:
 		}
-		_, _ = uc.syncOnce(tenant.With(ctx, source.OrganizationID), source, DirectoryModeDelta)
+		_, _ = uc.syncOnce(ctx, source.ID, DirectoryModeDelta)
 	}
 }
 

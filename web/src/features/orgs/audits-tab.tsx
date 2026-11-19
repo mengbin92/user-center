@@ -178,7 +178,7 @@ export function OrganizationAuditsTab({
       <ReasonDialog
         open={exportOpen}
         onClose={() => setExportOpen(false)}
-        onConfirm={(reason) => void exportAudits.mutateAsync(reason)}
+        onConfirm={(reason) => exportAudits.mutate(reason)}
         title="导出本组织审计"
         description="导出内容严格限定当前组织，沿用平台导出的 CSV 字段与下载校验。"
         confirmLabel="生成并下载"

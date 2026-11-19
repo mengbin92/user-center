@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/mengbin92/user-center/pkg/jsonx"
@@ -79,14 +80,21 @@ func (r *directoryRepo) ListSources(ctx context.Context, tx biz.Tx, orgID int64)
 // ran. A NULL last_run_at sorts first in MySQL and SQLite, so a newly created
 // source is picked up on the next tick.
 func (r *directoryRepo) DueSources(ctx context.Context, tx biz.Tx, now time.Time, limit int) ([]*biz.DirectorySource, error) {
-	var rows []directorySourcePO
-	if err := r.d.dbOr(tx).WithContext(ctx).
-		Where("status = ? AND (last_run_at IS NULL OR last_run_at <= ?)", biz.DirectoryStatusActive, now).
-		Order("last_run_at ASC").Limit(limit).Find(&rows).Error; err != nil {
+	db := r.d.dbOr(tx).WithContext(ctx)
+	rows, err := db.Table("directory_sources AS s").Select("s.*").
+		Joins("JOIN organizations o ON o.id = s.organization_id AND o.status = ?", biz.OrgStatusActive).
+		Where("s.status = ? AND (s.last_run_at IS NULL OR s.last_run_at <= ?)", biz.DirectoryStatusActive, now.Add(-30*time.Second)).
+		Order("s.last_run_at ASC, s.id ASC").Rows()
+	if err != nil {
 		return nil, err
 	}
-	out := make([]*biz.DirectorySource, 0, len(rows))
-	for _, p := range rows {
+	defer rows.Close()
+	var out []*biz.DirectorySource
+	for len(out) < limit && rows.Next() {
+		var p directorySourcePO
+		if err := db.ScanRows(rows, &p); err != nil {
+			return nil, err
+		}
 		s, err := directorySourceToBiz(p)
 		if err != nil {
 			continue
@@ -100,19 +108,23 @@ func (r *directoryRepo) DueSources(ctx context.Context, tx biz.Tx, now time.Time
 		}
 		out = append(out, s)
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
-func (r *directoryRepo) UpdateSource(ctx context.Context, tx biz.Tx, s *biz.DirectorySource, expected uint64) (*biz.DirectorySource, error) {
+func (r *directoryRepo) UpdateSource(ctx context.Context, tx biz.Tx, s *biz.DirectorySource, expected uint64, resetCursor bool) (*biz.DirectorySource, error) {
 	cfg, err := jsonx.Marshal(s.Config)
 	if err != nil {
 		return nil, err
 	}
-	res := r.d.dbOr(tx).WithContext(ctx).Model(&directorySourcePO{}).
-		Where("id = ? AND revision = ?", s.ID, expected).Updates(map[string]any{
+	values := map[string]any{
 		"config_json": string(cfg), "secret_enc": s.SecretEnc, "status": s.Status,
-		"cursor_value": s.Cursor, "updated_at": s.UpdatedAt, "revision": expected + 1,
-	})
+		"updated_at": s.UpdatedAt, "revision": expected + 1,
+	}
+	if resetCursor {
+		values["cursor_value"] = ""
+	}
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&directorySourcePO{}).
+		Where("id = ? AND revision = ?", s.ID, expected).Updates(values)
 	if res.Error != nil {
 		return nil, res.Error
 	}
@@ -122,11 +134,17 @@ func (r *directoryRepo) UpdateSource(ctx context.Context, tx biz.Tx, s *biz.Dire
 	return r.GetSource(ctx, tx, s.ID)
 }
 
-func (r *directoryRepo) UpdateCursor(ctx context.Context, tx biz.Tx, id int64, cursor string, at time.Time) error {
-	return r.d.dbOr(tx).WithContext(ctx).Model(&directorySourcePO{}).
-		Where("id = ?", id).Updates(map[string]any{
-		"cursor_value": cursor, "last_run_at": at, "updated_at": at,
-	}).Error
+func (r *directoryRepo) CompleteAttempt(ctx context.Context, tx biz.Tx, id int64, revision uint64, cursor string, at time.Time) error {
+	res := r.d.dbOr(tx).WithContext(ctx).Model(&directorySourcePO{}).
+		Where("id = ? AND revision = ? AND (last_run_at IS NULL OR last_run_at < ?)", id, revision, at).
+		Updates(map[string]any{"cursor_value": cursor, "last_run_at": at})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return biz.ConflictRevision(revision)
+	}
+	return nil
 }
 
 func directoryRunToBiz(p directoryRunPO) (*biz.DirectoryRun, error) {
@@ -162,14 +180,21 @@ func (r *directoryRepo) FinishRun(ctx context.Context, tx biz.Tx, run *biz.Direc
 	if err != nil {
 		return err
 	}
-	return r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&directoryRunPO{}).
-		Where("id = ?", run.ID).Updates(map[string]any{
+	res := r.d.tenantOr(ctx, tx).WithContext(ctx).Model(&directoryRunPO{}).
+		Where("id = ? AND source_id = ? AND organization_id = ?", run.ID, run.SourceID, run.OrganizationID).Updates(map[string]any{
 		"status": run.Status, "finished_at": run.FinishedAt,
 		"fetched": run.Fetched, "created_count": run.Created, "updated_count": run.Updated,
 		"disabled_count": run.Disabled, "unchanged_count": run.Unchanged, "failed_count": run.Failed,
 		"cursor_before": run.CursorBefore, "cursor_after": run.CursorAfter,
 		"report_json": string(report), "error_text": run.ErrorText,
-	}).Error
+	})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return biz.ErrResourceNotFound
+	}
+	return nil
 }
 
 func (r *directoryRepo) ListRuns(ctx context.Context, tx biz.Tx, sourceID int64, limit int) ([]*biz.DirectoryRun, error) {
@@ -207,18 +232,12 @@ func (r *directoryRepo) GetObject(ctx context.Context, tx biz.Tx, sourceID int64
 }
 
 func (r *directoryRepo) UpsertObject(ctx context.Context, tx biz.Tx, o *biz.DirectoryObject) error {
-	db := r.d.tenantOr(ctx, tx).WithContext(ctx)
-	var existing directoryObjectPO
-	err := db.Where("source_id = ? AND external_id = ?", o.SourceID, o.ExternalID).First(&existing).Error
-	if err == nil {
-		return db.Model(&directoryObjectPO{}).Where("id = ?", existing.ID).Updates(map[string]any{
-			"local_id": o.LocalID, "last_seen_at": o.LastSeenAt, "revision": existing.Revision + 1,
-		}).Error
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-	return db.Create(&directoryObjectPO{
+	return r.d.tenantOr(ctx, tx).WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "source_id"}, {Name: "external_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"local_id": o.LocalID, "last_seen_at": o.LastSeenAt, "revision": gorm.Expr("revision + 1"),
+		}),
+	}).Create(&directoryObjectPO{
 		SourceID: o.SourceID, OrganizationID: o.OrganizationID,
 		ExternalID: o.ExternalID, LocalID: o.LocalID, LastSeenAt: o.LastSeenAt, Revision: 1,
 	}).Error

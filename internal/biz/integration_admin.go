@@ -42,8 +42,12 @@ func validateClient(c *IntegrationClient) error {
 		return Validation("至少需要允许一个 gRPC 方法")
 	}
 	for _, m := range c.AllowedMethods {
-		if !isIntegrationMethod(strings.TrimPrefix(m, "/api.usercenter.v1.IntegrationService/")) {
+		short := strings.TrimPrefix(m, "/api.usercenter.v1.IntegrationService/")
+		if !isIntegrationMethod(short) {
 			return Validation("不允许的方法: " + m)
+		}
+		if c.Code == ApplicationCode && (short == "Authenticate" || short == "CompleteMFA") {
+			return Validation("gRPC 登录必须使用独立的应用代码")
 		}
 	}
 	if c.CallbackURL != "" {
@@ -68,7 +72,7 @@ func validateClient(c *IntegrationClient) error {
 
 func isIntegrationMethod(m string) bool {
 	switch m {
-	case "ValidateSession", "ValidateSubject", "GetUser", "BatchGetUsers", "GetSessionAuthorization", "GetResourceAuthorization", "RevokeSession":
+	case "ValidateSession", "ValidateSubject", "GetUser", "BatchGetUsers", "GetSessionAuthorization", "GetResourceAuthorization", "RevokeSession", "Authenticate", "CompleteMFA":
 		return true
 	default:
 		return false
@@ -164,9 +168,8 @@ func (uc *IntegrationAdminUsecase) Rotate(ctx context.Context, actor ActorContex
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return nil, err
 	}
-	existing, err := uc.IntegrationClients.Get(ctx, nil, id)
-	if err != nil {
-		return nil, ErrResourceNotFound
+	if actor.ExpectedTargetRevision == 0 {
+		return nil, Validation("expected_revision 不能为空")
 	}
 	secret, err := newToken(32)
 	if err != nil {
@@ -174,17 +177,7 @@ func (uc *IntegrationAdminUsecase) Rotate(ctx context.Context, actor ActorContex
 	}
 	var updated *IntegrationClient
 	err = uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		current, err := uc.IntegrationClients.Get(ctx, tx, id)
-		if err != nil {
-			return err
-		}
-		if actor.ExpectedTargetRevision == 0 {
-			return Validation("expected_revision 不能为空")
-		}
-		if _, err := uc.IntegrationClients.Update(ctx, tx, current, actor.ExpectedTargetRevision); err != nil {
-			return err
-		}
-		row, err := uc.IntegrationClients.RotateCredential(ctx, tx, id, HashToken(secret), existing.CredentialVersion+1)
+		row, err := uc.IntegrationClients.RotateCredential(ctx, tx, id, HashToken(secret), actor.ExpectedTargetRevision)
 		if err != nil {
 			return err
 		}
@@ -204,29 +197,17 @@ func (uc *IntegrationAdminUsecase) Disable(ctx context.Context, actor ActorConte
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return nil, err
 	}
+	if actor.ExpectedTargetRevision == 0 {
+		return nil, Validation("expected_revision 不能为空")
+	}
 	var out *IntegrationClient
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		current, err := uc.IntegrationClients.Get(ctx, tx, id)
+		row, err := uc.IntegrationClients.Disable(ctx, tx, id, actor.ExpectedTargetRevision)
 		if err != nil {
 			return err
 		}
-		if actor.ExpectedTargetRevision == 0 {
-			return Validation("expected_revision 不能为空")
-		}
-		if _, err := uc.IntegrationClients.Update(ctx, tx, current, actor.ExpectedTargetRevision); err != nil {
-			return err
-		}
-		existing, err := uc.IntegrationClients.Get(ctx, tx, id)
-		if err != nil {
-			return ErrResourceNotFound
-		}
-		if err := uc.IntegrationClients.Disable(ctx, tx, id); err != nil {
-			return err
-		}
-		out = existing
-		out.Status = "disabled"
-		out.Revision++
-		return uc.audit(ctx, tx, actor, "integration.client.disable", existing.Code, "{}", "{}", "{}", reason, "success")
+		out = row
+		return uc.audit(ctx, tx, actor, "integration.client.disable", row.Code, "{}", "{}", "{}", reason, "success")
 	})
 	if err != nil {
 		return nil, err
@@ -322,23 +303,28 @@ func (uc *IntegrationAdminUsecase) Dispatch(ctx context.Context) error {
 			}
 		}
 	}
-	due, err := uc.Outbox.DueDeliveries(ctx, nil, now, 50)
-	if err != nil {
-		return err
-	}
-	for _, d := range due {
+	for range 50 {
+		// Claim immediately before I/O so the lease never expires in a local queue.
+		due, err := uc.Outbox.DueDeliveries(ctx, nil, uc.Clock.Now().UTC(), 1)
+		if err != nil {
+			return err
+		}
+		if len(due) == 0 {
+			break
+		}
+		d := due[0]
 		if err := uc.deliver(ctx, d); err != nil {
 			attempts := d.Attempts
 			delay := time.Duration(1<<minInt(attempts, 7)) * 30 * time.Second
 			if attempts >= 8 {
 				delay = 6 * time.Hour
 			}
-			if markErr := uc.Outbox.MarkRetry(ctx, d.EventID, d.SubscriberID, now.Add(delay), truncateError(err.Error())); markErr != nil {
+			if markErr := uc.Outbox.MarkRetry(ctx, d, uc.Clock.Now().UTC().Add(delay), err.Error()); markErr != nil {
 				return markErr
 			}
 			continue
 		}
-		if err := uc.Outbox.MarkDelivered(ctx, d.EventID, d.SubscriberID, now); err != nil {
+		if err := uc.Outbox.MarkDelivered(ctx, d, uc.Clock.Now().UTC()); err != nil {
 			return err
 		}
 	}
@@ -370,11 +356,11 @@ func (uc *IntegrationAdminUsecase) deliver(ctx context.Context, d *Delivery) err
 		"payload": payload,
 	})
 	if err != nil {
-		return err
+		return errors.New("invalid webhook event payload")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, current.CallbackURL, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return errors.New("invalid webhook request URL")
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-UserCenter-Event", d.EventType)
@@ -388,7 +374,7 @@ func (uc *IntegrationAdminUsecase) deliver(ctx context.Context, d *Delivery) err
 	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return errors.New("webhook connection failed")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -423,11 +409,4 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
-}
-
-func truncateError(s string) string {
-	if len(s) > 500 {
-		return s[:500]
-	}
-	return s
 }

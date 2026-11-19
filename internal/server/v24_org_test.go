@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/internal/conf"
 )
 
 var invitationTokenPattern = regexp.MustCompile(`token=([A-Za-z0-9_-]+)`)
@@ -49,7 +51,19 @@ func createTestOrg(t *testing.T, h *harness, code string) string {
 }
 
 func TestOrganizationInvitationLifecycle(t *testing.T) {
-	h := newHarness(t)
+	t.Run("shared", func(t *testing.T) {
+		testOrganizationInvitationLifecycle(t, newHarness(t))
+	})
+	t.Run("isolated", func(t *testing.T) {
+		testOrganizationInvitationLifecycle(t, newHarnessFor(t, &conf.Data{
+			Database: &conf.Database{Driver: "sqlite", Source: "file:" + filepath.Join(t.TempDir(), "platform.db")},
+			Tenancy:  &conf.Tenancy{SchemaIsolation: true},
+		}))
+	})
+}
+
+func testOrganizationInvitationLifecycle(t *testing.T, h *harness) {
+	t.Helper()
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
 	orgID := createTestOrg(t, h, "invite-org")
 	fixtureStepUp(h)

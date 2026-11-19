@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -23,14 +24,14 @@ func TestInvitationExpiryQuotaAndTenantBoundary(t *testing.T) {
 	ctx := context.Background()
 
 	// Expired token: a stable conflict code instead of a driver error.
-	expiredUser := fixtureUserWithEmail(t, h, "expired_user", "expired@example.com")
+	fixtureUserWithEmail(t, h, "expired_user", "expired@example.com")
+	expiredToken := base64.RawURLEncoding.EncodeToString(make([]byte, 32))
 	_, err := h.svc.Organizations.CreateInvitation(ctx, nil, &biz.OrganizationInvitation{
 		OrganizationID: parseID(t, orgID), Email: "expired@example.com", EmailNormalized: "expired@example.com",
-		Role: biz.OrgRoleMember, TokenHash: biz.HashToken("expired-token"),
+		Role: biz.OrgRoleMember, TokenHash: biz.HashToken(expiredToken),
 		InvitedBy: 1, ExpiresAt: time.Now().UTC().Add(-time.Hour),
 	})
 	require.NoError(t, err)
-	_ = expiredUser
 
 	// Quota: 50 pending invitations blocks the next one.
 	for i := 0; i < biz.MaxPendingInvitationsPerOrg; i++ {
@@ -60,7 +61,7 @@ func TestInvitationExpiryQuotaAndTenantBoundary(t *testing.T) {
 	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true).Code)
 	require.Equal(t, http.StatusOK, h.login("expired_user", "InvitePass-123").Code)
 	expired := h.do(http.MethodPost, "/api/v1/orgs/invitations:accept",
-		map[string]any{"token": "expired-token"}, "", true)
+		map[string]any{"token": expiredToken}, "", true)
 	require.Equal(t, http.StatusConflict, expired.Code)
 	require.Contains(t, expired.Body.String(), biz.InvitationErrExpired)
 }

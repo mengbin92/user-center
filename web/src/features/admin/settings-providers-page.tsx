@@ -177,7 +177,7 @@ export function AdminProvidersPage() {
       <ReasonDialog
         open={Boolean(pending)}
         onClose={() => setPending(null)}
-        onConfirm={(reason) => void update.mutateAsync({ reason })}
+        onConfirm={(reason) => update.mutate({ reason })}
         title={pending?.enable ? '启用登录提供方' : '停用登录提供方'}
         description="变更会写入审计并推进 policy revision；未配置凭据的提供方无法启用。"
         confirmLabel="确认变更"

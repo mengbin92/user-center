@@ -291,6 +291,18 @@ func (h *harness) login(username, password string) *httptest.ResponseRecorder {
 	return h.do(http.MethodPost, "/api/v1/auth/login", map[string]any{"username": username, "password": password}, "", true)
 }
 
+// waitForFreshRateLimitWindow waits out the tail of an aligned fixed window.
+// The limiter intentionally uses aligned windows (see docs/security.md), so a
+// test that asserts an exact rejection can otherwise be split across two
+// windows and see the allowed request succeed.
+func waitForFreshRateLimitWindow(t *testing.T, window time.Duration) {
+	t.Helper()
+	remaining := window - time.Duration(time.Now().UTC().UnixNano()%window.Nanoseconds())
+	if remaining < 5*time.Second {
+		time.Sleep(remaining + 100*time.Millisecond)
+	}
+}
+
 // authorize runs the OIDC authorize request and, when the provider asks for
 // consent, completes the one-time consent flow as the signed-in user. It
 // returns the final redirect location (with the code on approval).

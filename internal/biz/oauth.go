@@ -3,7 +3,6 @@ package biz
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/url"
 	"slices"
 	"strings"
@@ -48,33 +47,32 @@ type OAuthResult struct {
 	Redirect         string
 }
 
-func (uc *AuthUsecase) OAuthProviders() []string {
-	var out []string
-	// An explicit enable list in auth settings wins: toggling a provider must
-	// actually change the login entry points. An empty list keeps the legacy
-	// behavior of exposing every configured provider.
-	if settings, err := uc.Settings.GetAuth(context.Background(), nil); err == nil && len(settings.Providers) > 0 {
-		if slices.Contains(settings.Providers, ProvidersDisabledAll) {
-			return []string{}
-		}
-		for _, name := range settings.Providers {
-			if p := uc.OAuth[name]; p != nil {
-				out = append(out, name)
-			}
-		}
-		return out
-	}
+func (uc *AuthUsecase) OAuthProviders(settings *AuthSettings) []string {
+	out := make([]string, 0, len(uc.OAuth))
 	for name, p := range uc.OAuth {
-		if p != nil {
+		if p != nil && oauthProviderEnabled(settings.Providers, name) {
 			out = append(out, name)
 		}
 	}
+	slices.Sort(out)
 	return out
 }
 
-func (uc *AuthUsecase) oauthProvider(name string) (OAuthProvider, error) {
-	p, ok := uc.OAuth[name]
-	if !ok || p == nil {
+func oauthProviderEnabled(providers []string, name string) bool {
+	return !slices.Contains(providers, ProvidersDisabledAll) &&
+		(len(providers) == 0 || slices.Contains(providers, name))
+}
+
+func (uc *AuthUsecase) oauthProvider(ctx context.Context, name string) (OAuthProvider, error) {
+	p := uc.OAuth[name]
+	if p == nil {
+		return nil, ErrOAuthUnavailable
+	}
+	settings, err := uc.Settings.GetAuth(ctx, nil)
+	if err != nil {
+		return nil, ErrDependency
+	}
+	if !oauthProviderEnabled(settings.Providers, name) {
 		return nil, ErrOAuthUnavailable
 	}
 	return p, nil
@@ -88,7 +86,7 @@ func (uc *AuthUsecase) oauthRedirectURI(provider string) string {
 // Binding mode requires an authenticated session; the state carries the user
 // so the callback cannot be replayed for another account.
 func (uc *AuthUsecase) StartOAuth(ctx context.Context, provider, mode, next string, actor *ActorContext) (string, string, time.Time, error) {
-	p, err := uc.oauthProvider(provider)
+	p, err := uc.oauthProvider(ctx, provider)
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
@@ -142,7 +140,7 @@ func (uc *AuthUsecase) StartOAuth(ctx context.Context, provider, mode, next stri
 }
 
 func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code string, actor *ActorContext, ip, ua string) (*OAuthResult, error) {
-	p, err := uc.oauthProvider(provider)
+	p, err := uc.oauthProvider(ctx, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +148,7 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 	if err != nil {
 		return nil, ErrOAuthState
 	}
-	defer func() { _ = uc.Challenges.Delete(ctx, state) }()
+	defer func() { _ = uc.Challenges.Delete(ctx, "oauth_state", state) }()
 	var st oauthState
 	if err := jsonx.Unmarshal([]byte(c.Payload), &st); err != nil || st.Provider != provider || st.RedirectURI == "" {
 		return nil, ErrOAuthState
@@ -195,6 +193,8 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 					return nil
 				}
 				return ErrOAuthBound
+			} else if !errors.Is(ferr, ErrResourceNotFound) {
+				return ErrDependency
 			}
 			if _, cerr := uc.Identities.Create(ctx, tx, &ExternalIdentity{
 				UserID: st.UserID, Provider: provider, ProviderSubject: profile.Subject,
@@ -214,32 +214,40 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 		return &OAuthResult{Redirect: "/account/security?bound=" + provider}, nil
 	}
 	identity, err := uc.Identities.FindBySubject(ctx, nil, provider, profile.Issuer, profile.Subject)
-	if err != nil {
+	if errors.Is(err, ErrResourceNotFound) {
 		return nil, ErrOAuthNotBound
 	}
-	user, err := uc.Users.Get(ctx, nil, identity.UserID)
 	if err != nil {
+		return nil, ErrDependency
+	}
+	user, err := uc.Users.Get(ctx, nil, identity.UserID)
+	if errors.Is(err, ErrUserNotFound) {
 		return nil, ErrOAuthNotBound
+	}
+	if err != nil {
+		return nil, ErrDependency
 	}
 	if user.Status != UserStatusEnabled {
 		return nil, ErrUnauthenticated
 	}
-	mfa, merr := uc.MFA.Get(ctx, nil, user.ID)
-	if merr != nil && !errors.Is(merr, ErrResourceNotFound) {
-		return nil, ErrDependency
+	mfa, err := uc.beginLoginMFA(ctx, user, LoginInput{IP: ip, UserAgent: ua, Remember: true}, ApplicationCode)
+	if err != nil {
+		return nil, err
 	}
-	if mfa != nil && mfa.Enabled() {
-		challengeID := uc.IDs.NewID()
-		expires := uc.Clock.Now().Add(5 * time.Minute)
-		payload, _ := jsonx.Marshal(map[string]any{"identity_version": user.IdentityVersion, "ip": ip, "ua": SummizeAgent(ua)})
-		if err := uc.Challenges.Put(ctx, Challenge{ID: challengeID, Purpose: "mfa", Payload: string(payload), UserID: user.ID, ExpiresAt: expires}); err != nil {
-			return nil, ErrDependency
-		}
-		target := "/login?mfa_challenge=" + challengeID
+	if mfa != nil {
+		q := url.Values{"mfa_challenge": {mfa.ChallengeID}}
 		if st.Next != "" {
-			target += "&next=" + url.QueryEscape(st.Next)
+			q.Set("next", st.Next)
 		}
-		return &OAuthResult{Status: "mfa_required", ChallengeID: challengeID, ChallengeExpires: expires, Redirect: target}, nil
+		target := "/login?" + q.Encode()
+		if mfa.WebAuthnChallenge != "" {
+			fragment := url.Values{
+				"challenge": {mfa.WebAuthnChallenge}, "rp_id": {mfa.WebAuthnRPID},
+				"allow_credential_ids": mfa.WebAuthnCredentialIDs,
+			}
+			target += "#" + fragment.Encode()
+		}
+		return &OAuthResult{Status: mfa.Status, ChallengeID: mfa.ChallengeID, ChallengeExpires: mfa.ChallengeExpires, Redirect: target}, nil
 	}
 	cred, err := uc.Credentials.Get(ctx, nil, user.ID)
 	if err != nil && !errors.Is(err, ErrResourceNotFound) {
@@ -249,7 +257,7 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 	if err != nil {
 		return nil, err
 	}
-	session, raw, err := uc.issueSession(ctx, user, ua, ip)
+	session, raw, err := uc.issueSessionFor(ctx, user, ua, ip, ApplicationCode)
 	if err != nil {
 		return nil, err
 	}
@@ -270,5 +278,3 @@ func (uc *AuthUsecase) CompleteOAuth(ctx context.Context, provider, state, code 
 	}
 	return result, nil
 }
-
-var _ = fmt.Sprintf

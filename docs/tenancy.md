@@ -20,6 +20,8 @@ MySQL 方案的关键点是**不换连接**：只在 SQL 里限定 schema。因�
 
 平台路径解析为 0，永远使用平台 schema。**默认关闭**（`data.tenancy.schema_isolation` / `TENANT_SCHEMA_ISOLATION=1`），关闭时路由回调不生效，存量行为与测试不变。
 
+SQLite 文件模式把租户库放在 `<平台数据库路径>.tenants/tenant_<组织 ID>.db`。升级已启用隔离的开发实例时，先停服务并备份，再核对旧 `tenant_<组织 ID>.db` 的归属，移入对应平台库的 `.tenants` 目录。旧位置通常在平台库旁，使用不带目录的相对路径时旧文件位于系统临时目录的 `usercenter-tenants` 子目录。缺少归属确认时服务会拒绝使用旧文件。内存模式为当前实例分配临时租户目录。
+
 ## 2. 数据域
 
 | 位置 | 表 |
@@ -42,11 +44,14 @@ MySQL 方案的关键点是**不换连接**：只在 SQL 里限定 schema。因�
 
 ## 4. 启用与 cutover
 
+存量搬迁仅支持 MySQL。同一实例上的平台库与租户库均需使用 InnoDB。先备份平台库和已有租户库，停掉所有服务副本和其他写入方，在维护窗口串行执行。迁移账号需要建库、建表和升级旧租户表的权限，以及对应平台表和租户表的读写权限。
+
 ```bash
 # 1) 平台库常规迁移（含 017 tenant_schemas）
 go run ./cmd/migrate -config configs/config.yaml
 
-# 2) 建租户 schema（幂等）
+# 2) 当前维护终端开启隔离，随后建租户 schema（幂等）
+export TENANT_SCHEMA_ISOLATION=1
 go run ./cmd/tenant-schema -config configs/config.yaml -all
 
 # 3) 存量数据搬迁：先预演，再执行，核对后可清理平台副本
@@ -54,11 +59,13 @@ go run ./cmd/tenant-migrate -config configs/config.yaml -all -dry-run
 go run ./cmd/tenant-migrate -config configs/config.yaml -all
 go run ./cmd/tenant-migrate -config configs/config.yaml -all -purge
 
-# 4) 开启开关并滚动重启
-export TENANT_SCHEMA_ISOLATION=1
+# 4) 服务配置启用同一隔离开关和 schema 前缀，再启动服务
 ```
 
-`cmd/tenant-migrate` 按表复制并校验行数，逐表幂等（先清空该组织的租户行再插入）。`-purge` 只在行数校验通过后删除平台副本。清理前建议保留一次备份。
+`tenant-schema -all` 登记活跃组织。归档组织如需一并搬迁，先用 `tenant-schema -org <id>` 登记。随后 `tenant-migrate -all` 搬迁登记为 ready 的组织。
+现有租户库的前缀应保持稳定。新配置与注册表冲突时，建库和搬迁会停止，已注册的库名会保留。
+
+`tenant-migrate` 以组织为事务单位，复制到空的租户表并精确核对行数和内容。已有租户数据必须与平台副本完全一致，出现差异时本组织整笔操作回滚。指定 `-purge` 后，只有本组织全部表核对通过才会在同一事务中清理平台副本。已成功清理的组织可以安全重跑，现有租户数据会保留。
 
 新建组织在 `OrganizationUsecase.Create` 内自动完成三阶段：写平台注册行（`provisioning`）→ 建 schema → 租户事务内写成员/内置角色/审计/事件并激活。中途失败保留 `provisioning` 状态（`orgAccess` 不可见），用同一 code 重试会续做而非撞唯一键。
 

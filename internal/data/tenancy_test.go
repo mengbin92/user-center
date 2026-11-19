@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -15,10 +16,14 @@ import (
 
 func newTenantTestData(t *testing.T, enabled bool) *Data {
 	t.Helper()
-	dir := t.TempDir()
+	return openTenantTestData(t, filepath.Join(t.TempDir(), "platform.db"), enabled)
+}
+
+func openTenantTestData(t *testing.T, path string, enabled bool) *Data {
+	t.Helper()
 	cfg := &conf.Data{
 		Database: &conf.Database{
-			Driver: "sqlite", Source: "file:" + filepath.Join(dir, "platform.db") + "?_fk=1",
+			Driver: "sqlite", Source: "file:" + path + "?_fk=1",
 		},
 		Tenancy: &conf.Tenancy{SchemaIsolation: enabled},
 	}
@@ -28,6 +33,43 @@ func newTenantTestData(t *testing.T, enabled bool) *Data {
 	t.Cleanup(cleanup)
 	require.NoError(t, d.AutoMigrate())
 	return d
+}
+
+func TestSQLiteTenantFilesAreScopedToPlatformDatabase(t *testing.T) {
+	dir := t.TempDir()
+	platformA := filepath.Join(dir, "platform-a.db")
+	platformB := filepath.Join(dir, "platform-b.db")
+	a := openTenantTestData(t, platformA, true)
+	b := openTenantTestData(t, platformB, true)
+	ctx := tenant.With(context.Background(), 7)
+	var count int64
+	require.Error(t, b.TenantDB(ctx).Table("organization_members").Count(&count).Error)
+	require.NoDirExists(t, platformB+".tenants")
+
+	_, err := a.EnsureTenantSchema(ctx, 7)
+	require.NoError(t, err)
+	_, err = b.EnsureTenantSchema(ctx, 7)
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(platformA+".tenants", "tenant_7.db"))
+	require.FileExists(t, filepath.Join(platformB+".tenants", "tenant_7.db"))
+}
+
+func TestSQLiteTenantFilesRequireExplicitLegacyOwnership(t *testing.T) {
+	dir := t.TempDir()
+	platform := filepath.Join(dir, "platform.db")
+	d := openTenantTestData(t, platform, true)
+	legacy := filepath.Join(dir, "tenant_7.db")
+	require.NoError(t, os.WriteFile(legacy, nil, 0o600))
+	_, err := d.EnsureTenantSchema(context.Background(), 7)
+	require.ErrorContains(t, err, "legacy SQLite tenant file")
+	require.FileExists(t, legacy)
+	require.NoDirExists(t, platform+".tenants")
+}
+
+func TestTenantSchemaConfigurationRejectsInvalidNamespaces(t *testing.T) {
+	require.Error(t, validateTenantPrefix("user-center_"))
+	require.Error(t, validateTenantMySQLSource("user@tcp(localhost)/UserCenter_Org_9", ""))
+	require.NoError(t, validateTenantMySQLSource("user@tcp(localhost)/usercenter", ""))
 }
 
 func TestTenantSchemasArePhysicallySeparate(t *testing.T) {

@@ -282,22 +282,6 @@ func (r *mfaRepo) Get(ctx context.Context, tx biz.Tx, userID int64) (*biz.MFASta
 	return mfaStateFromPO(&p), nil
 }
 
-// ListByUsers resolves MFA state for a page of users in one query.
-func (r *mfaRepo) ListByUsers(ctx context.Context, tx biz.Tx, userIDs []int64) (map[int64]*biz.MFAState, error) {
-	out := make(map[int64]*biz.MFAState, len(userIDs))
-	if len(userIDs) == 0 {
-		return out, nil
-	}
-	var rows []mfaPO
-	if err := r.d.dbOr(tx).WithContext(ctx).Where("user_id IN ?", userIDs).Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	for i := range rows {
-		out[rows[i].UserID] = mfaStateFromPO(&rows[i])
-	}
-	return out, nil
-}
-
 func mfaStateFromPO(p *mfaPO) *biz.MFAState {
 	hashes := []string{}
 	if p.RecoveryHashes != "" {
@@ -465,7 +449,8 @@ func (r *sessionRepo) ListByUser(ctx context.Context, tx biz.Tx, userID int64) (
 }
 
 func (r *sessionRepo) Touch(ctx context.Context, tx biz.Tx, id string, lastSeen, idleExpires time.Time) error {
-	return r.d.dbOr(tx).WithContext(ctx).Model(&sessionPO{}).Where("id = ?", id).Updates(map[string]any{
+	return r.d.dbOr(tx).WithContext(ctx).Model(&sessionPO{}).
+		Where("id = ? AND last_seen_at < ? AND revoked_at IS NULL", id, lastSeen).Updates(map[string]any{
 		"last_seen_at": lastSeen, "idle_expires_at": idleExpires,
 	}).Error
 }

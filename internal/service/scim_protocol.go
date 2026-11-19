@@ -1,8 +1,11 @@
 package service
 
 import (
+	"errors"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -70,6 +73,12 @@ func scimStatus(err error) (int, string) {
 	if err == nil {
 		return http.StatusOK, ""
 	}
+	if errors.Is(err, biz.ErrSCIMPrecondition) {
+		return http.StatusPreconditionFailed, ""
+	}
+	if errors.Is(err, biz.ErrSCIMReadOnlyProfile) {
+		return http.StatusBadRequest, "mutability"
+	}
 	if e := kerrors.FromError(err); e != nil {
 		switch e.Code {
 		case 400:
@@ -81,7 +90,10 @@ func scimStatus(err error) (int, string) {
 		case 404:
 			return http.StatusNotFound, ""
 		case 409:
-			return http.StatusConflict, "uniqueness"
+			if e.Reason == "SCIM_UNIQUENESS" || e.Reason == "USERNAME_EXISTS" {
+				return http.StatusConflict, "uniqueness"
+			}
+			return http.StatusConflict, ""
 		case 503:
 			return http.StatusServiceUnavailable, ""
 		}
@@ -91,6 +103,10 @@ func scimStatus(err error) (int, string) {
 
 func scimFail(w http.ResponseWriter, err error) {
 	status, scimType := scimStatus(err)
+	if status == http.StatusInternalServerError {
+		scimError(w, status, scimType, "SCIM 处理失败")
+		return
+	}
 	detail := err.Error()
 	if e := kerrors.FromError(err); e != nil {
 		detail = e.Message
@@ -99,27 +115,27 @@ func scimFail(w http.ResponseWriter, err error) {
 }
 
 func scimBearer(r *http.Request) string {
-	raw := r.Header.Get("Authorization")
-	if len(raw) < 8 || !strings.EqualFold(raw[:7], "Bearer ") {
+	values := r.Header.Values("Authorization")
+	if len(values) != 1 {
 		return ""
 	}
-	return strings.TrimSpace(raw[7:])
+	auth := strings.Fields(values[0])
+	if len(auth) != 2 || !strings.EqualFold(auth[0], "Bearer") {
+		return ""
+	}
+	return auth[1]
 }
 
-func scimID(path string) (int64, bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) < 4 {
-		return 0, false
-	}
-	raw := parts[len(parts)-1]
-	if raw == "Users" || raw == "Groups" || raw == "" {
-		return 0, false
+func scimID(path, collection string) (int64, error) {
+	base, raw, item := strings.Cut(strings.Trim(path, "/"), "/"+collection+"/")
+	if !item && base == "scim/v2/"+collection {
+		return 0, nil
 	}
 	v, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || v <= 0 {
-		return 0, false
+	if !item || base != "scim/v2" || err != nil || v <= 0 {
+		return 0, biz.ErrResourceNotFound
 	}
-	return v, true
+	return v, nil
 }
 
 func scimUserResource(u *biz.SCIMUser, baseURL string) map[string]any {
@@ -181,17 +197,20 @@ func scimETag(revision uint64) string {
 	return `W/"` + strconv.FormatUint(revision, 10) + `"`
 }
 
-// scimIfMatch enforces the optimistic concurrency version an IdP read earlier.
-// A missing If-Match is allowed (many IdPs do not send it); a wrong one is not.
-func scimIfMatchOK(r *http.Request, revision uint64) bool {
+func scimExpectedRevision(r *http.Request) (uint64, error) {
 	raw := strings.TrimSpace(r.Header.Get("If-Match"))
 	if raw == "" || raw == "*" {
-		return true
+		return 0, nil
 	}
 	raw = strings.TrimPrefix(raw, "W/")
-	raw = strings.Trim(raw, `"`)
-	v, err := strconv.ParseUint(raw, 10, 64)
-	return err == nil && v == revision
+	if len(raw) < 3 || raw[0] != '"' || raw[len(raw)-1] != '"' {
+		return 0, biz.ErrSCIMPrecondition
+	}
+	v, err := strconv.ParseUint(raw[1:len(raw)-1], 10, 64)
+	if err != nil || v == 0 {
+		return 0, biz.ErrSCIMPrecondition
+	}
+	return v, nil
 }
 
 func scimPaging(r *http.Request) (int, int, error) {
@@ -228,43 +247,50 @@ func scimPage[T any](items []T, start, count int) []T {
 	return items[offset:end]
 }
 
-// scimFilter is a closed grammar: attribute eq "value" (or eq true/false),
-// joined by "and". Anything else is refused with invalidFilter rather than
-// interpreted loosely -- a loose parser is how a filter becomes a data leak.
+var scimFilterClause = regexp.MustCompile(`(?i)^\s*(emails\[type eq "work"\]\.value|[a-z][a-z0-9.]*)\s+eq\s+("(?:[^"\\]|\\.)*"|true|false)(\s+and\s+|\s*$)`)
+
+// scimFilter accepts known attributes and equality conditions joined by "and".
 func scimFilter(raw string, resource string) (func(*biz.SCIMUser) bool, func(*biz.SCIMGroup) bool, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return func(*biz.SCIMUser) bool { return true }, func(*biz.SCIMGroup) bool { return true }, nil
 	}
-	clauses := strings.Split(raw, " and ")
+	allowed := map[string]bool{
+		"username": true, "externalid": true, "id": true, "active": true,
+		"emails.value": true, "emails[type eq \"work\"].value": true,
+	}
+	if resource == "Group" {
+		allowed = map[string]bool{"displayname": true, "externalid": true, "id": true}
+	}
 	type predicate struct{ attr, value string }
-	preds := make([]predicate, 0, len(clauses))
-	for _, clause := range clauses {
-		parts := strings.SplitN(strings.TrimSpace(clause), " eq ", 2)
-		if len(parts) != 2 {
+	var preds []predicate
+	for raw != "" {
+		match := scimFilterClause.FindStringSubmatch(raw)
+		if match == nil {
 			return nil, nil, biz.Validation("不支持的 filter 语法")
 		}
-		attr := strings.TrimSpace(parts[0])
-		value := strings.Trim(strings.TrimSpace(parts[1]), `"`)
-		allowed := map[string]bool{
-			"userName": true, "externalId": true, "id": true, "active": true,
-			"emails.value": true, "emails[type eq \"work\"].value": true,
-		}
-		if resource == "Group" {
-			allowed = map[string]bool{"displayName": true, "externalId": true, "id": true}
-		}
+		attr, value := strings.ToLower(match[1]), match[2]
 		if !allowed[attr] {
 			return nil, nil, biz.Validation("不支持的 filter 属性: " + attr)
 		}
+		if attr == "active" {
+			value = strings.ToLower(value)
+			if value != "true" && value != "false" {
+				return nil, nil, biz.Validation("active 的 filter 值必须是布尔值")
+			}
+		} else if value[0] != '"' || jsonx.Unmarshal([]byte(value), &value) != nil {
+			return nil, nil, biz.Validation("filter 值必须是合法 JSON 字符串")
+		}
 		preds = append(preds, predicate{attr, value})
+		raw = raw[len(match[0]):]
 	}
 	userMatch := func(u *biz.SCIMUser) bool {
 		for _, p := range preds {
 			var got string
 			switch p.attr {
-			case "userName":
+			case "username":
 				got = u.UserName
-			case "externalId":
+			case "externalid":
 				got = u.ExternalID
 			case "id":
 				got = strconv.FormatInt(u.ID, 10)
@@ -283,9 +309,9 @@ func scimFilter(raw string, resource string) (func(*biz.SCIMUser) bool, func(*bi
 		for _, p := range preds {
 			var got string
 			switch p.attr {
-			case "displayName":
+			case "displayname":
 				got = g.DisplayName
-			case "externalId":
+			case "externalid":
 				got = g.ExternalID
 			case "id":
 				got = strconv.FormatInt(g.ID, 10)
@@ -417,6 +443,18 @@ func (s *SCIMService) ServeSCIM(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(tenant.With(r.Context(), orgID))
 	baseURL := strings.TrimSuffix(s.uc.PublicBaseURL, "/")
 	path := strings.Trim(r.URL.Path, "/")
+	if r.Method == http.MethodGet && (path == "scim/v2/Users" || strings.HasPrefix(path, "scim/v2/Users/") ||
+		path == "scim/v2/Groups" || strings.HasPrefix(path, "scim/v2/Groups/")) {
+		query, err := url.ParseQuery(r.URL.RawQuery)
+		if err != nil {
+			scimFail(w, biz.Validation("查询参数不合法"))
+			return
+		}
+		if err := scimValidateQuery(query); err != nil {
+			scimFail(w, err)
+			return
+		}
+	}
 
 	switch {
 	case path == "scim/v2/ServiceProviderConfig":
@@ -444,6 +482,7 @@ func requireSCIMMethod(w http.ResponseWriter, r *http.Request, methods ...string
 			return true
 		}
 	}
+	w.Header().Set("Allow", strings.Join(methods, ", "))
 	scimError(w, http.StatusMethodNotAllowed, "", "method not allowed on this SCIM resource")
 	return false
 }

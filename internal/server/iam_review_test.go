@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -11,7 +12,29 @@ import (
 
 	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/internal/conf"
 )
+
+func TestIAMWritesUseOneDatabaseConnection(t *testing.T) {
+	h := newHarnessFor(t, &conf.Data{Database: &conf.Database{
+		Driver: "sqlite", Source: "file:" + filepath.Join(t.TempDir(), "single.db"), MaxOpenConns: 1,
+	}})
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	fixtureStepUp(h)
+	user := iamFixtureUser(t, h, "single_connection_member")
+	role := h.management(http.MethodPost, "/api/v1/admin/iam/roles", map[string]any{
+		"code": "single_connection_reader", "name": "Reader", "reason": "single connection",
+		"grants": []any{map[string]any{
+			"operation": "identity.user.read", "effect": "allow", "scope": map[string]bool{"all": true},
+		}},
+	}, "", true)
+	require.Equal(t, http.StatusOK, role.Code, role.Body.String())
+	roleID := decode[map[string]any](t, role)["id"]
+	assignment := h.management(http.MethodPost, "/api/v1/admin/iam/assignments", map[string]any{
+		"user_id": strconv.FormatInt(user.ID, 10), "role_id": roleID, "reason": "single connection",
+	}, "", true)
+	require.Equal(t, http.StatusOK, assignment.Code, assignment.Body.String())
+}
 
 func iamBody(h *harness, body map[string]any) map[string]any {
 	policy, err := h.svc.Policy.PolicyRevision(context.Background(), nil)

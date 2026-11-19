@@ -306,15 +306,17 @@ func (r *outboxRepo) ListDeliveries(ctx context.Context, tx biz.Tx, status strin
 	return out, total, nil
 }
 
-func (r *outboxRepo) MarkDelivered(ctx context.Context, eventID, subscriberID string, at time.Time) error {
+func (r *outboxRepo) MarkDelivered(ctx context.Context, delivery *biz.Delivery, at time.Time) error {
 	return r.d.dbOr(nil).WithContext(ctx).Model(&deliveryPO{}).
-		Where("event_id = ? AND subscriber_id = ?", eventID, subscriberID).
+		Where("event_id = ? AND subscriber_id = ? AND status = ? AND attempts = ?",
+			delivery.EventID, delivery.SubscriberID, "delivering", delivery.Attempts).
 		Updates(map[string]any{"status": "delivered", "next_retry_at": at, "last_error": ""}).Error
 }
 
-func (r *outboxRepo) MarkRetry(ctx context.Context, eventID, subscriberID string, at time.Time, lastError string) error {
+func (r *outboxRepo) MarkRetry(ctx context.Context, delivery *biz.Delivery, at time.Time, lastError string) error {
 	return r.d.dbOr(nil).WithContext(ctx).Model(&deliveryPO{}).
-		Where("event_id = ? AND subscriber_id = ? AND status <> ?", eventID, subscriberID, "delivered").
+		Where("event_id = ? AND subscriber_id = ? AND status = ? AND attempts = ?",
+			delivery.EventID, delivery.SubscriberID, "delivering", delivery.Attempts).
 		Updates(map[string]any{"status": "retrying", "next_retry_at": at, "last_error": lastError}).Error
 }
 

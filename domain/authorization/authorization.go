@@ -380,7 +380,8 @@ func Evaluate(in Input) Decision {
 	}
 	d.Reason = "DENY_MATCHED"
 	for _, s := range denies {
-		if s.Matches(in.Actor.UserID, in.TargetUserID, in.WholeObject) {
+		// A whole-object authorization covers every user in the context.
+		if in.WholeObject && !s.Empty() || s.Matches(in.Actor.UserID, in.TargetUserID, false) {
 			return d
 		}
 	}

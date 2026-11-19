@@ -50,6 +50,9 @@ func TestIntegrationAuthenticateBindsSessionToApplication(t *testing.T) {
 	require.True(t, errors.Is(err, biz.ErrInvalidCredentials))
 	_, err = uc.Authenticate(ctx, "other-app", "root", "ChangeMe-12345", "10.0.0.1", "grpc", "req-3")
 	require.True(t, errors.Is(err, biz.ErrPermissionDenied))
+	browserClient := integrationClientForAuth(t, h, biz.ApplicationCode)
+	_, err = uc.Authenticate(biz.WithIntegrationClient(context.Background(), browserClient), "", "root", "ChangeMe-12345", "10.0.0.1", "grpc", "req-reserved")
+	require.ErrorIs(t, err, biz.ErrPermissionDenied)
 
 	// A disabled account cannot log in over gRPC either.
 	disabled := fixtureUserWithEmail(t, h, "grpc_disabled", "disabled@example.com")

@@ -27,14 +27,10 @@ func (s *AuthService) GetAuthContext(ctx context.Context, _ *usercv1.GetAuthCont
 	if err != nil {
 		return nil, err
 	}
-	providers := s.uc.OAuthProviders()
-	if providers == nil {
-		providers = []string{}
-	}
 	return &usercv1.AuthContext{
 		RegistrationEnabled:       settings.RegistrationEnabled,
 		EmailVerificationRequired: settings.EmailVerificationRequired,
-		Providers:                 providers,
+		Providers:                 s.uc.OAuthProviders(settings),
 		CsrfToken:                 ensureCSRF(ctx, s.deps),
 		PasswordMinLength:         int32(settings.PasswordMinLength),
 		MfaRequiredForAdmins:      settings.MFARequiredForAdmins,
@@ -91,7 +87,7 @@ func (s *AuthService) Login(ctx context.Context, req *usercv1.LoginRequest) (*us
 		reply.ChallengeExpiresAt = result.ChallengeExpires.Format(timeLayout)
 		return reply, nil
 	}
-	setSessionCookie(ctx, s.deps, result.RawToken, result.Session.ExpiresAt)
+	setSessionCookie(ctx, s.deps, result)
 	reply.SessionExpiresAt = result.Session.ExpiresAt.Format(timeLayout)
 	return reply, nil
 }
@@ -105,7 +101,7 @@ func (s *AuthService) CompleteMFA(ctx context.Context, req *usercv1.CompleteMFAR
 	if err != nil {
 		return nil, err
 	}
-	setSessionCookie(ctx, s.deps, result.RawToken, result.Session.ExpiresAt)
+	setSessionCookie(ctx, s.deps, result)
 	return &usercv1.LoginReply{
 		Status: result.Status, User: userProto(result.User),
 		SessionExpiresAt:       result.Session.ExpiresAt.Format(timeLayout),

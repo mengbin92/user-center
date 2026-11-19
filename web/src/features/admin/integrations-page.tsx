@@ -54,6 +54,8 @@ const INTEGRATION_METHODS = [
   'GetSessionAuthorization',
   'GetResourceAuthorization',
   'RevokeSession',
+  'Authenticate',
+  'CompleteMFA',
 ] as const
 
 type IntegrationTab = 'clients' | 'deliveries'

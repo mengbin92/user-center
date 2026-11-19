@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"github.com/mengbin92/user-center/internal/conf"
 	"github.com/mengbin92/user-center/internal/obs"
 	"github.com/mengbin92/user-center/internal/service"
+	"github.com/mengbin92/user-center/pkg/jsonx"
 	"github.com/mengbin92/user-center/platform/httpx"
 )
 
@@ -78,6 +78,8 @@ func NewHTTPServer(
 		// counted, otherwise the error-rate panels silently under-report.
 		khttp.Filter(metrics.HTTP, mw.Filter),
 	)
+	srv.ReadHeaderTimeout = 5 * time.Second
+	srv.ReadTimeout = time.Duration(timeout) * time.Second
 	// Route classification is a closed table, not a guess: the metric label and
 	// the slow-request log both read from it. Proto routes are added by
 	// WalkRoute below; raw handlers have no method matcher and are therefore
@@ -153,7 +155,7 @@ func NewHTTPServer(
 			Status string            `json:"status"`
 			Checks map[string]string `json:"checks"`
 		}{Status: status, Checks: checks}
-		_ = json.NewEncoder(w).Encode(payload)
+		_ = jsonx.NewEncoder(w).Encode(payload)
 	})
 
 	mountOAuthRoutes(handle, mw, auth, publicBase)
@@ -179,7 +181,7 @@ func NewHTTPServer(
 		w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 		http.ServeContent(w, r, name, job.CreatedAt, f)
 	}
-	download := mw.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handle(obs.MethodAny, "/api/v1/admin/exports/{id}/download", func(w http.ResponseWriter, r *http.Request) {
 		actor, _ := biz.ActorFromContext(r.Context())
 		rawID := strings.TrimPrefix(r.URL.Path, "/api/v1/admin/exports/")
 		rawID = strings.TrimSuffix(rawID, "/download")
@@ -194,12 +196,9 @@ func NewHTTPServer(
 			return
 		}
 		serveArtifact(w, r, job)
-	}))
-	handle(obs.MethodAny, "/api/v1/admin/exports/{id}/download", func(w http.ResponseWriter, r *http.Request) {
-		download.ServeHTTP(w, r)
 	})
 
-	orgDownload := mw.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handle(obs.MethodAny, "/api/v1/orgs/{id}/audits/exports/{export_id}/download", func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 		if len(parts) != 8 || parts[0] != "api" || parts[4] != "audits" || parts[5] != "exports" {
 			writeError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "导出任务不存在")
@@ -221,9 +220,6 @@ func NewHTTPServer(
 			return
 		}
 		serveArtifact(w, r, job)
-	}))
-	handle(obs.MethodAny, "/api/v1/orgs/{id}/audits/exports/{export_id}/download", func(w http.ResponseWriter, r *http.Request) {
-		orgDownload.ServeHTTP(w, r)
 	})
 
 	webDir := os.Getenv("WEB_DIST")

@@ -148,7 +148,7 @@ export function AdminOrganizationSettingsPage() {
       <ReasonDialog
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        onConfirm={(reason) => void save.mutateAsync(reason)}
+        onConfirm={(reason) => save.mutate(reason)}
         title="保存组织策略"
         description="策略变更立即生效，并写入审计。"
         confirmLabel="保存"

@@ -12,7 +12,8 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/user-center ./cmd/user-center \
+ARG VERSION=dev
+RUN CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/user-center ./cmd/user-center \
  && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/migrate ./cmd/migrate \
  && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/admin-rescue ./cmd/admin-rescue \
  && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/import-legacy ./cmd/import-legacy

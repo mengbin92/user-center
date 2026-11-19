@@ -30,7 +30,7 @@
 
 ## 4. 同步引擎
 
-独立 worker（30s ticker）扫描到期源，按 `interval_seconds`（默认 300，下限 30）串行执行；`TryLock` 防止同一进程内重入。也可通过管理面手动触发。
+独立 worker（30s ticker）扫描到期源，按 `interval_seconds`（默认 300，下限 30）串行执行。管理面可手动触发，同一进程内同一目录源的运行、配置变更与凭据轮换互斥。已暂停的源允许手动预演，已归档组织的源停止运行。
 
 | 模式 | 行为 |
 |---|---|
@@ -38,13 +38,13 @@
 | `delta` | 携带游标拉取增量，只处理响应中的对象与显式 `deleted` 列表 |
 | `dry_run` | 只生成预演报告，**不写入、不推进游标**，且 `created_count/updated_count` 保持 0 |
 
-每次运行生成一条 `directory_sync_runs` 记录，含 `fetched / created / updated / disabled / unchanged / failed`、游标前后值、逐对象的 `report_json` 与错误文本；状态为 `succeeded / partial / failed`。单个对象失败不会中断整批，也不会伪装成干净成功。
+每次运行生成一条 `directory_sync_runs` 记录，含 `fetched / created / updated / disabled / unchanged / failed`、游标前后值、逐对象的 `report_json` 与错误文本。状态为 `succeeded / partial / failed`。部分失败时保留原游标，下次运行重试。超过存储上限的详情以 `report_truncated` 结尾，计数覆盖整次运行。JSON 源需要显式声明 `full: true` 并提供 `users` 数组，才能按缺席对账。省略新游标时保留原游标。
 
 对账与冲突策略：
 
 - `deletion_policy`：`disable`（默认，停用本组织成员资格并撤销其角色/委派）/ `delete`（移除成员与映射）/ `keep`（只记录，不处理）。
 - 源端删除**不硬删除全局账号**，理由与 SCIM 相同：账号跨组织共享。
-- `conflict_policy`：`source_wins`（默认，以目录为准更新）/ `local_wins`（已有对象只更新 `last_seen_at`，不覆盖本地资料）。
+- `conflict_policy`：`source_wins`（默认，以目录为准同步组织成员状态）/ `local_wins`（已匹配对象只更新 `last_seen_at`）。目录源在开户时提供用户名、邮箱和显示名称。既有账号的共享资料由本人或平台管理员维护。
 - 幂等：按 `(source_id, externalId)` 匹配；重跑全量不会重复建号。
 
 ## 5. 管理面

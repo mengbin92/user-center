@@ -36,7 +36,15 @@ func NewMetricsServer(cfg *conf.Server, metrics *obs.Metrics, log *zap.Logger) *
 			interval = time.Duration(cfg.Metrics.RefreshSeconds) * time.Second
 		}
 	}
-	return &MetricsServer{addr: addr, interval: interval, metrics: metrics, log: log}
+	s := &MetricsServer{addr: addr, interval: interval, metrics: metrics, log: log}
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", metrics.Handler())
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	s.srv = &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	return s
 }
 
 // Start blocks until the listener stops, matching the kratos transport.Server
@@ -46,19 +54,16 @@ func (s *MetricsServer) Start(ctx context.Context) error {
 		s.log.Info("metrics listener disabled")
 		return nil
 	}
-	go s.metrics.Run(ctx, s.interval)
-
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", s.metrics.Handler())
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
-	s.srv = &http.Server{
-		Addr:              s.addr,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.metrics.Run(ctx, s.interval)
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
 	s.log.Info("metrics listener started", zap.String("addr", s.addr))
 	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
@@ -67,9 +72,6 @@ func (s *MetricsServer) Start(ctx context.Context) error {
 }
 
 func (s *MetricsServer) Stop(ctx context.Context) error {
-	if s.srv == nil {
-		return nil
-	}
 	return s.srv.Shutdown(ctx)
 }
 

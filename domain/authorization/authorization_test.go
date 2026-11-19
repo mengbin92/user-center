@@ -69,6 +69,12 @@ func TestEvaluate(t *testing.T) {
 	require.False(t, Evaluate(denied).Allowed)
 	require.Equal(t, "DENY_MATCHED", Evaluate(denied).Reason)
 
+	denied.WholeObject, denied.TargetUserID = true, 0
+	denied.Sources[1].RoleScope = Scope{UserIDs: []int64{42}}
+	require.Equal(t, "DENY_MATCHED", Evaluate(denied).Reason)
+	denied.WholeObject, denied.TargetUserID = false, 10
+	require.True(t, Evaluate(denied).Allowed)
+
 	expired := base
 	expired.Sources[0].Validity.ExpiresAt = ptr(now.Add(-time.Minute))
 	require.False(t, Evaluate(expired).Allowed)

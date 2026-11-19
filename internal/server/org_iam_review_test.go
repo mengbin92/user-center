@@ -8,8 +8,62 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/mengbin92/user-center/domain/authorization"
 	"github.com/mengbin92/user-center/internal/biz"
 )
+
+func TestOrganizationRoleEditorRequiresDirectGrantAuthority(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	fixtureStepUp(h)
+	orgID := orgByCode(t, h, "org-role-authority")
+	roleID := createOrgRoleWithGrants(t, h, orgID, "org-role-editor", biz.PermOrgRoleManage)
+	userID := joinOrg(t, h, orgID, "org_role_editor", "member")
+	require.Equal(t, http.StatusOK, assignOrgRole(t, h, orgID, userID, roleID).Code)
+
+	require.Equal(t, http.StatusOK, h.login("org_role_editor", "FixturePass-123").Code)
+	fixtureStepUp(h)
+	allowed := []map[string]any{{"operation": biz.PermOrgMemberRead, "effect": "allow", "scope": map[string]any{"all": true}}}
+	denied := []map[string]any{{"operation": biz.PermOrgAuditRead, "effect": "allow", "scope": map[string]any{"all": true}}}
+	path := "/api/v1/orgs/" + orgID + "/iam/roles"
+	created := h.do(http.MethodPost, path, map[string]any{
+		"code": "within-authority", "name": "Within authority", "grants": allowed, "reason": "role authoring",
+	}, "", true)
+	require.Equal(t, http.StatusOK, created.Code, created.Body.String())
+	newRole := decode[map[string]any](t, created)
+
+	rec := h.do(http.MethodPost, path, map[string]any{
+		"code": "outside-authority", "name": "Outside authority", "grants": denied, "reason": "role authoring",
+	}, "", true)
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	rec = h.do(http.MethodPut, path+"/"+newRole["id"].(string)+"/permissions", map[string]any{
+		"expected_revision": newRole["revision"], "grants": denied, "reason": "role authoring",
+	}, "", true)
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+}
+
+func TestOrganizationPlatformOverrideRequiresActiveUnrestrictedAssignment(t *testing.T) {
+	h := newHarness(t)
+	admin, err := h.svc.IAM.GetRoleByCode(t.Context(), nil, "admin")
+	require.NoError(t, err)
+	bounded := iamFixtureUser(t, h, "bounded_admin")
+	iamFixtureAssign(t, h, bounded.ID, admin.ID, authorization.Scope{UserIDs: []int64{bounded.ID}})
+	require.Equal(t, http.StatusOK, h.login(bounded.Username, "FixturePass-123").Code)
+	path := "/api/v1/admin/organizations"
+	rec := h.do(http.MethodGet, path, nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	rec = h.do(http.MethodGet, path, nil, "", false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	roles := decode[map[string]any](t, h.do(http.MethodGet, "/api/v1/me/session-roles", nil, "", false))
+	rec = h.do(http.MethodPut, "/api/v1/me/session-roles", map[string]any{
+		"role_ids": []string{}, "expected_revision": roles["revision"],
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	rec = h.do(http.MethodGet, path, nil, "", false)
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+}
 
 func orgByCode(t *testing.T, h *harness, code string) string {
 	t.Helper()

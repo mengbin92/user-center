@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	kconfig "github.com/go-kratos/kratos/v3/config"
 	"github.com/go-kratos/kratos/v3/config/file"
@@ -22,12 +24,14 @@ func Load(path string) (*conf.Bootstrap, error) {
 	if err := cfg.Scan(&b); err != nil {
 		return nil, err
 	}
-	applyEnv(&b)
+	if err := applyEnv(&b); err != nil {
+		return nil, err
+	}
 	return &b, nil
 }
 
 // applyEnv keeps secrets out of config files and docker images.
-func applyEnv(b *conf.Bootstrap) {
+func applyEnv(b *conf.Bootstrap) error {
 	srv := wiring.ProvideServer(b)
 	dataConf := wiring.ProvideData(b)
 	sec := wiring.ProvideSecurity(b)
@@ -37,9 +41,7 @@ func applyEnv(b *conf.Bootstrap) {
 	if v := os.Getenv("GRPC_ADDR"); v != "" {
 		srv.Grpc.Addr = v
 	}
-	// Empty string here means "disable": operators turn the listener off with
-	// METRICS_ADDR=off rather than by editing a config file in the image.
-	if v, ok := os.LookupEnv("METRICS_ADDR"); ok {
+	if v := strings.TrimSpace(os.Getenv("METRICS_ADDR")); v != "" {
 		srv.Metrics.Addr = v
 	}
 	if v := os.Getenv("PUBLIC_BASE_URL"); v != "" {
@@ -48,19 +50,6 @@ func applyEnv(b *conf.Bootstrap) {
 	// Write-path limiting is on by default; RATE_LIMIT_ENABLED=false is the
 	// escape hatch for a deployment that fronts the API with its own limiter and
 	// does not want two counters.
-	if v, ok := os.LookupEnv("RATE_LIMIT_ENABLED"); ok {
-		srv.RateLimit.Enabled = v != "false" && v != "0" && v != "off"
-	}
-	if v := os.Getenv("RATE_LIMIT_WRITE_PER_MINUTE"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			srv.RateLimit.WritePerMinute = int32(n)
-		}
-	}
-	if v := os.Getenv("RATE_LIMIT_HEAVY_PER_MINUTE"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			srv.RateLimit.HeavyPerMinute = int32(n)
-		}
-	}
 	if v := os.Getenv("DB_DRIVER"); v != "" {
 		dataConf.Database.Driver = v
 	}
@@ -70,16 +59,10 @@ func applyEnv(b *conf.Bootstrap) {
 	// Tenant schema isolation is opt-in. Enabling it in config without running
 	// cmd/tenant-schema first leaves tenant databases missing, so the CLI is
 	// part of the rollout rather than an optional extra.
-	if v := os.Getenv("TENANT_SCHEMA_ISOLATION"); v != "" {
-		if dataConf.Tenancy == nil {
-			dataConf.Tenancy = &conf.Tenancy{}
-		}
-		dataConf.Tenancy.SchemaIsolation = v == "1" || v == "true" || v == "TRUE" || v == "yes"
+	if dataConf.Tenancy == nil {
+		dataConf.Tenancy = &conf.Tenancy{}
 	}
 	if v := os.Getenv("TENANT_SCHEMA_PREFIX"); v != "" {
-		if dataConf.Tenancy == nil {
-			dataConf.Tenancy = &conf.Tenancy{}
-		}
 		dataConf.Tenancy.SchemaPrefix = v
 	}
 	if v := os.Getenv("REDIS_ADDR"); v != "" {
@@ -87,11 +70,6 @@ func applyEnv(b *conf.Bootstrap) {
 	}
 	if v := os.Getenv("REDIS_PASSWORD"); v != "" {
 		dataConf.Redis.Password = v
-	}
-	if v := os.Getenv("REDIS_DB"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			dataConf.Redis.Db = int32(n)
-		}
 	}
 	if v := os.Getenv("SESSION_SECRET"); v != "" {
 		sec.SessionSecret = v
@@ -102,13 +80,44 @@ func applyEnv(b *conf.Bootstrap) {
 	if v := os.Getenv("MFA_ENCRYPTION_KEY"); v != "" {
 		sec.MfaEncryptionKey = v
 	}
-	if v := os.Getenv("COOKIE_SECURE"); v != "" {
-		sec.CookieSecure = v == "1" || v == "true"
-	}
 	if v := os.Getenv("COOKIE_DOMAIN"); v != "" {
 		sec.CookieDomain = v
 	}
-	if v := os.Getenv("TRUST_PROXY_HEADERS"); v != "" {
-		sec.TrustProxyHeaders = v == "1" || v == "true"
+	for _, setting := range []struct {
+		name   string
+		target *bool
+	}{
+		{"RATE_LIMIT_ENABLED", &srv.RateLimit.Enabled},
+		{"TENANT_SCHEMA_ISOLATION", &dataConf.Tenancy.SchemaIsolation},
+		{"COOKIE_SECURE", &sec.CookieSecure},
+		{"TRUST_PROXY_HEADERS", &sec.TrustProxyHeaders},
+	} {
+		switch strings.ToLower(strings.TrimSpace(os.Getenv(setting.name))) {
+		case "":
+		case "1", "true", "yes", "on":
+			*setting.target = true
+		case "0", "false", "no", "off":
+			*setting.target = false
+		default:
+			return fmt.Errorf("%s must be a boolean", setting.name)
+		}
 	}
+	for _, setting := range []struct {
+		name   string
+		target *int32
+		min    int64
+	}{
+		{"RATE_LIMIT_WRITE_PER_MINUTE", &srv.RateLimit.WritePerMinute, 1},
+		{"RATE_LIMIT_HEAVY_PER_MINUTE", &srv.RateLimit.HeavyPerMinute, 1},
+		{"REDIS_DB", &dataConf.Redis.Db, 0},
+	} {
+		if raw := strings.TrimSpace(os.Getenv(setting.name)); raw != "" {
+			value, err := strconv.ParseInt(raw, 10, 32)
+			if err != nil || value < setting.min {
+				return fmt.Errorf("%s must be an integer between %d and 2147483647", setting.name, setting.min)
+			}
+			*setting.target = int32(value)
+		}
+	}
+	return nil
 }

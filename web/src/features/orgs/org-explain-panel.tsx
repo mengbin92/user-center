@@ -60,7 +60,7 @@ export function OrgExplainPanel({ orgId }: { orgId: string }) {
             variant="secondary"
             loading={explain.isPending}
             disabled={!userId.trim() || !operation.trim()}
-            onClick={() => void explain.mutateAsync()}
+            onClick={() => explain.mutate()}
           >
             <Search className="h-3.5 w-3.5" />
             解释

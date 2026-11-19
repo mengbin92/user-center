@@ -75,6 +75,21 @@ func TestCompletionRecordRejectsReplay(t *testing.T) {
 	require.ErrorIs(t, repo.Complete(ctx, nil, "challenge", "password_reset", 1, "reset"), biz.ErrChallengeInvalid)
 }
 
+func TestChallengeDeleteUsesExactPurpose(t *testing.T) {
+	store := NewChallengeStore(testData(t))
+	ctx := context.Background()
+	for _, purpose := range []string{"registration", "password_reset"} {
+		require.NoError(t, store.Put(ctx, biz.Challenge{
+			ID: "same-id", Purpose: purpose, ExpiresAt: time.Now().Add(time.Minute),
+		}))
+	}
+	require.NoError(t, store.Delete(ctx, "registration", "same-id"))
+	_, err := store.Get(ctx, "registration", "same-id")
+	require.ErrorIs(t, err, biz.ErrChallengeInvalid)
+	_, err = store.Get(ctx, "password_reset", "same-id")
+	require.NoError(t, err)
+}
+
 func TestSessionRoleCASRollsBackStaleWrite(t *testing.T) {
 	d := testData(t)
 	repo := NewSessionRepo(d)

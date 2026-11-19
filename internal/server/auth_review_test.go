@@ -7,20 +7,22 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/mengbin92/user-center/internal/biz"
+	"github.com/mengbin92/user-center/internal/service"
 	"github.com/mengbin92/user-center/pkg/totp"
 	"github.com/stretchr/testify/require"
 )
 
 type retainingChallenges struct{ biz.ChallengeStore }
 
-func (s retainingChallenges) Delete(context.Context, string) error {
+func (s retainingChallenges) Delete(context.Context, string, string) error {
 	return errors.New("delete unavailable")
 }
 
@@ -47,9 +49,52 @@ func resetChallenge(t *testing.T, h *harness, identifier string) (string, string
 	rec := h.do(http.MethodPost, "/api/v1/auth/password-reset-challenges", map[string]any{"identifier": identifier}, "", true)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	id := decode[map[string]any](t, rec)["challenge_id"].(string)
-	code := regexp.MustCompile(`[0-9]{6}`).FindString(h.mail.last().body)
-	require.NotEmpty(t, code)
+	link := passwordResetMailParams(t, h)
+	require.Equal(t, id, link.Get("challenge"))
+	code := link.Get("code")
+	require.Regexp(t, `^[0-9]{6}$`, code)
 	return id, code
+}
+
+func passwordResetMailParams(t *testing.T, h *harness) url.Values {
+	t.Helper()
+	rawLink := regexp.MustCompile(`https?://[^\s]+`).FindString(h.mail.last().body)
+	link, err := url.Parse(rawLink)
+	require.NoError(t, err)
+	require.Equal(t, "/reset-password", link.Path)
+	require.Empty(t, link.RawQuery)
+	params, err := url.ParseQuery(link.Fragment)
+	require.NoError(t, err)
+	return params
+}
+
+func assertRememberCookie(t *testing.T, rec *httptest.ResponseRecorder, remember bool) {
+	t.Helper()
+	for _, c := range rec.Result().Cookies() {
+		if c.Name != service.SessionCookie {
+			continue
+		}
+		require.True(t, c.HttpOnly)
+		if remember {
+			require.True(t, c.Expires.After(time.Now()))
+		} else {
+			require.True(t, c.Expires.IsZero())
+		}
+		return
+	}
+	t.Fatal("missing session cookie")
+}
+
+func TestRememberControlsOnlyCookiePersistence(t *testing.T) {
+	h := newHarness(t)
+	for _, remember := range []bool{false, true} {
+		rec := h.do(http.MethodPost, "/api/v1/auth/login", map[string]any{
+			"username": "root", "password": "ChangeMe-12345", "remember": remember,
+		}, "", true)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		assertRememberCookie(t, rec, remember)
+		require.NotEmpty(t, decode[map[string]any](t, rec)["session_expires_at"])
+	}
 }
 
 func TestPasswordResetAfterChangedCredentialAndReplayDenied(t *testing.T) {
@@ -67,6 +112,48 @@ func TestPasswordResetAfterChangedCredentialAndReplayDenied(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, h.login("root", "ChangedPass-12345").Code)
 	require.Equal(t, http.StatusUnauthorized, h.login("root", "ReplayedPass-12345").Code)
 	require.Equal(t, http.StatusOK, h.login("root", "ResetPass-12345").Code)
+}
+
+func TestPasswordResetDeniesStaleIdentityGeneration(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	id, code := resetChallenge(t, h, "root@example.com")
+	rec := h.do(http.MethodPost, "/api/v1/me/password:change", map[string]any{
+		"current_password": "ChangeMe-12345", "new_password": "ChangedPass-12345",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	rec = h.do(http.MethodPost, "/api/v1/auth/password-reset", map[string]any{
+		"challenge_id": id, "code": code, "new_password": "StalePass-12345",
+	}, "", true)
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "CHALLENGE_INVALID")
+	require.Equal(t, http.StatusOK, h.login("root", "ChangedPass-12345").Code)
+}
+
+func TestUnverifiedEmailRequiresGovernedPasswordReset(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	fixtureStepUp(h)
+	u := fixtureUserWithEmail(t, h, "verify.reset", "verify-reset@example.com")
+	u.EmailVerified = false
+	_, err := h.svc.Users.Update(context.Background(), nil, u, u.Revision)
+	require.NoError(t, err)
+
+	rec := h.do(http.MethodPost, "/api/v1/auth/password-reset-challenges", map[string]any{"identifier": u.Username}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NotEmpty(t, decode[map[string]any](t, rec)["challenge_id"])
+	require.Empty(t, h.mail.last().to)
+
+	path := "/api/v1/admin/users/" + strconv.FormatInt(u.ID, 10) + "/password-reset-requests"
+	rec = h.management(http.MethodPost, path, map[string]any{"reason": "account recovery"}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, u.Email, h.mail.last().to)
+	link := passwordResetMailParams(t, h)
+	rec = h.do(http.MethodPost, "/api/v1/auth/password-reset", map[string]any{
+		"challenge_id": link.Get("challenge"), "code": link.Get("code"), "new_password": "AdminReset-12345",
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, http.StatusOK, h.login(u.Username, "AdminReset-12345").Code)
 }
 
 func TestChallengeAttemptLimitDeniesCorrectCodeAfterTenFailures(t *testing.T) {
@@ -88,6 +175,7 @@ func TestChallengeAttemptLimitDeniesCorrectCodeAfterTenFailures(t *testing.T) {
 func TestLoginAccountLimitCountsWrongPasswordsAcrossAddresses(t *testing.T) {
 	h := newHarness(t)
 	h.svc.MaxLoginAttempts = 2
+	waitForFreshRateLimitWindow(t, 5*time.Minute)
 	require.Equal(t, http.StatusUnauthorized, h.login("root", "wrong-password").Code)
 	// Username and email share the same authoritative account limit.
 	require.Equal(t, http.StatusUnauthorized, h.login("root@example.com", "wrong-password").Code)
@@ -167,18 +255,6 @@ func TestOversizedPasswordReturnsPolicyViolation(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "PASSWORD_POLICY_VIOLATION")
 }
 
-type concurrentMFARead struct {
-	biz.MFARepo
-	ready sync.WaitGroup
-}
-
-func (s *concurrentMFARead) Get(ctx context.Context, tx biz.Tx, id int64) (*biz.MFAState, error) {
-	state, err := s.MFARepo.Get(ctx, tx, id)
-	s.ready.Done()
-	s.ready.Wait()
-	return state, err
-}
-
 func TestConcurrentTOTPReplayOnlyCreatesOneSession(t *testing.T) {
 	h := newHarness(t)
 	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
@@ -189,9 +265,9 @@ func TestConcurrentTOTPReplayOnlyCreatesOneSession(t *testing.T) {
 	for i := range challenges {
 		challenges[i] = decode[map[string]any](t, h.login("root", "ChangeMe-12345"))["challenge_id"].(string)
 	}
-	state := &concurrentMFARead{MFARepo: h.svc.MFA}
-	state.ready.Add(2)
-	h.svc.MFA = state
+	held := make(chan struct{}, 1)
+	release := make(chan struct{})
+	h.svc.Users = &lockGate{UserRepo: h.svc.Users, held: held, release: release}
 	code, err := totp.Code(secret, time.Now().Unix()/30+1, 6)
 	require.NoError(t, err)
 	type outcome struct {
@@ -199,18 +275,50 @@ func TestConcurrentTOTPReplayOnlyCreatesOneSession(t *testing.T) {
 		body string
 	}
 	results := make(chan outcome, 2)
-	for _, challenge := range challenges {
-		go func(id string) {
-			rec := h.do(http.MethodPost, "/api/v1/auth/mfa/complete", map[string]any{"challenge_id": id, "code": code}, "", true)
-			results <- outcome{code: rec.Code, body: rec.Body.String()}
-		}(challenge)
+	complete := func(id string) {
+		rec := h.do(http.MethodPost, "/api/v1/auth/mfa/complete", map[string]any{"challenge_id": id, "code": code}, "", true)
+		results <- outcome{code: rec.Code, body: rec.Body.String()}
 	}
-	first, second := <-results, <-results
+	go complete(challenges[0])
+	<-held
+	go complete(challenges[1])
+	first := <-results
+	close(release)
+	second := <-results
 	// Keep the bodies in the failure message: a 503 here means a dependency
 	// error (for SQLite, a write lock) rather than the expected replay
 	// rejection, and the body is the only place that distinguishes them.
 	require.ElementsMatch(t, []int{http.StatusOK, http.StatusBadRequest},
 		[]int{first.code, second.code}, "first=%+v second=%+v", first, second)
+}
+
+type unavailableSessionCreate struct{ biz.SessionRepo }
+
+func (unavailableSessionCreate) Create(context.Context, biz.Tx, *biz.Session) error {
+	return errors.New("session persistence unavailable")
+}
+
+func TestMFALoginRollsBackRecoveryCodeIfSessionCreationFails(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	setup := decode[map[string]any](t, h.do(http.MethodPost, "/api/v1/me/mfa:setup",
+		map[string]any{"current_password": "ChangeMe-12345"}, "", true))
+	code, err := totp.Code(setup["secret"].(string), time.Now().Unix()/30, 6)
+	require.NoError(t, err)
+	confirmed := decode[map[string]any](t, h.do(http.MethodPost, "/api/v1/me/mfa:confirm",
+		map[string]any{"code": code}, "", true))
+	recoveryCode := confirmed["recovery_codes"].([]any)[0].(string)
+	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true).Code)
+
+	challenge := decode[map[string]any](t, h.login("root", "ChangeMe-12345"))["challenge_id"]
+	body := map[string]any{"challenge_id": challenge, "code": recoveryCode}
+	repo := h.svc.Sessions
+	h.svc.Sessions = unavailableSessionCreate{repo}
+	rec := h.do(http.MethodPost, "/api/v1/auth/mfa/complete", body, "", true)
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code, rec.Body.String())
+	h.svc.Sessions = repo
+	rec = h.do(http.MethodPost, "/api/v1/auth/mfa/complete", body, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
 type passwordlessCredentials struct{ biz.CredentialRepo }

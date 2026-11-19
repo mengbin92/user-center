@@ -115,13 +115,24 @@ func TestRequestIDIsGeneratedWhenAbsentAndCappedWhenTooLong(t *testing.T) {
 	require.NotEqual(t, long, logs.All()[0].ContextMap()["request_id"])
 }
 
-func TestRequireRejectsWithoutActor(t *testing.T) {
+func TestFilterRejectsRawDownloadWithoutActor(t *testing.T) {
 	mw, _ := testMiddleware(t, "60000")
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler must not run without an actor")
 	})
 	rec := httptest.NewRecorder()
 	// No session cookie and a nil session usecase: prepare must not touch it.
-	mw.Require(handler).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/exports/1/download", nil))
+	mw.Filter(handler).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/exports/1/download", nil))
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	require.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+}
+
+func TestClientIPUsesNearestProxyAddress(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "127.0.0.1:8080"
+	req.Header.Set("X-Forwarded-For", "198.51.100.8, 203.0.113.9")
+	require.Equal(t, "127.0.0.1", clientIP(req, false))
+	require.Equal(t, "203.0.113.9", clientIP(req, true))
+	req.Header.Set("X-Forwarded-For", "not-an-ip")
+	require.Equal(t, "127.0.0.1", clientIP(req, true))
 }

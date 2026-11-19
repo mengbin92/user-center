@@ -26,11 +26,11 @@ type OIDCConsentPrompt struct {
 	ExpiresAt    time.Time
 }
 
-func (uc *OIDCUsecase) consentRequired(ctx context.Context, client *OIDCClient, userID int64, scopes []string, force bool) (bool, error) {
+func (uc *OIDCUsecase) consentRequired(ctx context.Context, tx Tx, client *OIDCClient, userID int64, scopes []string, force bool) (bool, error) {
 	if force {
 		return true, nil
 	}
-	consent, err := uc.OIDCConsents.GetConsent(ctx, nil, client.ClientID, userID)
+	consent, err := uc.OIDCConsents.GetConsent(ctx, tx, client.ClientID, userID)
 	if err != nil {
 		if errors.Is(err, ErrResourceNotFound) {
 			return true, nil
@@ -45,7 +45,7 @@ func (uc *OIDCUsecase) consentRequired(ctx context.Context, client *OIDCClient, 
 	return false, nil
 }
 
-func (uc *OIDCUsecase) parkConsentRequest(ctx context.Context, actor ActorContext, client *OIDCClient, req OIDCAuthorizeRequest, redirect, scope, challenge, method string, authTime time.Time) (string, error) {
+func (uc *OIDCUsecase) parkConsentRequest(ctx context.Context, tx Tx, actor ActorContext, client *OIDCClient, req OIDCAuthorizeRequest, redirect, scope, challenge, method string, authTime time.Time) (string, error) {
 	raw, err := newToken(32)
 	if err != nil {
 		return "", ErrDependency
@@ -57,10 +57,17 @@ func (uc *OIDCUsecase) parkConsentRequest(ctx context.Context, actor ActorContex
 		AuthTime: authTime.UTC(), IdentityVersion: actor.User.IdentityVersion,
 		CreatedAt: uc.Clock.Now().UTC(), ExpiresAt: uc.Clock.Now().Add(10 * time.Minute).UTC(),
 	}
-	if err := uc.OIDCConsents.CreateConsentRequest(ctx, nil, parked); err != nil {
+	if err := uc.OIDCConsents.CreateConsentRequest(ctx, tx, parked); err != nil {
 		return "", ErrDependency
 	}
 	return "/consent?handle=" + url.QueryEscape(raw), nil
+}
+
+func validParkedConsent(parked *OIDCConsentRequest, client *OIDCClient, actor ActorContext) bool {
+	return actor.User.IdentityVersion == parked.IdentityVersion &&
+		client.Status == "active" && slices.Contains(client.RedirectURIs, parked.RedirectURI) &&
+		oidcScopesAllowed(strings.Fields(parked.Scope), client.Scopes) &&
+		(!(client.Public || client.RequirePKCE) || parked.CodeChallenge != "")
 }
 
 // ConsentPrompt resolves the display view for a parked request. The handle is
@@ -77,10 +84,10 @@ func (uc *OIDCUsecase) ConsentPrompt(ctx context.Context, actor ActorContext, ha
 		return nil, ErrDependency
 	}
 	client, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, nil, parked.ClientID)
-	if err != nil || client.Status != "active" {
-		return nil, ErrResourceNotFound
+	if err != nil && !errors.Is(err, ErrOIDCClientNotFound) {
+		return nil, ErrDependency
 	}
-	if !slices.Contains(client.RedirectURIs, parked.RedirectURI) {
+	if err != nil || !validParkedConsent(parked, client, actor) {
 		return nil, ErrResourceNotFound
 	}
 	host := ""
@@ -117,10 +124,10 @@ func (uc *OIDCUsecase) DecideConsent(ctx context.Context, actor ActorContext, ha
 			return ErrDependency
 		}
 		client, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, tx, parked.ClientID)
-		if err != nil || client.Status != "active" {
-			return ErrResourceNotFound
+		if err != nil && !errors.Is(err, ErrOIDCClientNotFound) {
+			return ErrDependency
 		}
-		if !slices.Contains(client.RedirectURIs, parked.RedirectURI) {
+		if err != nil || !validParkedConsent(parked, client, actor) {
 			return ErrResourceNotFound
 		}
 		if !approve {
@@ -148,6 +155,11 @@ func (uc *OIDCUsecase) DecideConsent(ctx context.Context, actor ActorContext, ha
 			}); err != nil {
 				return ErrDependency
 			}
+		} else {
+			// An approval that the user cannot later see and revoke must
+			// not grant an application long-lived offline access.
+			scopes := slices.DeleteFunc(strings.Fields(parked.Scope), func(scope string) bool { return scope == "offline_access" })
+			parked.Scope = strings.Join(scopes, " ")
 		}
 		rawCode, err := newToken(32)
 		if err != nil {
@@ -201,8 +213,19 @@ func (uc *OIDCUsecase) RevokeConsent(ctx context.Context, actor ActorContext, cl
 		return Validation("client_id 不能为空")
 	}
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		// Token exchange and authorization code issuance lock the same
+		// client row, so revocation cannot miss newly rotated credentials.
+		if _, err := uc.OIDCClients.GetOIDCClientByClientID(ctx, tx, clientID); err != nil {
+			if errors.Is(err, ErrOIDCClientNotFound) {
+				return ErrResourceNotFound
+			}
+			return ErrDependency
+		}
 		if err := uc.OIDCConsents.DeleteConsent(ctx, tx, clientID, actor.User.ID); err != nil {
 			return err // ErrResourceNotFound: no row, therefore no audit
+		}
+		if err := uc.OIDCCodes.RevokeOIDCGrants(ctx, tx, clientID, actor.User.ID, uc.Clock.Now().UTC()); err != nil {
+			return ErrDependency
 		}
 		return uc.audit(ctx, tx, actor, "oidc.consent.revoke", clientID, "{}", "{}", "{}", "user revoked consent", "success")
 	})

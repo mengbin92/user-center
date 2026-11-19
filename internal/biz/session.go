@@ -118,18 +118,31 @@ func (uc *SessionUsecase) RevokeOwn(ctx context.Context, actor ActorContext, id 
 }
 
 func (uc *SessionUsecase) RevokeOthers(ctx context.Context, actor ActorContext) error {
-	rows, err := uc.Sessions.ListByUser(ctx, nil, actor.User.ID)
-	if err != nil {
-		return ErrDependency
-	}
 	now := uc.Clock.Now().UTC()
-	for _, s := range rows {
-		if s.ID == actor.Session.ID || s.RevokedAt != nil {
-			continue
+	var revoked []*Session
+	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
+		if err := uc.lockUserGeneration(ctx, tx, actor.User.ID, actor.Session.IdentityVersion); err != nil {
+			return err
 		}
-		if err := uc.Sessions.Revoke(ctx, nil, s.ID, &now); err != nil {
+		rows, err := uc.Sessions.ListByUser(ctx, tx, actor.User.ID)
+		if err != nil {
 			return ErrDependency
 		}
+		for _, s := range rows {
+			if s.ID == actor.Session.ID || s.RevokedAt != nil {
+				continue
+			}
+			if err := uc.Sessions.Revoke(ctx, tx, s.ID, &now); err != nil {
+				return ErrDependency
+			}
+			revoked = append(revoked, s)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, s := range revoked {
 		_ = uc.StepUp.Delete(ctx, StepUpKey(s))
 	}
 	// Recorded even when nothing was revoked: "user revoked other sessions" is

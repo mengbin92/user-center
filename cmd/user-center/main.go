@@ -13,6 +13,8 @@ import (
 	"github.com/mengbin92/user-center/internal/config"
 )
 
+var version = "dev"
+
 func main() {
 	confPath := flag.String("config", envOr("CONF_PATH", "configs/config.yaml"), "path to config yaml")
 	flag.Parse()
@@ -33,7 +35,7 @@ func main() {
 	if cleanup != nil {
 		defer cleanup()
 	}
-	if err := app.Run(); err != nil {
+	if err := app.Run(version); err != nil {
 		log.Fatal("run app", zap.Error(err))
 	}
 }

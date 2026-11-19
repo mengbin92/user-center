@@ -69,6 +69,21 @@ func TestMetricsServerServesScrape(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
+func TestMetricsServerStopsBeforeListen(t *testing.T) {
+	s := NewMetricsServer(&conf.Server{
+		Metrics: &conf.Metrics{Addr: "127.0.0.1:0"},
+	}, obs.NewMetrics(nil), zap.NewNop())
+	require.NoError(t, s.Stop(context.Background()))
+	done := make(chan error, 1)
+	go func() { done <- s.Start(context.Background()) }()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("metrics listener started after shutdown")
+	}
+}
+
 func freeLoopbackAddr(t *testing.T) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")

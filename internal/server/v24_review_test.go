@@ -102,6 +102,7 @@ func TestProviderDisableAllSentinel(t *testing.T) {
 	auth := decode[map[string]any](t, h.do(http.MethodGet, "/api/v1/admin/settings/auth", nil, "", false))
 	// Empty list means every configured provider is enabled (legacy default).
 	require.Contains(t, h.do(http.MethodGet, "/api/v1/auth/context", nil, "", false).Body.String(), "github")
+	pendingState := oauthStateFor(t, h, "login")
 	disabled := h.do(http.MethodPatch, "/api/v1/admin/settings/auth", map[string]any{
 		"providers": []string{biz.ProvidersDisabledAll}, "update_mask": "providers",
 		"expected_revision": auth["revision"], "reason": "disable all",
@@ -112,6 +113,10 @@ func TestProviderDisableAllSentinel(t *testing.T) {
 	require.NotContains(t, contextBody, "mock")
 	view := h.do(http.MethodGet, "/api/v1/admin/settings/providers", nil, "", false).Body.String()
 	require.Contains(t, view, `"enabled":false`)
+	callback := h.do(http.MethodGet, "/api/v1/auth/providers/mock/callback?state="+pendingState+"&code=ok", nil, "", false)
+	require.Contains(t, callback.Header().Get("Location"), "oauth_error=oauth_failed")
+	start := h.do(http.MethodGet, "/api/v1/auth/providers/github/start", nil, "", false)
+	require.Contains(t, start.Header().Get("Location"), "oauth_error=oauth_failed")
 }
 
 func TestConsentStateLengthAndRevokeMissing(t *testing.T) {

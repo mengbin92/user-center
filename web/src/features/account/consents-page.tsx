@@ -99,7 +99,7 @@ export function ConsentsPage() {
                           variant="ghost"
                           loading={revoke.isPending}
                           onClick={() =>
-                            void revoke.mutateAsync(item.client_id ?? '')
+                            revoke.mutate(item.client_id ?? '')
                           }
                         >
                           <Trash2 className="h-3.5 w-3.5" />

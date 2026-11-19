@@ -6,10 +6,10 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"github.com/mengbin92/user-center/pkg/jsonx"
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -22,6 +22,7 @@ import (
 	"github.com/mengbin92/user-center/internal/conf"
 	"github.com/mengbin92/user-center/internal/obs"
 	"github.com/mengbin92/user-center/internal/service"
+	"github.com/mengbin92/user-center/pkg/jsonx"
 	"github.com/mengbin92/user-center/platform/httpx"
 	"github.com/mengbin92/user-center/platform/tenant"
 )
@@ -94,25 +95,10 @@ func (m *Middleware) CookieSecure() bool   { return m.secure }
 func (m *Middleware) CookieDomain() string { return m.domain }
 
 func (m *Middleware) Filter(next http.Handler) http.Handler {
-	return m.wrap(next, false)
-}
-
-// Require protects raw (non-proto) routes with the same auth/CSRF rules.
-func (m *Middleware) Require(next http.Handler) http.Handler {
-	return m.wrap(next, true)
-}
-
-func (m *Middleware) wrap(next http.Handler, requireAuth bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
 		ctx, ok := m.prepare(rec, r)
-		if ok && requireAuth {
-			if _, has := biz.ActorFromContext(ctx); !has {
-				writeError(rec, http.StatusUnauthorized, "UNAUTHENTICATED", "登录状态无效或已过期")
-				ok = false
-			}
-		}
 		// Limiting happens after authentication so the budget is keyed by the
 		// real subject, and before the handler so a rejected call costs nothing.
 		if ok && m.writeLimiter != nil {
@@ -179,7 +165,19 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	w.Header().Set("X-Frame-Options", "DENY")
-	if isUnsafe(r.Method) && strings.HasPrefix(r.URL.Path, "/api/v1/") {
+	ctx = biz.WithRequestID(ctx, requestID)
+	path := r.URL.Path
+	api := strings.HasPrefix(path, "/api/v1/")
+	scim := strings.HasPrefix(path, "/scim/v2/")
+	probe := path == "/healthz" || path == "/readyz"
+	if api || scim || probe {
+		w.Header().Set("Cache-Control", "no-store")
+	}
+	if probe || scim {
+		return ctx, true
+	}
+	writeAPI := api && !isSafeMethod(r.Method)
+	if writeAPI {
 		const maxRequestBody = 1 << 20
 		if r.ContentLength > maxRequestBody {
 			writeError(w, http.StatusRequestEntityTooLarge, "REQUEST_TOO_LARGE", "请求内容不能超过 1 MiB")
@@ -207,25 +205,24 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 		IP:        clientIP(r, m.trustProxy),
 		UserAgent: r.UserAgent(),
 	}
-	if c, err := r.Cookie(service.CSRFCookie); err == nil && c.Value != "" {
-		info.CSRF = c.Value
-	} else {
-		token := randomToken()
-		http.SetCookie(w, &http.Cookie{
-			Name: service.CSRFCookie, Value: token, Path: "/", HttpOnly: false,
-			Secure: m.secure, SameSite: http.SameSiteLaxMode, Domain: m.domain,
-			MaxAge: 86400,
-		})
-		info.CSRF = token
+	if api {
+		if c, err := r.Cookie(service.CSRFCookie); err == nil && c.Value != "" {
+			info.CSRF = c.Value
+		} else {
+			info.CSRF = randomToken()
+			http.SetCookie(w, &http.Cookie{
+				Name: service.CSRFCookie, Value: info.CSRF, Path: "/", HttpOnly: false,
+				Secure: m.secure, SameSite: http.SameSiteLaxMode, Domain: m.domain,
+				MaxAge: 86400,
+			})
+		}
 	}
 	ctx = httpx.With(ctx, info)
-	ctx = biz.WithRequestID(ctx, requestID)
 	// Schema routing is driven by the verified URL shape, never by a body
 	// field. Platform paths resolve to 0 and always use the platform pool.
-	ctx = tenant.With(ctx, tenant.FromPath(r.URL.Path))
-	r = r.WithContext(ctx)
+	ctx = tenant.With(ctx, tenant.FromPath(path))
 
-	if isUnsafe(r.Method) && strings.HasPrefix(r.URL.Path, "/api/v1/") {
+	if writeAPI {
 		header := r.Header.Get("X-CSRF-Token")
 		if header == "" || header != info.CSRF {
 			writeError(w, http.StatusForbidden, "PERMISSION_DENIED", "CSRF 校验失败，请刷新页面后重试")
@@ -233,6 +230,10 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 		}
 	}
 
+	// Static assets and bearer-only endpoints have no browser session dependency.
+	if !api && path != "/oidc/authorize" && path != "/oidc/logout" {
+		return ctx, true
+	}
 	if c, err := r.Cookie(service.SessionCookie); err == nil && c.Value != "" {
 		actor, err := m.sessions.ValidateSession(ctx, c.Value)
 		if err == nil && actor.Session != nil && actor.Session.ApplicationCode != biz.ApplicationCode {
@@ -274,15 +275,6 @@ func (m *Middleware) prepare(w http.ResponseWriter, r *http.Request) (context.Co
 	return ctx, true
 }
 
-func isUnsafe(method string) bool {
-	switch method {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
-		return false
-	default:
-		return true
-	}
-}
-
 // authenticatedPrefixes lists the path families that require a session. Keep it
 // in sync with the gateway route table: a missing prefix silently disables both
 // the 401 gate and the password-change gate below.
@@ -311,14 +303,14 @@ func hasAnyPrefix(path string, prefixes []string) bool {
 
 func clientIP(r *http.Request, trustProxy bool) string {
 	if trustProxy {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			if i := strings.IndexByte(xff, ','); i >= 0 {
-				return strings.TrimSpace(xff[:i])
-			}
-			return strings.TrimSpace(xff)
+		forwarded := r.Header.Values("X-Forwarded-For")
+		raw := r.Header.Get("X-Real-IP")
+		if len(forwarded) > 0 {
+			chain := forwarded[len(forwarded)-1]
+			raw = chain[strings.LastIndexByte(chain, ',')+1:]
 		}
-		if xr := r.Header.Get("X-Real-IP"); xr != "" {
-			return strings.TrimSpace(xr)
+		if addr, err := netip.ParseAddr(strings.TrimSpace(raw)); err == nil && addr.Zone() == "" {
+			return addr.Unmap().String()
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

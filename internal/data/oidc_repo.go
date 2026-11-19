@@ -238,6 +238,18 @@ func (r *oidcRepo) ConsumeOIDCRefreshToken(ctx context.Context, tx biz.Tx, hash,
 	return refresh, nil
 }
 
+func (r *oidcRepo) RevokeOIDCGrants(ctx context.Context, tx biz.Tx, clientID string, userID int64, now time.Time) error {
+	db := r.d.dbOr(tx).WithContext(ctx)
+	if err := db.Model(&oidcCodePO{}).
+		Where("client_id = ? AND user_id = ? AND consumed_at IS NULL AND expires_at > ?", clientID, userID, now).
+		Update("consumed_at", now).Error; err != nil {
+		return err
+	}
+	return db.Model(&oidcRefreshPO{}).
+		Where("client_id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?", clientID, userID, now).
+		Update("revoked_at", now).Error
+}
+
 // --- consent ---
 
 func oidcConsentToBiz(p *oidcConsentPO) *biz.OIDCConsent {

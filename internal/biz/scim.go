@@ -5,9 +5,10 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
-	"fmt"
+	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mengbin92/user-center/pkg/jsonx"
 )
@@ -29,6 +30,9 @@ const (
 	SCIMKindUser            = "user"
 	SCIMKindGroup           = "group"
 )
+
+var ErrSCIMPrecondition = errors.New("If-Match 与当前版本不一致")
+var ErrSCIMReadOnlyProfile = errors.New("平台账号资料只能通过账号资料流程修改")
 
 type SCIMToken struct {
 	ID                int64
@@ -76,18 +80,24 @@ type SCIMUser struct {
 }
 
 type SCIMUserInput struct {
-	ExternalID  string
-	UserName    string
-	DisplayName string
-	Email       string
-	Active      *bool
+	ExternalID       string
+	UserName         string
+	DisplayName      string
+	Email            string
+	Active           *bool
+	ExpectedRevision uint64
 }
 
 type SCIMGroupInput struct {
 	ExternalID  string
 	DisplayName string
-	AddMembers  []int64
-	DelMembers  []int64
+	Members     []SCIMGroupMemberChange
+}
+
+type SCIMGroupMemberChange struct {
+	IDs     []int64
+	Replace bool
+	Remove  bool
 }
 
 type SCIMRepo interface {
@@ -108,9 +118,10 @@ type SCIMRepo interface {
 	GetGroup(context.Context, Tx, int64, int64) (*SCIMGroup, error)
 	ListGroups(context.Context, Tx, int64) ([]*SCIMGroup, error)
 	UpdateGroup(context.Context, Tx, *SCIMGroup, uint64) (*SCIMGroup, error)
-	DeleteGroup(context.Context, Tx, int64, int64) error
+	DeleteGroup(context.Context, Tx, int64, int64, uint64) error
 	SetGroupMembers(context.Context, Tx, int64, []int64) error
 	GroupMembers(context.Context, Tx, int64) ([]int64, error)
+	RemoveUserFromGroups(context.Context, Tx, int64, int64) error
 }
 
 type SCIMUsecase struct {
@@ -126,8 +137,15 @@ func NewSCIMUsecase(s *Services, repo SCIMRepo) *SCIMUsecase {
 // Token governance (browser admin surface)
 
 func (uc *SCIMUsecase) scimAdminGuard(ctx context.Context, actor ActorContext, requireWrite bool) error {
+	actor, err := uc.currentIAMActor(ctx, actor)
+	if err != nil {
+		return err
+	}
 	if !isPlatformAdmin(actor) {
 		return ErrPermissionDenied
+	}
+	if err := uc.requireAdminMFA(ctx, actor); err != nil {
+		return err
 	}
 	if requireWrite {
 		return uc.RequireStepUp(ctx, actor)
@@ -329,42 +347,54 @@ func (uc *SCIMUsecase) setUserActive(ctx context.Context, tx Tx, orgID, userID i
 	if member.Status != OrgMemberActive {
 		return nil
 	}
+	if member.Role == OrgRoleOwner {
+		org := &OrganizationUsecase{Services: uc.Services}
+		if err := org.ensureAnotherOwner(ctx, tx, orgID); err != nil {
+			return err
+		}
+	}
+	if err := uc.Organizations.RemoveMember(ctx, tx, orgID, userID, member.Revision); err != nil {
+		return err
+	}
 	if err := revokeOrgMemberAssignments(ctx, uc.Services, tx, orgID, userID, 0); err != nil {
 		return ErrDependency
 	}
-	return uc.Organizations.RemoveMember(ctx, tx, orgID, userID, member.Revision)
+	return nil
 }
 
-func (uc *SCIMUsecase) localUser(ctx context.Context, tx Tx, orgID, userID int64) (*User, *OrganizationMember, error) {
+func (uc *SCIMUsecase) localUser(ctx context.Context, tx Tx, orgID, userID int64) (*User, *OrganizationMember, *SCIMIdentity, error) {
 	identity, err := uc.SCIM.GetIdentityByLocal(ctx, tx, orgID, SCIMKindUser, userID)
-	if err != nil || identity == nil {
-		return nil, nil, ErrResourceNotFound
+	if err != nil {
+		return nil, nil, nil, scimLookupError(err)
 	}
 	user, err := uc.Users.Get(ctx, tx, userID)
 	if err != nil {
-		return nil, nil, ErrResourceNotFound
+		return nil, nil, nil, scimLookupError(err)
 	}
 	member, err := uc.Organizations.GetMember(ctx, tx, orgID, userID)
 	if err != nil {
-		return nil, nil, ErrResourceNotFound
+		return nil, nil, nil, scimLookupError(err)
 	}
-	return user, member, nil
+	return user, member, identity, nil
+}
+
+func scimLookupError(err error) error {
+	if IsNotFound(err) {
+		return ErrResourceNotFound
+	}
+	return ErrDependency
 }
 
 func (uc *SCIMUsecase) userView(ctx context.Context, tx Tx, orgID, userID int64) (*SCIMUser, error) {
-	user, member, err := uc.localUser(ctx, tx, orgID, userID)
+	user, member, identity, err := uc.localUser(ctx, tx, orgID, userID)
 	if err != nil {
 		return nil, err
-	}
-	identity, err := uc.SCIM.GetIdentityByLocal(ctx, tx, orgID, SCIMKindUser, userID)
-	if err != nil {
-		return nil, ErrDependency
 	}
 	return &SCIMUser{
 		ID: user.ID, ExternalID: identity.ExternalID, UserName: user.Username,
 		DisplayName: user.DisplayName, Email: user.Email,
 		Active:   member.Status == OrgMemberActive && user.Status == UserStatusEnabled,
-		Revision: user.Revision,
+		Revision: identity.Revision,
 	}, nil
 }
 
@@ -376,10 +406,11 @@ func (uc *SCIMUsecase) ListUsers(ctx context.Context, orgID int64) ([]*SCIMUser,
 	out := make([]*SCIMUser, 0, len(identities))
 	for _, identity := range identities {
 		view, err := uc.userView(ctx, nil, orgID, identity.LocalID)
-		if err != nil {
-			// A mapping whose local row was removed is skipped rather than
-			// failing the whole list: an IdP reconciliation must still work.
+		if errors.Is(err, ErrResourceNotFound) {
 			continue
+		}
+		if err != nil {
+			return nil, err
 		}
 		out = append(out, view)
 	}
@@ -395,33 +426,55 @@ func (uc *SCIMUsecase) GetUser(ctx context.Context, orgID, id int64) (*SCIMUser,
 // REFUSED, not silently attached: otherwise a tenant's SCIM token could pull
 // another tenant's user into its own directory by guessing an e-mail address.
 func (uc *SCIMUsecase) CreateUser(ctx context.Context, orgID int64, in SCIMUserInput) (*SCIMUser, error) {
-	if strings.TrimSpace(in.UserName) == "" {
-		return nil, Validation("userName 不能为空")
+	in.UserName = strings.TrimSpace(in.UserName)
+	if in.UserName == "" || utf8.RuneCountInString(in.UserName) > 128 {
+		return nil, Validation("userName 必须为 1–128 个字符")
+	}
+	in.DisplayName = firstNonEmpty(in.DisplayName, in.UserName)
+	if utf8.RuneCountInString(in.DisplayName) > 128 {
+		return nil, Validation("displayName 不能超过 128 个字符")
+	}
+	in.Email = NormalizeEmail(in.Email)
+	if in.Email != "" {
+		if err := ValidateEmail(in.Email); err != nil {
+			return nil, err
+		}
 	}
 	externalID := strings.TrimSpace(in.ExternalID)
 	if externalID == "" {
 		externalID = in.UserName
 	}
+	if utf8.RuneCountInString(externalID) > 255 {
+		return nil, Validation("externalId 不能超过 255 个字符")
+	}
 	var created *SCIMUser
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		if existing, err := uc.SCIM.GetIdentityByExternal(ctx, tx, orgID, SCIMKindUser, externalID); err == nil && existing != nil {
+		if _, err := uc.SCIM.GetIdentityByExternal(ctx, tx, orgID, SCIMKindUser, externalID); err == nil {
 			return ConflictCode("SCIM_UNIQUENESS", "externalId 已存在")
+		} else if !IsNotFound(err) {
+			return ErrDependency
 		}
 		now := uc.Clock.Now()
 		var user *User
-		if normalized := NormalizeEmail(in.Email); normalized != "" {
-			user, _ = uc.Users.GetByEmail(ctx, tx, normalized)
+		if in.Email != "" {
+			var err error
+			user, err = uc.Users.GetByEmail(ctx, tx, in.Email)
+			if err != nil && !IsNotFound(err) {
+				return ErrDependency
+			}
 		}
 		if user == nil {
-			username := strings.TrimSpace(in.UserName)
-			if _, err := uc.Users.GetByUsername(ctx, tx, NormalizeUsername(username)); err == nil {
-				username = fmt.Sprintf("%s-%s", username, uc.IDs.NewID()[:8])
+			normalized := NormalizeUsername(in.UserName)
+			if _, err := uc.Users.GetByUsername(ctx, tx, normalized); err == nil {
+				return ConflictCode("SCIM_UNIQUENESS", "userName 已存在")
+			} else if !IsNotFound(err) {
+				return ErrDependency
 			}
 			var err error
 			user, err = uc.Users.Create(ctx, tx, &User{
-				Username: username, UsernameNormalized: NormalizeUsername(username),
-				DisplayName: firstNonEmpty(in.DisplayName, username),
-				Email:       in.Email, EmailNormalized: NormalizeEmail(in.Email),
+				Username: in.UserName, UsernameNormalized: normalized,
+				DisplayName: in.DisplayName,
+				Email:       in.Email, EmailNormalized: in.Email,
 				Status: UserStatusEnabled, Revision: 1, IdentityVersion: 1,
 				CreatedAt: now, UpdatedAt: now,
 			})
@@ -451,6 +504,9 @@ func (uc *SCIMUsecase) CreateUser(ctx context.Context, orgID int64, in SCIMUserI
 			}
 		} else {
 			member, err := uc.Organizations.GetMember(ctx, tx, orgID, user.ID)
+			if err != nil && !IsNotFound(err) {
+				return ErrDependency
+			}
 			if err != nil || member.Status != OrgMemberActive {
 				return ConflictCode("SCIM_UNIQUENESS", "该邮箱已存在且不属于本组织")
 			}
@@ -458,14 +514,15 @@ func (uc *SCIMUsecase) CreateUser(ctx context.Context, orgID int64, in SCIMUserI
 		if _, err := uc.SCIM.UpsertIdentity(ctx, tx, &SCIMIdentity{
 			OrganizationID: orgID, Kind: SCIMKindUser, ExternalID: externalID, LocalID: user.ID,
 		}); err != nil {
-			return ErrDependency
+			return err
 		}
 		if in.Active != nil && !*in.Active {
 			member, err := uc.Organizations.GetMember(ctx, tx, orgID, user.ID)
-			if err == nil {
-				if err := uc.setUserActive(ctx, tx, orgID, user.ID, false, member); err != nil {
-					return err
-				}
+			if err != nil {
+				return ErrDependency
+			}
+			if err := uc.setUserActive(ctx, tx, orgID, user.ID, false, member); err != nil {
+				return err
 			}
 		}
 		if err := uc.scimAudit(ctx, tx, orgID, "scim.user.created", itoa(user.ID), externalID); err != nil {
@@ -484,49 +541,39 @@ func (uc *SCIMUsecase) CreateUser(ctx context.Context, orgID int64, in SCIMUserI
 	return created, nil
 }
 
-func (uc *SCIMUsecase) ReplaceUser(ctx context.Context, orgID, id int64, in SCIMUserInput) (*SCIMUser, error) {
-	return uc.editUser(ctx, orgID, id, in, true)
+func (uc *SCIMUsecase) ReplaceUser(ctx context.Context, orgID, id int64, in SCIMUserInput, expected uint64) (*SCIMUser, error) {
+	if strings.TrimSpace(in.UserName) == "" {
+		return nil, Validation("userName 不能为空")
+	}
+	in.ExpectedRevision = expected
+	return uc.PatchUser(ctx, orgID, id, in)
 }
 
 func (uc *SCIMUsecase) PatchUser(ctx context.Context, orgID, id int64, in SCIMUserInput) (*SCIMUser, error) {
-	return uc.editUser(ctx, orgID, id, in, false)
-}
-
-func (uc *SCIMUsecase) editUser(ctx context.Context, orgID, id int64, in SCIMUserInput, replace bool) (*SCIMUser, error) {
+	in.ExternalID = strings.TrimSpace(in.ExternalID)
+	if utf8.RuneCountInString(in.ExternalID) > 255 {
+		return nil, Validation("externalId 不能超过 255 个字符")
+	}
 	var out *SCIMUser
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		user, member, err := uc.localUser(ctx, tx, orgID, id)
+		user, member, identity, err := uc.localUser(ctx, tx, orgID, id)
 		if err != nil {
 			return err
 		}
-		if in.UserName != "" || replace {
-			if name := strings.TrimSpace(in.UserName); name != "" {
-				user.Username = name
-				user.UsernameNormalized = NormalizeUsername(name)
-			}
+		if (in.UserName != "" && NormalizeUsername(in.UserName) != user.UsernameNormalized) ||
+			(in.Email != "" && NormalizeEmail(in.Email) != user.EmailNormalized) ||
+			(in.DisplayName != "" && strings.TrimSpace(in.DisplayName) != user.DisplayName) {
+			return ErrSCIMReadOnlyProfile
 		}
-		if in.DisplayName != "" || replace {
-			user.DisplayName = firstNonEmpty(in.DisplayName, user.DisplayName)
+		if in.ExternalID != "" {
+			identity.ExternalID = in.ExternalID
 		}
-		if in.Email != "" || replace {
-			user.Email = in.Email
-			user.EmailNormalized = NormalizeEmail(in.Email)
-		}
-		user.UpdatedAt = uc.Clock.Now()
-		if _, err := uc.Users.Update(ctx, tx, user, user.Revision); err != nil {
-			return ErrDependency
+		if err := uc.updateUserIdentity(ctx, tx, identity, in.ExpectedRevision); err != nil {
+			return err
 		}
 		if in.Active != nil {
 			if err := uc.setUserActive(ctx, tx, orgID, id, *in.Active, member); err != nil {
 				return err
-			}
-		}
-		if strings.TrimSpace(in.ExternalID) != "" {
-			if _, err := uc.SCIM.UpsertIdentity(ctx, tx, &SCIMIdentity{
-				OrganizationID: orgID, Kind: SCIMKindUser,
-				ExternalID: in.ExternalID, LocalID: id,
-			}); err != nil {
-				return ErrDependency
 			}
 		}
 		if err := uc.scimAudit(ctx, tx, orgID, "scim.user.updated", itoa(id), in.ExternalID); err != nil {
@@ -545,16 +592,37 @@ func (uc *SCIMUsecase) editUser(ctx context.Context, orgID, id int64, in SCIMUse
 	return out, nil
 }
 
+func (uc *SCIMUsecase) updateUserIdentity(ctx context.Context, tx Tx, identity *SCIMIdentity, expected uint64) error {
+	if expected != 0 && identity.Revision != expected {
+		return ErrSCIMPrecondition
+	}
+	_, err := uc.SCIM.UpsertIdentity(ctx, tx, identity)
+	if expected != 0 && errors.Is(err, ErrRevisionConflict) {
+		return ErrSCIMPrecondition
+	}
+	return err
+}
+
 // DeleteUser deprovisions: the organization membership and the externalId
 // mapping go away, but the global account is never deleted. Other tenants and
 // audit history must survive one tenant's deprovisioning.
 func (uc *SCIMUsecase) DeleteUser(ctx context.Context, orgID, id int64) error {
+	return uc.DeleteUserIfMatch(ctx, orgID, id, 0)
+}
+
+func (uc *SCIMUsecase) DeleteUserIfMatch(ctx context.Context, orgID, id int64, expected uint64) error {
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		_, member, err := uc.localUser(ctx, tx, orgID, id)
+		_, member, identity, err := uc.localUser(ctx, tx, orgID, id)
 		if err != nil {
 			return err
 		}
-		if err := uc.Organizations.RemoveMember(ctx, tx, orgID, id, member.Revision); err != nil {
+		if err := uc.updateUserIdentity(ctx, tx, identity, expected); err != nil {
+			return err
+		}
+		if err := uc.setUserActive(ctx, tx, orgID, id, false, member); err != nil {
+			return err
+		}
+		if err := uc.SCIM.RemoveUserFromGroups(ctx, tx, orgID, id); err != nil {
 			return ErrDependency
 		}
 		if err := uc.SCIM.DeleteIdentity(ctx, tx, orgID, SCIMKindUser, id); err != nil {
@@ -569,12 +637,14 @@ func (uc *SCIMUsecase) DeleteUser(ctx context.Context, orgID, id int64) error {
 
 func (uc *SCIMUsecase) groupView(ctx context.Context, tx Tx, orgID, id int64) (*SCIMGroup, error) {
 	group, err := uc.SCIM.GetGroup(ctx, tx, orgID, id)
-	if err != nil || group == nil {
-		return nil, ErrResourceNotFound
+	if err != nil {
+		return nil, scimLookupError(err)
 	}
 	identity, err := uc.SCIM.GetIdentityByLocal(ctx, tx, orgID, SCIMKindGroup, id)
-	if err == nil && identity != nil {
+	if err == nil {
 		group.ExternalID = identity.ExternalID
+	} else if !IsNotFound(err) {
+		return nil, ErrDependency
 	}
 	members, err := uc.SCIM.GroupMembers(ctx, tx, id)
 	if err != nil {
@@ -596,8 +666,10 @@ func (uc *SCIMUsecase) ListGroups(ctx context.Context, orgID int64) ([]*SCIMGrou
 		}
 		g.MemberIDs = members
 		identity, err := uc.SCIM.GetIdentityByLocal(ctx, nil, orgID, SCIMKindGroup, g.ID)
-		if err == nil && identity != nil {
+		if err == nil {
 			g.ExternalID = identity.ExternalID
+		} else if !IsNotFound(err) {
+			return nil, ErrDependency
 		}
 	}
 	return groups, nil
@@ -608,37 +680,38 @@ func (uc *SCIMUsecase) GetGroup(ctx context.Context, orgID, id int64) (*SCIMGrou
 }
 
 func (uc *SCIMUsecase) CreateGroup(ctx context.Context, orgID int64, in SCIMGroupInput) (*SCIMGroup, error) {
-	if strings.TrimSpace(in.DisplayName) == "" {
-		return nil, Validation("displayName 不能为空")
+	in.DisplayName = strings.TrimSpace(in.DisplayName)
+	if in.DisplayName == "" || utf8.RuneCountInString(in.DisplayName) > 255 {
+		return nil, Validation("displayName 必须为 1–255 个字符")
 	}
 	externalID := strings.TrimSpace(in.ExternalID)
 	if externalID == "" {
 		externalID = in.DisplayName
 	}
+	if utf8.RuneCountInString(externalID) > 255 {
+		return nil, Validation("externalId 不能超过 255 个字符")
+	}
 	var created *SCIMGroup
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		if existing, err := uc.SCIM.GetIdentityByExternal(ctx, tx, orgID, SCIMKindGroup, externalID); err == nil && existing != nil {
+		if _, err := uc.SCIM.GetIdentityByExternal(ctx, tx, orgID, SCIMKindGroup, externalID); err == nil {
 			return ConflictCode("SCIM_UNIQUENESS", "externalId 已存在")
+		} else if !IsNotFound(err) {
+			return ErrDependency
 		}
 		group, err := uc.SCIM.CreateGroup(ctx, tx, &SCIMGroup{
 			OrganizationID: orgID, DisplayName: in.DisplayName,
 			Revision: 1,
 		})
 		if err != nil {
-			return ErrDependency
+			return err
 		}
 		if _, err := uc.SCIM.UpsertIdentity(ctx, tx, &SCIMIdentity{
 			OrganizationID: orgID, Kind: SCIMKindGroup, ExternalID: externalID, LocalID: group.ID,
 		}); err != nil {
-			return ErrDependency
+			return err
 		}
-		if len(in.AddMembers) > 0 {
-			if err := uc.validGroupMembers(ctx, tx, orgID, in.AddMembers); err != nil {
-				return err
-			}
-			if err := uc.SCIM.SetGroupMembers(ctx, tx, group.ID, in.AddMembers); err != nil {
-				return ErrDependency
-			}
+		if err := uc.editGroupMembers(ctx, tx, orgID, group.ID, in.Members); err != nil {
+			return err
 		}
 		if err := uc.scimAudit(ctx, tx, orgID, "scim.group.created", itoa(group.ID), externalID); err != nil {
 			return err
@@ -656,44 +729,42 @@ func (uc *SCIMUsecase) CreateGroup(ctx context.Context, orgID int64, in SCIMGrou
 	return created, nil
 }
 
-func (uc *SCIMUsecase) PatchGroup(ctx context.Context, orgID, id int64, in SCIMGroupInput) (*SCIMGroup, error) {
+func (uc *SCIMUsecase) PatchGroup(ctx context.Context, orgID, id int64, in SCIMGroupInput, expected uint64) (*SCIMGroup, error) {
+	in.DisplayName = strings.TrimSpace(in.DisplayName)
+	in.ExternalID = strings.TrimSpace(in.ExternalID)
+	if utf8.RuneCountInString(in.DisplayName) > 255 || utf8.RuneCountInString(in.ExternalID) > 255 {
+		return nil, Validation("displayName 和 externalId 不能超过 255 个字符")
+	}
 	var out *SCIMGroup
 	err := uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
 		group, err := uc.SCIM.GetGroup(ctx, tx, orgID, id)
-		if err != nil || group == nil {
-			return ErrResourceNotFound
+		if err != nil {
+			return scimLookupError(err)
 		}
-		if strings.TrimSpace(in.DisplayName) != "" {
+		if expected != 0 && group.Revision != expected {
+			return ErrSCIMPrecondition
+		}
+		if in.DisplayName != "" {
 			group.DisplayName = in.DisplayName
-			if _, err := uc.SCIM.UpdateGroup(ctx, tx, group, group.Revision); err != nil {
-				return ErrDependency
-			}
 		}
-		if len(in.AddMembers) > 0 || len(in.DelMembers) > 0 {
-			if err := uc.validGroupMembers(ctx, tx, orgID, append(in.AddMembers, in.DelMembers...)); err != nil {
+		if _, err := uc.SCIM.UpdateGroup(ctx, tx, group, group.Revision); err != nil {
+			if expected != 0 && errors.Is(err, ErrRevisionConflict) {
+				return ErrSCIMPrecondition
+			}
+			return err
+		}
+		if in.ExternalID != "" {
+			identity, err := uc.SCIM.GetIdentityByLocal(ctx, tx, orgID, SCIMKindGroup, id)
+			if err != nil {
+				return scimLookupError(err)
+			}
+			identity.ExternalID = in.ExternalID
+			if _, err := uc.SCIM.UpsertIdentity(ctx, tx, identity); err != nil {
 				return err
 			}
-			current, err := uc.SCIM.GroupMembers(ctx, tx, id)
-			if err != nil {
-				return ErrDependency
-			}
-			set := map[int64]bool{}
-			for _, uid := range current {
-				set[uid] = true
-			}
-			for _, uid := range in.AddMembers {
-				set[uid] = true
-			}
-			for _, uid := range in.DelMembers {
-				delete(set, uid)
-			}
-			next := make([]int64, 0, len(set))
-			for uid := range set {
-				next = append(next, uid)
-			}
-			if err := uc.SCIM.SetGroupMembers(ctx, tx, id, next); err != nil {
-				return ErrDependency
-			}
+		}
+		if err := uc.editGroupMembers(ctx, tx, orgID, id, in.Members); err != nil {
+			return err
 		}
 		if err := uc.scimAudit(ctx, tx, orgID, "scim.group.updated", itoa(id), in.ExternalID); err != nil {
 			return err
@@ -711,15 +782,22 @@ func (uc *SCIMUsecase) PatchGroup(ctx context.Context, orgID, id int64, in SCIMG
 	return out, nil
 }
 
-func (uc *SCIMUsecase) DeleteGroup(ctx context.Context, orgID, id int64) error {
+func (uc *SCIMUsecase) DeleteGroup(ctx context.Context, orgID, id int64, expected uint64) error {
 	return uc.Tx.InTx(ctx, func(ctx context.Context, tx Tx) error {
-		if _, err := uc.SCIM.GetGroup(ctx, tx, orgID, id); err != nil {
-			return ErrResourceNotFound
+		group, err := uc.SCIM.GetGroup(ctx, tx, orgID, id)
+		if err != nil {
+			return scimLookupError(err)
+		}
+		if expected != 0 && group.Revision != expected {
+			return ErrSCIMPrecondition
+		}
+		if err := uc.SCIM.DeleteGroup(ctx, tx, orgID, id, group.Revision); err != nil {
+			if expected != 0 && errors.Is(err, ErrRevisionConflict) {
+				return ErrSCIMPrecondition
+			}
+			return err
 		}
 		if err := uc.SCIM.SetGroupMembers(ctx, tx, id, nil); err != nil {
-			return ErrDependency
-		}
-		if err := uc.SCIM.DeleteGroup(ctx, tx, orgID, id); err != nil {
 			return ErrDependency
 		}
 		if err := uc.SCIM.DeleteIdentity(ctx, tx, orgID, SCIMKindGroup, id); err != nil {
@@ -729,12 +807,54 @@ func (uc *SCIMUsecase) DeleteGroup(ctx context.Context, orgID, id int64) error {
 	})
 }
 
+func (uc *SCIMUsecase) editGroupMembers(ctx context.Context, tx Tx, orgID, id int64, changes []SCIMGroupMemberChange) error {
+	if len(changes) == 0 {
+		return nil
+	}
+	current, err := uc.SCIM.GroupMembers(ctx, tx, id)
+	if err != nil {
+		return ErrDependency
+	}
+	set := make(map[int64]struct{}, len(current))
+	for _, uid := range current {
+		set[uid] = struct{}{}
+	}
+	for _, change := range changes {
+		if change.Replace {
+			clear(set)
+		}
+		if change.Remove {
+			for _, uid := range change.IDs {
+				delete(set, uid)
+			}
+			continue
+		}
+		if err := uc.validGroupMembers(ctx, tx, orgID, change.IDs); err != nil {
+			return err
+		}
+		for _, uid := range change.IDs {
+			set[uid] = struct{}{}
+		}
+	}
+	next := make([]int64, 0, len(set))
+	for uid := range set {
+		next = append(next, uid)
+	}
+	if err := uc.SCIM.SetGroupMembers(ctx, tx, id, next); err != nil {
+		return ErrDependency
+	}
+	return nil
+}
+
 // validGroupMembers refuses ids that are not provisioned users of THIS tenant.
 // Without it, a SCIM client could put an arbitrary platform user id into a
 // group and make the group enumeration disclose foreign accounts.
 func (uc *SCIMUsecase) validGroupMembers(ctx context.Context, tx Tx, orgID int64, ids []int64) error {
 	for _, uid := range ids {
-		if _, _, err := uc.localUser(ctx, tx, orgID, uid); err != nil {
+		if _, _, _, err := uc.localUser(ctx, tx, orgID, uid); err != nil {
+			if !errors.Is(err, ErrResourceNotFound) {
+				return err
+			}
 			return Validation("组成员必须是通过 SCIM 供给到本组织的用户")
 		}
 	}

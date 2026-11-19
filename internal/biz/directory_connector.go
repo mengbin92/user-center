@@ -2,7 +2,6 @@ package biz
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +12,8 @@ import (
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
+
+	"github.com/mengbin92/user-center/pkg/jsonx"
 )
 
 // Directory connectors are deliberately small and stateless: the sync engine
@@ -113,7 +114,7 @@ func NewDirectoryConnectors() map[string]DirectoryConnector {
 // an SSRF guard is still required: the worker follows them unattended.
 func validateDirectoryURL(raw string, allowedSchemes ...string) (*url.URL, error) {
 	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" {
+	if err != nil || u.Hostname() == "" || u.User != nil || u.Fragment != "" {
 		return nil, Validation("目录地址不是合法 URL")
 	}
 	ok := false
@@ -139,10 +140,10 @@ func validateDirectoryURL(raw string, allowedSchemes ...string) (*url.URL, error
 // Generic JSON feed (Entra/Okta/飞书 export gateways, and test fixtures)
 
 type jsonFeedPayload struct {
-	Users   []jsonFeedUser `json:"users"`
-	Deleted []string       `json:"deleted"`
-	Cursor  string         `json:"cursor"`
-	Full    bool           `json:"full"`
+	Users   *[]jsonFeedUser `json:"users"`
+	Deleted []string        `json:"deleted"`
+	Cursor  string          `json:"cursor"`
+	Full    bool            `json:"full"`
 }
 
 type jsonFeedUser struct {
@@ -188,16 +189,26 @@ func (jsonFeedConnector) Fetch(ctx context.Context, cfg DirectoryConfig, secret,
 	if resp.StatusCode != http.StatusOK {
 		return nil, Validation("目录源返回 " + strconv.Itoa(resp.StatusCode))
 	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	const maxFeedBytes = 8 << 20
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxFeedBytes+1))
 	if err != nil {
 		return nil, ErrDependency
 	}
-	var payload jsonFeedPayload
-	if err := json.Unmarshal(raw, &payload); err != nil {
+	if len(raw) > maxFeedBytes {
+		return nil, Validation("目录源响应超过大小上限")
+	}
+	var payload *jsonFeedPayload
+	if err := jsonx.Unmarshal(raw, &payload); err != nil || payload == nil || payload.Full && payload.Users == nil {
 		return nil, Validation("目录源返回的 JSON 不合法")
 	}
-	out := &DirectorySnapshot{Cursor: payload.Cursor, Full: payload.Full || cursor == "", Deleted: payload.Deleted}
-	for _, u := range payload.Users {
+	out := &DirectorySnapshot{Cursor: payload.Cursor, Full: payload.Full, Deleted: payload.Deleted}
+	if out.Cursor == "" {
+		out.Cursor = cursor
+	}
+	if payload.Users == nil {
+		return out, nil
+	}
+	for _, u := range *payload.Users {
 		if strings.TrimSpace(u.ExternalID) == "" || strings.TrimSpace(u.UserName) == "" {
 			return nil, Validation("目录用户缺少 externalId 或 userName")
 		}
@@ -210,9 +221,6 @@ func (jsonFeedConnector) Fetch(ctx context.Context, cfg DirectoryConfig, secret,
 			DisplayName: u.DisplayName, Email: u.Email, Active: active,
 		})
 	}
-	if out.Cursor == "" {
-		out.Cursor = time.Now().UTC().Format(time.RFC3339Nano)
-	}
 	return out, nil
 }
 
@@ -224,6 +232,7 @@ type ldapConnector struct{}
 func (ldapConnector) Kind() string { return "ldap" }
 
 func (ldapConnector) Fetch(ctx context.Context, cfg DirectoryConfig, secret, cursor string) (*DirectorySnapshot, error) {
+	startedAt := time.Now().UTC()
 	u, err := validateDirectoryURL(cfg.URL, "ldap", "ldaps")
 	if err != nil {
 		return nil, err
@@ -248,11 +257,11 @@ func (ldapConnector) Fetch(ctx context.Context, cfg DirectoryConfig, secret, cur
 	}
 	if cursor != "" {
 		// AD's whenChanged uses the generalized-time form YYYYMMDDHHMMSS.0Z.
-		filter = fmt.Sprintf("(&%s(whenChanged>=%s))", filter, cursor)
+		filter = fmt.Sprintf("(&%s(whenChanged>=%s))", filter, ldap.EscapeFilter(cursor))
 	}
 	attrs := []string{cfg.ExternalIDAttr, cfg.UserNameAttr, cfg.DisplayNameAttr, cfg.EmailAttr, "userAccountControl"}
 	paging := ldap.NewControlPaging(uint32(cfg.PageSize))
-	out := &DirectorySnapshot{Full: cursor == ""}
+	out := &DirectorySnapshot{Full: cursor == "", Cursor: startedAt.Format("20060102150405.0Z")}
 	for {
 		select {
 		case <-ctx.Done():
@@ -297,6 +306,5 @@ func (ldapConnector) Fetch(ctx context.Context, cfg DirectoryConfig, secret, cur
 		}
 		paging.SetCookie(pagingResult.Cookie)
 	}
-	out.Cursor = time.Now().UTC().Format("20060102150405.0Z")
 	return out, nil
 }

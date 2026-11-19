@@ -30,7 +30,7 @@ func (uc *IntegrationUsecase) integrationAppID(ctx context.Context, requested st
 	if strings.TrimSpace(requested) != "" && requested != client.Code {
 		return "", nil, ErrPermissionDenied
 	}
-	if strings.TrimSpace(client.Code) == "" {
+	if strings.TrimSpace(client.Code) == "" || client.Code == ApplicationCode {
 		return "", nil, ErrPermissionDenied
 	}
 	return client.Code, client, nil

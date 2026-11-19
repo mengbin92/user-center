@@ -44,7 +44,7 @@ export function PasskeyPanel() {
       return api.me.confirmWebAuthnRegistration(body)
     },
     successMessage: 'Passkey 已绑定',
-    successDescription: '可用作登录与安全验证的第二因素。',
+    successDescription: '支持设备身份验证的通行密钥可用于免密码登录。',
     invalidate: [['me', 'webauthn', 'credentials']],
     refreshAuth: true,
     onSuccess: reset,
@@ -77,9 +77,9 @@ export function PasskeyPanel() {
 
   const busy = register.isPending || verify.isPending || remove.isPending
   const submit = () => {
-    if (action === 'register') void register.mutateAsync()
-    if (action === 'verify') void verify.mutateAsync()
-    if (action === 'delete') void remove.mutateAsync()
+    if (action === 'register') register.mutate()
+    if (action === 'verify') verify.mutate()
+    if (action === 'delete') remove.mutate()
   }
 
   return (
@@ -87,7 +87,7 @@ export function PasskeyPanel() {
       <Card>
         <CardHeader
           title="Passkey / 安全密钥"
-          description="平台认证器或硬件密钥可作为第二因素；用户名与密码仍是第一因素。"
+          description="可发现且支持设备身份验证的通行密钥可免密码登录。绑定的安全密钥也可用于两步验证。"
           actions={
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={() => setAction('verify')}>
@@ -102,7 +102,7 @@ export function PasskeyPanel() {
           }
         />
         <CardContent className="space-y-2">
-          <InlineAlert tone="info" title="第二因素">
+          <InlineAlert tone="info" title="凭据保护">
             注册、删除与安全验证都需要重新输入当前密码；凭据公钥保存在服务端，认证器计数器回退会被拒绝。
           </InlineAlert>
           {items.length === 0 ? (

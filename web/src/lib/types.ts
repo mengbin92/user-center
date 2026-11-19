@@ -28,10 +28,14 @@ export type BatchAssignReply = Schemas['api.usercenter.v1.BatchAssignReply']
 export type BatchAssignRequest = Schemas['api.usercenter.v1.BatchAssignRequest']
 export type BatchFailure = Schemas['api.usercenter.v1.BatchFailure']
 export type BatchPreviewReply = Schemas['api.usercenter.v1.BatchPreviewReply']
+export type BeginPasskeyLoginRequest =
+  Schemas['api.usercenter.v1.BeginPasskeyLoginRequest']
 export type ChallengeReply = Schemas['api.usercenter.v1.ChallengeReply']
 export type ChangePasswordRequest =
   Schemas['api.usercenter.v1.ChangePasswordRequest']
 export type CompleteMFARequest = Schemas['api.usercenter.v1.CompleteMFARequest']
+export type CompletePasskeyLoginRequest =
+  Schemas['api.usercenter.v1.CompletePasskeyLoginRequest']
 export type ConfirmEmailRequest = Schemas['api.usercenter.v1.ConfirmEmailRequest']
 export type ConfirmMFARequest = Schemas['api.usercenter.v1.ConfirmMFARequest']
 export type Constraint = Schemas['api.usercenter.v1.Constraint']
@@ -78,6 +82,8 @@ export type ListMeta = Schemas['api.usercenter.v1.ListMeta']
 export type LoginReply = Schemas['api.usercenter.v1.LoginReply']
 export type LoginRequest = Schemas['api.usercenter.v1.LoginRequest']
 export type MenuItem = Schemas['api.usercenter.v1.MenuItem']
+export type PasskeyLoginChallengeReply =
+  Schemas['api.usercenter.v1.PasskeyLoginChallengeReply']
 export type MenusReply = Schemas['api.usercenter.v1.MenusReply']
 export type AddOrganizationMemberRequest =
   Schemas['api.usercenter.v1.AddOrganizationMemberRequest']

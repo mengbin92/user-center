@@ -88,7 +88,6 @@ type ExternalIdentityRepo interface {
 
 type MFARepo interface {
 	Get(context.Context, Tx, int64) (*MFAState, error)
-	ListByUsers(context.Context, Tx, []int64) (map[int64]*MFAState, error)
 	Save(context.Context, Tx, *MFAState) error
 	Delete(context.Context, Tx, int64) error
 }
@@ -124,18 +123,19 @@ type ChallengeStore interface {
 	// Delete, keeping the DB unique completion record authoritative.
 	Verify(context.Context, string, string, string) (Challenge, error)
 	Get(context.Context, string, string) (Challenge, error)
-	Delete(context.Context, string) error
+	Delete(ctx context.Context, purpose, id string) error
 }
 
 type Challenge struct {
-	ID        string
-	Purpose   string
-	CodeHash  string
-	UserID    int64
-	Email     string
-	Payload   string
-	Attempts  int
-	ExpiresAt time.Time
+	ID              string
+	Purpose         string
+	CodeHash        string
+	UserID          int64
+	IdentityVersion uint64
+	Email           string
+	Payload         string
+	Attempts        int
+	ExpiresAt       time.Time
 }
 
 type RateLimiter interface {
@@ -288,8 +288,8 @@ type OutboxRepo interface {
 	DueDeliveries(context.Context, Tx, time.Time, int) ([]*Delivery, error)
 	ListDeliveries(context.Context, Tx, string, int, int) ([]*Delivery, int64, error)
 	RetryDelivery(context.Context, Tx, string, string) error
-	MarkDelivered(context.Context, string, string, time.Time) error
-	MarkRetry(context.Context, string, string, time.Time, string) error
+	MarkDelivered(context.Context, *Delivery, time.Time) error
+	MarkRetry(context.Context, *Delivery, time.Time, string) error
 }
 
 type IntegrationClientRepo interface {
@@ -298,8 +298,8 @@ type IntegrationClientRepo interface {
 	GetByClientID(context.Context, Tx, string) (*IntegrationClient, error)
 	Create(context.Context, Tx, *IntegrationClient) (*IntegrationClient, error)
 	Update(context.Context, Tx, *IntegrationClient, uint64) (*IntegrationClient, error)
-	RotateCredential(context.Context, Tx, int64, string, int) (*IntegrationClient, error)
-	Disable(context.Context, Tx, int64) error
+	RotateCredential(context.Context, Tx, int64, string, uint64) (*IntegrationClient, error)
+	Disable(context.Context, Tx, int64, uint64) (*IntegrationClient, error)
 }
 
 type SettingsRepo interface {
@@ -339,6 +339,7 @@ type OIDCCodeRepo interface {
 	ConsumeOIDCCode(context.Context, Tx, string, string, string, time.Time) (*OIDCCode, error)
 	CreateOIDCRefreshToken(context.Context, Tx, *OIDCRefreshToken) error
 	ConsumeOIDCRefreshToken(context.Context, Tx, string, string, time.Time) (*OIDCRefreshToken, error)
+	RevokeOIDCGrants(context.Context, Tx, string, int64, time.Time) error
 }
 
 // OIDCConsentRepo owns granted scopes and the parked authorize requests.
@@ -400,6 +401,7 @@ type OrganizationRepo interface {
 	CountOrganizations(context.Context, Tx) (int64, error)
 
 	GetMember(context.Context, Tx, int64, int64) (*OrganizationMember, error)
+	GetMemberForUpdate(context.Context, Tx, int64, int64) (*OrganizationMember, error)
 	ListMembers(context.Context, Tx, int64) ([]*OrganizationMember, error)
 	AddMember(context.Context, Tx, *OrganizationMember) (*OrganizationMember, error)
 	RestoreMember(context.Context, Tx, int64, int64, string, *int64, int64) (*OrganizationMember, error)

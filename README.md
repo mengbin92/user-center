@@ -2,7 +2,7 @@
 
 从 [`micro-one-api`](https://github.com/mengbin92/micro-one-api) 抽离出来的独立用户中心。它拥有账号、凭据、邮箱验证、MFA、会话和平台 IAM 权限治理，拥有自己的 MySQL 数据库、Redis 命名空间、邮件适配器和前端 SPA，可独立完成注册、登录、用户管理、密码恢复、MFA、会话撤销、角色授权与审计。
 
-> **状态：v0.12.1 — 组织委派、SCIM 2.0、企业目录同步与租户 schema 隔离。** v0.12.1 为 PATCH：修复 CI 上并发 TOTP 用例的偶发 503（SQLite 写锁缺少 busy timeout），无 API、迁移与配置变更。补齐组织级 SoD 的委派写入入口与界面；新增 SCIM 2.0 用户/组供给与凭据管理（[文档](docs/scim.md)）；新增企业目录同步（LDAP/AD 与 JSON 网关，[文档](docs/directory-sync.md)）；交付可选的按组织独立 schema 路由与租户数据域隔离（[文档](docs/tenancy.md)，**存量数据 cutover 未完成**）。**升级须先执行迁移 `015` 与 `016`**，完整范围见 [v0.12.0 发布说明](docs/releases/release-v0.12.0.md)。真实上游供应商登录验收保持未验证。
+> **📣 最新发布 v0.13.0（2026-11-19）**。新增无密码 Passkey 登录，修复租户搬迁误删目标数据、SCIM 共享账号越权和 IAM 授权问题。已启用租户隔离的实例需先核对升级步骤。[发布说明](docs/releases/release-v0.13.0.md) · [变更记录](CHANGELOG.md)
 
 ## 目录
 
@@ -119,6 +119,7 @@ scripts/                  开发与检查脚本
 | CSRF | 双提交 Cookie：非 HttpOnly 的 `uc_csrf` + 写请求 `X-CSRF-Token`；中间件对全部 `/api/v1` 非安全方法强制校验 |
 | 密码 | bcrypt；最小字符数可配置（默认 10），最多 72 字节；修改密码后提升 `identity_version` 并撤销其他会话 |
 | MFA | TOTP（RFC 6238）+ 8 个一次性恢复码；秘钥 AES-GCM 加密；`last_step` 防重放；5 次失败锁定 5 分钟 |
+| Passkey | WebAuthn 通行密钥可作第二因素，也可**无密码登录**：公开 begin/complete 断言、防枚举诱饵、挑战单次消费、签名计数器克隆检测；已启用 TOTP 的账号仍须第二因素 |
 | Step-up | 高风险操作要求近期主认证 + 第二因素验证，证明绑定当前 session 与身份版本、5 分钟过期 |
 | 邮箱 | 注册/换绑使用一次性验证码；验证码 HMAC 后存 Redis（无 Redis 时内存），单次消费 + 数据库完成记录幂等 |
 | 审计 | 所有敏感写入在业务事务内写 `iam_audit_events`；登录与安全事件写 `security_events`；CSV 导出重新校验权限与范围 |
@@ -138,7 +139,7 @@ scripts/                  开发与检查脚本
 
 | 接口族 | 路径 |
 |---|---|
-| 公开认证 | `/auth/context`、`/auth/registration-challenges`、`/auth/register`、`/auth/login`、`/auth/mfa/complete`、`/auth/logout`、`/auth/password-reset-challenges`、`/auth/password-reset` |
+| 公开认证 | `/auth/context`、`/auth/registration-challenges`、`/auth/register`、`/auth/login`、`/auth/mfa/complete`、`/auth/passkey/login:begin`、`/auth/passkey/login:complete`、`/auth/logout`、`/auth/password-reset-challenges`、`/auth/password-reset` |
 | 第三方登录 | `GET /auth/providers/{provider}/start`、`GET /auth/providers/{provider}/callback`（GitHub / Google；绑定使用 `?mode=bind`） |
 | 本人 | `/me`、`/me/password:change`、`/me/email-challenges`、`/me/email:confirm`、`/me/security`、`/me/mfa:*`、`/me/sessions`、`/me/session-roles`、`/me/authorization`、`/me/security-events` |
 | 用户管理 | `/admin/overview`、`/admin/users`、`/admin/users/{id}`、`{id}:set-status`、`{id}:archive`、`{id}/password-reset-requests`、`{id}/mfa:reset`、`{id}/email-changes*`、`{id}/sessions*`、`{id}/effective-permissions`、`/admin/users:export`、`/admin/exports/{id}`、`/admin/exports/{id}/download` |
@@ -154,6 +155,8 @@ scripts/                  开发与检查脚本
 ## 实现范围与已知差异
 
 **已实现（V1）**：用户生命周期（创建/资料/启停/归档）、密码与邮箱变更、管理员邮箱变更、强制首次改密、TOTP + 恢复码、管理员强制 MFA、Step-up、会话治理、角色/会话角色、权限目录、角色继承、授权分配（含列表与批量，事务内整批拒绝）、委派、职责分离、菜单投影、授权解释/模拟、审计与导出、认证配置、GitHub/Google 登录与绑定、接入客户端管理、gRPC 客户端鉴权、Outbox Webhook 投递、`cmd/import-legacy` 离线导入。
+
+**v0.13.0** 支持使用可发现的 Passkey 免密码登录。认证器须完成设备身份验证，配置了 TOTP 的账号仍须完成第二步。[发布说明](docs/releases/release-v0.13.0.md)
 
 **V2 已交付**：
 - v0.7.0：Prometheus 指标（独立回环监听）、7 条 SLO 告警规则、慢请求日志与全链路 `request_id`、MySQL 负载基线与索引审计、CI 的 MySQL/生成物/compose 门禁；`admin` 列表单请求 SELECT 92 → 20。
@@ -257,6 +260,8 @@ SMOKE_USER=root SMOKE_PASSWORD='<密码>' \
 - [前端说明](docs/frontend.md)
 - [V2.4 路线图](docs/roadmap-v2.4.md)
 - [V2.5 路线图](docs/roadmap-v2.5.md)
+- [v0.13.0 发布说明](docs/releases/release-v0.13.0.md)
+- [v0.12.1 发布说明](docs/releases/release-v0.12.1.md)
 - [v0.11.0 发布说明](docs/releases/release-v0.11.0.md)
 - [v0.10.1 发布说明](docs/releases/release-v0.10.1.md)
 - [v0.10.0 发布说明](docs/releases/release-v0.10.0.md)

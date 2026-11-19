@@ -182,8 +182,20 @@ func (r *organizationRepo) CountOrganizations(ctx context.Context, tx biz.Tx) (i
 }
 
 func (r *organizationRepo) GetMember(ctx context.Context, tx biz.Tx, orgID, userID int64) (*biz.OrganizationMember, error) {
+	return r.getMember(ctx, tx, orgID, userID, false)
+}
+
+func (r *organizationRepo) GetMemberForUpdate(ctx context.Context, tx biz.Tx, orgID, userID int64) (*biz.OrganizationMember, error) {
+	return r.getMember(ctx, tx, orgID, userID, true)
+}
+
+func (r *organizationRepo) getMember(ctx context.Context, tx biz.Tx, orgID, userID int64, lock bool) (*biz.OrganizationMember, error) {
 	var p organizationMemberPO
-	err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("organization_id = ? AND user_id = ?", orgID, userID).First(&p).Error
+	db := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("organization_id = ? AND user_id = ?", orgID, userID)
+	if lock {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := db.First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, biz.ErrResourceNotFound
 	}
@@ -508,6 +520,23 @@ func (r *organizationRepo) GetInvitation(ctx context.Context, tx biz.Tx, id int6
 }
 
 func (r *organizationRepo) GetInvitationByTokenHash(ctx context.Context, tx biz.Tx, hash string) (*biz.OrganizationInvitation, error) {
+	if r.d.IsolationEnabled() && tenant.From(ctx) == 0 {
+		ids, err := r.d.TenantOrganizationIDs(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, orgID := range ids {
+			inv, err := r.invitationByTokenHash(tenant.With(ctx, orgID), tx, hash)
+			if !errors.Is(err, biz.ErrResourceNotFound) {
+				return inv, err
+			}
+		}
+		return nil, biz.ErrResourceNotFound
+	}
+	return r.invitationByTokenHash(ctx, tx, hash)
+}
+
+func (r *organizationRepo) invitationByTokenHash(ctx context.Context, tx biz.Tx, hash string) (*biz.OrganizationInvitation, error) {
 	var p organizationInvitationPO
 	err := r.d.tenantOr(ctx, tx).WithContext(ctx).Where("token_hash = ?", hash).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

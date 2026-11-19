@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -33,8 +34,11 @@ type DepartmentInput struct {
 }
 
 func isPlatformAdmin(actor ActorContext) bool {
+	if actor.User == nil || actor.Session == nil {
+		return false
+	}
 	for _, r := range actor.User.Roles {
-		if r.Code == "root" || r.Code == "admin" {
+		if r.Unrestricted && (r.Code == "root" || r.Code == "admin") && slices.Contains(actor.Session.ActiveRoleIDs, r.ID) {
 			return true
 		}
 	}
@@ -94,7 +98,7 @@ func (uc *OrganizationUsecase) orgPermission(ctx context.Context, actor ActorCon
 		return err
 	}
 	if isPlatformAdmin(actor) {
-		return nil
+		return uc.requireAdminMFA(ctx, actor)
 	}
 	if _, err := uc.AuthorizeIn(ctx, actor, authorization.Organization(orgID), operation, targetUserID, wholeObject); err != nil {
 		return err
@@ -350,6 +354,9 @@ func (uc *OrganizationUsecase) Archive(ctx context.Context, actor ActorContext, 
 func (uc *OrganizationUsecase) AdminList(ctx context.Context, actor ActorContext, status string) ([]*Organization, error) {
 	if !isPlatformAdmin(actor) {
 		return nil, ErrPermissionDenied
+	}
+	if err := uc.requireAdminMFA(ctx, actor); err != nil {
+		return nil, err
 	}
 	orgs, err := uc.Organizations.ListAllOrganizations(ctx, nil, status)
 	if err != nil {
@@ -772,6 +779,9 @@ func (uc *OrganizationUsecase) ArchiveDepartment(ctx context.Context, actor Acto
 func (uc *OrganizationUsecase) AdminArchive(ctx context.Context, actor ActorContext, orgID int64, expected uint64, reason string) (*Organization, error) {
 	if !isPlatformAdmin(actor) {
 		return nil, ErrPermissionDenied
+	}
+	if err := uc.requireAdminMFA(ctx, actor); err != nil {
+		return nil, err
 	}
 	if err := uc.RequireStepUp(ctx, actor); err != nil {
 		return nil, err

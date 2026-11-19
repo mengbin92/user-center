@@ -9,10 +9,12 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/mengbin92/user-center/internal/biz"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,6 +26,7 @@ type webAuthnFixture struct {
 	credIDText string
 	cose       []byte
 	counter    uint32
+	verified   bool
 	rpID       string
 	origin     string
 }
@@ -50,6 +53,9 @@ func (f *webAuthnFixture) authData(attested bool, counter uint32) []byte {
 	rpHash := sha256.Sum256([]byte(f.rpID))
 	out := append([]byte{}, rpHash[:]...)
 	flags := byte(0x01)
+	if f.verified {
+		flags |= 0x04
+	}
 	if attested {
 		flags |= 0x40
 	}
@@ -128,6 +134,13 @@ func TestWebAuthnFullLifecycle(t *testing.T) {
 	// A passkey is a second factor and satisfies the admin MFA policy.
 	security := h.do(http.MethodGet, "/api/v1/me/security", nil, "", false)
 	require.Equal(t, true, decode[map[string]any](t, security)["mfa_enabled"])
+	me := h.do(http.MethodGet, "/api/v1/me", nil, "", false)
+	require.Equal(t, true, decode[map[string]any](t, me)["mfa_enabled"])
+	users := h.do(http.MethodGet, "/api/v1/admin/users?mfa_enabled=true", nil, "", false)
+	require.Equal(t, http.StatusOK, users.Code, users.Body.String())
+	items := decode[map[string]any](t, users)["items"].([]any)
+	require.Len(t, items, 1)
+	require.Equal(t, true, items[0].(map[string]any)["mfa_enabled"])
 
 	// Assertion -> Step-up proof.
 	assertChallenge := decode[map[string]any](t, h.do(http.MethodPost,
@@ -162,6 +175,11 @@ func TestWebAuthnFullLifecycle(t *testing.T) {
 	}, "", true)
 	require.Equal(t, http.StatusConflict, back.Code)
 	require.Contains(t, back.Body.String(), "WEBAUTHN_SIGN_COUNT_REGRESSION")
+	audits, _, err := h.svc.Audit.List(t.Context(), nil, biz.AuditFilter{
+		Action: "credential.webauthn.sign_count_regression", Limit: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, audits, 1)
 
 	// The last second factor cannot be removed without a replacement.
 	last := h.do(http.MethodPost, "/api/v1/me/webauthn/credentials/"+credentialID+":delete",
@@ -172,7 +190,7 @@ func TestWebAuthnFullLifecycle(t *testing.T) {
 	// Login MFA can be satisfied by the passkey instead of TOTP.
 	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true).Code)
 	login := decode[map[string]any](t, h.do(http.MethodPost, "/api/v1/auth/login",
-		map[string]any{"username": "root", "password": "ChangeMe-12345"}, "", true))
+		map[string]any{"username": "root", "password": "ChangeMe-12345", "remember": true}, "", true))
 	require.Equal(t, "mfa_required", login["status"])
 	wa := login["webauthn"].(map[string]any)
 	require.NotEmpty(t, wa["challenge"])
@@ -183,6 +201,7 @@ func TestWebAuthnFullLifecycle(t *testing.T) {
 	}, "", true)
 	require.Equal(t, http.StatusOK, completed.Code, completed.Body.String())
 	require.Equal(t, "authenticated", decode[map[string]any](t, completed)["status"])
+	assertRememberCookie(t, completed, true)
 }
 
 func TestWebAuthnRejectsWrongOriginAndAttestationFormat(t *testing.T) {
@@ -221,4 +240,36 @@ func TestWebAuthnRejectsWrongOriginAndAttestationFormat(t *testing.T) {
 	}, "", true)
 	require.Equal(t, http.StatusBadRequest, rec2.Code)
 	require.True(t, strings.Contains(rec2.Body.String(), "attestation"))
+}
+
+func TestOAuthPasskeySecondFactor(t *testing.T) {
+	h := newHarness(t)
+	require.Equal(t, http.StatusOK, h.login("root", "ChangeMe-12345").Code)
+	oauthComplete(t, h, "bind")
+	f := newWebAuthnFixture(t)
+	reg := decode[map[string]any](t, h.do(http.MethodPost,
+		"/api/v1/me/webauthn/credentials:challenge",
+		map[string]any{"current_password": "ChangeMe-12345"}, "", true))
+	registerPasskey(t, h, f, reg["challenge_id"].(string), reg["challenge"].(string))
+	require.Equal(t, http.StatusOK, h.do(http.MethodPost, "/api/v1/auth/logout", nil, "", true).Code)
+
+	state := oauthStateFor(t, h, "login")
+	callback := h.do(http.MethodGet, "/api/v1/auth/providers/mock/callback?state="+state+"&code=ok", nil, "", false)
+	require.Equal(t, http.StatusFound, callback.Code)
+	redirect, err := url.Parse(callback.Header().Get("Location"))
+	require.NoError(t, err)
+	require.Equal(t, "/login", redirect.Path)
+	require.Equal(t, http.StatusUnauthorized, h.do(http.MethodGet, "/api/v1/me", nil, "", false).Code)
+	fragment, err := url.ParseQuery(redirect.Fragment)
+	require.NoError(t, err)
+	require.Equal(t, f.rpID, fragment.Get("rp_id"))
+	require.Equal(t, []string{f.credIDText}, fragment["allow_credential_ids"])
+	authData, clientData, signature := f.assertion(t, fragment.Get("challenge"), 2)
+	rec := h.do(http.MethodPost, "/api/v1/auth/mfa/complete", map[string]any{
+		"challenge_id": redirect.Query().Get("mfa_challenge"), "credential_id": f.credIDText,
+		"authenticator_data": authData, "client_data_json": clientData, "signature": signature,
+	}, "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assertRememberCookie(t, rec, true)
+	require.Equal(t, http.StatusOK, h.do(http.MethodGet, "/api/v1/me", nil, "", false).Code)
 }

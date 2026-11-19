@@ -29,7 +29,7 @@ security:
   session_ttl_minutes: 720
   idle_timeout_minutes: 60
   step_up_ttl_minutes: 5
-  trust_proxy_headers: true
+  trust_proxy_headers: false
 
 mail:
   driver: console
