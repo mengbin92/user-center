@@ -6,15 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-19
+
+**版本判定：MINOR（v0.12.1 → v0.13.0）。** 新增无密码 Passkey 登录 API 和界面入口，同时修复全仓审查确认的认证、越权和租户迁移问题。[发布说明](docs/releases/release-v0.13.0.md)
+
 ### Added — 无密码 Passkey 登录（迁移自 micro-one-api v0.41）
 
 - 新增公开端点 `POST /api/v1/auth/passkey/login:begin` 与 `POST /api/v1/auth/passkey/login:complete`：用户名或邮箱换取 WebAuthn 断言挑战，验签通过后签发与密码登录相同的 HttpOnly 会话 Cookie。Passkey 从这里起是**第一因素**，密码登录保持不变。
-- 防枚举：未知账号、停用账号与未绑定 Passkey 的账号在 `begin` 得到同形状的诱饵 ceremony；假凭据 ID 由服务端 `CodeSecret` 做 HMAC 派生（同一标识重复探测稳定，客户端无法自行重算识别诱饵）。`complete` 对诱饵与真实账号的无效断言统一返回 `CHALLENGE_INVALID`，不暴露账号是否存在。
+- 防枚举与用户验证：公开挑战统一使用可发现凭据，省略账号的凭据 ID。服务端要求认证器完成用户验证，未知账号、停用账号与无效断言统一返回 `CHALLENGE_INVALID`。
 - 一次性与并发：挑战经 `auth_flow_completions` 单次消费，签名计数器更新与会话签发在同一事务、先锁用户行；重放同一挑战返回 `CHALLENGE_INVALID`，克隆认证器的计数器回退仍返回 `WEBAUTHN_SIGN_COUNT_REGRESSION`。
 - 第二因素不被绕过：仍启用 TOTP 的账号在 Passkey 通过后返回 `mfa_required` + challenge，复用 `/api/v1/auth/mfa/complete`，此时不签发会话。
 - 登录页新增「使用通行密钥」入口：未填标识先提示；浏览器取消/超时映射为可读提示；MFA 待决阶段不再重复提供 Passkey 作为第二因素。
 - 无数据库迁移：复用 `webauthn_credentials`、挑战存储与现有安全事件/审计路径；`make api` 与 `npm run generate:api` 已更新生成物。
-- 测试：Go HTTP 级覆盖真实 P-256 断言登录、MFA 仍待验证、挑战重放、未知/停用/未绑定账号的诱饵 parity；前端覆盖成功登录、MFA 分流与空标识拒绝。
+- 测试：Go HTTP 级覆盖真实 P-256 断言登录、缺少用户验证的拒绝、MFA 仍待验证、挑战重放及不同账号状态的响应一致性。前端覆盖成功登录、MFA 分流与空标识拒绝。
+
+### Fixed — 全仓审查
+
+- 认证：修复自助和管理员密码重置，绑定挑战的邮箱和身份版本。OAuth 执行提供方启停配置及已启用的第二因素。Passkey、TOTP、恢复码和会话签发按同一事务校验、更新，浏览器记住登录遵循用户选项。
+- 权限与租户：整体授权尊重局部 deny；组织角色变更校验操作者授权上限。修复单连接事务卡死、隔离租户邀请接受与目录运行历史、目录部分失败后推进游标。
+- 接入：SCIM 保留共享身份边界和最后一位 owner，修复组成员替换及条件写入。OIDC 撤销同意同步撤销未兑换授权码和刷新令牌，已签发访问令牌最迟在到期时失效。
+- 运维：修复 MySQL 迁移并发和租户切换误删目标数据、SQLite 租户文件串用、健康检查受 Cookie 影响、过期 Outbox 工作结果覆盖，以及归档清理漏删密码历史。
+- 前端：会话切换取消仍在等待 CSRF 的旧写请求，处理 OAuth MFA 续接，并消除失败操作引发的未处理 Promise 拒绝。
+- 依赖：将 `go-ntlmssp`、`golang.org/x/net` 和 `golang.org/x/crypto` 更新到公告标明的最低修复版本。
 
 ## [0.12.1] - 2026-11-09
 
